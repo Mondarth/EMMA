@@ -120,12 +120,16 @@ To run them locally, export the same four variables, then:
 
 ```sh
 pnpm build
-pnpm run e2e:packages                    # install the pinned game system into tests/e2e/.data
+pnpm run e2e:packages                    # install the pinned game system and the fixture modules into tests/e2e/.data
 pnpm run e2e:server                      # start the pinned Foundry VTT server on http://localhost:30000
 pnpm exec playwright install chromium    # once per Playwright version
 pnpm run test:e2e --project=chromium
 pnpm run e2e:server:stop
 ```
+
+The fixture modules in `tests/e2e/fixtures/modules` are empty modules that the tests activate, so that saving can be
+tested without touching EMMA. After changing them, run `pnpm run e2e:packages` again and restart the server, which only
+finds new modules when it starts.
 
 The first test run accepts the licence agreement, creates and launches a world, enables the module and creates a
 player user. Delete `tests/e2e/.data` to start again from nothing. The Firefox project opens a browser window: headless

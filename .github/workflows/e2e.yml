@@ -69,7 +69,7 @@ jobs:
           path: |
             tests/e2e/.data/Data/systems
             tests/e2e/.data/Data/modules
-          key: foundry-packages-${{ hashFiles('scripts/e2e/install-packages.ts') }}
+          key: foundry-packages-${{ hashFiles('scripts/e2e/install-packages.ts', 'tests/e2e/fixtures/modules/**') }}
 
       - name: Install the pinned system and module
         run: pnpm run e2e:packages

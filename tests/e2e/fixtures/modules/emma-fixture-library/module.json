@@ -1,0 +1,8 @@
+{
+  "id": "emma-fixture-library",
+  "title": "EMMA Fixture Library",
+  "description": "An empty module the EMMA end-to-end tests activate and deactivate.",
+  "version": "1.0.0",
+  "compatibility": { "minimum": "14", "verified": "14" },
+  "authors": [{ "name": "EMMA tests" }]
+}
