@@ -130,7 +130,7 @@ pnpm run e2e:server:stop
 The first test run accepts the licence agreement, creates and launches a world, enables the module and creates a
 player user. Delete `tests/e2e/.data` to start again from nothing. The Firefox project opens a browser window: headless
 Firefox cannot create the WebGL context Foundry VTT needs. Without a desktop session (over SSH, in a container, in CI),
-run the tests with `pnpm run test:e2e:xvfb` instead, which gives the browsers a virtual 1920x1080 display (Xvfb must
+run the tests with `pnpm run test:e2e:xvfb` instead, which gives the browsers a virtual 1920x1080 display (`xvfb` must
 and `xauth` must be installed: `sudo apt-get install xvfb xauth` on Debian or Ubuntu); it takes the same arguments, such as `--project=firefox`. Start the server with `pnpm run e2e:server` rather than
 `docker compose` directly: the script first creates the directories the server mounts, which Docker would otherwise
 create as root, and runs Foundry VTT as you, so that it can write to them; otherwise it hangs. The script replaces any
