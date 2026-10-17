@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { localize } from '@module/lib/i18n';
   import type { View } from '@module/settings';
   import type { ModuleState } from '@module/state/module-state.svelte';
 
   import ListView from './ListView.svelte';
+  import SplitView from './SplitView.svelte';
   import Toolbar from './Toolbar.svelte';
 
   interface Props {
@@ -35,7 +35,7 @@
     {#if view === 'list'}
       <ListView {modules} />
     {:else}
-      <p class="emma-placeholder">{localize('MONDARTH-EMMA.Split.Placeholder')}</p>
+      <SplitView {modules} />
     {/if}
   </div>
 </div>
@@ -54,10 +54,5 @@
     flex-direction: column;
     flex: 1;
     min-height: 0;
-  }
-
-  .emma-placeholder {
-    margin: auto;
-    color: var(--color-text-secondary);
   }
 </style>

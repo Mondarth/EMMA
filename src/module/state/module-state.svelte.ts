@@ -126,6 +126,15 @@ export class ModuleState {
   }
 
   /**
+   * Select every module on one side. The range anchor is kept, so a later range selection still starts from the last
+   * plain or toggled click.
+   * @param side - The side
+   */
+  selectAll(side: Side): void {
+    for (const id of this.#ids(side)) this.#selection[side].add(id);
+  }
+
+  /**
    * Deselect everything on one side.
    * @param side - The side
    */

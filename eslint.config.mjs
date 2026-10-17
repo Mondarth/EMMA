@@ -58,6 +58,11 @@ export default defineConfig(
     languageOptions: { parserOptions: { parser: ts.parser } },
   },
   {
+    // Svelte's `{@render snippet()}` tag renders a snippet, which returns void; the rule mistakes it for a misused value.
+    files: ['**/*.svelte'],
+    rules: { '@typescript-eslint/no-confusing-void-expression': 'off' },
+  },
+  {
     // Assertions on mocked methods (`expect(obj.method)`) are safe; the rule cannot tell them from real unbound calls.
     files: ['tests/**'],
     rules: { '@typescript-eslint/unbound-method': 'off' },

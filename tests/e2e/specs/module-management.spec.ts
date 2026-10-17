@@ -132,7 +132,7 @@ test.describe('EMMA views', () => {
     const emma = page.locator(EMMA_WINDOW);
 
     await emma.getByRole('button', { name: 'Split view' }).click();
-    await expect(emma.getByText('The split view is on its way.')).toBeVisible();
+    await expect(emma.getByRole('listbox', { name: /^Active/ })).toBeVisible();
     await expect.poll(() => page.evaluate(() => game.settings.get('mondarth-emma', 'view'))).toBe('split');
 
     await closeEmma(page);
@@ -140,5 +140,47 @@ test.describe('EMMA views', () => {
 
     await expect(emma.getByRole('button', { name: 'Split view' })).toHaveAttribute('aria-pressed', 'true');
     await expect(emma.getByRole('list', { name: 'Installed modules' })).toHaveCount(0);
+  });
+
+  test('the split view moves modules between the inactive and active sides without saving', async ({ page }) => {
+    await setView(page, 'split');
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+    const inactive = emma.getByRole('listbox', { name: /^Inactive/ });
+    const active = emma.getByRole('listbox', { name: /^Active/ });
+    const deactivate = emma.getByRole('button', { name: 'Deactivate the selected modules', exact: true });
+    const activate = emma.getByRole('button', { name: 'Activate the selected modules', exact: true });
+    const emmaOption = (side: typeof active) => side.getByRole('option', { name: new RegExp(`^${MODULE_TITLE}`) });
+
+    await expect(deactivate).toBeDisabled();
+    await expect(activate).toBeDisabled();
+
+    await emmaOption(active).click();
+    await expect(emmaOption(active)).toHaveAttribute('aria-selected', 'true');
+    await deactivate.click();
+
+    await expect(emmaOption(inactive)).toHaveAttribute('aria-selected', 'true');
+    await expect(emmaOption(active)).toHaveCount(0);
+
+    await activate.click();
+    await expect(emmaOption(active)).toBeVisible();
+
+    const saved = await page.evaluate(id => game.settings.get('core', 'moduleConfiguration')[id], MODULE_ID);
+    expect(saved).toBe(true);
+  });
+
+  test('the split view lists can be driven from the keyboard', async ({ page }) => {
+    await setView(page, 'split');
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+    const active = emma.getByRole('listbox', { name: /^Active/ });
+
+    await active.focus();
+    await page.keyboard.press('Home');
+    await page.keyboard.press('ControlOrMeta+a');
+
+    const count = await active.getByRole('option').count();
+    await expect(active.getByRole('option', { selected: true })).toHaveCount(count);
+    await expect(emma.getByRole('button', { name: 'Deactivate the selected modules', exact: true })).toBeEnabled();
   });
 });
