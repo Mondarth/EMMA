@@ -49,12 +49,16 @@ async function setView(page: Page, view: 'list' | 'split'): Promise<void> {
 }
 
 /**
- * Close the EMMA window, if it is open, through Foundry's public registry of open applications.
+ * Close the EMMA window, if it is open, through Foundry's public registry of open applications, discarding any changes
+ * staged in it without asking.
  * @param page - A logged-in page
  */
 async function closeEmma(page: Page): Promise<void> {
   await page.evaluate(async id => {
-    await foundry.applications.instances.get(id)?.close();
+    // EMMA's window takes a `discard` option that Foundry's base type does not declare.
+    const app = foundry.applications.instances.get(id) as
+      { close(options: { discard: boolean }): Promise<unknown> } | undefined;
+    await app?.close({ discard: true });
   }, `${MODULE_ID}-app`);
   await expect(page.locator(EMMA_WINDOW)).toHaveCount(0);
 }
@@ -182,5 +186,175 @@ test.describe('EMMA views', () => {
     const count = await active.getByRole('option').count();
     await expect(active.getByRole('option', { selected: true })).toHaveCount(count);
     await expect(emma.getByRole('button', { name: 'Deactivate the selected modules', exact: true })).toBeEnabled();
+  });
+});
+
+const LIBRARY = { id: 'emma-fixture-library', title: 'EMMA Fixture Library' } as const;
+const ADDON = { id: 'emma-fixture-addon', title: 'EMMA Fixture Add-on' } as const;
+
+/**
+ * Save the fixture modules as inactive again, without reloading, so each test starts from the same activation.
+ * @param page - A page logged in as the GM
+ */
+async function deactivateFixtures(page: Page): Promise<void> {
+  await page.evaluate(
+    async ids => {
+      const saved = game.settings.get('core', 'moduleConfiguration');
+      await game.settings.set('core', 'moduleConfiguration', {
+        ...saved,
+        ...Object.fromEntries(ids.map(id => [id, false])),
+      });
+    },
+    [LIBRARY.id, ADDON.id],
+  );
+}
+
+/**
+ * Read whether the world has saved a module as active.
+ * @param page - A logged-in page
+ * @param id - The module ID
+ * @returns Whether it is saved as active
+ */
+async function savedActive(page: Page, id: string): Promise<boolean> {
+  return page.evaluate(moduleId => game.settings.get('core', 'moduleConfiguration')[moduleId] === true, id);
+}
+
+test.describe('Saving', () => {
+  test.beforeEach(async ({ page }) => {
+    await joinAs(page, USERS.gm);
+    await setDisabled(page, false);
+    await setView(page, 'list');
+    await deactivateFixtures(page);
+  });
+
+  test.afterEach(async ({ page }) => {
+    await closeEmma(page);
+    await deactivateFixtures(page);
+  });
+
+  test('Save saves the staged changes and asks to reload', async ({ page }) => {
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+    const save = emma.getByRole('button', { name: 'Save', exact: true });
+
+    await expect(save).toBeDisabled();
+    await emma.getByRole('checkbox', { name: LIBRARY.title }).check();
+    await expect(emma.getByRole('status')).toHaveText('Changes staged: 1');
+    await save.click();
+
+    const prompt = page.locator('#reload-world-confirm');
+    await expect(prompt).toBeVisible();
+    expect(await savedActive(page, LIBRARY.id)).toBe(true);
+
+    // Decline the reload: the activation is already saved, and the tests keep their session.
+    await prompt.getByRole('button', { name: 'No' }).click();
+    await expect(prompt).toHaveCount(0);
+    await expect(save).toBeDisabled();
+  });
+
+  test('Reset discards the staged changes', async ({ page }) => {
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+    const library = emma.getByRole('checkbox', { name: LIBRARY.title });
+
+    await library.check();
+    await emma.getByRole('button', { name: 'Reset', exact: true }).click();
+
+    await expect(library).not.toBeChecked();
+    await expect(emma.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+  });
+
+  test('a module cannot be saved as active without the modules it requires', async ({ page }) => {
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+    const save = emma.getByRole('button', { name: 'Save', exact: true });
+
+    await emma.getByRole('checkbox', { name: ADDON.title }).check();
+
+    await expect(emma.getByRole('status')).toHaveText(
+      `${ADDON.title} requires ${LIBRARY.title}, which must be active too.`,
+    );
+    await expect(save).toBeDisabled();
+
+    await emma.getByRole('checkbox', { name: LIBRARY.title }).check();
+
+    await expect(save).toBeEnabled();
+  });
+});
+
+/** Foundry's dialog asking whether to discard staged changes. It has an ID, but no accessible name. */
+const DISCARD_QUESTION = `#${MODULE_ID}-discard`;
+
+/**
+ * Click the EMMA window's Close Window button, as a user would. Foundry's notifications, such as the warning about
+ * missing hardware acceleration in a test browser, can cover the button, so they are cleared first.
+ * @param page - A page showing the EMMA window
+ */
+async function clickClose(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    ui.notifications?.clear();
+  });
+  await page.locator(EMMA_WINDOW).getByRole('button', { name: 'Close Window' }).click();
+}
+
+test.describe('Closing with staged changes', () => {
+  test.beforeEach(async ({ page }) => {
+    await joinAs(page, USERS.gm);
+    await setDisabled(page, false);
+    await setView(page, 'list');
+  });
+
+  test.afterEach(async ({ page }) => {
+    await closeEmma(page);
+  });
+
+  test('asks before discarding them', async ({ page }) => {
+    const button = await moduleManagementButton(page);
+    await button.click();
+    const emma = page.locator(EMMA_WINDOW);
+    const library = emma.getByRole('checkbox', { name: LIBRARY.title });
+    const question = page.locator(DISCARD_QUESTION);
+
+    await library.check();
+    await clickClose(page);
+
+    await expect(question).toBeVisible();
+    await expect(question.getByRole('heading', { name: 'Discard staged changes?' })).toBeVisible();
+    await question.getByRole('button', { name: 'Keep editing' }).click();
+    await expect(question).toHaveCount(0);
+    await expect(library).toBeChecked();
+
+    await clickClose(page);
+    await question.getByRole('button', { name: 'Discard and close' }).click();
+    await expect(emma).toHaveCount(0);
+
+    await button.click();
+    await expect(emma.getByRole('checkbox', { name: LIBRARY.title })).not.toBeChecked();
+  });
+
+  test('closes without asking when nothing is staged', async ({ page }) => {
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+
+    await clickClose(page);
+
+    await expect(emma).toHaveCount(0);
+    await expect(page.locator(DISCARD_QUESTION)).toHaveCount(0);
+  });
+});
+
+test.describe('Players', () => {
+  test.afterEach(async ({ page }) => {
+    await closeEmma(page);
+  });
+
+  test('see EMMA read-only', async ({ page }) => {
+    await joinAs(page, USERS.player);
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+
+    await expect(emma.getByText('Only a GM can change which modules are active.')).toBeVisible();
+    await expect(emma.getByRole('checkbox', { name: MODULE_TITLE })).toBeDisabled();
+    await expect(emma.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
   });
 });

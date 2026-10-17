@@ -116,16 +116,140 @@ describe('EmmaApp', () => {
     expect(screen.getByRole('button', { name: 'MONDARTH-EMMA.Toolbar.Split' })).toHaveAttribute('aria-pressed', 'true');
   });
 
-  test('discards unsaved changes when it closes', async () => {
-    const { EmmaApp } = await loadApp();
-    const app = new EmmaApp();
-    await app.render({ force: true });
+  describe('closing with staged changes', () => {
+    /**
+     * Open EMMA and stage a change.
+     * @returns The window and the installed mocks
+     */
+    async function openWithChange() {
+      const loaded = await loadApp();
+      const app = new loaded.EmmaApp();
+      await app.render({ force: true });
+      await userEvent.click(screen.getByRole('checkbox', { name: 'EMMA' }));
+      return { ...loaded, app };
+    }
+
+    test('closes without asking when nothing is staged', async () => {
+      const { EmmaApp, foundry } = await loadApp();
+      const app = new EmmaApp();
+      await app.render({ force: true });
+
+      await expect(app.close()).resolves.toBe(app);
+
+      expect(foundry.confirm).not.toHaveBeenCalled();
+      expect(app.rendered).toBe(false);
+    });
+
+    test('asks first, offering to keep editing by default', async () => {
+      const { app, foundry } = await openWithChange();
+
+      await app.close();
+
+      expect(foundry.confirm).toHaveBeenCalledOnce();
+      expect(foundry.confirm.mock.calls[0]?.[0]).toMatchObject({
+        id: 'mondarth-emma-discard',
+        window: { title: 'MONDARTH-EMMA.Discard.Title' },
+        content: '<p>MONDARTH-EMMA.Discard.Body</p>',
+        modal: true,
+        yes: { label: 'MONDARTH-EMMA.Discard.Discard', default: false },
+        no: { label: 'MONDARTH-EMMA.Discard.Keep', default: true },
+      });
+    });
+
+    test.each([
+      ['chooses to keep editing', false],
+      ['dismisses the question', null],
+    ])('stays open, keeping the changes, when the user %s', async (_case, answer) => {
+      const { app, foundry } = await openWithChange();
+      foundry.confirm.mockResolvedValueOnce(answer);
+
+      await expect(app.close()).resolves.toBeUndefined();
+
+      expect(app.rendered).toBe(true);
+      expect(screen.getByRole('checkbox', { name: 'EMMA' })).toBeChecked();
+    });
+
+    test('closes, discarding the changes, when the user agrees', async () => {
+      const { app, foundry } = await openWithChange();
+      foundry.confirm.mockResolvedValueOnce(true);
+
+      await expect(app.close()).resolves.toBe(app);
+      await app.render({ force: true });
+
+      expect(screen.getByRole('checkbox', { name: 'EMMA' })).not.toBeChecked();
+    });
+
+    test('closes without asking when told to discard the changes', async () => {
+      const { app, foundry } = await openWithChange();
+
+      await app.close({ discard: true });
+
+      expect(foundry.confirm).not.toHaveBeenCalled();
+      expect(app.rendered).toBe(false);
+    });
+
+    test('asks only once, however often closing is attempted meanwhile', async () => {
+      const { app, foundry } = await openWithChange();
+      let answer: (value: boolean) => void = () => undefined;
+      foundry.confirm.mockReturnValueOnce(
+        new Promise(resolve => {
+          answer = resolve;
+        }),
+      );
+
+      const first = app.close();
+      await expect(app.close()).resolves.toBeUndefined();
+      answer(true);
+
+      await expect(first).resolves.toBe(app);
+      expect(foundry.confirm).toHaveBeenCalledOnce();
+    });
+
+    test('asks again after the user chose to keep editing', async () => {
+      const { app, foundry } = await openWithChange();
+      foundry.confirm.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+
+      await app.close();
+      await app.close();
+
+      expect(foundry.confirm).toHaveBeenCalledTimes(2);
+      expect(app.rendered).toBe(false);
+    });
+
+    test('closes without asking once the changes are saved', async () => {
+      const { app, foundry } = await openWithChange();
+      await userEvent.click(screen.getByRole('button', { name: 'MONDARTH-EMMA.Footer.Save' }));
+      await vi.waitFor(() => {
+        expect(foundry.reloadConfirm).toHaveBeenCalled();
+      });
+
+      await app.close();
+
+      expect(foundry.confirm).not.toHaveBeenCalled();
+      expect(app.rendered).toBe(false);
+    });
+  });
+
+  test('saves the staged changes and asks to reload', async () => {
+    const { EmmaApp, game, foundry } = await loadApp();
+    await new EmmaApp().render({ force: true });
+
     await userEvent.click(screen.getByRole('checkbox', { name: 'EMMA' }));
+    await userEvent.click(screen.getByRole('button', { name: 'MONDARTH-EMMA.Footer.Save' }));
 
-    await app.close();
-    await app.render({ force: true });
+    await vi.waitFor(() => {
+      expect(foundry.reloadConfirm).toHaveBeenCalledExactlyOnceWith({ world: true });
+    });
+    expect(game.settings.set).toHaveBeenCalledWith('core', 'moduleConfiguration', { dice: false, emma: true });
+  });
 
-    expect(screen.getByRole('checkbox', { name: 'EMMA' })).not.toBeChecked();
+  test('is read-only for a user who may not manage modules', async () => {
+    const { EmmaApp } = await loadApp({ isGM: false });
+
+    await new EmmaApp().render({ force: true });
+
+    expect(screen.getByRole('checkbox', { name: 'EMMA' })).toBeDisabled();
+    expect(screen.getByText('MONDARTH-EMMA.Footer.ReadOnly')).toBeInTheDocument();
   });
 
   test('mounts afresh when it reopens', async () => {

@@ -5,9 +5,11 @@
   interface Props {
     /** The modules to show and stage changes in. */
     modules: ModuleState;
+    /** Whether the user may change which modules are active. */
+    canManage: boolean;
   }
 
-  const { modules }: Props = $props();
+  const { modules, canManage }: Props = $props();
 </script>
 
 {#if modules.entries.length === 0}
@@ -20,6 +22,7 @@
           <input
             type="checkbox"
             checked={modules.isActive(entry.id)}
+            disabled={!canManage}
             onchange={event => {
               modules.setActive(entry.id, event.currentTarget.checked);
             }} />

@@ -12,7 +12,7 @@ describe('ListView', () => {
   });
 
   test('lists every installed module in display order', () => {
-    render(ListView, { modules: createModules() });
+    render(ListView, { modules: createModules(), canManage: true });
 
     const list = screen.getByRole('list', { name: 'MONDARTH-EMMA.List.Label' });
     const titles = within(list)
@@ -22,7 +22,7 @@ describe('ListView', () => {
   });
 
   test('shows each module’s version and authors', () => {
-    render(ListView, { modules: createModules() });
+    render(ListView, { modules: createModules(), canManage: true });
 
     const dice = screen.getByRole('checkbox', { name: 'Dice So Nice!' }).closest('li') as HTMLElement;
     expect(within(dice).getByText('5.2.4')).toBeInTheDocument();
@@ -30,14 +30,14 @@ describe('ListView', () => {
   });
 
   test('leaves out the authors of a module that names none', () => {
-    render(ListView, { modules: createModules() });
+    render(ListView, { modules: createModules(), canManage: true });
 
     const emma = screen.getByRole('checkbox', { name: 'EMMA' }).closest('li') as HTMLElement;
     expect(emma.querySelector('.emma-module-authors')).toBeNull();
   });
 
   test('checks the active modules', () => {
-    render(ListView, { modules: createModules() });
+    render(ListView, { modules: createModules(), canManage: true });
 
     expect(screen.getByRole('checkbox', { name: 'libWrapper' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'EMMA' })).not.toBeChecked();
@@ -45,7 +45,7 @@ describe('ListView', () => {
 
   test('stages a change when a module is checked or unchecked', async () => {
     const modules = createModules();
-    render(ListView, { modules });
+    render(ListView, { modules, canManage: true });
 
     await userEvent.click(screen.getByRole('checkbox', { name: 'EMMA' }));
     await userEvent.click(screen.getByRole('checkbox', { name: 'libWrapper' }));
@@ -56,7 +56,7 @@ describe('ListView', () => {
 
   test('toggles a module from its title too', async () => {
     const modules = createModules();
-    render(ListView, { modules });
+    render(ListView, { modules, canManage: true });
 
     await userEvent.click(screen.getByText('EMMA'));
 
@@ -64,7 +64,7 @@ describe('ListView', () => {
   });
 
   test('marks modules with a staged change', async () => {
-    render(ListView, { modules: createModules() });
+    render(ListView, { modules: createModules(), canManage: true });
     const emma = screen.getByRole('checkbox', { name: 'EMMA' });
 
     await userEvent.click(emma);
@@ -76,7 +76,7 @@ describe('ListView', () => {
 
   test('follows changes made elsewhere', async () => {
     const modules = createModules();
-    render(ListView, { modules });
+    render(ListView, { modules, canManage: true });
 
     modules.select('inactive', 'dice');
     modules.activateSelected();
@@ -84,8 +84,15 @@ describe('ListView', () => {
     expect(await screen.findByRole('checkbox', { name: 'Dice So Nice!', checked: true })).toBeInTheDocument();
   });
 
+  test('disables the checkboxes for a user who may not manage modules', () => {
+    render(ListView, { modules: createModules(), canManage: false });
+
+    for (const checkbox of screen.getAllByRole('checkbox')) expect(checkbox).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'libWrapper' })).toBeChecked();
+  });
+
   test('says so when no module is installed', () => {
-    render(ListView, { modules: createModules({}, []) });
+    render(ListView, { modules: createModules({}, []), canManage: true });
 
     expect(screen.getByText('MONDARTH-EMMA.List.Empty')).toBeInTheDocument();
     expect(screen.queryByRole('list')).toBeNull();

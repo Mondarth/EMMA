@@ -5,9 +5,11 @@
   interface Props {
     /** The modules and their selection. */
     modules: ModuleState;
+    /** Whether the user may change which modules are active. */
+    canManage: boolean;
   }
 
-  const { modules }: Props = $props();
+  const { modules, canManage }: Props = $props();
 
   const deactivate = localize('MONDARTH-EMMA.Split.Deactivate');
   const activate = localize('MONDARTH-EMMA.Split.Activate');
@@ -19,7 +21,7 @@
     class="icon fa-solid fa-angle-left"
     aria-label={deactivate}
     data-tooltip={deactivate}
-    disabled={modules.selected('active').size === 0}
+    disabled={!canManage || modules.selected('active').size === 0}
     onclick={() => {
       modules.deactivateSelected();
     }}></button>
@@ -28,7 +30,7 @@
     class="icon fa-solid fa-angle-right"
     aria-label={activate}
     data-tooltip={activate}
-    disabled={modules.selected('inactive').size === 0}
+    disabled={!canManage || modules.selected('inactive').size === 0}
     onclick={() => {
       modules.activateSelected();
     }}></button>

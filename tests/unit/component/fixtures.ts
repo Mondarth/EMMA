@@ -3,9 +3,9 @@ import { ModuleState } from '@module/state/module-state.svelte';
 
 /** Three installed modules, in display order. */
 export const ENTRIES: readonly ModuleEntry[] = [
-  { id: 'dice', title: 'Dice So Nice!', version: '5.2.4', authors: ['Simone', 'JDW'] },
-  { id: 'emma', title: 'EMMA', version: '0.1.0', authors: [] },
-  { id: 'lib-wrapper', title: 'libWrapper', version: '1.13.2', authors: ['ruipin'] },
+  { id: 'dice', title: 'Dice So Nice!', version: '5.2.4', authors: ['Simone', 'JDW'], requires: [] },
+  { id: 'emma', title: 'EMMA', version: '0.1.0', authors: [], requires: [] },
+  { id: 'lib-wrapper', title: 'libWrapper', version: '1.13.2', authors: ['ruipin'], requires: [] },
 ];
 
 /**
