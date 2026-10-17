@@ -7,13 +7,14 @@ import { ModuleState } from '@module/state/module-state.svelte';
 /**
  * Build a module entry.
  * @param id - The module ID, also used as its title
+ * @param requires - The IDs of the modules it requires
  * @returns The entry
  */
-function entry(id: string): ModuleEntry {
-  return { id, title: id, version: '1.0.0', authors: [] };
+function entry(id: string, requires: string[] = []): ModuleEntry {
+  return { id, title: id, version: '1.0.0', authors: [], requires };
 }
 
-const ENTRIES = ['a', 'b', 'c', 'd', 'e', 'f'].map(entry);
+const ENTRIES = ['a', 'b', 'c', 'd', 'e', 'f'].map(id => entry(id));
 
 /**
  * Create the state for {@link ENTRIES}: by default a, c and e inactive, b, d and f active.
@@ -378,6 +379,50 @@ describe('ModuleState', () => {
       expect(state.changes).toEqual({ a: false });
       state.reset();
       expect(state.isActive('a')).toBe(true);
+    });
+  });
+
+  describe('unmet', () => {
+    const LIBRARY = [entry('app', ['lib', 'extra']), entry('extra'), entry('lib'), entry('other', ['gone'])];
+
+    test('is empty while every active module has what it requires', () => {
+      const state = new ModuleState(LIBRARY, { app: true, extra: true, lib: true });
+
+      expect(state.unmet).toEqual([]);
+    });
+
+    test('lists active modules whose required modules will not be active, by title', () => {
+      const state = new ModuleState(LIBRARY, { app: true, extra: true, lib: true });
+
+      state.setActive('lib', false);
+      state.setActive('extra', false);
+
+      expect(state.unmet).toEqual([{ entry: LIBRARY[0], missing: ['lib', 'extra'] }]);
+    });
+
+    test('ignores inactive modules', () => {
+      const state = new ModuleState(LIBRARY, {});
+
+      expect(state.unmet).toEqual([]);
+    });
+
+    test('names a required module that is not installed by its ID', () => {
+      const state = new ModuleState(LIBRARY, {});
+
+      state.setActive('other', true);
+
+      expect(state.unmet).toEqual([{ entry: LIBRARY[3], missing: ['gone'] }]);
+    });
+
+    test('clears once the required modules are staged too', () => {
+      const state = new ModuleState(LIBRARY, {});
+      state.setActive('app', true);
+
+      state.select('inactive', 'extra');
+      state.select('inactive', 'lib', 'toggle');
+      state.activateSelected();
+
+      expect(state.unmet).toEqual([]);
     });
   });
 });

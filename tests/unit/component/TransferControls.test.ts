@@ -15,7 +15,7 @@ describe('TransferControls', () => {
   });
 
   test('offers < to deactivate, then > to activate, as icon buttons with tooltips', () => {
-    render(TransferControls, { modules: createModules() });
+    render(TransferControls, { modules: createModules(), canManage: true });
 
     const [first, second] = screen.getAllByRole('button');
     expect(first).toHaveAccessibleName(DEACTIVATE);
@@ -26,7 +26,7 @@ describe('TransferControls', () => {
   });
 
   test('disables both buttons while nothing is selected', () => {
-    render(TransferControls, { modules: createModules() });
+    render(TransferControls, { modules: createModules(), canManage: true });
 
     expect(screen.getByRole('button', { name: ACTIVATE })).toBeDisabled();
     expect(screen.getByRole('button', { name: DEACTIVATE })).toBeDisabled();
@@ -34,7 +34,7 @@ describe('TransferControls', () => {
 
   test('enables each button once its side has a selection', async () => {
     const modules = createModules();
-    render(TransferControls, { modules });
+    render(TransferControls, { modules, canManage: true });
 
     modules.select('inactive', 'emma');
 
@@ -45,7 +45,7 @@ describe('TransferControls', () => {
   test('> activates the selected inactive modules', async () => {
     const modules = createModules();
     modules.select('inactive', 'emma');
-    render(TransferControls, { modules });
+    render(TransferControls, { modules, canManage: true });
 
     await userEvent.click(screen.getByRole('button', { name: ACTIVATE }));
 
@@ -58,10 +58,20 @@ describe('TransferControls', () => {
   test('< deactivates the selected active modules', async () => {
     const modules = createModules();
     modules.select('active', 'lib-wrapper');
-    render(TransferControls, { modules });
+    render(TransferControls, { modules, canManage: true });
 
     await userEvent.click(screen.getByRole('button', { name: DEACTIVATE }));
 
     expect(modules.changes).toEqual({ 'lib-wrapper': false });
+  });
+
+  test('stays disabled for a user who may not manage modules, even with a selection', () => {
+    const modules = createModules();
+    modules.select('inactive', 'emma');
+    modules.select('active', 'lib-wrapper');
+    render(TransferControls, { modules, canManage: false });
+
+    expect(screen.getByRole('button', { name: ACTIVATE })).toBeDisabled();
+    expect(screen.getByRole('button', { name: DEACTIVATE })).toBeDisabled();
   });
 });

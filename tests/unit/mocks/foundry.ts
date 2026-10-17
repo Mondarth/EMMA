@@ -57,6 +57,8 @@ export interface ModuleMockData {
   version?: string;
   /** Author names. */
   authors?: string[];
+  /** Packages it requires: a module ID, or an ID and package type, which defaults to `module` as in Foundry. */
+  requires?: (string | { id: string; type?: 'module' | 'system' | 'world' })[];
   api?: unknown;
 }
 
@@ -80,8 +82,22 @@ export interface GameMockOptions {
  * @returns The mock module
  */
 function createModuleMock(id: string, data: ModuleMockData) {
-  const { active = false, title = id, version = '1.0.0', authors = [], api } = data;
-  return { id, active, title, version, authors: new Set(authors.map(name => ({ name }))), api };
+  const { active = false, title = id, version = '1.0.0', authors = [], requires = [], api } = data;
+  return {
+    id,
+    active,
+    title,
+    version,
+    authors: new Set(authors.map(name => ({ name }))),
+    relationships: {
+      requires: new Set(
+        requires.map(required =>
+          typeof required === 'string' ? { id: required, type: 'module' } : { type: 'module', ...required },
+        ),
+      ),
+    },
+    api,
+  };
 }
 
 /**
@@ -176,16 +192,21 @@ export class ApplicationV2Mock {
 }
 
 /**
- * Create a stand-in for the `foundry` namespace: `ApplicationV2`, and a native `ModuleManagement` window whose
- * instances are recorded so tests can see when it opened.
+ * Create a stand-in for the `foundry` namespace: `ApplicationV2`, `DialogV2.confirm`, `SettingsConfig.reloadConfirm`,
+ * and a native
+ * `ModuleManagement` window whose instances are recorded so tests can see when it opened.
  * @returns The mock namespace
  */
 export function createFoundryNamespaceMock() {
   const moduleManagementRender = vi.fn(() => Promise.resolve());
+  const reloadConfirm = vi.fn((_options?: { world?: boolean }) => Promise.resolve());
+  // Resolves as a dismissed dialog does, unless a test says otherwise.
+  const confirm = vi.fn((_config?: object): Promise<boolean | null> => Promise.resolve(null));
 
   return {
     applications: {
-      api: { ApplicationV2: ApplicationV2Mock },
+      api: { ApplicationV2: ApplicationV2Mock, DialogV2: { confirm } },
+      settings: { SettingsConfig: { reloadConfirm } },
       sidebar: {
         apps: {
           ModuleManagement: class {
@@ -196,6 +217,10 @@ export function createFoundryNamespaceMock() {
     },
     /** Called each time a native Module Management window is rendered. */
     moduleManagementRender,
+    /** `SettingsConfig.reloadConfirm`, which asks the user to reload. */
+    reloadConfirm,
+    /** `DialogV2.confirm`, which asks the user a yes-or-no question. */
+    confirm,
   };
 }
 

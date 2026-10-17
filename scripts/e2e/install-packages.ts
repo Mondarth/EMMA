@@ -2,7 +2,7 @@
 
 /**
  * Install the pinned game system (and any modules) that EMMA - Enhanced Module Manager Application is tested with into the end-to-end test data
- * directory.
+ * directory, along with the empty fixture modules in `tests/e2e/fixtures/modules` that the tests activate.
  *
  * Usage: `node scripts/e2e/install-packages.ts`
  */
@@ -14,6 +14,7 @@ import path from 'node:path';
 
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const DATA = path.join(ROOT, 'tests/e2e/.data/Data');
+const FIXTURES = path.join(ROOT, 'tests/e2e/fixtures/modules');
 
 interface PinnedPackage {
   /** Directory under the Foundry user data folder: `systems` or `modules`. */
@@ -84,4 +85,18 @@ async function install(pinned: PinnedPackage): Promise<void> {
   }
 }
 
+/**
+ * Copy the fixture modules into the test data, replacing any older copies so they always match the repository.
+ */
+function installFixtures(): void {
+  for (const entry of fs.readdirSync(FIXTURES, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const target = path.join(DATA, 'modules', entry.name);
+    fs.rmSync(target, { recursive: true, force: true });
+    fs.cpSync(path.join(FIXTURES, entry.name), target, { recursive: true });
+    console.log(`${entry.name}: installed from the fixtures`);
+  }
+}
+
 for (const pinned of PACKAGES) await install(pinned);
+installFixtures();

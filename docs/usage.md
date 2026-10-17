@@ -48,8 +48,17 @@ Split view
 EMMA remembers the view you last chose, separately for each user and on every device you play on. The list view is shown
 until you choose otherwise.
 
-Changes you make are staged, not saved: saving them, which reloads the world, is coming in a later version. Closing the
-window discards them.
+## Saving
+
+Changes you make in either view are staged, not applied: the footer counts them, and modules you have changed are
+marked. **Save** applies them and asks to reload the world, which they need to take effect; every connected player
+reloads with you. **Reset** discards them. Closing the window with changes staged asks first whether to discard them
+or keep editing.
+
+A module that requires other modules can only be saved as active together with them. While one is missing, the footer
+names it and **Save** stays disabled.
+
+Only a GM or assistant GM with permission to modify configuration settings can save. Everyone else sees EMMA read-only.
 
 ## Settings
 

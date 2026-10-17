@@ -21,6 +21,21 @@
       "NoneInactive": "Every module is active.",
       "NoneActive": "No module is active."
     },
+    "Footer": {
+      "Save": "Save",
+      "Reset": "Reset",
+      "Changes": "Changes staged: {count}",
+      "ReadOnly": "Only a GM can change which modules are active."
+    },
+    "Requirements": {
+      "Unmet": "{module} requires {missing}, which must be active too."
+    },
+    "Discard": {
+      "Title": "Discard staged changes?",
+      "Body": "The changes you staged in EMMA have not been saved. Closing the window discards them.",
+      "Discard": "Discard and close",
+      "Keep": "Keep editing"
+    },
     "Settings": {
       "Disabled": {
         "Name": "Disable EMMA",
@@ -28,7 +43,8 @@
       }
     },
     "Errors": {
-      "OpenFailed": "EMMA could not open, so Foundry's Module Management window has been opened instead. See the console for details."
+      "OpenFailed": "EMMA could not open, so Foundry's Module Management window has been opened instead. See the console for details.",
+      "SaveFailed": "EMMA could not save which modules are active. See the console for details."
     }
   }
 }

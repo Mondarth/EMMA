@@ -8,9 +8,11 @@
   interface Props {
     /** The modules to show and stage changes in. */
     modules: ModuleState;
+    /** Whether the user may change which modules are active. */
+    canManage: boolean;
   }
 
-  const { modules }: Props = $props();
+  const { modules, canManage }: Props = $props();
 
   const uid = $props.id();
 
@@ -36,7 +38,7 @@
 
 <div class="emma-split">
   {@render pane('inactive')}
-  <TransferControls {modules} />
+  <TransferControls {modules} {canManage} />
   {@render pane('active')}
 </div>
 

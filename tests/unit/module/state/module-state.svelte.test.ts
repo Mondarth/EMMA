@@ -4,7 +4,13 @@ import { afterEach, describe, expect, test } from 'vitest';
 import type { ModuleEntry } from '@module/adapters/modules';
 import { ModuleState } from '@module/state/module-state.svelte';
 
-const ENTRIES: ModuleEntry[] = ['a', 'b', 'c'].map(id => ({ id, title: id, version: '1.0.0', authors: [] }));
+const ENTRIES: ModuleEntry[] = ['a', 'b', 'c'].map(id => ({
+  id,
+  title: id,
+  version: '1.0.0',
+  authors: [],
+  requires: [],
+}));
 
 let cleanup: (() => void) | undefined;
 

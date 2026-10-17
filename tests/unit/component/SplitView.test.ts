@@ -26,7 +26,7 @@ describe('SplitView', () => {
   });
 
   test('shows inactive modules on the left, the transfer buttons, then active modules on the right', () => {
-    render(SplitView, { modules: createModules() });
+    render(SplitView, { modules: createModules(), canManage: true });
 
     const [inactive, active] = screen.getAllByRole('listbox');
     const [deactivate] = screen.getAllByRole('button');
@@ -39,7 +39,7 @@ describe('SplitView', () => {
   });
 
   test('counts the modules on each side', () => {
-    render(SplitView, { modules: createModules() });
+    render(SplitView, { modules: createModules(), canManage: true });
 
     expect(screen.getByRole('heading', { name: `${INACTIVE} 2` })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: `${ACTIVE} 1` })).toBeInTheDocument();
@@ -47,7 +47,7 @@ describe('SplitView', () => {
 
   test('moves selected modules across and back', async () => {
     const modules = createModules();
-    render(SplitView, { modules });
+    render(SplitView, { modules, canManage: true });
     const user = userEvent.setup();
 
     await user.click(screen.getByRole('option', { name: /^Dice So Nice!/ }));
@@ -68,20 +68,23 @@ describe('SplitView', () => {
   });
 
   test('says so when no module is active', () => {
-    render(SplitView, { modules: createModules({}) });
+    render(SplitView, { modules: createModules({}), canManage: true });
 
     expect(screen.getByText('MONDARTH-EMMA.Split.NoneActive')).toBeInTheDocument();
     expect(screen.queryByText('MONDARTH-EMMA.Split.NoneInactive')).toBeNull();
   });
 
   test('says so when every module is active', () => {
-    render(SplitView, { modules: createModules(Object.fromEntries(ENTRIES.map(({ id }) => [id, true]))) });
+    render(SplitView, {
+      modules: createModules(Object.fromEntries(ENTRIES.map(({ id }) => [id, true]))),
+      canManage: true,
+    });
 
     expect(screen.getByText('MONDARTH-EMMA.Split.NoneInactive')).toBeInTheDocument();
   });
 
   test('keeps the selections of the two sides apart', async () => {
-    render(SplitView, { modules: createModules() });
+    render(SplitView, { modules: createModules(), canManage: true });
 
     await userEvent.click(screen.getByRole('option', { name: /^EMMA/ }));
     await userEvent.click(screen.getByRole('option', { name: /^libWrapper/ }));
@@ -89,8 +92,17 @@ describe('SplitView', () => {
     expect(screen.getAllByRole('option', { selected: true })).toHaveLength(2);
   });
 
+  test('lets a user who may not manage modules select, but not move, modules', async () => {
+    render(SplitView, { modules: createModules(), canManage: false });
+
+    await userEvent.click(screen.getByRole('option', { name: /^EMMA/ }));
+
+    expect(screen.getByRole('option', { name: /^EMMA/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('button', { name: 'MONDARTH-EMMA.Split.Activate' })).toBeDisabled();
+  });
+
   test('leaves nothing behind when unmounted', () => {
-    const { container, unmount } = render(SplitView, { modules: createModules() });
+    const { container, unmount } = render(SplitView, { modules: createModules(), canManage: true });
 
     unmount();
 

@@ -12,6 +12,14 @@ export type Side = 'inactive' | 'active';
  */
 export type SelectMode = 'replace' | 'toggle' | 'range';
 
+/** A module that will be active while modules it requires will not. */
+export interface UnmetRequirement {
+  /** The module with the unmet requirement. */
+  readonly entry: ModuleEntry;
+  /** The titles of the required modules that will not be active, or the IDs of those not installed. */
+  readonly missing: readonly string[];
+}
+
 /**
  * The state behind EMMA's views: the installed modules, which of them the world has saved as active, the changes
  * staged on top of that, and what is selected on each side of the split view.
@@ -47,6 +55,21 @@ export class ModuleState {
 
   /** Whether any change is staged. */
   readonly dirty: boolean = $derived(Object.keys(this.changes).length > 0);
+
+  /**
+   * The modules that will be active, once the staged changes are saved, without every module they require, in display
+   * order. Foundry refuses to save such an activation, so it must be empty before saving.
+   */
+  readonly unmet: readonly UnmetRequirement[] = $derived.by(() => {
+    const titles: Record<string, string> = Object.fromEntries(this.entries.map(({ id, title }) => [id, title]));
+    return this.entries
+      .filter(({ id }) => this.#pending[id] === true)
+      .map(entry => ({
+        entry,
+        missing: entry.requires.filter(id => this.#pending[id] !== true).map(id => titles[id] ?? id),
+      }))
+      .filter(({ missing }) => missing.length > 0);
+  });
 
   /**
    * @param entries - The installed modules, in display order

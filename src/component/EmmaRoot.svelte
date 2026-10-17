@@ -2,6 +2,7 @@
   import type { View } from '@module/settings';
   import type { ModuleState } from '@module/state/module-state.svelte';
 
+  import Footer from './Footer.svelte';
   import ListView from './ListView.svelte';
   import SplitView from './SplitView.svelte';
   import Toolbar from './Toolbar.svelte';
@@ -11,11 +12,15 @@
     modules: ModuleState;
     /** The view to show first. */
     initialView: View;
+    /** Whether the user may change which modules are active. */
+    canManage: boolean;
+    /** Saves the staged changes. */
+    onSave: () => Promise<unknown>;
     /** Called when the user switches view, so the choice can be remembered. */
     onViewChange?: (view: View) => void;
   }
 
-  const { modules, initialView, onViewChange }: Props = $props();
+  const { modules, initialView, canManage, onSave, onViewChange }: Props = $props();
 
   // The window is mounted afresh each time it opens, so the initial view is only read once.
   // svelte-ignore state_referenced_locally
@@ -33,11 +38,13 @@
 
   <div class="emma-pane">
     {#if view === 'list'}
-      <ListView {modules} />
+      <ListView {modules} {canManage} />
     {:else}
-      <SplitView {modules} />
+      <SplitView {modules} {canManage} />
     {/if}
   </div>
+
+  <Footer {modules} {canManage} {onSave} />
 </div>
 
 <style>

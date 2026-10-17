@@ -1,6 +1,12 @@
 import { describe, expect, test } from 'vitest';
 
-import { canManageModules, listInstalledModules, readActivation, writeActivation } from '@module/adapters/modules';
+import {
+  canManageModules,
+  listInstalledModules,
+  readActivation,
+  requestReload,
+  writeActivation,
+} from '@module/adapters/modules';
 import type { FoundryMockOptions } from '../../mocks/foundry';
 import { installFoundryMocks } from '../../mocks/foundry';
 
@@ -28,6 +34,7 @@ describe('listInstalledModules', () => {
       title: 'Dice So Nice!',
       version: '5.2.4',
       authors: ['Simone', 'JDW'],
+      requires: [],
     });
   });
 
@@ -55,6 +62,27 @@ describe('listInstalledModules', () => {
     installFoundryMocks({ modules: { b: { title: 'Same' }, a: { title: 'Same' } } });
 
     expect(listInstalledModules().map(({ id }) => id)).toEqual(['a', 'b']);
+  });
+
+  test('lists the modules each module requires', () => {
+    installFoundryMocks({ modules: { dice: { requires: ['lib-wrapper', { id: 'socketlib', type: 'module' }] } } });
+
+    expect(listInstalledModules()[0]?.requires).toEqual(['lib-wrapper', 'socketlib']);
+  });
+
+  test('ignores required systems and worlds, which EMMA cannot activate', () => {
+    installFoundryMocks({
+      modules: {
+        dice: {
+          requires: [
+            { id: 'dnd5e', type: 'system' },
+            { id: 'my-world', type: 'world' },
+          ],
+        },
+      },
+    });
+
+    expect(listInstalledModules()[0]?.requires).toEqual([]);
   });
 
   test('is empty when nothing is installed', () => {
@@ -161,5 +189,15 @@ describe('writeActivation', () => {
     await expect(writeActivation({ emma: true })).rejects.toThrow('Only a GM');
 
     expect(game.settings.set).not.toHaveBeenCalled();
+  });
+});
+
+describe('requestReload', () => {
+  test('asks to reload the world, as Foundry’s Module Management does', async () => {
+    const { foundry } = setUp();
+
+    await requestReload();
+
+    expect(foundry.reloadConfirm).toHaveBeenCalledExactlyOnceWith({ world: true });
   });
 });

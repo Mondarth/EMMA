@@ -13,6 +13,8 @@ export interface ModuleEntry {
   readonly version: string;
   /** Author names, in manifest order. */
   readonly authors: readonly string[];
+  /** The IDs of the modules this one requires, which must be active whenever it is. */
+  readonly requires: readonly string[];
 }
 
 /** Whether each module is active, keyed by module ID. */
@@ -29,6 +31,10 @@ export function listInstalledModules(): ModuleEntry[] {
     title: pkg.title,
     version: pkg.version,
     authors: Array.from(pkg.authors, author => author.name),
+    // Only module requirements matter here: a required system or world is not something EMMA can activate.
+    requires: Array.from(pkg.relationships.requires)
+      .filter(({ type }) => type === 'module')
+      .map(({ id }) => id),
   })).sort((a, b) => collator.compare(a.title, b.title) || a.id.localeCompare(b.id));
 }
 
@@ -69,4 +75,13 @@ export async function writeActivation(activation: ActivationMap): Promise<boolea
 
   await game.settings.set('core', 'moduleConfiguration', next);
   return true;
+}
+
+/**
+ * Ask the user to reload the world so a saved activation takes effect, as Foundry's own Module Management window does.
+ * Every connected client reloads with the GM.
+ * @returns Once the user has answered
+ */
+export async function requestReload(): Promise<void> {
+  await foundry.applications.settings.SettingsConfig.reloadConfirm({ world: true });
 }
