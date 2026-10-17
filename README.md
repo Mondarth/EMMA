@@ -24,5 +24,5 @@ This project was scaffolded with [create-fvtt-module](https://github.com/ulenaro
 tooling and configuration it started from were written in part with AI assistance (Claude Opus 5.5) and reviewed by a
 human.
 
-This statement covers the scaffold only, not work added since. Keep, amend or remove it to reflect how this project is
-developed.
+Development of the module itself continues with AI assistance (Claude Opus 5.5). All changes, whether written by a
+person or with AI assistance, are reviewed by a human before they are merged.

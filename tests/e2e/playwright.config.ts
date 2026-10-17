@@ -45,7 +45,7 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], viewport: VIEWPORT },
     },
     // Headless Firefox cannot create the WebGL context Foundry VTT needs. Headed, it renders WebGL in software, so it
-    // opens a window; CI gives it a virtual display (xvfb-run in .github/workflows/e2e.yml).
+    // opens a window, which needs a display: `pnpm test:e2e:xvfb` provides a virtual 1920x1080 one, in CI and locally.
     {
       name: 'firefox',
       testIgnore: SETUP,

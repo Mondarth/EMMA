@@ -91,13 +91,89 @@ export function createGameMock(options: GameMockOptions = {}) {
   };
 }
 
+/**
+ * A working stand-in for `foundry.applications.api.ApplicationV2`, reproducing the parts of the render and close
+ * lifecycle EMMA relies on: `render` builds the frame on first render, then calls `_renderHTML` and `_replaceHTML`;
+ * `close` calls `_onClose` and removes the frame.
+ */
+export class ApplicationV2Mock {
+  static DEFAULT_OPTIONS: object = {};
+
+  options: { id?: string; window?: { title?: string } };
+  element: HTMLElement | null = null;
+  rendered = false;
+  bringToFront: Mock<() => void> = vi.fn();
+
+  constructor(options: object = {}) {
+    const ctor = this.constructor as typeof ApplicationV2Mock;
+    this.options = { ...ctor.DEFAULT_OPTIONS, ...options };
+  }
+
+  async render(options: object = {}): Promise<this> {
+    if (this.element === null) {
+      this.element = document.createElement('div');
+      if (this.options.id !== undefined) this.element.id = this.options.id;
+      this.element.append(document.createElement('section'));
+      document.body.append(this.element);
+    }
+    const result = await this._renderHTML({}, options);
+    this._replaceHTML(result, this.element.firstElementChild as HTMLElement, options);
+    this.rendered = true;
+    return this;
+  }
+
+  async close(options: object = {}): Promise<this> {
+    await this._onClose(options);
+    this.element?.remove();
+    this.element = null;
+    this.rendered = false;
+    return this;
+  }
+
+  protected _renderHTML(_context: object, _options: object): unknown {
+    throw new Error('ApplicationV2Mock subclasses must implement _renderHTML');
+  }
+
+  protected _replaceHTML(_result: unknown, _content: HTMLElement, _options: object): void {
+    throw new Error('ApplicationV2Mock subclasses must implement _replaceHTML');
+  }
+
+  protected _onClose(_options: object): void | Promise<void> {
+    // The base class does nothing on close.
+  }
+}
+
+/**
+ * Create a stand-in for the `foundry` namespace: `ApplicationV2`, and a native `ModuleManagement` window whose
+ * instances are recorded so tests can see when it opened.
+ * @returns The mock namespace
+ */
+export function createFoundryNamespaceMock() {
+  const moduleManagementRender = vi.fn(() => Promise.resolve());
+
+  return {
+    applications: {
+      api: { ApplicationV2: ApplicationV2Mock },
+      sidebar: {
+        apps: {
+          ModuleManagement: class {
+            render = moduleManagementRender;
+          },
+        },
+      },
+    },
+    /** Called each time a native Module Management window is rendered. */
+    moduleManagementRender,
+  };
+}
+
 export interface FoundryMockOptions extends GameMockOptions {
   /** Value of `CONFIG.debug.hooks`. */
   debugHooks?: boolean;
 }
 
 /**
- * Install mock Foundry globals (`Hooks`, `game`, `ui`, `CONFIG`) for the current test.
+ * Install mock Foundry globals (`foundry`, `Hooks`, `game`, `ui`, `CONFIG`) for the current test.
  * Undo with `vi.unstubAllGlobals()`.
  * @param options - Initial state
  * @returns Handles to the installed mocks
@@ -111,11 +187,13 @@ export function installFoundryMocks(options: FoundryMockOptions = {}) {
     notifications: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
   };
   const config = { debug: { hooks: debugHooks } };
+  const foundry = createFoundryNamespaceMock();
 
+  vi.stubGlobal('foundry', foundry);
   vi.stubGlobal('Hooks', hooks);
   vi.stubGlobal('game', game);
   vi.stubGlobal('ui', ui);
   vi.stubGlobal('CONFIG', config);
 
-  return { hooks, game, ui, config };
+  return { foundry, hooks, game, ui, config };
 }

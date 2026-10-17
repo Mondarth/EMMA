@@ -1,8 +1,7 @@
 import { svelte } from '@sveltejs/vite-plugin-svelte';
+import { svelteTesting } from '@testing-library/svelte/vite';
 import fs from 'node:fs';
 import path from 'node:path';
-
-import { sveltePreprocess } from 'svelte-preprocess';
 
 import autoprefixer from 'autoprefixer';
 import dts from 'unplugin-dts/vite';
@@ -127,6 +126,7 @@ export default defineConfig(({ mode }) => {
     test: {
       include: ['**/*.{test,spec}.?(c|m)[jt]s?(x)', '../tests/unit/**/*.{test,spec}.?(c|m)[jt]s?(x)'],
       environment: 'happy-dom',
+      setupFiles: ['../tests/unit/setup.ts'],
       restoreMocks: true,
       unstubGlobals: true,
       coverage: {
@@ -147,6 +147,7 @@ export default defineConfig(({ mode }) => {
       conditions: ['browser', 'import'],
       alias: {
         '@module': path.resolve(__dirname, 'src/module/'),
+        '@component': path.resolve(__dirname, 'src/component/'),
       },
     },
 
@@ -233,10 +234,10 @@ export default defineConfig(({ mode }) => {
         },
         compilerOptions: { noEmitOnError: false },
       }),
-      svelte({
-        compilerOptions,
-        preprocess: sveltePreprocess(),
-      }),
+      // Preprocessing comes from svelte.config.js, which svelte-check and the ESLint plugin also read.
+      svelte({ compilerOptions }),
+      // Test runs only: resolves Svelte's browser build and unmounts rendered components after each test.
+      ...(mode === 'test' ? [svelteTesting()] : []),
     ],
   };
 });
