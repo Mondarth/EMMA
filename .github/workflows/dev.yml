@@ -1,0 +1,144 @@
+name: Dev CI
+
+# The full quality gate. Runs on every push to `dev` and on every pull request. The release workflow calls it for pushes
+# to `main`, so nothing is released without passing it.
+on:
+  push:
+    branches:
+      - dev
+  pull_request:
+    branches:
+      - dev
+      - main
+  workflow_call:
+    secrets:
+      CODECOV_TOKEN:
+        required: false
+  workflow_dispatch:
+
+# A newer push to the same pull request supersedes the run in progress; other runs are never cancelled.
+concurrency:
+  group: dev-ci-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  HUSKY: "0"
+
+jobs:
+  commits:
+    name: Commit messages
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      - name: Lint the pull request's commit messages
+        run: >-
+          pnpm exec commitlint --verbose
+          --from ${{ github.event.pull_request.base.sha }}
+          --to ${{ github.event.pull_request.head.sha }}
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      - run: pnpm typecheck
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      # ESLint also reports Prettier formatting for scripts; the second step covers the remaining file types.
+      - run: pnpm exec eslint . --max-warnings 0
+      - run: pnpm exec prettier --check "**/*.{json,css,scss,md,yml,yaml}"
+
+  svelte-check:
+    name: Svelte check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      # svelte-check warns (and so fails) when the project has no components at all, so only run it once one exists.
+      - name: Run svelte-check
+        if: ${{ hashFiles('src/**/*.svelte') != '' }}
+        run: pnpm run svelte-check
+
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      # Fails when coverage drops below the thresholds in vite.config.ts.
+      - run: pnpm run test:coverage
+      # Without a CODECOV_TOKEN secret the upload is skipped and CI still passes.
+      - name: Upload coverage to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          files: coverage/lcov.info
+          flags: unit
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+      - name: Upload coverage report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage
+          path: coverage/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      - run: pnpm build
+      - name: Upload bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: module-bundle
+          path: |
+            dist/
+            module.json
+          if-no-files-found: error
+          retention-days: 7
+
+  docs:
+    name: Docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Python tooling stays inside the image built from docs/Dockerfile; nothing is installed on the runner.
+      - name: Build documentation
+        run: docker compose run --rm --user "$(id -u):$(id -g)" docs make html
+      - name: Upload documentation
+        uses: actions/upload-artifact@v7
+        with:
+          name: documentation
+          path: docs/_build/html/
+          if-no-files-found: error
+          retention-days: 7
+
+  # A single required check for the branch rulesets.
+  ci-passed:
+    name: CI passed
+    if: ${{ always() }}
+    needs: [commits, typecheck, lint, svelte-check, test, build, docs]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check that every job passed (or was skipped)
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: echo "$NEEDS" | jq -e 'all(.[]; .result == "success" or .result == "skipped")'

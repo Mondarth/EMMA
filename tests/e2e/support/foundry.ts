@@ -1,0 +1,42 @@
+import type { Page } from '@playwright/test';
+import { expect } from '@playwright/test';
+
+export const MODULE_ID = 'mondarth-emma';
+export const MODULE_TITLE = 'EMMA - Enhanced Module Manager Application';
+
+/** The world created by `setup/bootstrap.setup.ts`. */
+export const WORLD = {
+  id: 'mondarth-emma-e2e',
+  title: 'EMMA - Enhanced Module Manager Application E2E',
+  system: 'dnd5e',
+} as const;
+
+export const USERS = { gm: 'Gamemaster', player: 'E2E Player' } as const;
+
+/**
+ * Log in to the active world and wait until Foundry has finished loading.
+ *
+ * Locators here follow Foundry's own v14 templates (`templates/setup/parts/join-form.hbs`). The user is typed into a
+ * text field, which has no accessible name, so it is found by its form field name.
+ * @param page - The page to log in with
+ * @param userName - Name of the Foundry user to join as
+ */
+export async function joinAs(page: Page, userName: string): Promise<void> {
+  // A user stays marked as active for a moment after their previous session closes, and cannot join until then.
+  await expect(async () => {
+    await page.goto('/join');
+    await page.locator('input[name="username"]').fill(userName);
+    await page.getByRole('button', { name: 'Join Game Session' }).click();
+    await page.waitForURL('**/game', { timeout: 5_000 });
+  }).toPass({ timeout: 30_000 });
+
+  await waitForReady(page);
+}
+
+/**
+ * Wait until Foundry's `ready` hook has run on the page.
+ * @param page - A page showing the game view
+ */
+export async function waitForReady(page: Page): Promise<void> {
+  await page.waitForFunction(() => typeof game !== 'undefined' && game.ready, undefined, { timeout: 90_000 });
+}

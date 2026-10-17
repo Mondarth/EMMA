@@ -1,0 +1,17 @@
+#!/bin/env bash
+
+if [ "$2" = "commit" ]; then
+  echo "Skipping prepare-commit-msg hook due to amend."
+  exit 0
+fi
+
+if [ -n "$GIT_SEQUENCE_EDITOR" ]; then
+  echo "Skipping prepare-commit-msg hook due to rebase."
+  exit 0
+fi
+
+# The Commitizen prompt needs a terminal. Without one (an IDE, a script, CI), skip it rather than fail the commit:
+# husky runs hooks with `sh -e`, which exits on a failed redirection. commitlint still checks the message in commit-msg.
+if (exec < /dev/tty) 2> /dev/null; then
+  exec < /dev/tty && pnpm exec cz --hook || true
+fi
