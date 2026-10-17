@@ -5,5 +5,7 @@
     "rootDir": ".",
     "resolveJsonModule": true
   },
-  "include": ["src/**/*", "tests/**/*"]
+  "include": ["src/**/*", "tests/**/*"],
+  // Playwright's output holds bundled JS (the trace viewer declares globals such as `ui`) that must not join the program.
+  "exclude": ["./node_modules/*", "tests/e2e/.data", "tests/e2e/test-results", "tests/e2e/playwright-report"]
 }

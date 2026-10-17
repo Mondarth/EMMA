@@ -1,5 +1,18 @@
 {
   "MONDARTH-EMMA": {
-    "Title": "EMMA - Enhanced Module Manager Application"
+    "Title": "EMMA - Enhanced Module Manager Application",
+    "App": {
+      "Title": "EMMA - module management",
+      "Placeholder": "Module views are on their way."
+    },
+    "Settings": {
+      "Disabled": {
+        "Name": "Disable EMMA",
+        "Hint": "Use Foundry's built-in Module Management window instead of EMMA. Takes effect immediately."
+      }
+    },
+    "Errors": {
+      "OpenFailed": "EMMA could not open, so Foundry's Module Management window has been opened instead. See the console for details."
+    }
   }
 }

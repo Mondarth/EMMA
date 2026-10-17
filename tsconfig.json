@@ -12,7 +12,8 @@
     "noImplicitOverride": true,
     "rootDir": "./src",
     "paths": {
-      "@module/*": ["./src/module/*"]
+      "@module/*": ["./src/module/*"],
+      "@component/*": ["./src/component/*"]
     },
     "noEmit": true,
     "declaration": true,

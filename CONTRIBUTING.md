@@ -129,7 +129,9 @@ pnpm run e2e:server:stop
 
 The first test run accepts the licence agreement, creates and launches a world, enables the module and creates a
 player user. Delete `tests/e2e/.data` to start again from nothing. The Firefox project opens a browser window: headless
-Firefox cannot create the WebGL context Foundry VTT needs (CI runs it on a virtual display with `xvfb-run`). Start the server with `pnpm run e2e:server` rather than
+Firefox cannot create the WebGL context Foundry VTT needs. Without a desktop session (over SSH, in a container, in CI),
+run the tests with `pnpm run test:e2e:xvfb` instead, which gives the browsers a virtual 1920x1080 display (`xvfb` must
+and `xauth` must be installed: `sudo apt-get install xvfb xauth` on Debian or Ubuntu); it takes the same arguments, such as `--project=firefox`. Start the server with `pnpm run e2e:server` rather than
 `docker compose` directly: the script first creates the directories the server mounts, which Docker would otherwise
 create as root, and runs Foundry VTT as you, so that it can write to them; otherwise it hangs. The script replaces any
 server left running, so a hung one is not reused.
@@ -143,5 +145,5 @@ This project was scaffolded with [create-fvtt-module](https://github.com/ulenaro
 tooling and configuration it started from were written in part with AI assistance (Claude Opus 5.5) and reviewed by a
 human.
 
-This statement covers the scaffold only, not work added since. Keep, amend or remove it to reflect how this project is
-developed.
+Development of the module itself continues with AI assistance (Claude Opus 5.5). All changes, whether written by a
+person or with AI assistance, are reviewed by a human before they are merged.

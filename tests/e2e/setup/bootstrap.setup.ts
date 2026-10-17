@@ -85,7 +85,7 @@ setup('prepare the Foundry world', async ({ page }) => {
   }
 
   const active = await page.evaluate(id => {
-    const moduleUnderTest = game.modules?.get(id);
+    const moduleUnderTest = game.modules.get(id);
     return moduleUnderTest?.active ?? false;
   }, MODULE_ID);
   expect(active, `${MODULE_ID} should be active in the test world`).toBe(true);

@@ -17,14 +17,15 @@ async function loadModule(options: FoundryMockOptions = {}) {
 
 describe('module entry point', () => {
   beforeEach(() => {
-    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'info').mockImplementation(() => undefined);
   });
 
   test('does nothing until Foundry fires init', async () => {
-    const { hooks } = await loadModule();
+    const { hooks, game } = await loadModule();
 
     expect(hooks.once).toHaveBeenCalledExactlyOnceWith('init', expect.any(Function));
-    expect(console.log).not.toHaveBeenCalled();
+    expect(console.info).not.toHaveBeenCalled();
+    expect(game.settings.register).not.toHaveBeenCalled();
   });
 
   test('announces itself on init', async () => {
@@ -32,7 +33,16 @@ describe('module entry point', () => {
 
     hooks.run('init');
 
-    expect(console.log).toHaveBeenCalledExactlyOnceWith('mondarth-emma | Initializing');
+    expect(console.info).toHaveBeenCalledExactlyOnceWith('mondarth-emma |', 'Initializing');
+  });
+
+  test('registers its settings and takes over Module Management on init', async () => {
+    const { hooks, game } = await loadModule();
+
+    hooks.run('init');
+
+    expect(game.settings.register).toHaveBeenCalledWith('mondarth-emma', 'disabled', expect.any(Object));
+    expect(hooks.on).toHaveBeenCalledWith('renderSettings', expect.any(Function));
   });
 
   test('only initializes once', async () => {
@@ -41,6 +51,6 @@ describe('module entry point', () => {
     hooks.run('init');
     hooks.run('init');
 
-    expect(console.log).toHaveBeenCalledOnce();
+    expect(console.info).toHaveBeenCalledOnce();
   });
 });

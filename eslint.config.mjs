@@ -9,6 +9,7 @@ import ts from 'typescript-eslint';
 export default defineConfig(
   {
     ignores: [
+      '.foundryvtt/',
       '.vite-cache/',
       'coverage/',
       'dist/',
