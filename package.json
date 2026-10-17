@@ -80,7 +80,7 @@
     "svelte-check": "^4.7.6",
     "svelte-preprocess": "^6.0.5",
     "typescript": "npm:@typescript/typescript6",
-    "typescript-eslint": "^8.67.0",
+    "typescript-eslint": "^8.71.2",
     "unplugin-dts": "^1.0.3",
     "vite": "^6.4.3",
     "vite-tsconfig-paths": "^5.1.4",
