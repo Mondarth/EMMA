@@ -1,16 +1,24 @@
+import { screen } from '@testing-library/svelte';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
+import { registerSettings } from '@module/settings';
+import type { FoundryMockOptions } from '../../mocks/foundry';
 import { installFoundryMocks } from '../../mocks/foundry';
 
+const MODULES = { dice: { title: 'Dice So Nice!' }, emma: { title: 'EMMA' } };
+
 /**
- * Install the Foundry mocks, then load a fresh copy of the app module: `EmmaApp` extends the mocked `ApplicationV2`,
- * and each copy starts without an open window.
- * @returns The app module
+ * Install the Foundry mocks with EMMA's settings registered, then load a fresh copy of the app module: `EmmaApp`
+ * extends the mocked `ApplicationV2`, and each copy starts without an open window.
+ * @param options - Mock state
+ * @returns The app module and the installed mocks
  */
-async function loadApp() {
-  installFoundryMocks();
+async function loadApp(options: FoundryMockOptions = {}) {
+  const mocks = installFoundryMocks({ modules: MODULES, ...options });
+  registerSettings();
   vi.resetModules();
-  return import('@module/app/emma-app');
+  return { ...(await import('@module/app/emma-app')), ...mocks };
 }
 
 describe('EmmaApp', () => {
@@ -65,6 +73,59 @@ describe('EmmaApp', () => {
 
     await expect(app.close()).resolves.toBe(app);
     expect(app.mounted).toBe(false);
+  });
+
+  test('shows the installed modules with their saved activation', async () => {
+    const { EmmaApp } = await loadApp({ settings: { 'core.moduleConfiguration': { dice: true } } });
+
+    await new EmmaApp().render({ force: true });
+
+    expect(screen.getByRole('checkbox', { name: 'Dice So Nice!' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'EMMA' })).not.toBeChecked();
+  });
+
+  test('opens in the view the user last chose', async () => {
+    const { EmmaApp } = await loadApp({ settings: { 'mondarth-emma.view': 'split' } });
+
+    await new EmmaApp().render({ force: true });
+
+    expect(screen.getByRole('button', { name: 'MONDARTH-EMMA.Toolbar.Split' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('remembers the view the user switches to', async () => {
+    const { EmmaApp, game } = await loadApp();
+    await new EmmaApp().render({ force: true });
+
+    await userEvent.click(screen.getByRole('button', { name: 'MONDARTH-EMMA.Toolbar.Split' }));
+
+    expect(game.settings.set).toHaveBeenCalledExactlyOnceWith('mondarth-emma', 'view', 'split');
+  });
+
+  test('logs, and keeps the new view, if the view cannot be saved', async () => {
+    const { EmmaApp, game } = await loadApp();
+    const failure = new Error('offline');
+    game.settings.set.mockRejectedValueOnce(failure);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await new EmmaApp().render({ force: true });
+
+    await userEvent.click(screen.getByRole('button', { name: 'MONDARTH-EMMA.Toolbar.Split' }));
+
+    await vi.waitFor(() => {
+      expect(console.error).toHaveBeenCalledWith('mondarth-emma |', 'Unable to remember the view', failure);
+    });
+    expect(screen.getByRole('button', { name: 'MONDARTH-EMMA.Toolbar.Split' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('discards unsaved changes when it closes', async () => {
+    const { EmmaApp } = await loadApp();
+    const app = new EmmaApp();
+    await app.render({ force: true });
+    await userEvent.click(screen.getByRole('checkbox', { name: 'EMMA' }));
+
+    await app.close();
+    await app.render({ force: true });
+
+    expect(screen.getByRole('checkbox', { name: 'EMMA' })).not.toBeChecked();
   });
 
   test('mounts afresh when it reopens', async () => {

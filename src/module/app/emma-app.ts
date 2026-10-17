@@ -1,12 +1,20 @@
 import { mount, unmount } from 'svelte';
 
 import EmmaRoot from '@component/EmmaRoot.svelte';
+import { listInstalledModules, readActivation } from '@module/adapters/modules';
 import { MODULE_ID } from '@module/lib/constants';
+import { log } from '@module/lib/logger';
+import type { View } from '@module/settings';
+import { getView, setView } from '@module/settings';
+import { ModuleState } from '@module/state/module-state.svelte';
 
 /**
  * The EMMA window: an `ApplicationV2` frame whose content is rendered entirely by the {@link EmmaRoot} Svelte
  * component. Handlebars is not used, so `_renderHTML` produces nothing and `_replaceHTML` mounts the component the
  * first time the window opens. The component is unmounted when the window closes, and mounted afresh if it reopens.
+ *
+ * Each time the window opens it reads the installed modules and their saved activation into a new
+ * {@link ModuleState}, so changes staged and not saved are discarded when the window closes.
  */
 export class EmmaApp extends foundry.applications.api.ApplicationV2 {
   static override DEFAULT_OPTIONS = {
@@ -40,12 +48,24 @@ export class EmmaApp extends foundry.applications.api.ApplicationV2 {
   }
 
   /**
-   * Mount the Svelte component into the window content on first render. Later renders leave it in place.
+   * Mount the Svelte component into the window content on first render, with the modules as they are saved now and
+   * the view this user last chose. Later renders leave it in place.
    * @param _result - The (empty) result of {@link EmmaApp._renderHTML}
    * @param content - The window's content element
    */
   protected override _replaceHTML(_result: unknown, content: HTMLElement): void {
-    this.#component ??= mount(EmmaRoot, { target: content });
+    this.#component ??= mount(EmmaRoot, {
+      target: content,
+      props: {
+        modules: new ModuleState(listInstalledModules(), readActivation()),
+        initialView: getView(),
+        onViewChange: (view: View) => {
+          setView(view).catch((error: unknown) => {
+            log.error('Unable to remember the view', error);
+          });
+        },
+      },
+    });
   }
 
   /**
