@@ -14,7 +14,12 @@
       "Empty": "No modules are installed."
     },
     "Split": {
-      "Placeholder": "The split view is on its way."
+      "Inactive": "Inactive",
+      "Active": "Active",
+      "Activate": "Activate the selected modules",
+      "Deactivate": "Deactivate the selected modules",
+      "NoneInactive": "Every module is active.",
+      "NoneActive": "No module is active."
     },
     "Settings": {
       "Disabled": {

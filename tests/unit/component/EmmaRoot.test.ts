@@ -8,7 +8,6 @@ import { createModules } from './fixtures';
 
 const LIST = 'MONDARTH-EMMA.Toolbar.List';
 const SPLIT = 'MONDARTH-EMMA.Toolbar.Split';
-const SPLIT_PLACEHOLDER = 'MONDARTH-EMMA.Split.Placeholder';
 
 describe('EmmaRoot', () => {
   beforeEach(() => {
@@ -34,7 +33,7 @@ describe('EmmaRoot', () => {
     render(EmmaRoot, { modules: createModules(), initialView: 'split' });
 
     expect(screen.getByRole('button', { name: SPLIT })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByText(SPLIT_PLACEHOLDER)).toBeInTheDocument();
+    expect(screen.getAllByRole('listbox')).toHaveLength(2);
     expect(screen.queryByRole('list')).toBeNull();
   });
 
@@ -43,7 +42,7 @@ describe('EmmaRoot', () => {
     render(EmmaRoot, { modules: createModules(), initialView: 'list', onViewChange });
 
     await userEvent.click(screen.getByRole('button', { name: SPLIT }));
-    expect(screen.getByText(SPLIT_PLACEHOLDER)).toBeInTheDocument();
+    expect(screen.getAllByRole('listbox')).toHaveLength(2);
 
     await userEvent.click(screen.getByRole('button', { name: LIST }));
     expect(screen.getByRole('list')).toBeInTheDocument();
@@ -78,6 +77,17 @@ describe('EmmaRoot', () => {
 
     expect(screen.getByRole('checkbox', { name: 'EMMA' })).toBeChecked();
     expect(modules.changes).toEqual({ emma: true });
+  });
+
+  test('keeps changes staged in the split view when switching to the list view', async () => {
+    const modules = createModules();
+    render(EmmaRoot, { modules, initialView: 'split' });
+
+    await userEvent.click(screen.getByRole('option', { name: /EMMA/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'MONDARTH-EMMA.Split.Activate' }));
+    await userEvent.click(screen.getByRole('button', { name: LIST }));
+
+    expect(screen.getByRole('checkbox', { name: 'EMMA' })).toBeChecked();
   });
 
   test('leaves nothing behind when unmounted', () => {

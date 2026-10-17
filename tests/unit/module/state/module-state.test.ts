@@ -181,6 +181,27 @@ describe('ModuleState', () => {
     });
   });
 
+  describe('selectAll', () => {
+    test('selects every module on that side only', () => {
+      const state = createState();
+
+      state.selectAll('inactive');
+
+      expect([...state.selected('inactive')].sort()).toEqual(['a', 'c', 'e']);
+      expect(state.selected('active').size).toBe(0);
+    });
+
+    test('keeps the range anchor', () => {
+      const state = createState({});
+      state.select('inactive', 'c');
+
+      state.selectAll('inactive');
+      state.select('inactive', 'e', 'range');
+
+      expect([...state.selected('inactive')].sort()).toEqual(['c', 'd', 'e']);
+    });
+  });
+
   describe('clearSelection', () => {
     test('deselects everything on that side only', () => {
       const state = createState();

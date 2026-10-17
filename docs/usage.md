@@ -32,7 +32,18 @@ List view
   Modules you have changed are marked at their left edge.
 
 Split view
-: Inactive and active modules side by side. Coming soon.
+: Inactive modules on the left, active modules on the right. Select modules on one side, then move them across with
+  the buttons between the lists: **<** deactivates the modules selected on the active side, and **>** activates the
+  modules selected on the inactive side. Moved modules stay selected, so the opposite button undoes a move.
+
+### Selecting in the split view
+
+| To                                   | Mouse                     | Keyboard (with the list focused)       |
+| ------------------------------------ | ------------------------- | -------------------------------------- |
+| Select one module                    | Click it                  | Arrow keys, **Home**, **End**          |
+| Add or remove one module             | **Ctrl**-click (**⌘** on macOS) | **Ctrl**/**⌘** with the arrow keys to move, then **Space** |
+| Select a range                       | **Shift**-click           | **Shift** with the arrow keys          |
+| Select every module on that side     |                           | **Ctrl**+**A** (**⌘**+**A** on macOS)  |
 
 EMMA remembers the view you last chose, separately for each user and on every device you play on. The list view is shown
 until you choose otherwise.
