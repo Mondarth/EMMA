@@ -15,6 +15,7 @@ usage.md
 
 developers/prerequisites.md
 developers/setup.md
+developers/architecture.md
 developers/workflow.md
 developers/github-setup.md
 developers/documentation.md

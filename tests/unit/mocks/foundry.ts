@@ -49,13 +49,39 @@ export function createHooksMock() {
   return { on, once, off, callAll, run };
 }
 
+export interface ModuleMockData {
+  active?: boolean;
+  /** Defaults to the module ID. */
+  title?: string;
+  /** Defaults to `1.0.0`. */
+  version?: string;
+  /** Author names. */
+  authors?: string[];
+  api?: unknown;
+}
+
 export interface GameMockOptions {
   /** Whether the current user is a GM; `null` leaves `game.user` unset, as it is during `init`. */
   isGM?: boolean | null;
+  /** Whether the current user holds the "Modify Configuration Settings" permission. Defaults to `isGM`. */
+  canModifySettings?: boolean;
+  /** The user's language, `game.i18n.lang`. Defaults to `en`. */
+  lang?: string;
   /** Modules known to `game.modules`, keyed by ID. */
-  modules?: Record<string, { active: boolean; title?: string; api?: unknown }>;
+  modules?: Record<string, ModuleMockData>;
   /** Initial stored setting values, keyed by `namespace.key`. */
   settings?: Record<string, unknown>;
+}
+
+/**
+ * Build the `game.modules` entry for a module.
+ * @param id - The module ID
+ * @param data - What the test sets
+ * @returns The mock module
+ */
+function createModuleMock(id: string, data: ModuleMockData) {
+  const { active = false, title = id, version = '1.0.0', authors = [], api } = data;
+  return { id, active, title, version, authors: new Set(authors.map(name => ({ name }))), api };
 }
 
 /**
@@ -64,13 +90,18 @@ export interface GameMockOptions {
  * @returns The mock `game`
  */
 export function createGameMock(options: GameMockOptions = {}) {
-  const { isGM = true, modules = {}, settings = {} } = options;
+  const { isGM = true, lang = 'en', modules = {}, settings = {} } = options;
+  const canModifySettings = options.canModifySettings ?? isGM === true;
   const stored = new Map<string, unknown>(Object.entries(settings));
-  const defaults = new Map<string, unknown>();
+  // Core settings EMMA reads, with Foundry's defaults.
+  const defaults = new Map<string, unknown>([['core.moduleConfiguration', {}]]);
 
   return {
-    user: isGM === null ? null : { isGM },
-    modules: new Map(Object.entries(modules)),
+    user:
+      isGM === null
+        ? null
+        : { isGM, can: vi.fn((permission: string): boolean => permission === 'SETTINGS_MODIFY' && canModifySettings) },
+    modules: new Map(Object.entries(modules).map(([id, data]) => [id, createModuleMock(id, data)])),
     settings: {
       register: vi.fn((namespace: string, key: string, data: { default?: unknown }): void => {
         defaults.set(`${namespace}.${key}`, data.default);
@@ -85,6 +116,7 @@ export function createGameMock(options: GameMockOptions = {}) {
       }),
     },
     i18n: {
+      lang,
       localize: vi.fn((key: string): string => key),
       format: vi.fn((key: string, data: Record<string, string> = {}): string => `${key} ${JSON.stringify(data)}`),
     },
