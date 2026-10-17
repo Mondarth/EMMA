@@ -153,6 +153,19 @@ export class ModuleState {
   }
 
   /**
+   * Stage one module to become active or inactive, as the list view's checkboxes do. The module is deselected on both
+   * sides, since it may move from one to the other. Unknown modules are ignored.
+   * @param id - A module ID
+   * @param active - Whether the module should be active
+   */
+  setActive(id: string, active: boolean): void {
+    if (!(id in this.#pending)) return;
+    this.#pending[id] = active;
+    this.#selection.inactive.delete(id);
+    this.#selection.active.delete(id);
+  }
+
+  /**
    * Discard the staged changes and both selections.
    */
   reset(): void {

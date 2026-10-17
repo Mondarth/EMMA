@@ -2,8 +2,19 @@
   "MONDARTH-EMMA": {
     "Title": "EMMA - Enhanced Module Manager Application",
     "App": {
-      "Title": "EMMA - module management",
-      "Placeholder": "Module views are on their way."
+      "Title": "EMMA - module management"
+    },
+    "Toolbar": {
+      "Label": "Views",
+      "List": "List view",
+      "Split": "Split view"
+    },
+    "List": {
+      "Label": "Installed modules",
+      "Empty": "No modules are installed."
+    },
+    "Split": {
+      "Placeholder": "The split view is on its way."
     },
     "Settings": {
       "Disabled": {

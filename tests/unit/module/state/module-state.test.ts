@@ -277,6 +277,47 @@ describe('ModuleState', () => {
     });
   });
 
+  describe('setActive', () => {
+    test('stages one module to become active or inactive', () => {
+      const state = createState();
+
+      state.setActive('a', true);
+      state.setActive('b', false);
+
+      expect(state.changes).toEqual({ a: true, b: false });
+      expect(ids(state, 'active')).toEqual(['a', 'd', 'f']);
+    });
+
+    test('leaves nothing staged when set back to what is saved', () => {
+      const state = createState();
+
+      state.setActive('a', true);
+      state.setActive('a', false);
+
+      expect(state.dirty).toBe(false);
+    });
+
+    test('deselects the module on both sides', () => {
+      const state = createState();
+      state.select('inactive', 'a');
+      state.select('inactive', 'c', 'toggle');
+
+      state.setActive('a', true);
+
+      expect([...state.selected('inactive')]).toEqual(['c']);
+      expect(state.selected('active').size).toBe(0);
+    });
+
+    test('ignores modules it does not know', () => {
+      const state = createState();
+
+      state.setActive('unknown', true);
+
+      expect(state.dirty).toBe(false);
+      expect(state.activation).not.toHaveProperty('unknown');
+    });
+  });
+
   describe('reset', () => {
     test('discards staged changes and both selections', () => {
       const state = createState();

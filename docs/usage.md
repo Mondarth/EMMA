@@ -23,6 +23,23 @@ to the front.
 If EMMA ever fails to open, you are told so and Foundry's own Module Management window opens instead, so you can always
 manage your modules.
 
+## Views
+
+The toolbar at the top of the window switches between two views with the icon buttons on its right:
+
+List view
+: Every installed module, with its version and authors. Check or uncheck a module to activate or deactivate it.
+  Modules you have changed are marked at their left edge.
+
+Split view
+: Inactive and active modules side by side. Coming soon.
+
+EMMA remembers the view you last chose, separately for each user and on every device you play on. The list view is shown
+until you choose otherwise.
+
+Changes you make are staged, not saved: saving them, which reloads the world, is coming in a later version. Closing the
+window discards them.
+
 ## Settings
 
 Disable EMMA
