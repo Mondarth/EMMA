@@ -56,6 +56,24 @@ how compatible the module is with your version of Foundry. Hover over the badge 
 | Select a range                       | **Shift**-click           | **Shift** with the arrow keys          |
 | Select every module on that side     |                           | **Ctrl**+**A** (**⌘**+**A** on macOS)  |
 
+### Related modules in the list view
+
+When you check a module in the list view:
+
+- **Required modules are checked with it.** So are the modules they require in turn.
+- **Related modules are grouped under it,** indented, in place of their usual positions: required modules first, then recommended ones, each in alphabetical order. Each grouped module has an information icon at its left; hover over it to see whether the module is **Required** or **Recommended**.
+- **Recommended modules are left unchecked** for you to check if you want them, unless you turn on **Automatically activate/deactivate recommended modules** (see [Settings](#settings)).
+- **A module related to several checked modules** appears under each of them. Every copy is the same module, so checking or unchecking one changes them all.
+
+When you uncheck the module, the modules checked only because of it are unchecked again, unless another checked module still needs them, and they return to their usual places. Modules you checked yourself, or that were already active, stay as they are.
+
+A module that a checked module requires cannot be unchecked: its checkbox is dimmed and disabled, and hovering over
+it says which modules require it. In the split view, such a module on the active side cannot be selected, so it cannot
+be deactivated, and hovering over it says the same. It is released once no active module requires it. Modules that
+require each other do not lock one another, so neither is ever stuck.
+
+A module that conflicts with one that is checked is shown in red, with a warning icon whose tooltip reads **Conflict**.
+
 ### Module details
 
 Every module in either view has a disclosure triangle at its far right. Click it to open a drawer below the module
@@ -113,8 +131,9 @@ marked. **Save** applies them and asks to reload the world, which they need to t
 reloads with you. **Reset** discards them. Closing the window with changes staged asks first whether to discard them
 or keep editing.
 
-A module that requires other modules can only be saved as active together with them. While one is missing, the footer
-names it and **Save** stays disabled.
+A module that requires other modules can only be saved as active together with them. EMMA keeps them active while it
+is, but if the world was saved with one missing, or a required module is not installed, the footer names it and
+**Save** stays disabled.
 
 Only a GM or assistant GM with permission to modify configuration settings can save. Everyone else sees EMMA read-only.
 
@@ -123,6 +142,10 @@ Only a GM or assistant GM with permission to modify configuration settings can s
 Disable EMMA
 : A world setting, changed by the GM under **Game Settings**. When checked, the **Manage Modules** button opens
   Foundry's own Module Management window again. It takes effect immediately, without reloading.
+
+Automatically activate/deactivate recommended modules
+: A setting for each user, off by default. When on, checking a module in the list view also checks the modules it
+  recommends, and unchecking it unchecks them again, as it does for required modules.
 
 Module details
 : A menu every user can open under **Game Settings**, choosing the details their drawers show for themselves. See

@@ -1,6 +1,14 @@
 import { describe, expect, test } from 'vitest';
 
-import { getDrawerFields, getView, isEmmaDisabled, registerSettings, setDrawerFields, setView } from '@module/settings';
+import {
+  getDrawerFields,
+  getView,
+  isAutoRecommended,
+  isEmmaDisabled,
+  registerSettings,
+  setDrawerFields,
+  setView,
+} from '@module/settings';
 import { drawerFields } from '@module/state/drawer-fields.svelte';
 import { installFoundryMocks } from '../mocks/foundry';
 
@@ -47,6 +55,33 @@ describe('registerSettings', () => {
         default: ['description', 'authors', 'languages'],
       }),
     );
+  });
+});
+
+describe('isAutoRecommended', () => {
+  test('registers the per-user setting in Game Settings, off by default', () => {
+    const { game } = installFoundryMocks();
+
+    registerSettings();
+
+    expect(game.settings.register).toHaveBeenCalledWith('mondarth-emma', 'autoRecommended', {
+      name: 'MONDARTH-EMMA.Settings.AutoRecommended.Name',
+      hint: 'MONDARTH-EMMA.Settings.AutoRecommended.Hint',
+      scope: 'user',
+      config: true,
+      type: Boolean,
+      default: false,
+    });
+    expect(isAutoRecommended()).toBe(false);
+  });
+
+  test('follows the setting without a reload', async () => {
+    const { game } = installFoundryMocks();
+    registerSettings();
+
+    await game.settings.set('mondarth-emma', 'autoRecommended', true);
+
+    expect(isAutoRecommended()).toBe(true);
   });
 });
 

@@ -379,4 +379,23 @@ describe('SelectableList', () => {
       expect(scrolled).toEqual([option('libWrapper').id]);
     });
   });
+
+  test('makes a module an active module requires unselectable, explaining why on hover', async () => {
+    // Dice So Nice! requires libWrapper.
+    const modules = createModules({ dice: true, 'lib-wrapper': true });
+    render(SelectableList, { fields: new DrawerFields(), modules, side: 'active', labelledby: 'heading' });
+    const library = option('libWrapper');
+
+    expect(library).toHaveAttribute('aria-disabled', 'true');
+    expect(library).toHaveClass('locked');
+    expect(library).toHaveAttribute(
+      'data-tooltip',
+      'MONDARTH-EMMA.Requirements.Locked {"module":"libWrapper","parents":"Dice So Nice!"}',
+    );
+    expect(option('Dice So Nice!')).not.toHaveAttribute('aria-disabled');
+
+    await userEvent.click(library);
+
+    expect(library).toHaveAttribute('aria-selected', 'false');
+  });
 });
