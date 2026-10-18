@@ -2,6 +2,7 @@
   import { format, localize } from '@module/lib/i18n';
   import { lockedTooltip } from '@module/lib/locked';
   import type { DrawerFields } from '@module/state/drawer-fields.svelte';
+  import type { ModuleRow } from '@module/state/grouping';
   import type { ModuleState } from '@module/state/module-state.svelte';
 
   import DisclosureButton from './DisclosureButton.svelte';
@@ -15,9 +16,20 @@
     canManage: boolean;
     /** The details shown in module drawers. */
     fields: DrawerFields;
+    /** Whether related modules are grouped under the modules that relate to them, or every module listed flat. */
+    grouped?: boolean;
   }
 
-  const { modules, canManage, fields }: Props = $props();
+  const { modules, canManage, fields, grouped = true }: Props = $props();
+
+  const rows: readonly ModuleRow[] = $derived(
+    grouped ? modules.rows : modules.entries.map(entry => ({ key: entry.id, entry, depth: 0, relation: null })),
+  );
+
+  // Checked when every module is active, unchecked when none is, and a dash in between.
+  const mixed = $derived(!modules.allActive && !modules.noneActive);
+
+  const allLabel = $derived(localize('MONDARTH-EMMA.List.All'));
 
   const uid = $props.id();
 
@@ -51,6 +63,19 @@
 {/snippet}
 
 <h3 class="emma-list-heading">
+  <input
+    type="checkbox"
+    class="emma-list-all"
+    aria-label={allLabel}
+    data-tooltip={allLabel}
+    checked={modules.allActive}
+    disabled={!canManage || modules.entries.length === 0}
+    {@attach (node: HTMLInputElement) => {
+      node.indeterminate = mixed;
+    }}
+    onchange={event => {
+      modules.setAllActive(event.currentTarget.checked);
+    }} />
   <span id={`${uid}-heading`}>{localize('MONDARTH-EMMA.List.Label')}</span>
   {@render count('active', 'MONDARTH-EMMA.Split.Active')}
   {@render count('inactive', 'MONDARTH-EMMA.Split.Inactive')}
@@ -60,7 +85,7 @@
   <p class="emma-empty">{localize('MONDARTH-EMMA.List.Empty')}</p>
 {:else}
   <ul class="emma-list" aria-labelledby={`${uid}-heading`}>
-    {#each modules.rows as { key, entry, depth, relation } (key)}
+    {#each rows as { key, entry, depth, relation } (key)}
       {@const expanded = modules.isExpanded(entry.id)}
       {@const conflicted = modules.conflicted.has(entry.id)}
       {@const locked = lockedTooltip(modules, entry)}
@@ -117,11 +142,18 @@
 <style>
   .emma-list-heading {
     display: flex;
-    align-items: baseline;
+    align-items: center;
+    /* Lines the select-all checkbox up with the modules' checkboxes. */
+    padding-inline-start: 0.5rem;
     gap: 0.75rem;
     margin: 0 0 0.25rem;
     border: none;
     font-size: var(--font-size-14);
+  }
+
+  .emma-list-all {
+    flex: none;
+    margin: 0;
   }
 
   .emma-list-count {

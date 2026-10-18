@@ -131,7 +131,7 @@ test.describe('EMMA views', () => {
     const active = await page.evaluate(() => game.modules.filter(pkg => pkg.active).length);
     const inactive = (await page.evaluate(() => game.modules.size)) - active;
 
-    await expect(emma.getByRole('heading', { name: /^Installed modules/ })).toHaveText(
+    await expect(emma.getByRole('heading', { name: /Installed modules/ })).toHaveText(
       `Installed modules Active (${active}) Inactive (${inactive})`,
       { useInnerText: true },
     );
@@ -549,6 +549,67 @@ test.describe('Related modules in the list view', () => {
     await expect(emma.getByRole('img', { name: 'Required', exact: true })).toHaveCount(0);
     await expect(emma.getByRole('img', { name: 'Conflict', exact: true })).toHaveCount(0);
     await expect(emma.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+  });
+});
+
+test.describe('List view controls', () => {
+  test.beforeEach(async ({ page }) => {
+    await joinAs(page, USERS.gm);
+    await setDisabled(page, false);
+    await setView(page, 'list');
+    await deactivateFixtures(page);
+  });
+
+  test.afterEach(async ({ page }) => {
+    await closeEmma(page);
+    await page.evaluate(async () => {
+      await game.settings.set('mondarth-emma', 'grouped', true);
+    });
+  });
+
+  test('the select-all checkbox activates every module, then none, warning that EMMA would go', async ({ page }) => {
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+    const all = emma.getByRole('checkbox', { name: 'All modules', exact: true });
+    const warning = emma.getByText(
+      "Saving deactivates EMMA itself, so Foundry's own Module Management window will open from then on.",
+    );
+
+    expect(await all.evaluate((box: HTMLInputElement) => box.indeterminate)).toBe(true);
+
+    await all.click();
+    await expect(all).toBeChecked();
+    await expect(emma.getByRole('checkbox', { name: LIBRARY.title })).toBeChecked();
+    await expect(warning).toHaveCount(0);
+
+    await all.click();
+    await expect(all).not.toBeChecked();
+    await expect(emma.getByRole('checkbox', { name: MODULE_TITLE })).not.toBeChecked();
+    await expect(warning).toBeVisible();
+  });
+
+  test('the grouping toggle flattens the list, and is remembered', async ({ page }) => {
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+    const group = emma.getByRole('button', { name: 'Group related modules', exact: true });
+    await emma.getByRole('checkbox', { name: ADDON.title }).check();
+    await expect(emma.getByRole('img', { name: 'Required', exact: true })).toBeVisible();
+
+    await group.click();
+
+    await expect(group).toHaveAttribute('aria-pressed', 'false');
+    await expect(emma.getByRole('img', { name: 'Required', exact: true })).toHaveCount(0);
+    await expect(emma.getByRole('checkbox', { name: LIBRARY.title })).toBeDisabled();
+
+    await closeEmma(page);
+    await (await moduleManagementButton(page)).click();
+    await expect(emma.getByRole('button', { name: 'Group related modules', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+
+    await emma.getByRole('button', { name: 'Split view', exact: true }).click();
+    await expect(emma.getByRole('button', { name: 'Group related modules', exact: true })).toHaveCount(0);
   });
 });
 

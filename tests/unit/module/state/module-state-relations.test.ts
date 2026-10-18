@@ -425,3 +425,54 @@ describe('rowsOf', () => {
     expect(rowsOf(state, 'active').map(([key]) => key)).toEqual(['app', 'core', 'lib']);
   });
 });
+
+describe('setAllActive', () => {
+  test('activates every module, then deactivates every one, locked modules included', () => {
+    const state = createState();
+    expect(state.noneActive).toBe(true);
+    expect(state.allActive).toBe(false);
+
+    state.setAllActive(true);
+    expect(state.allActive).toBe(true);
+    expect(state.noneActive).toBe(false);
+    expect(state.isLocked('lib')).toBe(true);
+
+    state.setAllActive(false);
+    expect(state.noneActive).toBe(true);
+    expect(activeIds(state)).toEqual([]);
+  });
+
+  test('is neither all nor none with some modules active', () => {
+    const state = createState({ app: true, lib: true, core: true });
+
+    expect(state.allActive).toBe(false);
+    expect(state.noneActive).toBe(false);
+  });
+
+  test('leaves no module implied, so deactivating one later leaves the others', () => {
+    const state = createState();
+    state.setActive('app', true);
+
+    state.setAllActive(true);
+    state.setActive('app', false);
+
+    expect(state.isActive('lib')).toBe(true);
+  });
+
+  test('deselects every module on both sides', () => {
+    const state = createState({ tool: true });
+    state.select('inactive', 'rival');
+    state.select('active', 'tool');
+
+    state.setAllActive(true);
+
+    expect(state.selected('inactive').size + state.selected('active').size).toBe(0);
+  });
+
+  test('never counts every module as active when none is installed', () => {
+    const state = new ModuleState([], {});
+
+    expect(state.allActive).toBe(false);
+    expect(state.noneActive).toBe(true);
+  });
+});

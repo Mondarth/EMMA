@@ -10,6 +10,7 @@ import { DrawerFields } from '@module/state/drawer-fields.svelte';
 const onSave = () => Promise.resolve();
 const LIST = 'MONDARTH-EMMA.Toolbar.List';
 const SPLIT = 'MONDARTH-EMMA.Toolbar.Split';
+const GROUP = 'MONDARTH-EMMA.Toolbar.Group';
 
 describe('EmmaRoot', () => {
   beforeEach(() => {
@@ -21,6 +22,7 @@ describe('EmmaRoot', () => {
       fields: new DrawerFields(),
       modules: createModules(),
       initialView: 'list',
+      initialGrouped: true,
       canManage: true,
       onSave,
     });
@@ -35,6 +37,7 @@ describe('EmmaRoot', () => {
       fields: new DrawerFields(),
       modules: createModules(),
       initialView: 'list',
+      initialGrouped: true,
       canManage: true,
       onSave,
     });
@@ -48,6 +51,7 @@ describe('EmmaRoot', () => {
       fields: new DrawerFields(),
       modules: createModules(),
       initialView: 'split',
+      initialGrouped: true,
       canManage: true,
       onSave,
     });
@@ -63,6 +67,7 @@ describe('EmmaRoot', () => {
       fields: new DrawerFields(),
       modules: createModules(),
       initialView: 'list',
+      initialGrouped: true,
       canManage: true,
       onSave,
       onViewChange,
@@ -83,6 +88,7 @@ describe('EmmaRoot', () => {
       fields: new DrawerFields(),
       modules: createModules(),
       initialView: 'list',
+      initialGrouped: true,
       canManage: true,
       onSave,
       onViewChange,
@@ -98,6 +104,7 @@ describe('EmmaRoot', () => {
       fields: new DrawerFields(),
       modules: createModules(),
       initialView: 'list',
+      initialGrouped: true,
       canManage: true,
       onSave,
     });
@@ -135,6 +142,7 @@ describe('EmmaRoot', () => {
       fields: new DrawerFields(),
       modules: createModules(),
       initialView: 'list',
+      initialGrouped: true,
       canManage: true,
       onSave,
     });
@@ -173,6 +181,7 @@ describe('EmmaRoot', () => {
       fields: new DrawerFields(),
       modules: createModules(),
       initialView: 'list',
+      initialGrouped: true,
       canManage: true,
       onSave,
     });
@@ -180,5 +189,42 @@ describe('EmmaRoot', () => {
     unmount();
 
     expect(container).toBeEmptyDOMElement();
+  });
+
+  test('turns the list view’s grouping on and off from the toolbar, reporting each change', async () => {
+    const onGroupedChange = vi.fn();
+    // Dice So Nice! requires libWrapper, and is active, so libWrapper is grouped under it.
+    render(EmmaRoot, {
+      fields: new DrawerFields(),
+      modules: createModules({ dice: true, 'lib-wrapper': true }),
+      initialView: 'list',
+      initialGrouped: true,
+      canManage: true,
+      onSave,
+      onGroupedChange,
+    });
+    const group = screen.getByRole('button', { name: GROUP });
+    expect(group).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getAllByRole('img', { name: 'MONDARTH-EMMA.Relation.required' })).toHaveLength(1);
+
+    await userEvent.click(group);
+
+    expect(onGroupedChange).toHaveBeenCalledExactlyOnceWith(false);
+    expect(group).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByRole('img', { name: 'MONDARTH-EMMA.Relation.required' })).toBeNull();
+  });
+
+  test('starts with the list flat when asked to', () => {
+    render(EmmaRoot, {
+      fields: new DrawerFields(),
+      modules: createModules({ dice: true, 'lib-wrapper': true }),
+      initialView: 'list',
+      initialGrouped: false,
+      canManage: true,
+      onSave,
+    });
+
+    expect(screen.getByRole('button', { name: GROUP })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByRole('img', { name: 'MONDARTH-EMMA.Relation.required' })).toBeNull();
   });
 });

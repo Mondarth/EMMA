@@ -8,7 +8,7 @@ import { saveModules } from '@module/app/save';
 import { MODULE_ID } from '@module/lib/constants';
 import { log } from '@module/lib/logger';
 import type { View } from '@module/settings';
-import { getDrawerFields, getView, isAutoRecommended, setView } from '@module/settings';
+import { getDrawerFields, getView, isAutoRecommended, isGrouped, setGrouped, setView } from '@module/settings';
 import { drawerFields } from '@module/state/drawer-fields.svelte';
 import { ModuleState } from '@module/state/module-state.svelte';
 
@@ -81,12 +81,18 @@ export class EmmaApp extends foundry.applications.api.ApplicationV2 {
       props: {
         modules,
         initialView: getView(),
+        initialGrouped: isGrouped(),
         canManage: canManageModules(),
         fields: drawerFields,
         onSave: () => saveModules(modules),
         onViewChange: (view: View) => {
           setView(view).catch((error: unknown) => {
             log.error('Unable to remember the view', error);
+          });
+        },
+        onGroupedChange: (grouped: boolean) => {
+          setGrouped(grouped).catch((error: unknown) => {
+            log.error('Unable to remember the grouping', error);
           });
         },
       },

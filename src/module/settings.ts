@@ -12,6 +12,8 @@ export const SETTINGS = {
   drawerFields: 'drawerFields',
   /** Whether activating a module also activates the modules it recommends, and deactivating it deactivates them. */
   autoRecommended: 'autoRecommended',
+  /** Whether this user's list view groups related modules under the modules that relate to them, or lists them flat. */
+  grouped: 'grouped',
 } as const;
 
 /** EMMA's main views. */
@@ -48,6 +50,13 @@ export function registerSettings(): void {
     config: true,
     type: Boolean,
     default: false,
+  });
+
+  game.settings.register(MODULE_ID, SETTINGS.grouped, {
+    scope: 'user',
+    config: false,
+    type: Boolean,
+    default: true,
   });
 
   game.settings.register(MODULE_ID, SETTINGS.drawerFields, {
@@ -126,4 +135,20 @@ export async function setDrawerFields(fields: Iterable<DrawerField>): Promise<vo
     SETTINGS.drawerFields,
     DRAWER_FIELDS.filter(field => chosen.has(field)),
   );
+}
+
+/**
+ * Whether the current user's list view groups related modules, saved per user so it follows them between devices.
+ * @returns `true` to group them, the default; `false` for a flat list
+ */
+export function isGrouped(): boolean {
+  return game.settings.get(MODULE_ID, SETTINGS.grouped);
+}
+
+/**
+ * Remember whether the current user's list view groups related modules.
+ * @param grouped - `true` to group them, `false` for a flat list
+ */
+export async function setGrouped(grouped: boolean): Promise<void> {
+  await game.settings.set(MODULE_ID, SETTINGS.grouped, grouped);
 }
