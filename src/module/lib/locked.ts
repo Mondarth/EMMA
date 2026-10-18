@@ -9,10 +9,14 @@ import type { ModuleState } from '@module/state/module-state.svelte';
  * @returns The explanation, naming the active modules that require it, or `undefined` if it is not locked
  */
 export function lockedTooltip(modules: ModuleState, entry: ModuleEntry): string | undefined {
-  const parents = modules.lockedBy(entry.id);
-  if (parents.length === 0) return undefined;
-  return format('MONDARTH-EMMA.Requirements.Locked', {
+  const [parent, ...others] = modules.lockedBy(entry.id);
+  if (parent === undefined) return undefined;
+  // Foundry's localization has no plural rules, so one module and several have strings of their own.
+  if (others.length === 0) {
+    return format('MONDARTH-EMMA.Requirements.LockedOne', { module: entry.title, parent: parent.title });
+  }
+  return format('MONDARTH-EMMA.Requirements.LockedMany', {
     module: entry.title,
-    parents: formatList(parents.map(({ title }) => title)),
+    parents: formatList([parent, ...others].map(({ title }) => title)),
   });
 }
