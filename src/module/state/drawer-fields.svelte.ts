@@ -103,5 +103,66 @@ export class DrawerFields {
   }
 }
 
+/**
+ * The details a user is choosing in the Module details menu, and whether they differ from the details shown now.
+ */
+export class DrawerFieldsDraft {
+  /** The details shown now, in drawer order. */
+  readonly #initial: readonly DrawerField[];
+  readonly #chosen = new SvelteSet<DrawerField>();
+
+  /**
+   * @param initial - The details shown now
+   */
+  constructor(initial: Iterable<DrawerField>) {
+    for (const field of initial) this.#chosen.add(field);
+    this.#initial = this.fields;
+  }
+
+  /**
+   * The details chosen, in drawer order.
+   * @returns The fields
+   */
+  get fields(): DrawerField[] {
+    return DRAWER_FIELDS.filter(field => this.#chosen.has(field));
+  }
+
+  /**
+   * Whether the details chosen differ from those shown now, so that closing would lose a change.
+   * @returns `true` if there are changes to save
+   */
+  get dirty(): boolean {
+    const fields = this.fields;
+    return fields.length !== this.#initial.length || fields.some((field, index) => field !== this.#initial[index]);
+  }
+
+  /**
+   * Whether a detail is chosen.
+   * @param field - The detail
+   * @returns `true` if it is chosen
+   */
+  has(field: DrawerField): boolean {
+    return this.#chosen.has(field);
+  }
+
+  /**
+   * Choose a detail, or stop choosing it.
+   * @param field - The detail
+   * @param chosen - Whether to show it
+   */
+  choose(field: DrawerField, chosen: boolean): void {
+    if (chosen) this.#chosen.add(field);
+    else this.#chosen.delete(field);
+  }
+
+  /**
+   * Choose the details shown until a user chooses otherwise. Nothing is saved.
+   */
+  chooseDefaults(): void {
+    this.#chosen.clear();
+    for (const field of DEFAULT_DRAWER_FIELDS) this.#chosen.add(field);
+  }
+}
+
 /** The details shown in EMMA's drawers, kept in step with the user's setting. */
 export const drawerFields = new DrawerFields();

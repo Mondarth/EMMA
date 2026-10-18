@@ -100,4 +100,103 @@ describe('DrawerFieldsConfig', () => {
 
     await expect(app.close()).resolves.toBe(app);
   });
+
+  describe('closing with the choice changed and not saved', () => {
+    /**
+     * Open the menu and check one more detail, so that the choice differs from the one saved.
+     * @returns The menu window and the installed mocks
+     */
+    async function openChanged() {
+      const loaded = await loadMenu();
+      const app = new loaded.DrawerFieldsConfig();
+      await app.render({ force: true });
+      await userEvent.click(screen.getByRole('checkbox', { name: 'MONDARTH-EMMA.Drawer.Field.id' }));
+      return { app, ...loaded };
+    }
+
+    test('closes without asking when nothing changed', async () => {
+      const { DrawerFieldsConfig, foundry } = await loadMenu();
+      const app = new DrawerFieldsConfig();
+      await app.render({ force: true });
+
+      await app.close();
+
+      expect(foundry.confirm).not.toHaveBeenCalled();
+      expect(app.rendered).toBe(false);
+    });
+
+    test('asks first, keeping the changes by default', async () => {
+      const { app, foundry } = await openChanged();
+
+      await app.close();
+
+      expect(foundry.confirm).toHaveBeenCalledOnce();
+      expect(foundry.confirm.mock.calls[0]?.[0]).toMatchObject({
+        id: 'mondarth-emma-fields-discard',
+        window: { title: 'MONDARTH-EMMA.Settings.Fields.Discard.Title' },
+        content: '<p>MONDARTH-EMMA.Settings.Fields.Discard.Body</p>',
+        modal: true,
+        yes: { label: 'MONDARTH-EMMA.Discard.Discard', default: false },
+        no: { label: 'MONDARTH-EMMA.Discard.Keep', default: true },
+      });
+    });
+
+    test.each([false, null])('stays open when the answer is %s', async answer => {
+      const { app, foundry } = await openChanged();
+      foundry.confirm.mockResolvedValueOnce(answer);
+
+      await expect(app.close()).resolves.toBeUndefined();
+
+      expect(app.rendered).toBe(true);
+      expect(screen.getByRole('checkbox', { name: 'MONDARTH-EMMA.Drawer.Field.id' })).toBeChecked();
+    });
+
+    test('closes, saving nothing, when the user agrees to discard the changes', async () => {
+      const { app, foundry, game } = await openChanged();
+      foundry.confirm.mockResolvedValueOnce(true);
+
+      await app.close();
+
+      expect(app.rendered).toBe(false);
+      expect(game.settings.set).not.toHaveBeenCalled();
+    });
+
+    test('closes without asking when told to discard', async () => {
+      const { app, foundry } = await openChanged();
+
+      await app.close({ discard: true });
+
+      expect(foundry.confirm).not.toHaveBeenCalled();
+      expect(app.rendered).toBe(false);
+    });
+
+    test('asks only once while the question is open', async () => {
+      const { app, foundry } = await openChanged();
+      let answer = (_discard: boolean): void => undefined;
+      foundry.confirm.mockReturnValueOnce(
+        new Promise(resolve => {
+          answer = resolve;
+        }),
+      );
+
+      const first = app.close();
+      await expect(app.close()).resolves.toBeUndefined();
+      answer(true);
+      await first;
+
+      expect(foundry.confirm).toHaveBeenCalledOnce();
+      expect(app.rendered).toBe(false);
+    });
+
+    test('does not ask after saving', async () => {
+      const { app, foundry } = await openChanged();
+
+      await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+      await vi.waitFor(() => {
+        expect(app.rendered).toBe(false);
+      });
+      expect(foundry.confirm).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -340,6 +340,36 @@ test.describe('Choosing the details drawers show', () => {
     await setDrawerFields(page, null);
   });
 
+  test('closing the menu with the choice changed and not saved asks first', async ({ page }) => {
+    await page.getByRole('tab', { name: 'Settings', exact: true }).click();
+    await page.getByRole('button', { name: 'Game Settings' }).click();
+    const settings = page.locator('#settings-config');
+    await settings.getByRole('button', { name: MODULE_TITLE }).click();
+    await settings.getByRole('button', { name: 'Choose details' }).click();
+    const menuWindow = `#${MODULE_ID}-fields`;
+    const menu = page.locator(menuWindow);
+    const links = menu.getByRole('checkbox', { name: 'Links' });
+    const question = page.locator(`#${MODULE_ID}-fields-discard`);
+
+    await links.check();
+    await clickClose(page, menuWindow);
+
+    await expect(question.getByRole('heading', { name: 'Discard your changes?' })).toBeVisible();
+    await question.getByRole('button', { name: 'Keep editing' }).click();
+    await expect(question).toHaveCount(0);
+    await expect(links).toBeChecked();
+
+    await clickClose(page, menuWindow);
+    await question.getByRole('button', { name: 'Discard and close' }).click();
+
+    await expect(menu).toHaveCount(0);
+    expect(await page.evaluate(() => game.settings.get('mondarth-emma', 'drawerFields'))).toEqual([
+      'description',
+      'authors',
+      'languages',
+    ]);
+  });
+
   test('a player chooses them under Game Settings, and open drawers follow', async ({ page }) => {
     await (await moduleManagementButton(page)).click();
     const emma = page.locator(EMMA_WINDOW);
@@ -472,15 +502,16 @@ test.describe('Saving', () => {
 const DISCARD_QUESTION = `#${MODULE_ID}-discard`;
 
 /**
- * Click the EMMA window's Close Window button, as a user would. Foundry's notifications, such as the warning about
- * missing hardware acceleration in a test browser, can cover the button, so they are cleared first.
- * @param page - A page showing the EMMA window
+ * Click a window's Close Window button, as a user would. Foundry's notifications, such as the warning about missing
+ * hardware acceleration in a test browser, can cover the button, so they are cleared first.
+ * @param page - A page showing the window
+ * @param window - A selector for the window; EMMA's by default
  */
-async function clickClose(page: Page): Promise<void> {
+async function clickClose(page: Page, window = EMMA_WINDOW): Promise<void> {
   await page.evaluate(() => {
     ui.notifications?.clear();
   });
-  await page.locator(EMMA_WINDOW).getByRole('button', { name: 'Close Window' }).click();
+  await page.locator(window).getByRole('button', { name: 'Close Window' }).click();
 }
 
 test.describe('Closing with staged changes', () => {

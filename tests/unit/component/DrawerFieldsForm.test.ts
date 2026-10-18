@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import DrawerFieldsForm from '@component/DrawerFieldsForm.svelte';
-import { DRAWER_FIELDS } from '@module/state/drawer-fields.svelte';
+import { DRAWER_FIELDS, DrawerFieldsDraft } from '@module/state/drawer-fields.svelte';
 import { installFoundryMocks } from '../mocks/foundry';
 
 const SAVE = 'MONDARTH-EMMA.Settings.Fields.Save';
@@ -24,7 +24,7 @@ describe('DrawerFieldsForm', () => {
   });
 
   test('has a checkbox for every field, in drawer order, checked for those shown now', () => {
-    render(DrawerFieldsForm, { initial: ['links', 'id'], onSave: vi.fn() });
+    render(DrawerFieldsForm, { draft: new DrawerFieldsDraft(['links', 'id']), onSave: vi.fn() });
 
     const group = screen.getByRole('group', { name: 'MONDARTH-EMMA.Settings.Fields.Legend' });
     expect(group).toBeInTheDocument();
@@ -36,7 +36,7 @@ describe('DrawerFieldsForm', () => {
 
   test('saves the fields checked, in drawer order', async () => {
     const onSave = vi.fn(() => Promise.resolve());
-    render(DrawerFieldsForm, { initial: ['description'], onSave });
+    render(DrawerFieldsForm, { draft: new DrawerFieldsDraft(['description']), onSave });
 
     await userEvent.click(checkbox('id'));
     await userEvent.click(checkbox('description'));
@@ -48,7 +48,7 @@ describe('DrawerFieldsForm', () => {
 
   test('checks the defaults again without saving them', async () => {
     const onSave = vi.fn(() => Promise.resolve());
-    render(DrawerFieldsForm, { initial: ['id'], onSave });
+    render(DrawerFieldsForm, { draft: new DrawerFieldsDraft(['id']), onSave });
 
     await userEvent.click(screen.getByRole('button', { name: DEFAULTS }));
 
@@ -60,6 +60,17 @@ describe('DrawerFieldsForm', () => {
     expect(onSave).not.toHaveBeenCalled();
   });
 
+  test('records the changes in its draft', async () => {
+    const draft = new DrawerFieldsDraft(['description']);
+    render(DrawerFieldsForm, { draft, onSave: vi.fn() });
+
+    await userEvent.click(checkbox('id'));
+    expect(draft.dirty).toBe(true);
+
+    await userEvent.click(checkbox('id'));
+    expect(draft.dirty).toBe(false);
+  });
+
   test('disables Save while saving, and only saves once', async () => {
     let finish = (): void => undefined;
     const onSave = vi.fn(
@@ -68,7 +79,7 @@ describe('DrawerFieldsForm', () => {
           finish = resolve;
         }),
     );
-    render(DrawerFieldsForm, { initial: [], onSave });
+    render(DrawerFieldsForm, { draft: new DrawerFieldsDraft([]), onSave });
     const save = screen.getByRole('button', { name: SAVE });
 
     await userEvent.click(save);
@@ -84,7 +95,7 @@ describe('DrawerFieldsForm', () => {
     const failure = new Error('offline');
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const onSave = vi.fn(() => Promise.reject(failure));
-    render(DrawerFieldsForm, { initial: [], onSave });
+    render(DrawerFieldsForm, { draft: new DrawerFieldsDraft([]), onSave });
 
     await userEvent.click(screen.getByRole('button', { name: SAVE }));
 

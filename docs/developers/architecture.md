@@ -35,7 +35,9 @@ adapters is plain TypeScript and Svelte, tested without a Foundry server.
 `src/module/app/`
 : The `ApplicationV2` windows. `EmmaApp` is EMMA itself, and `DrawerFieldsConfig` the Module details settings menu,
   registered with `game.settings.registerMenu` and open to every user, in which they choose the details drawers show.
-  Each mounts its Svelte component on first render and unmounts it on close.
+  Each mounts its Svelte component on first render and unmounts it on close. Both ask before closing with unsaved
+  changes (staged activation in `EmmaApp`, a changed `DrawerFieldsDraft` in the menu), through `confirmDiscard` in
+  `confirm-discard.ts`; `close({ discard: true })` closes without asking.
 
 `src/component/`
 : The Svelte components. They read and change a `ModuleState` and never use `game` directly; text comes through

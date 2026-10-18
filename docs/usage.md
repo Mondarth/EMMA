@@ -85,7 +85,8 @@ out.
 
 Each user chooses the details their drawers show: in **Game Settings**, open the section for EMMA, choose **Choose
 details** under **Module details**, check the details you want and **Save**. **Reset to defaults** checks the
-defaults again. Open drawers change at once, and your choice follows you to every device you play on.
+defaults again. Open drawers change at once, and your choice follows you to every device you play on. Closing the
+window with your choice changed and not saved asks first whether to discard the change or keep editing.
 
 | Detail           | Shows                                                                                         |
 | ---------------- | --------------------------------------------------------------------------------------------- |

@@ -17,7 +17,7 @@ export default {
     'tense/subject-tense': [
       2,
       'always',
-      { allowedTenses: ['present-imperative'], firstOnly: true, allowlist: ['cover'] },
+      { allowedTenses: ['present-imperative'], firstOnly: true, allowlist: ['ask', 'cover'] },
     ],
   },
 };
