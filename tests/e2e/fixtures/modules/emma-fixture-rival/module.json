@@ -1,0 +1,11 @@
+{
+  "id": "emma-fixture-rival",
+  "title": "EMMA Fixture Rival",
+  "description": "An empty module that conflicts with EMMA Fixture Library, for the EMMA end-to-end tests of conflicts.",
+  "version": "1.0.0",
+  "compatibility": { "minimum": "14", "verified": "14" },
+  "authors": [{ "name": "EMMA tests" }],
+  "relationships": {
+    "conflicts": [{ "id": "emma-fixture-library", "type": "module", "reason": "Both wrap the same thing." }]
+  }
+}

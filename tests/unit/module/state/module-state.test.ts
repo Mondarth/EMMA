@@ -486,10 +486,8 @@ describe('ModuleState', () => {
     });
 
     test('lists active modules whose required modules will not be active, by title', () => {
-      const state = new ModuleState(LIBRARY, { app: true, extra: true, lib: true });
-
-      state.setActive('lib', false);
-      state.setActive('extra', false);
+      // Saved that way: EMMA itself never deactivates a module an active module requires.
+      const state = new ModuleState(LIBRARY, { app: true });
 
       expect(state.unmet).toEqual([{ entry: LIBRARY[0], missing: ['lib', 'extra'] }]);
     });

@@ -10,6 +10,8 @@ export const SETTINGS = {
   view: 'view',
   /** The details this user has chosen to show in module drawers. */
   drawerFields: 'drawerFields',
+  /** Whether activating a module also activates the modules it recommends, and deactivating it deactivates them. */
+  autoRecommended: 'autoRecommended',
 } as const;
 
 /** EMMA's main views. */
@@ -39,6 +41,15 @@ export function registerSettings(): void {
     default: DEFAULT_VIEW,
   });
 
+  game.settings.register(MODULE_ID, SETTINGS.autoRecommended, {
+    name: 'MONDARTH-EMMA.Settings.AutoRecommended.Name',
+    hint: 'MONDARTH-EMMA.Settings.AutoRecommended.Hint',
+    scope: 'user',
+    config: true,
+    type: Boolean,
+    default: false,
+  });
+
   game.settings.register(MODULE_ID, SETTINGS.drawerFields, {
     scope: 'user',
     config: false,
@@ -58,6 +69,15 @@ export function registerSettings(): void {
  */
 export function isEmmaDisabled(): boolean {
   return game.settings.get(MODULE_ID, SETTINGS.disabled);
+}
+
+/**
+ * Whether the current user has chosen to have recommended modules activated and deactivated with the modules that
+ * recommend them. Read on every use, so a change takes effect at once.
+ * @returns `true` if recommended modules follow the modules that recommend them
+ */
+export function isAutoRecommended(): boolean {
+  return game.settings.get(MODULE_ID, SETTINGS.autoRecommended);
 }
 
 /**

@@ -19,6 +19,13 @@
         "type": "module",
         "reason": "It adds to what the library does."
       }
+    ],
+    "recommends": [
+      {
+        "id": "emma-fixture-rival",
+        "type": "module",
+        "reason": "It goes well with the add-on."
+      }
     ]
   },
   "readme": "README.md",

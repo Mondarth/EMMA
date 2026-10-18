@@ -3,9 +3,55 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, test } from 'vitest';
 
 import ListView from '@component/ListView.svelte';
+import type { ModuleEntry } from '@module/adapters/modules';
+import { DrawerFields } from '@module/state/drawer-fields.svelte';
+import { ModuleState } from '@module/state/module-state.svelte';
+import { moduleEntry } from '../mocks/entries';
 import { installFoundryMocks } from '../mocks/foundry';
 import { createModules } from './fixtures';
-import { DrawerFields } from '@module/state/drawer-fields.svelte';
+
+/**
+ * Build a module entry with relationships to other modules.
+ * @param id - The module ID, also used as its title
+ * @param relations - The IDs of the modules it requires, recommends and conflicts with
+ * @param relations.requires - Modules it requires
+ * @param relations.recommends - Modules it recommends
+ * @param relations.conflicts - Modules it conflicts with
+ * @returns The entry
+ */
+function related(
+  id: string,
+  {
+    requires = [],
+    recommends = [],
+    conflicts = [],
+  }: Partial<Record<'requires' | 'recommends' | 'conflicts', string[]>> = {},
+): ModuleEntry {
+  const relations = (ids: string[]) => ids.map(other => ({ id: other, type: 'module' as const, title: other }));
+  return moduleEntry({
+    id,
+    requires,
+    relationships: {
+      systems: [],
+      requires: relations(requires),
+      recommends: relations(recommends),
+      conflicts: relations(conflicts),
+    },
+  });
+}
+
+/**
+ * The list's rows, each as its title, indented two spaces per level of grouping, with its relation icon's label.
+ * @returns One line per row
+ */
+function outline(): string[] {
+  return screen.getAllByRole('listitem').map(item => {
+    const depth = Number(item.style.getPropertyValue('--emma-depth'));
+    const relation = item.querySelector('.emma-module-relation')?.getAttribute('aria-label');
+    const title = item.querySelector('.emma-module-title')?.textContent ?? '';
+    return `${'  '.repeat(depth)}${title}${relation === undefined ? '' : ` [${relation}]`}`;
+  });
+}
 
 describe('ListView', () => {
   beforeEach(() => {
@@ -191,5 +237,136 @@ describe('ListView', () => {
     expect(screen.getByText('MONDARTH-EMMA.List.Empty')).toBeInTheDocument();
     expect(screen.queryByRole('list')).toBeNull();
     expect(screen.getByRole('heading')).toHaveTextContent('Active MONDARTH-EMMA.Count {"count":"0"}');
+  });
+
+  describe('related modules', () => {
+    // app requires lib and recommends extra; tool requires lib too; rival conflicts with lib.
+    const ENTRIES = [
+      related('app', { requires: ['lib'], recommends: ['extra'] }),
+      related('extra'),
+      related('lib'),
+      related('rival', { conflicts: ['lib'] }),
+      related('tool', { requires: ['lib'] }),
+    ];
+
+    test('checking a module checks the modules it requires and groups them under it, required first', async () => {
+      const modules = new ModuleState(ENTRIES, {});
+      render(ListView, { fields: new DrawerFields(), modules, canManage: true });
+
+      await userEvent.click(screen.getByRole('checkbox', { name: 'app' }));
+
+      expect(outline()).toEqual([
+        'app',
+        '  lib [MONDARTH-EMMA.Relation.required]',
+        '  extra [MONDARTH-EMMA.Relation.recommended]',
+        'rival',
+        'tool',
+      ]);
+      expect(screen.getByRole('checkbox', { name: /lib/ })).toBeChecked();
+      expect(screen.getByRole('checkbox', { name: /extra/ })).not.toBeChecked();
+    });
+
+    test('marks a grouped module with an information icon whose tooltip names the relation', async () => {
+      const modules = new ModuleState(ENTRIES, {});
+      render(ListView, { fields: new DrawerFields(), modules, canManage: true });
+
+      await userEvent.click(screen.getByRole('checkbox', { name: 'app' }));
+
+      const icon = screen.getByRole('img', { name: 'MONDARTH-EMMA.Relation.required' });
+      expect(icon).toHaveClass('fa-solid', 'fa-circle-info');
+      expect(icon).toHaveAttribute('data-tooltip', 'MONDARTH-EMMA.Relation.required');
+      const checkbox = screen.getByRole('checkbox', { name: /lib/ });
+      expect(icon.compareDocumentPosition(checkbox) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    test('repeats a module under each checked module that requires it', () => {
+      const modules = new ModuleState(ENTRIES, { app: true, lib: true, tool: true });
+      render(ListView, { fields: new DrawerFields(), modules, canManage: true });
+
+      expect(outline()).toEqual([
+        'app',
+        '  lib [MONDARTH-EMMA.Relation.required]',
+        '  extra [MONDARTH-EMMA.Relation.recommended]',
+        'rival',
+        'tool',
+        '  lib [MONDARTH-EMMA.Relation.required]',
+      ]);
+    });
+
+    test('every copy of a module changes them all', async () => {
+      const modules = new ModuleState(
+        [related('app', { recommends: ['extra'] }), related('extra'), related('tool', { recommends: ['extra'] })],
+        { app: true, tool: true },
+      );
+      render(ListView, { fields: new DrawerFields(), modules, canManage: true });
+      const [first, second] = screen.getAllByRole('checkbox', { name: /extra/ });
+
+      await userEvent.click(first as HTMLElement);
+
+      expect(second).toBeChecked();
+      expect(modules.isActive('extra')).toBe(true);
+    });
+
+    test('locks the checkbox of a module a checked module requires, explaining why on hover', async () => {
+      const modules = new ModuleState(ENTRIES, {});
+      render(ListView, { fields: new DrawerFields(), modules, canManage: true });
+
+      await userEvent.click(screen.getByRole('checkbox', { name: 'app' }));
+      await userEvent.click(screen.getByRole('checkbox', { name: 'tool' }));
+
+      const copies = screen.getAllByRole('checkbox', { name: /lib/ });
+      expect(copies).toHaveLength(2);
+      for (const checkbox of copies) {
+        expect(checkbox).toBeChecked();
+        expect(checkbox).toBeDisabled();
+        expect(checkbox.closest('li')).toHaveClass('locked');
+        expect(checkbox.closest('.emma-module-row')).toHaveAttribute(
+          'data-tooltip',
+          'MONDARTH-EMMA.Requirements.Locked {"module":"lib","parents":"app and tool"}',
+        );
+      }
+      expect(screen.getByRole('checkbox', { name: 'app' })).toBeEnabled();
+      expect(screen.getByRole('checkbox', { name: 'app' }).closest('.emma-module-row')).not.toHaveAttribute(
+        'data-tooltip',
+      );
+    });
+
+    test('unchecking a module unchecks what was checked for it and returns it to its place', async () => {
+      const modules = new ModuleState(ENTRIES, {});
+      render(ListView, { fields: new DrawerFields(), modules, canManage: true });
+      const app = screen.getByRole('checkbox', { name: 'app' });
+
+      await userEvent.click(app);
+      await userEvent.click(app);
+
+      expect(outline()).toEqual(['app', 'extra', 'lib', 'rival', 'tool']);
+      expect(modules.dirty).toBe(false);
+    });
+
+    test('gives each copy of a module its own drawer', async () => {
+      const modules = new ModuleState(ENTRIES, { app: true, lib: true, tool: true });
+      render(ListView, { fields: new DrawerFields(), modules, canManage: true });
+
+      modules.toggleExpanded('lib');
+
+      const buttons = await screen.findAllByRole('button', { name: 'MONDARTH-EMMA.Drawer.Hide {"module":"lib"}' });
+      const ids = buttons.map(button => button.getAttribute('aria-controls'));
+      expect(new Set(ids).size).toBe(2);
+      for (const id of ids) expect(document.getElementById(id as string)).toHaveClass('emma-drawer');
+    });
+
+    test('marks an unchecked module that conflicts with a checked one in red, with a warning icon', async () => {
+      const modules = new ModuleState(ENTRIES, {});
+      render(ListView, { fields: new DrawerFields(), modules, canManage: true });
+      expect(screen.queryByRole('img', { name: 'MONDARTH-EMMA.Relation.Conflict' })).toBeNull();
+
+      await userEvent.click(screen.getByRole('checkbox', { name: 'app' }));
+
+      const icon = screen.getByRole('img', { name: 'MONDARTH-EMMA.Relation.Conflict' });
+      expect(icon).toHaveClass('fa-solid', 'fa-triangle-exclamation');
+      expect(icon).toHaveAttribute('data-tooltip', 'MONDARTH-EMMA.Relation.Conflict');
+      expect(icon.closest('li')).toHaveClass('conflicted');
+      expect(icon.nextElementSibling).toHaveTextContent('rival');
+    });
   });
 });

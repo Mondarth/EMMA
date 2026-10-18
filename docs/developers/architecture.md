@@ -31,6 +31,16 @@ adapters is plain TypeScript and Svelte, tested without a Foundry server.
   and holds `drawerFields`, the details the user has chosen. Its one instance is set from the per-user setting when
   EMMA opens and by the setting's `onChange`, so open drawers follow a change made in the settings menu or on another
   of the user's devices.
+  `grouping.ts` holds the pure rules for related modules: `relatedModules` lists the installed modules a module
+  requires and recommends, `groupRows` builds the grouped rows (each module grouped under every parent that relates
+  to it, following chains and cutting loops), and `conflictedModules` finds the inactive modules in conflict with an
+  active one. `ModuleState` applies them: its `rows` group under the active modules, and `setActive` activates the
+  modules a module needs, remembering them as implied so that deactivating it deactivates only those it activated. A module an active module
+  requires is locked (`lockedBy`, `isLocked`): it cannot be deactivated or selected on the active side, except by
+  modules it needs itself, so that modules requiring each other never lock one another.
+  In the split view, a side's selection is the modules the user chose plus what they require there (`withRequired`),
+  `rowsOf` groups each side under its selected modules (on the active side including recommended modules still
+  inactive, for the user to confirm), and moving modules follows the same activation rules as checking them.
 
 `src/module/app/`
 : The `ApplicationV2` windows. `EmmaApp` is EMMA itself, and `DrawerFieldsConfig` the Module details settings menu,

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { format, localize } from '@module/lib/i18n';
+  import { lockedTooltip } from '@module/lib/locked';
   import type { DrawerFields } from '@module/state/drawer-fields.svelte';
   import type { ModuleState } from '@module/state/module-state.svelte';
 
@@ -21,12 +22,12 @@
   const uid = $props.id();
 
   /**
-   * The DOM ID of a module's drawer.
-   * @param id - The module ID
+   * The DOM ID of a row's drawer. A module grouped under several parents has a row, and so a drawer, under each.
+   * @param key - The row's key
    * @returns A document-unique ID
    */
-  function drawerId(id: string): string {
-    return `${uid}-drawer-${id}`;
+  function drawerId(key: string): string {
+    return `${uid}-drawer-${key.replaceAll('/', '__')}`;
   }
 
   /**
@@ -59,28 +60,45 @@
   <p class="emma-empty">{localize('MONDARTH-EMMA.List.Empty')}</p>
 {:else}
   <ul class="emma-list" aria-labelledby={`${uid}-heading`}>
-    {#each modules.entries as entry (entry.id)}
+    {#each modules.rows as { key, entry, depth, relation } (key)}
       {@const expanded = modules.isExpanded(entry.id)}
-      <li class={['emma-module', { changed: entry.id in modules.changes }]}>
-        <div class="emma-module-row">
+      {@const conflicted = modules.conflicted.has(entry.id)}
+      {@const locked = lockedTooltip(modules, entry)}
+      <li
+        class={['emma-module', { changed: entry.id in modules.changes, conflicted, locked: locked !== undefined }]}
+        style:--emma-depth={depth}>
+        <div class="emma-module-row" data-tooltip={locked}>
           <label>
+            {#if relation !== null}
+              {@const label = localize(`MONDARTH-EMMA.Relation.${relation}`)}
+              <i class="emma-module-relation fa-solid fa-circle-info" role="img" aria-label={label} data-tooltip={label}
+              ></i>
+            {/if}
             <input
               type="checkbox"
               checked={modules.isActive(entry.id)}
-              disabled={!canManage}
+              disabled={!canManage || locked !== undefined}
               onchange={event => {
                 modules.setActive(entry.id, event.currentTarget.checked);
               }}
               onkeydown={event => {
                 onKeydown(event, entry.id);
               }} />
+            {#if conflicted}
+              {@const label = localize('MONDARTH-EMMA.Relation.Conflict')}
+              <i
+                class="emma-module-conflict fa-solid fa-triangle-exclamation"
+                role="img"
+                aria-label={label}
+                data-tooltip={label}></i>
+            {/if}
             <span class="emma-module-title">{entry.title}</span>
           </label>
           <span class="emma-module-version"><VersionBadge version={entry.version} badge={entry.badge} /></span>
           <DisclosureButton
             title={entry.title}
             {expanded}
-            controls={drawerId(entry.id)}
+            controls={drawerId(key)}
             onToggle={() => {
               modules.toggleExpanded(entry.id);
             }}
@@ -89,7 +107,7 @@
             }} />
         </div>
         {#if expanded}
-          <ModuleDrawer {entry} id={drawerId(entry.id)} {fields} />
+          <ModuleDrawer {entry} id={drawerId(key)} {fields} />
         {/if}
       </li>
     {/each}
@@ -122,7 +140,7 @@
   }
 
   .emma-module {
-    padding: 0.25rem 0.25rem 0.25rem 0.5rem;
+    padding: 0.25rem 0.25rem 0.25rem calc(0.5rem + var(--emma-depth, 0) * 1.5rem);
     border-bottom: 1px solid var(--color-border);
   }
 
@@ -149,6 +167,26 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     color: var(--color-text-emphatic);
+  }
+
+  /* A module an active module requires cannot be unchecked; its row's tooltip says why. */
+  .emma-module.locked label {
+    cursor: not-allowed;
+  }
+
+  .emma-module.locked input {
+    opacity: 0.5;
+    /* Disabled controls swallow pointer events in some browsers, which would stop the row's tooltip showing. */
+    pointer-events: none;
+  }
+
+  .emma-module-relation {
+    color: var(--color-text-secondary);
+  }
+
+  .emma-module.conflicted .emma-module-title,
+  .emma-module-conflict {
+    color: var(--color-level-error);
   }
 
   .emma-module-version {

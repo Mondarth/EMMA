@@ -134,8 +134,9 @@ export default defineConfig(({ mode }) => {
         include: ['index.ts', 'module/**/*.ts', 'component/**/*.svelte'],
         reportsDirectory: '../coverage',
         reporter: ['text', 'html', 'lcov'],
-        // Ratchet these upward as coverage improves; never lower them to make a change pass.
-        thresholds: { statements: 95, branches: 90, functions: 100, lines: 95 },
+        // Ratchet these upward as coverage improves; never lower them to make a change pass. Branches stay below 100
+        // because Svelte compiles each `{value}` in markup to `value ?? ''`, a branch no string value can take.
+        thresholds: { statements: 100, branches: 97, functions: 100, lines: 100 },
       },
       includeSource: ['**/*.{ts,js}'],
     },

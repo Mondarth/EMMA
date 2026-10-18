@@ -8,7 +8,7 @@ import { saveModules } from '@module/app/save';
 import { MODULE_ID } from '@module/lib/constants';
 import { log } from '@module/lib/logger';
 import type { View } from '@module/settings';
-import { getDrawerFields, getView, setView } from '@module/settings';
+import { getDrawerFields, getView, isAutoRecommended, setView } from '@module/settings';
 import { drawerFields } from '@module/state/drawer-fields.svelte';
 import { ModuleState } from '@module/state/module-state.svelte';
 
@@ -73,7 +73,7 @@ export class EmmaApp extends foundry.applications.api.ApplicationV2 {
    */
   protected override _replaceHTML(_result: unknown, content: HTMLElement): void {
     if (this.#component !== null) return;
-    const modules = new ModuleState(listInstalledModules(), readActivation());
+    const modules = new ModuleState(listInstalledModules(), readActivation(), { autoRecommended: isAutoRecommended });
     this.#modules = modules;
     drawerFields.set(getDrawerFields());
     this.#component = mount(EmmaRoot, {
