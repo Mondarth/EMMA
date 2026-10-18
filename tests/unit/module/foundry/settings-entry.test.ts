@@ -15,7 +15,7 @@ vi.mock('@module/app/emma-app', () => ({ openEmma: vi.fn(() => Promise.resolve()
 function createSettingsTab() {
   const element = document.createElement('section');
   element.innerHTML = `
-    <button type="button" data-action="openApp" data-app="modules"><i class="fa-solid fa-cubes"></i> Manage Modules</button>
+    <button type="button" data-action="openApp" data-app="modules"><i class="fa-solid fa-cube" inert></i> Manage Modules</button>
     <button type="button" data-action="openApp" data-app="configure">Configure Settings</button>`;
   document.body.append(element);
 
