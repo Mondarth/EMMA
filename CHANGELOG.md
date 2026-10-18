@@ -1,3 +1,9 @@
+## [0.1.1](https://github.com/Mondarth/EMMA/compare/v0.1.0...v0.1.1) (2026-10-18)
+
+### Bug Fixes
+
+* **ui:** keep triangles clear of the scrollbar and tint the drawers ([7478a0f](https://github.com/Mondarth/EMMA/commit/7478a0f3c6b5f30b505ca2e7f414a6e82b73ecb6))
+
 ## [0.1.0](https://github.com/Mondarth/EMMA/compare/v0.0.0...v0.1.0) (2026-10-18)
 
 ### Features
