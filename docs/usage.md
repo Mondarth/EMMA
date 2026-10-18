@@ -74,6 +74,23 @@ require each other do not lock one another, so neither is ever stuck.
 
 A module that conflicts with one that is checked is shown in red, with a warning icon whose tooltip reads **Conflict**.
 
+### Related modules in the split view
+
+The split view follows the same rules, with selecting in place of checking:
+
+- **Selecting a module selects the modules it requires** on the same side, following the chain, and groups them under
+  it with the modules it recommends, required first. Each grouped module has the same information icon. Deselecting
+  the module deselects them again, unless another selected module requires them.
+- **Activating moves the required modules with it.** Moving a module to the active side activates what it requires,
+  and, with **Automatically activate/deactivate recommended modules** on, what it recommends. Deactivating it
+  deactivates the modules activated only for it.
+- **Recommended modules wait for you.** While an active module is selected, the modules it recommends that are still
+  inactive are grouped under it on the active side, each with a checkbox. Check it to activate that module too;
+  uncheck it to change your mind.
+
+A module required by an active module cannot be selected on the active side, and an inactive module that conflicts
+with an active one is shown in red with a warning icon, as in the list view.
+
 ### Module details
 
 Every module in either view has a disclosure triangle at its far right. Click it to open a drawer below the module
@@ -144,8 +161,9 @@ Disable EMMA
   Foundry's own Module Management window again. It takes effect immediately, without reloading.
 
 Automatically activate/deactivate recommended modules
-: A setting for each user, off by default. When on, checking a module in the list view also checks the modules it
-  recommends, and unchecking it unchecks them again, as it does for required modules.
+: A setting for each user, off by default. When on, activating a module, by checking it in the list view or moving
+  it to the active side of the split view, also activates the modules it recommends, and deactivating it deactivates
+  them again, as it does for required modules.
 
 Module details
 : A menu every user can open under **Game Settings**, choosing the details their drawers show for themselves. See

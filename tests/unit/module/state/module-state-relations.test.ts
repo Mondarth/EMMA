@@ -285,3 +285,143 @@ describe('locking', () => {
     expect([...state.selected('active')]).toEqual(['app', 'extra']);
   });
 });
+
+describe('selecting in the split view', () => {
+  test('selects the modules a selected module requires on the same side, following the chain', () => {
+    const state = createState();
+
+    state.select('inactive', 'app');
+
+    expect([...state.selected('inactive')]).toEqual(['app', 'core', 'lib']);
+    expect(state.isSelected('inactive', 'extra')).toBe(false);
+  });
+
+  test('drops them again when the module is deselected, unless another selected module requires them', () => {
+    const state = createState();
+    state.select('inactive', 'app');
+    state.select('inactive', 'tool', 'toggle');
+
+    state.select('inactive', 'app', 'toggle');
+
+    expect([...state.selected('inactive')]).toEqual(['core', 'lib', 'tool']);
+
+    state.select('inactive', 'tool', 'toggle');
+
+    expect(state.selected('inactive').size).toBe(0);
+  });
+
+  test('ignores a toggle on a module selected only because a selected module requires it', () => {
+    const state = createState();
+    state.select('inactive', 'app');
+
+    state.select('inactive', 'lib', 'toggle');
+
+    expect(state.isSelected('inactive', 'lib')).toBe(true);
+    state.select('inactive', 'app', 'toggle');
+    expect(state.isSelected('inactive', 'lib')).toBe(false);
+  });
+
+  test('does not select required modules on the other side', () => {
+    const state = createState({ lib: true, core: true });
+
+    state.select('inactive', 'app');
+
+    expect([...state.selected('inactive')]).toEqual(['app']);
+  });
+});
+
+describe('moving in the split view', () => {
+  test('activating moves what the modules require with them, selecting the modules moved that are not locked', () => {
+    const state = createState();
+    state.select('inactive', 'app');
+
+    expect(state.activateSelected()).toBe(3);
+
+    expect(activeIds(state)).toEqual(['app', 'core', 'lib']);
+    expect(state.isLocked('lib')).toBe(true);
+    expect([...state.selected('active')]).toEqual(['app']);
+  });
+
+  test('activating brings a requirement the user could not see selected, such as one on a range edge', () => {
+    const state = createState();
+    // core is required by lib, which app requires; only app is chosen.
+    state.select('inactive', 'tool');
+
+    state.activateSelected();
+
+    expect(activeIds(state)).toEqual(['core', 'lib', 'tool']);
+  });
+
+  test('activating brings recommended modules too when the setting says so', () => {
+    const state = createState({}, { autoRecommended: () => true });
+    state.select('inactive', 'app');
+
+    state.activateSelected();
+
+    expect(activeIds(state)).toEqual(['app', 'core', 'extra', 'lib']);
+  });
+
+  test('deactivating releases the modules activated only for the modules moved', () => {
+    const state = createState();
+    state.select('inactive', 'app');
+    state.activateSelected();
+
+    state.deactivateSelected();
+
+    expect(activeIds(state)).toEqual([]);
+    expect(state.dirty).toBe(false);
+  });
+});
+
+describe('rowsOf', () => {
+  /**
+   * Describe a side's rows by key and relation.
+   * @param state - The state
+   * @param side - The side
+   * @returns Each row's key and relation
+   */
+  function rowsOf(state: ModuleState, side: 'inactive' | 'active') {
+    return state.rowsOf(side).map(({ key, relation }) => [key, relation]);
+  }
+
+  test('groups related modules under the selected modules on each side', () => {
+    const state = createState();
+    expect(rowsOf(state, 'inactive').every(([, relation]) => relation === null)).toBe(true);
+
+    state.select('inactive', 'app');
+
+    expect(rowsOf(state, 'inactive')).toEqual([
+      ['app', null],
+      ['app/lib', 'required'],
+      ['app/lib/core', 'required'],
+      ['app/extra', 'recommended'],
+      ['rival', null],
+      ['tool', null],
+    ]);
+  });
+
+  test('groups an inactive recommended module under its selected active parent, for confirming', () => {
+    const state = createState();
+    state.select('inactive', 'app');
+    state.activateSelected();
+
+    expect(rowsOf(state, 'active')).toEqual([
+      ['app', null],
+      ['app/lib', 'required'],
+      ['app/lib/core', 'required'],
+      ['app/extra', 'recommended'],
+    ]);
+    expect(state.isActive('extra')).toBe(false);
+    expect(rowsOf(state, 'inactive').map(([key]) => key)).toContain('extra');
+  });
+
+  test('stops showing the recommended module on the active side once its parent is deselected', () => {
+    const state = createState();
+    state.select('inactive', 'app');
+    state.activateSelected();
+
+    state.clearSelection('active');
+
+    expect(rowsOf(state, 'active').map(([key]) => key)).toEqual(['app', 'core', 'lib']);
+  });
+});

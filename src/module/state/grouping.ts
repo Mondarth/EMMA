@@ -115,3 +115,27 @@ export function conflictedModules(entries: readonly ModuleEntry[], isActive: (id
       .map(({ id }) => id),
   );
 }
+
+/**
+ * Some modules with the modules they require among `entries`, and those modules' requirements in turn.
+ * @param entries - The modules to look among, in display order
+ * @param from - The IDs of the modules to start from
+ * @param skip - Whether to leave a required module out, along with what only it requires
+ * @returns The IDs of the modules and their requirements, in display order
+ */
+export function withRequired(
+  entries: readonly ModuleEntry[],
+  from: Iterable<string>,
+  skip: (id: string) => boolean,
+): string[] {
+  const found = new Set(from);
+  const queue = entries.filter(({ id }) => found.has(id));
+  for (let next = queue.shift(); next !== undefined; next = queue.shift()) {
+    for (const required of relatedModules(next, entries).required) {
+      if (found.has(required.id) || skip(required.id)) continue;
+      found.add(required.id);
+      queue.push(required);
+    }
+  }
+  return entries.filter(({ id }) => found.has(id)).map(({ id }) => id);
+}
