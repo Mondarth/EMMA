@@ -2,14 +2,22 @@ import { mount, unmount } from 'svelte';
 
 import EmmaRoot from '@component/EmmaRoot.svelte';
 import { canManageModules, listInstalledModules, readActivation } from '@module/adapters/modules';
+import type { DiscardClosingOptions, DiscardQuestion } from '@module/app/confirm-discard';
+import { confirmDiscard } from '@module/app/confirm-discard';
 import { saveModules } from '@module/app/save';
 import { MODULE_ID } from '@module/lib/constants';
-import { localize } from '@module/lib/i18n';
 import { log } from '@module/lib/logger';
 import type { View } from '@module/settings';
 import { getDrawerFields, getView, setView } from '@module/settings';
 import { drawerFields } from '@module/state/drawer-fields.svelte';
 import { ModuleState } from '@module/state/module-state.svelte';
+
+/** What to ask before closing EMMA with changes staged. */
+const DISCARD: DiscardQuestion = {
+  id: `${MODULE_ID}-discard`,
+  title: 'MONDARTH-EMMA.Discard.Title',
+  body: 'MONDARTH-EMMA.Discard.Body',
+};
 
 /**
  * The EMMA window: an `ApplicationV2` frame whose content is rendered entirely by the {@link EmmaRoot} Svelte
@@ -97,7 +105,7 @@ export class EmmaApp extends foundry.applications.api.ApplicationV2 {
       if (this.#confirming) return;
       this.#confirming = true;
       try {
-        if (!(await confirmDiscard())) return;
+        if (!(await confirmDiscard(DISCARD))) return;
       } finally {
         this.#confirming = false;
       }
@@ -124,26 +132,7 @@ export class EmmaApp extends foundry.applications.api.ApplicationV2 {
 // eslint-disable-next-line @typescript-eslint/no-namespace -- Declaration merging gives the options type a home next to the class, as Foundry's types do.
 export declare namespace EmmaApp {
   /** Options for {@link EmmaApp.close}. */
-  interface ClosingOptions extends foundry.applications.api.ApplicationV2.ClosingOptions {
-    /** Close without asking, discarding any staged changes. */
-    discard?: boolean;
-  }
-}
-
-/**
- * Ask whether to close EMMA, discarding the changes staged in it. Keeping them is the default.
- * @returns `true` if the user chose to discard the changes
- */
-async function confirmDiscard(): Promise<boolean> {
-  const discard = await foundry.applications.api.DialogV2.confirm({
-    id: `${MODULE_ID}-discard`,
-    window: { title: 'MONDARTH-EMMA.Discard.Title' },
-    content: `<p>${localize('MONDARTH-EMMA.Discard.Body')}</p>`,
-    modal: true,
-    yes: { label: 'MONDARTH-EMMA.Discard.Discard', icon: 'fa-solid fa-trash', default: false },
-    no: { label: 'MONDARTH-EMMA.Discard.Keep', icon: 'fa-solid fa-pen', default: true },
-  });
-  return discard === true;
+  type ClosingOptions = DiscardClosingOptions;
 }
 
 let instance: EmmaApp | null = null;

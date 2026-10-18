@@ -1,25 +1,19 @@
 <script lang="ts">
-  import { SvelteSet } from 'svelte/reactivity';
-
   import { localize } from '@module/lib/i18n';
   import { log } from '@module/lib/logger';
-  import type { DrawerField } from '@module/state/drawer-fields.svelte';
-  import { DEFAULT_DRAWER_FIELDS, DRAWER_FIELDS } from '@module/state/drawer-fields.svelte';
+  import type { DrawerField, DrawerFieldsDraft } from '@module/state/drawer-fields.svelte';
+  import { DRAWER_FIELDS } from '@module/state/drawer-fields.svelte';
 
   interface Props {
-    /** The details shown now. */
-    initial: readonly DrawerField[];
+    /** The details being chosen. */
+    draft: DrawerFieldsDraft;
     /** Saves the details chosen, in drawer order, reporting its own problems to the user. */
     onSave: (fields: DrawerField[]) => Promise<unknown>;
   }
 
-  const { initial, onSave }: Props = $props();
+  const { draft, onSave }: Props = $props();
 
   const uid = $props.id();
-
-  // The form is mounted afresh each time its window opens, so the initial choice is only read once.
-  // svelte-ignore state_referenced_locally
-  const chosen = new SvelteSet<DrawerField>(initial);
 
   let saving = $state(false);
 
@@ -33,20 +27,12 @@
     if (saving) return;
     saving = true;
     try {
-      await onSave(DRAWER_FIELDS.filter(field => chosen.has(field)));
+      await onSave(draft.fields);
     } catch (error) {
       log.error('Unable to save the drawer fields', error);
     } finally {
       saving = false;
     }
-  }
-
-  /**
-   * Choose the details shown until a user chooses otherwise. Nothing is saved until the form is.
-   */
-  function reset(): void {
-    chosen.clear();
-    for (const field of DEFAULT_DRAWER_FIELDS) chosen.add(field);
   }
 </script>
 
@@ -58,10 +44,9 @@
         <input
           id={`${uid}-${field}`}
           type="checkbox"
-          checked={chosen.has(field)}
+          checked={draft.has(field)}
           onchange={(event: Event & { currentTarget: HTMLInputElement }) => {
-            if (event.currentTarget.checked) chosen.add(field);
-            else chosen.delete(field);
+            draft.choose(field, event.currentTarget.checked);
           }} />
         {localize(`MONDARTH-EMMA.Drawer.Field.${field}`)}
       </label>
@@ -69,7 +54,11 @@
   </fieldset>
 
   <footer class="form-footer">
-    <button type="button" onclick={reset}>
+    <button
+      type="button"
+      onclick={() => {
+        draft.chooseDefaults();
+      }}>
       <i class="fa-solid fa-arrow-rotate-left" inert></i>
       {localize('MONDARTH-EMMA.Settings.Fields.Defaults')}
     </button>

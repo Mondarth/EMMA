@@ -99,7 +99,11 @@
         "Title": "EMMA - module details",
         "Legend": "Details shown in each module's drawer",
         "Defaults": "Reset to defaults",
-        "Save": "Save"
+        "Save": "Save",
+        "Discard": {
+          "Title": "Discard your changes?",
+          "Body": "The details you chose have not been saved. Closing the window discards them."
+        }
       }
     },
     "Errors": {
