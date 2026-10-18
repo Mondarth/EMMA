@@ -6,6 +6,7 @@ import SelectableList from '@component/SelectableList.svelte';
 import type { ModuleState } from '@module/state/module-state.svelte';
 import { installFoundryMocks } from '../mocks/foundry';
 import { createModules, ENTRIES } from './fixtures';
+import { DrawerFields } from '@module/state/drawer-fields.svelte';
 
 /** All three fixture modules inactive, in display order: Dice So Nice!, EMMA, libWrapper. */
 const ALL_INACTIVE = {};
@@ -20,7 +21,7 @@ function renderInactive(modules: ModuleState): HTMLElement {
   heading.id = 'heading';
   heading.textContent = 'Inactive';
   document.body.append(heading);
-  render(SelectableList, { modules, side: 'inactive', labelledby: 'heading' });
+  render(SelectableList, { fields: new DrawerFields(), modules, side: 'inactive', labelledby: 'heading' });
   return screen.getByRole('treegrid');
 }
 
@@ -83,7 +84,7 @@ describe('SelectableList', () => {
     test('gives each row a document-unique ID', () => {
       const modules = createModules(ALL_INACTIVE);
       renderInactive(modules);
-      render(SelectableList, { modules, side: 'inactive', labelledby: 'heading' });
+      render(SelectableList, { fields: new DrawerFields(), modules, side: 'inactive', labelledby: 'heading' });
 
       const ids = screen.getAllByRole('row').map(element => element.id);
       expect(new Set(ids).size).toBe(ids.length);

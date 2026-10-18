@@ -1,5 +1,6 @@
 <script lang="ts">
   import { localize } from '@module/lib/i18n';
+  import type { DrawerFields } from '@module/state/drawer-fields.svelte';
   import type { ModuleState, Side } from '@module/state/module-state.svelte';
 
   import SelectableList from './SelectableList.svelte';
@@ -10,9 +11,11 @@
     modules: ModuleState;
     /** Whether the user may change which modules are active. */
     canManage: boolean;
+    /** The details shown in module drawers. */
+    fields: DrawerFields;
   }
 
-  const { modules, canManage }: Props = $props();
+  const { modules, canManage, fields }: Props = $props();
 
   const uid = $props.id();
 
@@ -29,7 +32,7 @@
       {localize(TEXT[side].heading)}
       <span class="emma-split-count">{modules[side].length}</span>
     </h3>
-    <SelectableList {modules} {side} labelledby={headingId} />
+    <SelectableList {modules} {side} labelledby={headingId} {fields} />
     {#if modules[side].length === 0}
       <p class="emma-split-empty">{localize(TEXT[side].empty)}</p>
     {/if}

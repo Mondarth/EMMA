@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { DrawerFields } from '@module/state/drawer-fields.svelte';
   import type { View } from '@module/settings';
   import type { ModuleState } from '@module/state/module-state.svelte';
 
@@ -14,13 +15,15 @@
     initialView: View;
     /** Whether the user may change which modules are active. */
     canManage: boolean;
+    /** The details shown in module drawers. */
+    fields: DrawerFields;
     /** Saves the staged changes. */
     onSave: () => Promise<unknown>;
     /** Called when the user switches view, so the choice can be remembered. */
     onViewChange?: (view: View) => void;
   }
 
-  const { modules, initialView, canManage, onSave, onViewChange }: Props = $props();
+  const { modules, initialView, canManage, fields, onSave, onViewChange }: Props = $props();
 
   // The window is mounted afresh each time it opens, so the initial view is only read once.
   // svelte-ignore state_referenced_locally
@@ -38,9 +41,9 @@
 
   <div class="emma-pane">
     {#if view === 'list'}
-      <ListView {modules} {canManage} />
+      <ListView {modules} {canManage} {fields} />
     {:else}
-      <SplitView {modules} {canManage} />
+      <SplitView {modules} {canManage} {fields} />
     {/if}
   </div>
 

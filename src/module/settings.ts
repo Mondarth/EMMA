@@ -1,4 +1,6 @@
 import { MODULE_ID } from '@module/lib/constants';
+import type { DrawerField } from '@module/state/drawer-fields.svelte';
+import { DEFAULT_DRAWER_FIELDS, DRAWER_FIELDS, drawerFields, isDrawerField } from '@module/state/drawer-fields.svelte';
 
 /** Keys of the settings EMMA registers, without the module namespace. */
 export const SETTINGS = {
@@ -6,6 +8,8 @@ export const SETTINGS = {
   disabled: 'disabled',
   /** The view EMMA last showed this user: one list of every module, or inactive and active modules side by side. */
   view: 'view',
+  /** The details this user has chosen to show in module drawers. */
+  drawerFields: 'drawerFields',
 } as const;
 
 /** EMMA's main views. */
@@ -34,6 +38,17 @@ export function registerSettings(): void {
     choices: { list: 'MONDARTH-EMMA.Toolbar.List', split: 'MONDARTH-EMMA.Toolbar.Split' },
     default: DEFAULT_VIEW,
   });
+
+  game.settings.register(MODULE_ID, SETTINGS.drawerFields, {
+    scope: 'user',
+    config: false,
+    type: Array,
+    default: [...DEFAULT_DRAWER_FIELDS],
+    // Open drawers follow the change, whether it was made here or on another of the user's devices.
+    onChange: value => {
+      drawerFields.set(toDrawerFields(value));
+    },
+  });
 }
 
 /**
@@ -60,4 +75,35 @@ export function getView(): View {
  */
 export async function setView(view: View): Promise<void> {
   await game.settings.set(MODULE_ID, SETTINGS.view, view);
+}
+
+/**
+ * Read a saved list of drawer fields, dropping anything that is not a field, as a later version might have saved.
+ * @param value - The saved value
+ * @returns The fields, or {@link DEFAULT_DRAWER_FIELDS} if the value is not a list
+ */
+function toDrawerFields(value: unknown): DrawerField[] {
+  return Array.isArray(value) ? value.filter(isDrawerField) : [...DEFAULT_DRAWER_FIELDS];
+}
+
+/**
+ * The details the current user has chosen to show in module drawers.
+ * @returns The fields, in drawer order
+ */
+export function getDrawerFields(): DrawerField[] {
+  const saved = new Set(toDrawerFields(game.settings.get(MODULE_ID, SETTINGS.drawerFields)));
+  return DRAWER_FIELDS.filter(field => saved.has(field));
+}
+
+/**
+ * Remember the details the current user has chosen to show in module drawers.
+ * @param fields - The fields
+ */
+export async function setDrawerFields(fields: Iterable<DrawerField>): Promise<void> {
+  const chosen = new Set(fields);
+  await game.settings.set(
+    MODULE_ID,
+    SETTINGS.drawerFields,
+    DRAWER_FIELDS.filter(field => chosen.has(field)),
+  );
 }

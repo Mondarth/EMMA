@@ -38,6 +38,9 @@ setup('prepare the Foundry world', async ({ page }) => {
   // 3. Create and launch the world (when the server is still on the setup screen).
   if (new URL(page.url()).pathname.startsWith('/setup')) {
     const worldTile = page.locator(`[data-package-id="${WORLD.id}"]`);
+    // The world tiles render with the Create World button, after the page loads; count them any sooner and an
+    // existing world looks missing.
+    await expect(page.getByRole('button', { name: 'Create World' })).toBeVisible();
 
     if ((await worldTile.count()) === 0) {
       // v14 creates worlds on a page of their own, and launches the new world straight away. On its first launch it

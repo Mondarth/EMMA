@@ -5,28 +5,11 @@ import type { ModuleEntry } from '@module/adapters/modules';
 import { ModuleState } from '@module/state/module-state.svelte';
 import type { FoundryMockOptions } from '../../mocks/foundry';
 import { installFoundryMocks } from '../../mocks/foundry';
+import { moduleEntry } from '../../mocks/entries';
 
 const ENTRIES: ModuleEntry[] = [
-  {
-    id: 'app',
-    title: 'App',
-    version: '1.0.0',
-    badge: null,
-    description: '',
-    authors: [],
-    languages: [],
-    requires: ['lib'],
-  },
-  {
-    id: 'lib',
-    title: 'Library',
-    version: '1.0.0',
-    badge: null,
-    description: '',
-    authors: [],
-    languages: [],
-    requires: [],
-  },
+  moduleEntry({ id: 'app', title: 'App', requires: ['lib'] }),
+  moduleEntry({ id: 'lib', title: 'Library' }),
 ];
 
 /**

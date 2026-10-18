@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { DrawerFields } from '@module/state/drawer-fields.svelte';
   import type { ModuleState, SelectMode, Side } from '@module/state/module-state.svelte';
 
   import DisclosureButton from './DisclosureButton.svelte';
@@ -12,9 +13,11 @@
     side: Side;
     /** The ID of the element naming the list. */
     labelledby: string;
+    /** The details shown in module drawers. */
+    fields: DrawerFields;
   }
 
-  const { modules, side, labelledby }: Props = $props();
+  const { modules, side, labelledby, fields }: Props = $props();
 
   const uid = $props.id();
 
@@ -174,7 +177,7 @@
     {#if expanded}
       <div class="emma-option-details" role="row" aria-level="2">
         <div role="gridcell">
-          <ModuleDrawer {entry} id={drawerId(entry.id)} />
+          <ModuleDrawer {entry} id={drawerId(entry.id)} {fields} />
         </div>
       </div>
     {/if}

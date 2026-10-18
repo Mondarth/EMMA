@@ -8,6 +8,7 @@ import {
   writeActivation,
 } from '@module/adapters/modules';
 import type { FoundryMockOptions } from '../../mocks/foundry';
+import { moduleEntry } from '../../mocks/entries';
 import { installFoundryMocks } from '../../mocks/foundry';
 
 const MODULES = {
@@ -29,16 +30,14 @@ describe('listInstalledModules', () => {
   test('describes each installed module', () => {
     setUp();
 
-    expect(listInstalledModules()).toContainEqual({
-      id: 'dice',
-      title: 'Dice So Nice!',
-      version: '5.2.4',
-      badge: null,
-      description: '',
-      authors: [{ name: 'Simone' }, { name: 'JDW' }],
-      languages: [],
-      requires: [],
-    });
+    expect(listInstalledModules()).toContainEqual(
+      moduleEntry({
+        id: 'dice',
+        title: 'Dice So Nice!',
+        version: '5.2.4',
+        authors: [{ name: 'Simone' }, { name: 'JDW' }],
+      }),
+    );
   });
 
   test('gives the compatibility badge Foundry shows, with its tooltip as plain text too', () => {
@@ -171,6 +170,94 @@ describe('listInstalledModules', () => {
     });
 
     expect(listInstalledModules()[0]?.requires).toEqual([]);
+  });
+
+  describe('links', () => {
+    test('gives each web page the manifest links to, in a fixed order', () => {
+      installFoundryMocks({
+        modules: {
+          dice: {
+            links: {
+              bugs: 'https://example.com/dice/issues',
+              url: 'https://example.com/dice',
+              download: 'https://example.com/dice.zip',
+            },
+          },
+        },
+      });
+
+      expect(listInstalledModules()[0]?.links).toEqual([
+        { kind: 'url', url: 'https://example.com/dice' },
+        { kind: 'bugs', url: 'https://example.com/dice/issues' },
+        { kind: 'download', url: 'https://example.com/dice.zip' },
+      ]);
+    });
+
+    test('resolves a relative link to the file in the module’s folder', () => {
+      installFoundryMocks({ modules: { dice: { links: { readme: 'docs/README.md' } } } });
+
+      expect(listInstalledModules()[0]?.links).toEqual([
+        { kind: 'readme', url: `${window.location.origin}/modules/dice/docs/README.md` },
+      ]);
+    });
+
+    test.each(['javascript:alert(1)', 'data:text/html,hi', 'http://[bad', ''])('drops a link like %j', url => {
+      installFoundryMocks({ modules: { dice: { links: { changelog: url } } } });
+
+      expect(listInstalledModules()[0]?.links).toEqual([]);
+    });
+  });
+
+  test('gives the Foundry versions the module declares itself compatible with', () => {
+    installFoundryMocks({ modules: { dice: { compatibility: { minimum: '13', verified: '14.368', maximum: '' } } } });
+
+    expect(listInstalledModules()[0]?.compatibility).toEqual({ minimum: '13', verified: '14.368' });
+  });
+
+  test('gives every relationship, with the titles of the packages the world knows and the reasons given', () => {
+    installFoundryMocks({
+      system: { id: 'dnd5e', title: 'D&D Fifth Edition' },
+      modules: {
+        dice: {
+          systems: ['dnd5e', 'pf2e'],
+          requires: [
+            { id: 'lib-wrapper', reason: 'Wraps the roller.' },
+            { id: 'a-world', type: 'world' },
+          ],
+          recommends: [{ id: 'gone', reason: '' }],
+          conflicts: [{ id: 'dnd5e', type: 'system', reason: 'Has its own dice.' }],
+        },
+        'lib-wrapper': { title: 'libWrapper' },
+      },
+    });
+
+    expect(listInstalledModules()[0]?.relationships).toEqual({
+      systems: [
+        { id: 'dnd5e', type: 'system', title: 'D&D Fifth Edition' },
+        { id: 'pf2e', type: 'system', title: 'pf2e' },
+      ],
+      requires: [
+        { id: 'lib-wrapper', type: 'module', title: 'libWrapper', reason: 'Wraps the roller.' },
+        { id: 'a-world', type: 'world', title: 'a-world' },
+      ],
+      recommends: [{ id: 'gone', type: 'module', title: 'gone' }],
+      conflicts: [{ id: 'dnd5e', type: 'system', title: 'D&D Fifth Edition', reason: 'Has its own dice.' }],
+    });
+  });
+
+  test('gives the compendium packs, with their labels translated', () => {
+    const { game } = installFoundryMocks({
+      modules: { dice: { packs: [{ name: 'macros', label: 'DICE.Macros', type: 'Macro' }] } },
+    });
+    game.i18n.localize.mockImplementation((key: string) => (key === 'DICE.Macros' ? 'Dice macros' : key));
+
+    expect(listInstalledModules()[0]?.packs).toEqual([{ name: 'macros', label: 'Dice macros', type: 'Macro' }]);
+  });
+
+  test('says whether the module is a library', () => {
+    installFoundryMocks({ modules: { dice: { library: true }, emma: {} } });
+
+    expect(listInstalledModules().map(({ library }) => library)).toEqual([true, false]);
   });
 
   test('is empty when nothing is installed', () => {

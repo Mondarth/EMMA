@@ -63,9 +63,40 @@ export interface ModuleMockData {
   authors?: (string | { name: string; url?: string; email?: string; discord?: string })[];
   /** Languages the module is translated into: a language tag, or a tag with a name. */
   languages?: (string | { lang: string; name?: string })[];
-  /** Packages it requires: a module ID, or an ID and package type, which defaults to `module` as in Foundry. */
-  requires?: (string | { id: string; type?: 'module' | 'system' | 'world' })[];
+  /** Web pages the manifest links to, by manifest field. */
+  links?: Partial<Record<'url' | 'readme' | 'changelog' | 'bugs' | 'license' | 'manifest' | 'download', string>>;
+  /** The Foundry versions it declares itself compatible with. Defaults to none. */
+  compatibility?: { minimum?: string; verified?: string; maximum?: string };
+  /**
+   * Packages it requires: a module ID, or an ID, package type and reason. The type defaults to `module`, as in
+   * Foundry; so it does for `recommends` and `conflicts`, and to `system` for `systems`.
+   */
+  requires?: RelatedMockData[];
+  recommends?: RelatedMockData[];
+  conflicts?: RelatedMockData[];
+  systems?: RelatedMockData[];
+  /** Its compendium packs. */
+  packs?: { name: string; label: string; type: string }[];
+  /** Defaults to `false`. */
+  library?: boolean;
   api?: unknown;
+}
+
+/** A related package: an ID, or an ID with a package type and the reason for the relationship. */
+export type RelatedMockData = string | { id: string; type?: 'module' | 'system' | 'world'; reason?: string };
+
+/**
+ * Build the set of related packages Foundry gives a relationship.
+ * @param related - The packages
+ * @param type - The package type when none is given
+ * @returns The set
+ */
+function relatedSet(related: RelatedMockData[], type: 'module' | 'system') {
+  return new Set(
+    related.map(each =>
+      typeof each === 'string' ? { id: each, type, compatibility: {} } : { type, compatibility: {}, ...each },
+    ),
+  );
 }
 
 export interface GameMockOptions {
@@ -79,6 +110,8 @@ export interface GameMockOptions {
   modules?: Record<string, ModuleMockData>;
   /** Initial stored setting values, keyed by `namespace.key`. */
   settings?: Record<string, unknown>;
+  /** The game system in use, `game.system`. Defaults to `dnd5e`. */
+  system?: { id: string; title: string };
 }
 
 /**
@@ -96,7 +129,14 @@ function createModuleMock(id: string, data: ModuleMockData) {
     description = '',
     authors = [],
     languages = [],
+    links = {},
+    compatibility = {},
     requires = [],
+    recommends = [],
+    conflicts = [],
+    systems = [],
+    packs = [],
+    library = false,
     api,
   } = data;
   return {
@@ -114,13 +154,16 @@ function createModuleMock(id: string, data: ModuleMockData) {
           : { path: `lang/${language.lang}.json`, ...language },
       ),
     ),
+    ...links,
+    compatibility,
     relationships: {
-      requires: new Set(
-        requires.map(required =>
-          typeof required === 'string' ? { id: required, type: 'module' } : { type: 'module', ...required },
-        ),
-      ),
+      requires: relatedSet(requires, 'module'),
+      recommends: relatedSet(recommends, 'module'),
+      conflicts: relatedSet(conflicts, 'module'),
+      systems: relatedSet(systems, 'system'),
     },
+    packs: new Set(packs),
+    library,
     api,
   };
 }
@@ -131,11 +174,18 @@ function createModuleMock(id: string, data: ModuleMockData) {
  * @returns The mock `game`
  */
 export function createGameMock(options: GameMockOptions = {}) {
-  const { isGM = true, lang = 'en', modules = {}, settings = {} } = options;
+  const {
+    isGM = true,
+    lang = 'en',
+    modules = {},
+    settings = {},
+    system = { id: 'dnd5e', title: 'Dungeons & Dragons Fifth Edition' },
+  } = options;
   const canModifySettings = options.canModifySettings ?? isGM === true;
   const stored = new Map<string, unknown>(Object.entries(settings));
   // Core settings EMMA reads, with Foundry's defaults.
   const defaults = new Map<string, unknown>([['core.moduleConfiguration', {}]]);
+  const onChange = new Map<string, (value: unknown) => void>();
 
   return {
     user:
@@ -143,16 +193,23 @@ export function createGameMock(options: GameMockOptions = {}) {
         ? null
         : { isGM, can: vi.fn((permission: string): boolean => permission === 'SETTINGS_MODIFY' && canModifySettings) },
     modules: new Map(Object.entries(modules).map(([id, data]) => [id, createModuleMock(id, data)])),
+    system,
     settings: {
-      register: vi.fn((namespace: string, key: string, data: { default?: unknown }): void => {
-        defaults.set(`${namespace}.${key}`, data.default);
-      }),
+      register: vi.fn(
+        (namespace: string, key: string, data: { default?: unknown; onChange?: (value: unknown) => void }): void => {
+          defaults.set(`${namespace}.${key}`, data.default);
+          if (data.onChange !== undefined) onChange.set(`${namespace}.${key}`, data.onChange);
+        },
+      ),
+      registerMenu: vi.fn((_namespace: string, _key: string, _data: object): void => undefined),
       get: vi.fn((namespace: string, key: string): unknown => {
         const id = `${namespace}.${key}`;
         return stored.has(id) ? stored.get(id) : defaults.get(id);
       }),
+      // Calls the setting's `onChange`, as Foundry does once it has saved the value.
       set: vi.fn((namespace: string, key: string, value: unknown): Promise<unknown> => {
         stored.set(`${namespace}.${key}`, value);
+        onChange.get(`${namespace}.${key}`)?.(value);
         return Promise.resolve(value);
       }),
     },
@@ -218,7 +275,7 @@ export class ApplicationV2Mock {
 
 /**
  * Create a stand-in for the `foundry` namespace: `ApplicationV2`, `DialogV2.confirm`, `SettingsConfig.reloadConfirm`,
- * `utils.cleanHTML`, and a native `ModuleManagement` window whose instances are recorded so tests can see when it opened.
+ * `utils.cleanHTML` and `getRoute`, and a native `ModuleManagement` window whose instances are recorded so tests can see when it opened.
  * @returns The mock namespace
  */
 export function createFoundryNamespaceMock() {
@@ -247,7 +304,8 @@ export function createFoundryNamespaceMock() {
         },
       },
     },
-    utils: { cleanHTML },
+    // Foundry adds the server's route prefix, which these tests leave unset.
+    utils: { cleanHTML, getRoute: (path: string): string => `/${path}` },
     /** Called each time a native Module Management window is rendered. */
     moduleManagementRender,
     /** `SettingsConfig.reloadConfirm`, which asks the user to reload. */
