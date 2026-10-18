@@ -62,7 +62,9 @@ describe('SplitView', () => {
     await user.click(screen.getByRole('button', { name: 'MONDARTH-EMMA.Split.Activate' }));
 
     expect(titles(INACTIVE)).toEqual([]);
-    expect(titles(ACTIVE)).toEqual(['Dice So Nice!', 'EMMA', 'libWrapper']);
+    // The modules moved stay selected, so Dice So Nice! has libWrapper, which it requires, and EMMA, which it
+    // recommends, grouped under it.
+    expect(titles(ACTIVE)).toEqual(['Dice So Nice!', 'libWrapper', 'EMMA']);
     expect(screen.getByRole('heading', { name: `${ACTIVE} MONDARTH-EMMA.Count {"count":"3"}` })).toBeInTheDocument();
     expect(screen.getByText('MONDARTH-EMMA.Split.NoneInactive')).toBeInTheDocument();
 

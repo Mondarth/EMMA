@@ -38,6 +38,9 @@ adapters is plain TypeScript and Svelte, tested without a Foundry server.
   modules a module needs, remembering them as implied so that deactivating it deactivates only those it activated. A module an active module
   requires is locked (`lockedBy`, `isLocked`): it cannot be deactivated or selected on the active side, except by
   modules it needs itself, so that modules requiring each other never lock one another.
+  In the split view, a side's selection is the modules the user chose plus what they require there (`withRequired`),
+  `rowsOf` groups each side under its selected modules (on the active side including recommended modules still
+  inactive, for the user to confirm), and moving modules follows the same activation rules as checking them.
 
 `src/module/app/`
 : The `ApplicationV2` windows. `EmmaApp` is EMMA itself, and `DrawerFieldsConfig` the Module details settings menu,

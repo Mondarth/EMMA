@@ -2,7 +2,7 @@ import { SvelteSet } from 'svelte/reactivity';
 
 import type { ActivationMap, ModuleEntry } from '@module/adapters/modules';
 import type { ModuleRow } from '@module/state/grouping';
-import { conflictedModules, groupRows, relatedModules } from '@module/state/grouping';
+import { conflictedModules, groupRows, relatedModules, withRequired } from '@module/state/grouping';
 
 /** The two lists of the split view: modules that are inactive, and modules that are active. */
 export type Side = 'inactive' | 'active';
@@ -49,7 +49,8 @@ export class ModuleState {
 
   #saved: ActivationMap = $state.raw({});
   #pending: Record<string, boolean> = $state({});
-  readonly #selection: Record<Side, SvelteSet<string>> = { inactive: new SvelteSet(), active: new SvelteSet() };
+  /** The modules the user selected on each side; {@link ModuleState.selected} adds what they require. */
+  readonly #chosen: Record<Side, SvelteSet<string>> = { inactive: new SvelteSet(), active: new SvelteSet() };
   /** Where each side's next range selection starts. */
   readonly #anchor: Record<Side, string | null> = { inactive: null, active: null };
   /** The modules whose details drawer is open, in either view and on either side. */
@@ -66,6 +67,39 @@ export class ModuleState {
 
   /** The modules that will be active once the staged changes are saved, in display order. */
   readonly active: readonly ModuleEntry[] = $derived.by(() => this.#side('active'));
+
+  /** The modules selected on the inactive side: those chosen, and those they require on that side. */
+  readonly #selectedInactive: ReadonlySet<string> = $derived.by(() => this.#withRequired('inactive'));
+
+  /** The modules selected on the active side: those chosen, and those they require there that are not locked. */
+  readonly #selectedActive: ReadonlySet<string> = $derived.by(() => this.#withRequired('active'));
+
+  /**
+   * The inactive side's rows: its modules, with the modules each selected module requires or recommends there grouped
+   * under it.
+   */
+  // Inactive modules are never locked, so the selection already holds each selected module's chain of requirements.
+  readonly #inactiveRows: readonly ModuleRow[] = $derived.by(() =>
+    groupRows(this.inactive, id => this.#selectedInactive.has(id)),
+  );
+
+  /**
+   * The active side's rows: its modules, with the modules each selected module requires or recommends grouped under
+   * it. A recommended module still inactive is grouped there too, for the user to confirm.
+   */
+  readonly #activeRows: readonly ModuleRow[] = $derived.by(() => {
+    const recommended = this.active
+      .filter(({ id }) => this.#selectedActive.has(id))
+      .flatMap(entry => relatedModules(entry, this.entries).recommended)
+      .filter(({ id }) => this.#pending[id] !== true)
+      .map(({ id }) => id);
+    // The chain of requirements is grouped too, though locked modules in it cannot be selected.
+    const parents = withRequired(this.active, this.#selectedActive, () => false);
+    return groupRows(
+      this.entries.filter(({ id }) => this.#pending[id] === true || recommended.includes(id)),
+      id => parents.includes(id),
+    );
+  });
 
   /** The staged changes: the new activation of each module that differs from what is saved. */
   readonly changes: ActivationMap = $derived.by(() =>
@@ -148,12 +182,13 @@ export class ModuleState {
   }
 
   /**
-   * The modules selected on one side.
+   * The modules selected on one side: those the user selected, and the modules they require on that side, following
+   * the chain. On the active side, locked modules are never selected.
    * @param side - The side
    * @returns The selected module IDs; reactive, but not to be changed directly
    */
   selected(side: Side): ReadonlySet<string> {
-    return this.#selection[side];
+    return side === 'active' ? this.#selectedActive : this.#selectedInactive;
   }
 
   /**
@@ -163,12 +198,24 @@ export class ModuleState {
    * @returns `true` if it is selected
    */
   isSelected(side: Side, id: string): boolean {
-    return this.#selection[side].has(id);
+    return this.selected(side).has(id);
+  }
+
+  /**
+   * One side's rows for the split view: its modules, with the modules each selected module requires, then those it
+   * recommends, grouped under it. On the active side, a recommended module that is still inactive is grouped there
+   * too, for the user to confirm.
+   * @param side - The side
+   * @returns The rows, in display order
+   */
+  rowsOf(side: Side): readonly ModuleRow[] {
+    return side === 'active' ? this.#activeRows : this.#inactiveRows;
   }
 
   /**
    * Change a side's selection in response to a click on one of its modules. Clicks on a module that is not on that
-   * side, or that is locked, are ignored, and a range leaves out locked modules.
+   * side, or that is locked, are ignored, and a range leaves out locked modules. A module selected only because a
+   * selected module requires it cannot be toggled off.
    * @param side - The side clicked
    * @param id - The module clicked
    * @param mode - How the click changes the selection
@@ -177,33 +224,35 @@ export class ModuleState {
     const ids = this.#ids(side);
     const index = ids.indexOf(id);
     if (index === -1 || this.isLocked(id)) return;
-    const selection = this.#selection[side];
+    const chosen = this.#chosen[side];
 
     const anchor = this.#anchor[side];
     const anchorIndex = anchor === null ? -1 : ids.indexOf(anchor);
     if (mode === 'range' && anchorIndex !== -1) {
-      selection.clear();
+      chosen.clear();
       const [from, to] = anchorIndex < index ? [anchorIndex, index] : [index, anchorIndex];
-      for (const rangeId of ids.slice(from, to + 1)) if (!this.isLocked(rangeId)) selection.add(rangeId);
+      for (const rangeId of ids.slice(from, to + 1)) if (!this.isLocked(rangeId)) chosen.add(rangeId);
       return;
     }
 
     if (mode === 'toggle') {
-      if (!selection.delete(id)) selection.add(id);
+      if (chosen.has(id)) chosen.delete(id);
+      else if (!this.isSelected(side, id)) chosen.add(id);
+      else return;
     } else {
-      selection.clear();
-      selection.add(id);
+      chosen.clear();
+      chosen.add(id);
     }
     this.#anchor[side] = id;
   }
 
   /**
-   * Select every module on one side that is not locked. The range anchor is kept, so a later range selection still starts from the last
-   * plain or toggled click.
+   * Select every module on one side that is not locked. The range anchor is kept, so a later range selection still
+   * starts from the last plain or toggled click.
    * @param side - The side
    */
   selectAll(side: Side): void {
-    for (const id of this.#ids(side)) if (!this.isLocked(id)) this.#selection[side].add(id);
+    for (const id of this.#ids(side)) if (!this.isLocked(id)) this.#chosen[side].add(id);
   }
 
   /**
@@ -211,7 +260,7 @@ export class ModuleState {
    * @param side - The side
    */
   clearSelection(side: Side): void {
-    this.#selection[side].clear();
+    this.#chosen[side].clear();
     this.#anchor[side] = null;
   }
 
@@ -344,8 +393,8 @@ export class ModuleState {
    */
   #stage(id: string, active: boolean): void {
     this.#pending[id] = active;
-    this.#selection.inactive.delete(id);
-    this.#selection.active.delete(id);
+    this.#chosen.inactive.delete(id);
+    this.#chosen.active.delete(id);
   }
 
   /**
@@ -409,20 +458,48 @@ export class ModuleState {
   }
 
   /**
-   * Move a side's selected modules to the other side.
+   * Move a side's selected modules to the other side, as checking or unchecking them in the list view would: moving
+   * modules to the active side also activates what they need, and moving them to the inactive side deactivates what was
+   * activated only for them. The modules moved are selected on their new side.
    * @param from - The side whose selection moves
    * @param to - The side it moves to
    * @returns The number of modules moved
    */
   #move(from: Side, to: Side): number {
-    const moving = this.#ids(from).filter(id => this.#selection[from].has(id));
+    const moving = this.entries.filter(({ id }) => this.selected(from).has(id));
     if (moving.length === 0) return 0;
 
-    for (const id of moving) this.#pending[id] = to === 'active';
+    if (to === 'active') {
+      // The modules selected only because a chosen module requires them are activated for it, as implied modules.
+      const chosen = moving.filter(({ id }) => this.#chosen[from].has(id));
+      for (const { id } of chosen) {
+        this.#implied.delete(id);
+        this.#stage(id, true);
+      }
+      for (const entry of chosen) this.#activateRelated(entry);
+    } else {
+      for (const { id } of moving) {
+        this.#implied.delete(id);
+        this.#stage(id, false);
+      }
+      this.#releaseImplied();
+    }
     this.clearSelection(from);
     this.clearSelection(to);
-    for (const id of moving) this.#selection[to].add(id);
+    for (const { id } of moving) this.#chosen[to].add(id);
     return moving.length;
+  }
+
+  /**
+   * One side's selection: the modules chosen, and the modules they require on that side, leaving out locked modules,
+   * such as a module chosen before it was moved and locked.
+   * @param side - The side
+   * @returns The selected module IDs
+   */
+  #withRequired(side: Side): ReadonlySet<string> {
+    const entries = side === 'active' ? this.active : this.inactive;
+    const chosen = [...this.#chosen[side]].filter(id => !this.isLocked(id));
+    return new SvelteSet(withRequired(entries, chosen, id => this.isLocked(id)));
   }
 
   /**

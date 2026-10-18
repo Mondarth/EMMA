@@ -289,25 +289,26 @@ test.describe('Details drawers', () => {
     const emma = page.locator(EMMA_WINDOW);
     const inactive = emma.getByRole('treegrid', { name: /^Inactive/ });
     const library = inactive.getByRole('row', { name: LIBRARY.title, exact: true });
-    const addon = inactive.getByRole('row', { name: ADDON.title, exact: true });
+    // The rival requires nothing, so clicking it selects it alone.
+    const rival = inactive.getByRole('row', { name: RIVAL.title, exact: true });
 
-    await addon.click();
+    await rival.click();
     await inactive.getByRole('button', { name: SHOW }).click();
 
     await expect(library).toHaveAttribute('aria-expanded', 'true');
     await expect(inactive.getByText('end-to-end tests activate and deactivate')).toBeVisible();
     await expect(inactive.getByRole('row', { selected: true })).toHaveCount(1);
-    await expect(addon).toHaveAttribute('aria-selected', 'true');
+    await expect(rival).toHaveAttribute('aria-selected', 'true');
 
-    // The keyboard is on the add-on, which was clicked: the right arrow key opens its drawer too.
+    // The keyboard is on the rival, which was clicked: the right arrow key opens its drawer too.
     await inactive.focus();
     await page.keyboard.press('ArrowRight');
 
-    await expect(addon).toHaveAttribute('aria-expanded', 'true');
+    await expect(rival).toHaveAttribute('aria-expanded', 'true');
     await expect(library).toHaveAttribute('aria-expanded', 'true');
 
     await page.keyboard.press('ArrowRight');
-    await expect(addon).toHaveAttribute('aria-expanded', 'false');
+    await expect(rival).toHaveAttribute('aria-expanded', 'false');
   });
 });
 
@@ -548,6 +549,56 @@ test.describe('Related modules in the list view', () => {
     await expect(emma.getByRole('img', { name: 'Required', exact: true })).toHaveCount(0);
     await expect(emma.getByRole('img', { name: 'Conflict', exact: true })).toHaveCount(0);
     await expect(emma.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+  });
+});
+
+test.describe('Related modules in the split view', () => {
+  test.beforeEach(async ({ page }) => {
+    await joinAs(page, USERS.gm);
+    await setDisabled(page, false);
+    await setView(page, 'split');
+    await deactivateFixtures(page);
+  });
+
+  test.afterEach(async ({ page }) => {
+    await closeEmma(page);
+    await setView(page, 'list');
+  });
+
+  test('selecting groups related modules, activating brings what is required, and recommended ones wait', async ({
+    page,
+  }) => {
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+    const inactive = emma.getByRole('treegrid', { name: /^Inactive/ });
+    const active = emma.getByRole('treegrid', { name: /^Active/ });
+
+    await inactive.getByRole('row', { name: ADDON.title, exact: true }).click();
+
+    const library = inactive.getByRole('row', { name: LIBRARY.title, exact: true });
+    await expect(library).toHaveAttribute('aria-selected', 'true');
+    await expect(library).toHaveAttribute('aria-level', '2');
+    await expect(library.getByRole('img', { name: 'Required', exact: true })).toBeVisible();
+    const rival = inactive.getByRole('row', { name: RIVAL.title, exact: true });
+    await expect(rival).toHaveAttribute('aria-selected', 'false');
+    await expect(rival.getByRole('img', { name: 'Recommended', exact: true })).toBeVisible();
+
+    await emma.getByRole('button', { name: 'Activate the selected modules', exact: true }).click();
+
+    await expect(active.getByRole('row', { name: LIBRARY.title, exact: true })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    const proposed = active.getByRole('row', { name: RIVAL.title, exact: true });
+    const confirm = proposed.getByRole('checkbox', { name: 'Activate this recommended module too' });
+    await expect(confirm).not.toBeChecked();
+    // The rival conflicts with the library, now active.
+    await expect(proposed.getByRole('img', { name: 'Conflict', exact: true })).toBeVisible();
+
+    await confirm.check();
+
+    await expect(inactive.getByRole('row', { name: RIVAL.title, exact: true })).toHaveCount(0);
+    await expect(confirm).toBeChecked();
   });
 });
 

@@ -22,7 +22,8 @@
       "Activate": "Activate the selected modules",
       "Deactivate": "Deactivate the selected modules",
       "NoneInactive": "Every module is active.",
-      "NoneActive": "No module is active."
+      "NoneActive": "No module is active.",
+      "Confirm": "Activate this recommended module too"
     },
     "Drawer": {
       "Show": "Show details of {module}",

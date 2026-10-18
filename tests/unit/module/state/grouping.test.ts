@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import type { ModuleEntry } from '@module/adapters/modules';
 import type { ModuleRow } from '@module/state/grouping';
-import { groupRows, relatedModules } from '@module/state/grouping';
+import { groupRows, relatedModules, withRequired } from '@module/state/grouping';
 import { moduleEntry } from '../../mocks/entries';
 
 /**
@@ -118,5 +118,21 @@ describe('groupRows', () => {
     const loop = [entry('a', ['b']), entry('b', ['a']), entry('c')];
 
     expect(outline(groupRows(loop, () => true))).toEqual(['a', '  b (required)', 'c']);
+  });
+});
+
+describe('withRequired', () => {
+  const CHAIN = [entry('a', ['b']), entry('b', ['c']), entry('c'), entry('d', ['c'])];
+
+  test('adds what the modules require, following the chain, in display order', () => {
+    expect(withRequired(CHAIN, ['d', 'a'], () => false)).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  test('leaves out a skipped module and what only it requires', () => {
+    expect(withRequired(CHAIN, ['a'], id => id === 'b')).toEqual(['a']);
+  });
+
+  test('ignores modules not among the entries', () => {
+    expect(withRequired(CHAIN, ['gone'], () => false)).toEqual([]);
   });
 });
