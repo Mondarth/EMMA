@@ -39,11 +39,15 @@ describe('SplitView', () => {
     expect(titles(ACTIVE)).toEqual(['libWrapper']);
   });
 
-  test('counts the modules on each side', () => {
+  test('counts the modules on each side, in parentheses just after the title', () => {
     render(SplitView, { fields: new DrawerFields(), modules: createModules(), canManage: true });
 
-    expect(screen.getByRole('heading', { name: `${INACTIVE} 2` })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: `${ACTIVE} 1` })).toBeInTheDocument();
+    const heading = screen.getByRole('heading', { name: new RegExp(`^${INACTIVE}`) });
+    expect(heading.firstChild?.textContent?.trim()).toBe(INACTIVE);
+    expect(heading.querySelector('.emma-split-count')).toBe(heading.lastElementChild);
+
+    expect(screen.getByRole('heading', { name: `${INACTIVE} MONDARTH-EMMA.Count {"count":"2"}` })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: `${ACTIVE} MONDARTH-EMMA.Count {"count":"1"}` })).toBeInTheDocument();
   });
 
   test('moves selected modules across and back', async () => {
@@ -59,7 +63,7 @@ describe('SplitView', () => {
 
     expect(titles(INACTIVE)).toEqual([]);
     expect(titles(ACTIVE)).toEqual(['Dice So Nice!', 'EMMA', 'libWrapper']);
-    expect(screen.getByRole('heading', { name: `${ACTIVE} 3` })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: `${ACTIVE} MONDARTH-EMMA.Count {"count":"3"}` })).toBeInTheDocument();
     expect(screen.getByText('MONDARTH-EMMA.Split.NoneInactive')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'MONDARTH-EMMA.Split.Deactivate' }));

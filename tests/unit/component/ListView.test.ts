@@ -22,6 +22,21 @@ describe('ListView', () => {
     expect(titles).toEqual(['Dice So Nice!', 'EMMA', 'libWrapper']);
   });
 
+  test('is titled, with the number of modules active and inactive', async () => {
+    const modules = createModules();
+    render(ListView, { fields: new DrawerFields(), modules, canManage: true });
+
+    const heading = screen.getByRole('heading', { name: /^MONDARTH-EMMA.List.Label/ });
+    expect(heading).toHaveTextContent(
+      'MONDARTH-EMMA.List.Label MONDARTH-EMMA.Split.Active MONDARTH-EMMA.Count {"count":"1"} MONDARTH-EMMA.Split.Inactive MONDARTH-EMMA.Count {"count":"2"}',
+    );
+
+    await userEvent.click(screen.getByRole('checkbox', { name: 'EMMA' }));
+
+    expect(heading).toHaveTextContent('Active MONDARTH-EMMA.Count {"count":"2"}');
+    expect(heading).toHaveTextContent('Inactive MONDARTH-EMMA.Count {"count":"1"}');
+  });
+
   test('shows each module’s version', () => {
     render(ListView, { fields: new DrawerFields(), modules: createModules(), canManage: true });
 
@@ -175,5 +190,6 @@ describe('ListView', () => {
 
     expect(screen.getByText('MONDARTH-EMMA.List.Empty')).toBeInTheDocument();
     expect(screen.queryByRole('list')).toBeNull();
+    expect(screen.getByRole('heading')).toHaveTextContent('Active MONDARTH-EMMA.Count {"count":"0"}');
   });
 });

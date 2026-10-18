@@ -124,6 +124,27 @@ test.describe('EMMA views', () => {
     await expect(emma.getByRole('list', { name: 'Installed modules' }).getByRole('listitem')).toHaveCount(installed);
   });
 
+  test('both views count the active and inactive modules beside their titles', async ({ page }) => {
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+    const active = await page.evaluate(() => game.modules.filter(pkg => pkg.active).length);
+    const inactive = (await page.evaluate(() => game.modules.size)) - active;
+
+    await expect(emma.getByRole('heading', { name: /^Installed modules/ })).toHaveText(
+      `Installed modules Active (${active}) Inactive (${inactive})`,
+      { useInnerText: true },
+    );
+
+    await emma.getByRole('button', { name: 'Split view' }).click();
+
+    await expect(emma.getByRole('heading', { name: /^Inactive/ })).toHaveText(`Inactive (${inactive})`, {
+      useInnerText: true,
+    });
+    await expect(emma.getByRole('heading', { name: /^Active/ })).toHaveText(`Active (${active})`, {
+      useInnerText: true,
+    });
+  });
+
   test('versions carry the compatibility badge Foundry gives them', async ({ page }) => {
     await (await moduleManagementButton(page)).click();
     const emma = page.locator(EMMA_WINDOW);
@@ -242,6 +263,23 @@ test.describe('Details drawers', () => {
 
     await expect(drawer).toHaveCount(0);
     await expect(emma.getByRole('button', { name: SHOW })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  test('the toolbar button opens every drawer, then closes them all', async ({ page }) => {
+    await setView(page, 'list');
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+    const triangles = emma.getByRole('button', { name: /^(Show|Hide) details of / });
+    const installed = await page.evaluate(() => game.modules.size);
+
+    await emma.getByRole('button', { name: 'Expand all module details' }).click();
+
+    await expect(triangles.and(emma.locator('[aria-expanded="true"]'))).toHaveCount(installed);
+
+    await emma.getByRole('button', { name: 'Collapse all module details' }).click();
+
+    await expect(triangles.and(emma.locator('[aria-expanded="true"]'))).toHaveCount(0);
+    await expect(emma.getByRole('button', { name: 'Expand all module details' })).toBeVisible();
   });
 
   test('the split view opens drawers without changing the selection', async ({ page }) => {

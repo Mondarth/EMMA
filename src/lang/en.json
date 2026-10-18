@@ -4,10 +4,13 @@
     "App": {
       "Title": "EMMA - module management"
     },
+    "Count": "({count})",
     "Toolbar": {
       "Label": "Views",
       "List": "List view",
-      "Split": "Split view"
+      "Split": "Split view",
+      "Expand": "Expand all module details",
+      "Collapse": "Collapse all module details"
     },
     "List": {
       "Label": "Installed modules",

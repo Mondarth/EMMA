@@ -33,6 +33,7 @@
 <div class="emma-root">
   <Toolbar
     {view}
+    {modules}
     onViewChange={(next: View) => {
       if (next === view) return;
       view = next;
