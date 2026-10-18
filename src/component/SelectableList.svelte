@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { lockedTooltip } from '@module/lib/locked';
   import type { DrawerFields } from '@module/state/drawer-fields.svelte';
   import type { ModuleState, SelectMode, Side } from '@module/state/module-state.svelte';
 
@@ -143,16 +144,22 @@
   onkeydown={onKeydown}>
   {#each entries as entry (entry.id)}
     {@const expanded = modules.isExpanded(entry.id)}
+    {@const locked = lockedTooltip(modules, entry)}
     <!-- Rows are chosen with the keyboard through the treegrid, which holds focus and points at the keyboard's row with
          aria-activedescendant; a focusable row would take focus from it when clicked. -->
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_interactive_supports_focus -->
     <div
       id={optionId(entry.id)}
-      class={['emma-option', { active: entry.id === active, changed: entry.id in modules.changes }]}
+      class={[
+        'emma-option',
+        { active: entry.id === active, changed: entry.id in modules.changes, locked: locked !== undefined },
+      ]}
       role="row"
       aria-level="1"
       aria-expanded={expanded}
       aria-selected={modules.isSelected(side, entry.id)}
+      aria-disabled={locked === undefined ? undefined : 'true'}
+      data-tooltip={locked}
       aria-labelledby={`${optionId(entry.id)}-title`}
       onclick={event => {
         onClick(event, entry.id);
@@ -211,6 +218,15 @@
     cursor: pointer;
     user-select: none;
     border-left: 3px solid transparent;
+  }
+
+  /* A module an active module requires cannot be selected, so cannot be deactivated; its tooltip says why. */
+  .emma-option.locked {
+    cursor: not-allowed;
+  }
+
+  .emma-option.locked .emma-option-title {
+    opacity: 0.6;
   }
 
   .emma-option.changed {

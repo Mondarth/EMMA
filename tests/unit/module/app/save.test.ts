@@ -62,8 +62,9 @@ describe('saveModules', () => {
   });
 
   test('refuses an activation with unmet requirements, saying which', async () => {
-    const { game, ui, modules } = setUp();
-    modules.setActive('app', true);
+    const { game, ui } = setUp();
+    // Saved with App active and Library not: EMMA itself never deactivates a module an active module requires.
+    const modules = new ModuleState(ENTRIES, { app: true });
 
     await expect(saveModules(modules)).resolves.toBe(false);
 
@@ -73,7 +74,7 @@ describe('saveModules', () => {
       missing: 'Library',
     });
     expect(ui.notifications.error).toHaveBeenCalledOnce();
-    expect(modules.dirty).toBe(true);
+    expect(modules.unmet).toHaveLength(1);
   });
 
   test('reports a failed save, keeping the changes staged', async () => {

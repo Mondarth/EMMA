@@ -90,6 +90,22 @@ describe('EmmaApp', () => {
     expect(drawerFields.shown).toEqual(['id']);
   });
 
+  test('activates recommended modules with the modules that recommend them only while the user has chosen to', async () => {
+    const { EmmaApp, game } = await loadApp({
+      modules: { app: { title: 'App', recommends: ['extra'] }, extra: { title: 'Extra' } },
+    });
+    await new EmmaApp().render({ force: true });
+    const app = screen.getByRole('checkbox', { name: 'App' });
+
+    await userEvent.click(app);
+    expect(screen.getByRole('checkbox', { name: /Extra/ })).not.toBeChecked();
+    await userEvent.click(app);
+
+    await game.settings.set('mondarth-emma', 'autoRecommended', true);
+    await userEvent.click(app);
+    expect(screen.getByRole('checkbox', { name: /Extra/ })).toBeChecked();
+  });
+
   test('shows the installed modules with their saved activation', async () => {
     const { EmmaApp } = await loadApp({ settings: { 'core.moduleConfiguration': { dice: true } } });
 

@@ -91,13 +91,14 @@ describe('Footer', () => {
         moduleEntry({ id: 'lib', title: 'Library' }),
       ];
       const modules = new ModuleState(entries, {});
+      // Activating App activates Library with it; the module that is not installed stays missing.
       modules.setActive('app', true);
       render(Footer, { modules, canManage: true, onSave: vi.fn() });
 
       expect(screen.getByRole('button', { name: SAVE })).toBeDisabled();
       expect(screen.getByRole('button', { name: RESET })).toBeEnabled();
       expect(screen.getByRole('status')).toHaveTextContent(
-        'MONDARTH-EMMA.Requirements.Unmet {"module":"App","missing":"Library and gone"}',
+        'MONDARTH-EMMA.Requirements.Unmet {"module":"App","missing":"gone"}',
       );
     });
   });
@@ -107,24 +108,20 @@ describe('Footer', () => {
       moduleEntry({ id: 'app', title: 'App', requires: ['lib'] }),
       moduleEntry({ id: 'lib', title: 'Library' }),
     ];
-    const modules = new ModuleState(entries, {});
+    // Saved with App active and Library not, so its requirement is unmet until Library is activated.
+    const modules = new ModuleState(entries, { app: true });
     render(Footer, { modules, canManage: true, onSave: vi.fn() });
     const status = screen.getByRole('status');
+    expect(status).toHaveTextContent('MONDARTH-EMMA.Requirements.Unmet');
 
     modules.setActive('lib', true);
     await vi.waitFor(() => {
       expect(status).toHaveTextContent('MONDARTH-EMMA.Footer.Changes');
     });
 
-    modules.setActive('lib', false);
-    modules.setActive('app', true);
-    await vi.waitFor(() => {
-      expect(status).toHaveTextContent('MONDARTH-EMMA.Requirements.Unmet');
-    });
-
     modules.reset();
     await vi.waitFor(() => {
-      expect(status).toBeEmptyDOMElement();
+      expect(status).toHaveTextContent('MONDARTH-EMMA.Requirements.Unmet');
     });
   });
 

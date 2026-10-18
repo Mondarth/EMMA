@@ -101,6 +101,7 @@ test.describe('Module Management', () => {
 
 const LIBRARY = { id: 'emma-fixture-library', title: 'EMMA Fixture Library' } as const;
 const ADDON = { id: 'emma-fixture-addon', title: 'EMMA Fixture Add-on' } as const;
+const RIVAL = { id: 'emma-fixture-rival', title: 'EMMA Fixture Rival' } as const;
 
 test.describe('EMMA views', () => {
   test.beforeEach(async ({ page }) => {
@@ -421,7 +422,7 @@ async function deactivateFixtures(page: Page): Promise<void> {
         ...Object.fromEntries(ids.map(id => [id, false])),
       });
     },
-    [LIBRARY.id, ADDON.id],
+    [LIBRARY.id, ADDON.id, RIVAL.id],
   );
 }
 
@@ -480,21 +481,73 @@ test.describe('Saving', () => {
     await expect(emma.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
   });
 
-  test('a module cannot be saved as active without the modules it requires', async ({ page }) => {
+  test('a module a checked module requires is locked, saying why, in both views', async ({ page }) => {
     await (await moduleManagementButton(page)).click();
     const emma = page.locator(EMMA_WINDOW);
-    const save = emma.getByRole('button', { name: 'Save', exact: true });
+    const library = emma.getByRole('checkbox', { name: LIBRARY.title });
+    const why = `${LIBRARY.title} is required by ${ADDON.title}, so it must stay active while they are.`;
 
     await emma.getByRole('checkbox', { name: ADDON.title }).check();
 
-    await expect(emma.getByRole('status')).toHaveText(
-      `${ADDON.title} requires ${LIBRARY.title}, which must be active too.`,
-    );
-    await expect(save).toBeDisabled();
+    await expect(library).toBeChecked();
+    await expect(library).toBeDisabled();
+    await emma
+      .locator('.emma-module-row')
+      .filter({ has: page.getByRole('checkbox', { name: LIBRARY.title }) })
+      .hover();
+    await expect(page.locator('#tooltip')).toHaveText(why);
+    await expect(emma.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
 
-    await emma.getByRole('checkbox', { name: LIBRARY.title }).check();
+    await emma.getByRole('button', { name: 'Split view' }).click();
+    const row = emma.getByRole('treegrid', { name: /^Active/ }).getByRole('row', { name: LIBRARY.title, exact: true });
+    await expect(row).toHaveAttribute('aria-disabled', 'true');
+    // Forced, since Playwright will not click a row marked disabled; a user can, and nothing happens.
+    await row.click({ force: true });
+    await expect(row).toHaveAttribute('aria-selected', 'false');
+    await expect(emma.getByRole('button', { name: 'Deactivate the selected modules', exact: true })).toBeDisabled();
+  });
+});
 
-    await expect(save).toBeEnabled();
+test.describe('Related modules in the list view', () => {
+  test.beforeEach(async ({ page }) => {
+    await joinAs(page, USERS.gm);
+    await setDisabled(page, false);
+    await setView(page, 'list');
+    await deactivateFixtures(page);
+  });
+
+  test.afterEach(async ({ page }) => {
+    await closeEmma(page);
+  });
+
+  test('checking a module checks what it requires and groups related modules under it', async ({ page }) => {
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+    const titles = emma.locator('.emma-module-title');
+    const addon = emma.getByRole('checkbox', { name: ADDON.title });
+
+    await addon.check();
+
+    const order = await titles.allTextContents();
+    const at = order.indexOf(ADDON.title);
+    expect(order.slice(at, at + 3)).toEqual([ADDON.title, LIBRARY.title, RIVAL.title]);
+    expect(order.filter(title => title === LIBRARY.title)).toHaveLength(1);
+    await expect(emma.getByRole('checkbox', { name: LIBRARY.title })).toBeChecked();
+    await expect(emma.getByRole('checkbox', { name: RIVAL.title })).not.toBeChecked();
+
+    const library = emma.getByRole('listitem').filter({ has: page.getByRole('checkbox', { name: LIBRARY.title }) });
+    const rival = emma.getByRole('listitem').filter({ has: page.getByRole('checkbox', { name: RIVAL.title }) });
+    await expect(library.getByRole('img', { name: 'Required', exact: true })).toBeVisible();
+    await expect(rival.getByRole('img', { name: 'Recommended', exact: true })).toBeVisible();
+    // The rival conflicts with the library, now checked.
+    await expect(rival.getByRole('img', { name: 'Conflict', exact: true })).toBeVisible();
+
+    await addon.uncheck();
+
+    await expect(emma.getByRole('checkbox', { name: LIBRARY.title })).not.toBeChecked();
+    await expect(emma.getByRole('img', { name: 'Required', exact: true })).toHaveCount(0);
+    await expect(emma.getByRole('img', { name: 'Conflict', exact: true })).toHaveCount(0);
+    await expect(emma.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
   });
 });
 

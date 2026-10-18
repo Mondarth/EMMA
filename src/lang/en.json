@@ -82,7 +82,13 @@
       "ReadOnly": "Only a GM can change which modules are active."
     },
     "Requirements": {
-      "Unmet": "{module} requires {missing}, which must be active too."
+      "Unmet": "{module} requires {missing}, which must be active too.",
+      "Locked": "{module} is required by {parents}, so it must stay active while they are."
+    },
+    "Relation": {
+      "required": "Required",
+      "recommended": "Recommended",
+      "Conflict": "Conflict"
     },
     "Discard": {
       "Title": "Discard staged changes?",
@@ -94,6 +100,10 @@
       "Disabled": {
         "Name": "Disable EMMA",
         "Hint": "Use Foundry's built-in Module Management window instead of EMMA. Takes effect immediately."
+      },
+      "AutoRecommended": {
+        "Name": "Automatically activate/deactivate recommended modules",
+        "Hint": "When you activate a module in EMMA, also activate the modules it recommends, and deactivate them again with it. Required modules always follow the module that requires them."
       },
       "Fields": {
         "Name": "Module details",

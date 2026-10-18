@@ -1,6 +1,8 @@
 import { SvelteSet } from 'svelte/reactivity';
 
 import type { ActivationMap, ModuleEntry } from '@module/adapters/modules';
+import type { ModuleRow } from '@module/state/grouping';
+import { conflictedModules, groupRows, relatedModules } from '@module/state/grouping';
 
 /** The two lists of the split view: modules that are inactive, and modules that are active. */
 export type Side = 'inactive' | 'active';
@@ -20,9 +22,22 @@ export interface UnmetRequirement {
   readonly missing: readonly string[];
 }
 
+/** Options for a {@link ModuleState}. */
+export interface ModuleStateOptions {
+  /**
+   * Whether activating a module also activates the modules it recommends, read each time a module is activated so a
+   * change to the setting applies at once. By default it does not.
+   */
+  autoRecommended?: () => boolean;
+}
+
 /**
  * The state behind EMMA's views: the installed modules, which of them the world has saved as active, the changes
  * staged on top of that, what is selected on each side of the split view, and whose details drawer is open.
+ *
+ * Activating a module in the list view also activates the modules it requires, following the chain, and, if
+ * `autoRecommended` says so, those it recommends. Deactivating it deactivates those of them that were activated only
+ * for it and that no other active module still needs.
  *
  * Moving modules between the sides only stages the change; nothing reaches Foundry until the staged activation is
  * saved through the adapter (`writeActivation`), after which {@link ModuleState.markSaved} makes it the new baseline.
@@ -39,6 +54,12 @@ export class ModuleState {
   readonly #anchor: Record<Side, string | null> = { inactive: null, active: null };
   /** The modules whose details drawer is open, in either view and on either side. */
   readonly #expanded = new SvelteSet<string>();
+  /**
+   * The modules activated only because an active module requires or recommends them, which are deactivated again
+   * once no active module does.
+   */
+  readonly #implied = new SvelteSet<string>();
+  readonly #autoRecommended: () => boolean;
 
   /** The modules that will be inactive once the staged changes are saved, in display order. */
   readonly inactive: readonly ModuleEntry[] = $derived.by(() => this.#side('inactive'));
@@ -74,11 +95,37 @@ export class ModuleState {
   });
 
   /**
+   * The list view's rows: every module, with the modules each active module requires or recommends grouped under it
+   * rather than at their own place.
+   */
+  readonly rows: readonly ModuleRow[] = $derived.by(() => groupRows(this.entries, id => this.#pending[id] === true));
+
+  /**
+   * The inactive modules that conflict with a module that will be active: either declares the conflict. Activating
+   * one of them would make Foundry load conflicting modules together.
+   */
+  readonly conflicted: ReadonlySet<string> = $derived.by(() =>
+    conflictedModules(this.entries, id => this.#pending[id] === true),
+  );
+
+  /** The active modules each module is required by, keyed by the required module's ID, in display order. */
+  readonly #requiredBy: Readonly<Record<string, readonly ModuleEntry[]>> = $derived.by(() => {
+    const parents: Record<string, ModuleEntry[]> = {};
+    for (const entry of this.entries) {
+      if (this.#pending[entry.id] !== true) continue;
+      for (const { id } of relatedModules(entry, this.entries).required) (parents[id] ??= []).push(entry);
+    }
+    return parents;
+  });
+
+  /**
    * @param entries - The installed modules, in display order
    * @param saved - Which modules the world has saved as active; modules missing from it are inactive
+   * @param options - How activating a module affects the modules it relates to
    */
-  constructor(entries: readonly ModuleEntry[], saved: ActivationMap) {
+  constructor(entries: readonly ModuleEntry[], saved: ActivationMap, options: ModuleStateOptions = {}) {
     this.entries = entries;
+    this.#autoRecommended = options.autoRecommended ?? (() => false);
     this.#saved = this.#complete(saved);
     this.#pending = { ...this.#saved };
   }
@@ -121,7 +168,7 @@ export class ModuleState {
 
   /**
    * Change a side's selection in response to a click on one of its modules. Clicks on a module that is not on that
-   * side are ignored.
+   * side, or that is locked, are ignored, and a range leaves out locked modules.
    * @param side - The side clicked
    * @param id - The module clicked
    * @param mode - How the click changes the selection
@@ -129,7 +176,7 @@ export class ModuleState {
   select(side: Side, id: string, mode: SelectMode = 'replace'): void {
     const ids = this.#ids(side);
     const index = ids.indexOf(id);
-    if (index === -1) return;
+    if (index === -1 || this.isLocked(id)) return;
     const selection = this.#selection[side];
 
     const anchor = this.#anchor[side];
@@ -137,7 +184,7 @@ export class ModuleState {
     if (mode === 'range' && anchorIndex !== -1) {
       selection.clear();
       const [from, to] = anchorIndex < index ? [anchorIndex, index] : [index, anchorIndex];
-      for (const rangeId of ids.slice(from, to + 1)) selection.add(rangeId);
+      for (const rangeId of ids.slice(from, to + 1)) if (!this.isLocked(rangeId)) selection.add(rangeId);
       return;
     }
 
@@ -151,12 +198,12 @@ export class ModuleState {
   }
 
   /**
-   * Select every module on one side. The range anchor is kept, so a later range selection still starts from the last
+   * Select every module on one side that is not locked. The range anchor is kept, so a later range selection still starts from the last
    * plain or toggled click.
    * @param side - The side
    */
   selectAll(side: Side): void {
-    for (const id of this.#ids(side)) this.#selection[side].add(id);
+    for (const id of this.#ids(side)) if (!this.isLocked(id)) this.#selection[side].add(id);
   }
 
   /**
@@ -223,16 +270,53 @@ export class ModuleState {
   }
 
   /**
-   * Stage one module to become active or inactive, as the list view's checkboxes do. The module is deselected on both
-   * sides, since it may move from one to the other. Unknown modules are ignored.
+   * Stage one module to become active or inactive, as the list view's checkboxes do. Activating it activates the
+   * modules it requires, following the chain, and those it recommends if `autoRecommended` says so. Deactivating it
+   * deactivates the modules activated only for it that no other active module still needs. A module changed here,
+   * by the user, is never deactivated for them later. Every module changed is deselected on both sides, since it may
+   * move from one to the other. Unknown modules, and attempts to deactivate a locked module, are ignored.
    * @param id - A module ID
    * @param active - Whether the module should be active
    */
   setActive(id: string, active: boolean): void {
-    if (!(id in this.#pending)) return;
-    this.#pending[id] = active;
-    this.#selection.inactive.delete(id);
-    this.#selection.active.delete(id);
+    const entry = this.entries.find(each => each.id === id);
+    if (entry === undefined || (!active && this.isLocked(id))) return;
+    this.#implied.delete(id);
+    this.#stage(id, active);
+    if (active) this.#activateRelated(entry);
+    else this.#releaseImplied();
+  }
+
+  /**
+   * The active modules that keep a module locked active by requiring it. Modules it needs itself, directly or through
+   * a chain, do not count: they require it only in a loop, and deactivating it deactivates those activated for it.
+   * @param id - A module ID
+   * @returns The modules, in display order; empty if it is not locked
+   */
+  lockedBy(id: string): readonly ModuleEntry[] {
+    if (this.#pending[id] !== true) return [];
+    const parents = this.#requiredBy[id] ?? [];
+    if (parents.length === 0) return parents;
+    const needed = this.#closure(this.entries.filter(entry => entry.id === id));
+    return parents.filter(parent => !needed.includes(parent));
+  }
+
+  /**
+   * Whether a module is locked active because an active module requires it.
+   * @param id - A module ID
+   * @returns `true` if it cannot be deactivated or selected on the active side
+   */
+  isLocked(id: string): boolean {
+    return this.lockedBy(id).length > 0;
+  }
+
+  /**
+   * Whether a module was activated only because an active module requires or recommends it.
+   * @param id - A module ID
+   * @returns `true` if it will be deactivated again once no active module needs it
+   */
+  isImplied(id: string): boolean {
+    return this.#implied.has(id);
   }
 
   /**
@@ -240,6 +324,7 @@ export class ModuleState {
    */
   reset(): void {
     this.#pending = { ...this.#saved };
+    this.#implied.clear();
     this.clearSelection('inactive');
     this.clearSelection('active');
   }
@@ -249,6 +334,78 @@ export class ModuleState {
    */
   markSaved(): void {
     this.#saved = { ...this.#pending };
+    this.#implied.clear();
+  }
+
+  /**
+   * Stage a module's activation, deselecting it on both sides.
+   * @param id - A module ID
+   * @param active - Whether it should be active
+   */
+  #stage(id: string, active: boolean): void {
+    this.#pending[id] = active;
+    this.#selection.inactive.delete(id);
+    this.#selection.active.delete(id);
+  }
+
+  /**
+   * The installed modules a module needs active with it: those it requires and, if `autoRecommended` says so, those
+   * it recommends.
+   * @param entry - The module
+   * @returns The modules it needs
+   */
+  #needs(entry: ModuleEntry): ModuleEntry[] {
+    const { required, recommended } = relatedModules(entry, this.entries);
+    return this.#autoRecommended() ? [...required, ...recommended] : required;
+  }
+
+  /**
+   * The modules some modules need, and the modules those need in turn.
+   * @param from - The modules to start from, which are left out unless one of the others needs them
+   * @returns The modules needed, in the order found
+   */
+  #closure(from: readonly ModuleEntry[]): ModuleEntry[] {
+    const seen = [...from];
+    const found: ModuleEntry[] = [];
+    for (let index = 0; index < seen.length; index++) {
+      for (const needed of this.#needs(seen[index] as ModuleEntry)) {
+        if (!found.includes(needed)) found.push(needed);
+        if (!seen.includes(needed)) seen.push(needed);
+      }
+    }
+    return found;
+  }
+
+  /**
+   * Activate the modules a module needs, and the modules they need in turn, marking those not already active as
+   * implied.
+   * @param entry - The module activated
+   */
+  #activateRelated(entry: ModuleEntry): void {
+    for (const needed of this.#closure([entry])) {
+      if (this.#pending[needed.id] === true) continue;
+      this.#stage(needed.id, true);
+      this.#implied.add(needed.id);
+    }
+  }
+
+  /**
+   * Deactivate the implied modules no active module needs any more, repeating until none is left, since each one
+   * deactivated may have been the last to need another.
+   */
+  #releaseImplied(): void {
+    for (;;) {
+      const needed = this.entries
+        .filter(({ id }) => this.#pending[id] === true)
+        .flatMap(entry => this.#needs(entry))
+        .map(({ id }) => id);
+      const unneeded = [...this.#implied].filter(id => !needed.includes(id));
+      if (unneeded.length === 0) return;
+      for (const id of unneeded) {
+        this.#implied.delete(id);
+        this.#stage(id, false);
+      }
+    }
   }
 
   /**
