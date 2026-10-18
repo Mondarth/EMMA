@@ -1,3 +1,10 @@
+## [0.2.0](https://github.com/Mondarth/EMMA/compare/v0.1.1...v0.2.0) (2026-10-18)
+
+### Features
+
+* **ui:** group related modules and lock required ones ([05cc279](https://github.com/Mondarth/EMMA/commit/05cc2799b63e08d52c9245b1dd3c0e82b93b4eb3))
+* **ui:** group related modules in the split view ([b00f850](https://github.com/Mondarth/EMMA/commit/b00f850f120c4a08bdbae0ca591bbfab4d54b579))
+
 ## [0.1.1](https://github.com/Mondarth/EMMA/compare/v0.1.0...v0.1.1) (2026-10-18)
 
 ### Bug Fixes
