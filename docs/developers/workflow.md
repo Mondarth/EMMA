@@ -139,4 +139,8 @@ The unit tests fail when coverage drops below the thresholds in `vite.config.ts`
 level and raise them as tests are added; never lower them to get a change through. When a tool upgrade changes how
 coverage is measured, re-measure and say so in the commit.
 
+Statements, functions and lines must be fully covered. Branches need 97%, not 100%, because Svelte compiles each
+`{value}` in a component's markup to `value ?? ''`, a branch that a string value never takes, so a few branches cannot
+be covered. Any other uncovered branch needs a test.
+
 Coverage is also uploaded to Codecov, which comments the change on each pull request. Its checks are informational.
