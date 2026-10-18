@@ -11,7 +11,7 @@ import { ModuleState } from '@module/state/module-state.svelte';
  * @returns The entry
  */
 function entry(id: string, requires: string[] = []): ModuleEntry {
-  return { id, title: id, version: '1.0.0', authors: [], requires };
+  return { id, title: id, version: '1.0.0', badge: null, description: '', authors: [], languages: [], requires };
 }
 
 const ENTRIES = ['a', 'b', 'c', 'd', 'e', 'f'].map(id => entry(id));
@@ -223,6 +223,57 @@ describe('ModuleState', () => {
       state.select('inactive', 'c', 'range');
 
       expect([...state.selected('inactive')]).toEqual(['c']);
+    });
+  });
+
+  describe('toggleExpanded', () => {
+    test('opens and closes a module’s drawer', () => {
+      const state = createState();
+
+      expect(state.isExpanded('a')).toBe(false);
+      state.toggleExpanded('a');
+      expect(state.isExpanded('a')).toBe(true);
+      state.toggleExpanded('a');
+      expect(state.isExpanded('a')).toBe(false);
+    });
+
+    test('keeps any number of drawers open', () => {
+      const state = createState();
+
+      state.toggleExpanded('a');
+      state.toggleExpanded('b');
+
+      expect(state.isExpanded('a')).toBe(true);
+      expect(state.isExpanded('b')).toBe(true);
+    });
+
+    test('leaves the selection alone', () => {
+      const state = createState();
+      state.select('inactive', 'c');
+
+      state.toggleExpanded('a');
+
+      expect([...state.selected('inactive')]).toEqual(['c']);
+    });
+
+    test('keeps a drawer open while its module moves sides and changes are reset', () => {
+      const state = createState();
+      state.toggleExpanded('a');
+
+      state.select('inactive', 'a');
+      state.activateSelected();
+      expect(state.isExpanded('a')).toBe(true);
+
+      state.reset();
+      expect(state.isExpanded('a')).toBe(true);
+    });
+
+    test('ignores unknown modules', () => {
+      const state = createState();
+
+      state.toggleExpanded('unknown');
+
+      expect(state.isExpanded('unknown')).toBe(false);
     });
   });
 

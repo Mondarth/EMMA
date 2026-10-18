@@ -22,7 +22,7 @@ export interface UnmetRequirement {
 
 /**
  * The state behind EMMA's views: the installed modules, which of them the world has saved as active, the changes
- * staged on top of that, and what is selected on each side of the split view.
+ * staged on top of that, what is selected on each side of the split view, and whose details drawer is open.
  *
  * Moving modules between the sides only stages the change; nothing reaches Foundry until the staged activation is
  * saved through the adapter (`writeActivation`), after which {@link ModuleState.markSaved} makes it the new baseline.
@@ -37,6 +37,8 @@ export class ModuleState {
   readonly #selection: Record<Side, SvelteSet<string>> = { inactive: new SvelteSet(), active: new SvelteSet() };
   /** Where each side's next range selection starts. */
   readonly #anchor: Record<Side, string | null> = { inactive: null, active: null };
+  /** The modules whose details drawer is open, in either view and on either side. */
+  readonly #expanded = new SvelteSet<string>();
 
   /** The modules that will be inactive once the staged changes are saved, in display order. */
   readonly inactive: readonly ModuleEntry[] = $derived.by(() => this.#side('inactive'));
@@ -164,6 +166,25 @@ export class ModuleState {
   clearSelection(side: Side): void {
     this.#selection[side].clear();
     this.#anchor[side] = null;
+  }
+
+  /**
+   * Whether a module's details drawer is open.
+   * @param id - A module ID
+   * @returns `true` if it is open
+   */
+  isExpanded(id: string): boolean {
+    return this.#expanded.has(id);
+  }
+
+  /**
+   * Open a module's details drawer, or close it if it is open. Any number may be open at once, and opening one leaves
+   * the selection alone. Unknown modules are ignored.
+   * @param id - A module ID
+   */
+  toggleExpanded(id: string): void {
+    if (!(id in this.#pending)) return;
+    if (!this.#expanded.delete(id)) this.#expanded.add(id);
   }
 
   /**

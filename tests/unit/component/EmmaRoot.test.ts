@@ -34,7 +34,7 @@ describe('EmmaRoot', () => {
     render(EmmaRoot, { modules: createModules(), initialView: 'split', canManage: true, onSave });
 
     expect(screen.getByRole('button', { name: SPLIT })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getAllByRole('listbox')).toHaveLength(2);
+    expect(screen.getAllByRole('treegrid')).toHaveLength(2);
     expect(screen.queryByRole('list')).toBeNull();
   });
 
@@ -43,7 +43,7 @@ describe('EmmaRoot', () => {
     render(EmmaRoot, { modules: createModules(), initialView: 'list', canManage: true, onSave, onViewChange });
 
     await userEvent.click(screen.getByRole('button', { name: SPLIT }));
-    expect(screen.getAllByRole('listbox')).toHaveLength(2);
+    expect(screen.getAllByRole('treegrid')).toHaveLength(2);
 
     await userEvent.click(screen.getByRole('button', { name: LIST }));
     expect(screen.getByRole('list')).toBeInTheDocument();
@@ -84,7 +84,7 @@ describe('EmmaRoot', () => {
     const modules = createModules();
     render(EmmaRoot, { modules, initialView: 'split', canManage: true, onSave });
 
-    await userEvent.click(screen.getByRole('option', { name: /EMMA/ }));
+    await userEvent.click(screen.getByRole('row', { name: /EMMA/ }));
     await userEvent.click(screen.getByRole('button', { name: 'MONDARTH-EMMA.Split.Activate' }));
     await userEvent.click(screen.getByRole('button', { name: LIST }));
 

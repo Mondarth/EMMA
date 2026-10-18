@@ -33,9 +33,97 @@ describe('listInstalledModules', () => {
       id: 'dice',
       title: 'Dice So Nice!',
       version: '5.2.4',
-      authors: ['Simone', 'JDW'],
+      badge: null,
+      description: '',
+      authors: [{ name: 'Simone' }, { name: 'JDW' }],
+      languages: [],
       requires: [],
     });
+  });
+
+  test('gives the compatibility badge Foundry shows, with its tooltip as plain text too', () => {
+    installFoundryMocks({
+      modules: {
+        dice: {
+          badge: {
+            type: 'error',
+            icon: 'fa-solid fa-file-slash',
+            label: '5.2.4',
+            tooltip: 'Requires <strong>lib-wrapper</strong>',
+          },
+        },
+      },
+    });
+
+    expect(listInstalledModules()[0]?.badge).toEqual({
+      type: 'error',
+      icon: 'fa-solid fa-file-slash',
+      tooltip: 'Requires <strong>lib-wrapper</strong>',
+      text: 'Requires lib-wrapper',
+    });
+  });
+
+  test('gives a badge without an icon the one Foundry uses for compatible versions', () => {
+    installFoundryMocks({ modules: { dice: { badge: { type: 'success', tooltip: 'Verified' } } } });
+
+    expect(listInstalledModules()[0]?.badge?.icon).toBe('fa-solid fa-code-branch');
+  });
+
+  test('cleans the description with Foundry, so it is safe to insert', () => {
+    const { foundry } = installFoundryMocks({
+      modules: { dice: { description: '<p>Dice</p><script>alert(1)</script>' } },
+    });
+
+    expect(listInstalledModules()[0]?.description).toBe('<p>Dice</p>');
+    expect(foundry.cleanHTML).toHaveBeenCalledWith('<p>Dice</p><script>alert(1)</script>');
+  });
+
+  test('keeps the contact details each author gives', () => {
+    installFoundryMocks({
+      modules: {
+        dice: {
+          authors: [
+            { name: 'Simone', url: 'https://example.com/simone', email: 'simone@example.com', discord: 'simone' },
+            'JDW',
+          ],
+        },
+      },
+    });
+
+    expect(listInstalledModules()[0]?.authors).toEqual([
+      { name: 'Simone', url: 'https://example.com/simone', email: 'simone@example.com', discord: 'simone' },
+      { name: 'JDW' },
+    ]);
+  });
+
+  test.each(['javascript:alert(1)', 'data:text/html,hi', 'not a url'])('drops an author URL like %s', url => {
+    installFoundryMocks({ modules: { dice: { authors: [{ name: 'Simone', url }] } } });
+
+    expect(listInstalledModules()[0]?.authors).toEqual([{ name: 'Simone' }]);
+  });
+
+  test('keeps an http author URL', () => {
+    installFoundryMocks({ modules: { dice: { authors: [{ name: 'Simone', url: 'http://example.com/' }] } } });
+
+    expect(listInstalledModules()[0]?.authors).toEqual([{ name: 'Simone', url: 'http://example.com/' }]);
+  });
+
+  test('names each language as the manifest does, or else in the user’s language', () => {
+    installFoundryMocks({
+      modules: { dice: { languages: [{ lang: 'fr', name: 'Français' }, 'de', { lang: 'pt-BR', name: '' }] } },
+    });
+
+    expect(listInstalledModules()[0]?.languages).toEqual([
+      { lang: 'fr', name: 'Français' },
+      { lang: 'de', name: 'German' },
+      { lang: 'pt-BR', name: 'Brazilian Portuguese' },
+    ]);
+  });
+
+  test('names languages in the user’s language', () => {
+    installFoundryMocks({ modules: { dice: { languages: ['en'] } }, lang: 'fr' });
+
+    expect(listInstalledModules()[0]?.languages).toEqual([{ lang: 'en', name: 'anglais' }]);
   });
 
   test('sorts by title, ignoring case', () => {

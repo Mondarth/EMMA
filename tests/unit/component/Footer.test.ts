@@ -86,8 +86,26 @@ describe('Footer', () => {
 
     test('blocks Save, naming what is missing, while a requirement is unmet', () => {
       const entries: ModuleEntry[] = [
-        { id: 'app', title: 'App', version: '1.0.0', authors: [], requires: ['lib', 'gone'] },
-        { id: 'lib', title: 'Library', version: '1.0.0', authors: [], requires: [] },
+        {
+          id: 'app',
+          title: 'App',
+          version: '1.0.0',
+          badge: null,
+          description: '',
+          authors: [],
+          languages: [],
+          requires: ['lib', 'gone'],
+        },
+        {
+          id: 'lib',
+          title: 'Library',
+          version: '1.0.0',
+          badge: null,
+          description: '',
+          authors: [],
+          languages: [],
+          requires: [],
+        },
       ];
       const modules = new ModuleState(entries, {});
       modules.setActive('app', true);
@@ -103,8 +121,26 @@ describe('Footer', () => {
 
   test('updates the status as changes are staged and requirements met', async () => {
     const entries: ModuleEntry[] = [
-      { id: 'app', title: 'App', version: '1.0.0', authors: [], requires: ['lib'] },
-      { id: 'lib', title: 'Library', version: '1.0.0', authors: [], requires: [] },
+      {
+        id: 'app',
+        title: 'App',
+        version: '1.0.0',
+        badge: null,
+        description: '',
+        authors: [],
+        languages: [],
+        requires: ['lib'],
+      },
+      {
+        id: 'lib',
+        title: 'Library',
+        version: '1.0.0',
+        badge: null,
+        description: '',
+        authors: [],
+        languages: [],
+        requires: [],
+      },
     ];
     const modules = new ModuleState(entries, {});
     render(Footer, { modules, canManage: true, onSave: vi.fn() });

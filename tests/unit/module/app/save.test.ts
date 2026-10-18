@@ -7,8 +7,26 @@ import type { FoundryMockOptions } from '../../mocks/foundry';
 import { installFoundryMocks } from '../../mocks/foundry';
 
 const ENTRIES: ModuleEntry[] = [
-  { id: 'app', title: 'App', version: '1.0.0', authors: [], requires: ['lib'] },
-  { id: 'lib', title: 'Library', version: '1.0.0', authors: [], requires: [] },
+  {
+    id: 'app',
+    title: 'App',
+    version: '1.0.0',
+    badge: null,
+    description: '',
+    authors: [],
+    languages: [],
+    requires: ['lib'],
+  },
+  {
+    id: 'lib',
+    title: 'Library',
+    version: '1.0.0',
+    badge: null,
+    description: '',
+    authors: [],
+    languages: [],
+    requires: [],
+  },
 ];
 
 /**

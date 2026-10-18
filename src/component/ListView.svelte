@@ -2,6 +2,10 @@
   import { localize } from '@module/lib/i18n';
   import type { ModuleState } from '@module/state/module-state.svelte';
 
+  import DisclosureButton from './DisclosureButton.svelte';
+  import ModuleDrawer from './ModuleDrawer.svelte';
+  import VersionBadge from './VersionBadge.svelte';
+
   interface Props {
     /** The modules to show and stage changes in. */
     modules: ModuleState;
@@ -10,6 +14,28 @@
   }
 
   const { modules, canManage }: Props = $props();
+
+  const uid = $props.id();
+
+  /**
+   * The DOM ID of a module's drawer.
+   * @param id - The module ID
+   * @returns A document-unique ID
+   */
+  function drawerId(id: string): string {
+    return `${uid}-drawer-${id}`;
+  }
+
+  /**
+   * Open or close a module's drawer with the right arrow key, from either of the controls on its row.
+   * @param event - The key press
+   * @param id - The module ID
+   */
+  function onKeydown(event: KeyboardEvent, id: string): void {
+    if (event.key !== 'ArrowRight' || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    event.preventDefault();
+    modules.toggleExpanded(id);
+  }
 </script>
 
 {#if modules.entries.length === 0}
@@ -17,20 +43,36 @@
 {:else}
   <ul class="emma-list" aria-label={localize('MONDARTH-EMMA.List.Label')}>
     {#each modules.entries as entry (entry.id)}
+      {@const expanded = modules.isExpanded(entry.id)}
       <li class={['emma-module', { changed: entry.id in modules.changes }]}>
-        <label>
-          <input
-            type="checkbox"
-            checked={modules.isActive(entry.id)}
-            disabled={!canManage}
-            onchange={event => {
-              modules.setActive(entry.id, event.currentTarget.checked);
+        <div class="emma-module-row">
+          <label>
+            <input
+              type="checkbox"
+              checked={modules.isActive(entry.id)}
+              disabled={!canManage}
+              onchange={event => {
+                modules.setActive(entry.id, event.currentTarget.checked);
+              }}
+              onkeydown={event => {
+                onKeydown(event, entry.id);
+              }} />
+            <span class="emma-module-title">{entry.title}</span>
+          </label>
+          <span class="emma-module-version"><VersionBadge version={entry.version} badge={entry.badge} /></span>
+          <DisclosureButton
+            title={entry.title}
+            {expanded}
+            controls={drawerId(entry.id)}
+            onToggle={() => {
+              modules.toggleExpanded(entry.id);
+            }}
+            onKeydown={(event: KeyboardEvent) => {
+              onKeydown(event, entry.id);
             }} />
-          <span class="emma-module-title">{entry.title}</span>
-        </label>
-        <span class="emma-module-version">{entry.version}</span>
-        {#if entry.authors.length > 0}
-          <span class="emma-module-authors">{entry.authors.join(', ')}</span>
+        </div>
+        {#if expanded}
+          <ModuleDrawer {entry} id={drawerId(entry.id)} />
         {/if}
       </li>
     {/each}
@@ -47,12 +89,15 @@
   }
 
   .emma-module {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    align-items: center;
-    column-gap: 0.5rem;
-    padding: 0.25rem 0.5rem;
+    padding: 0.25rem 0.25rem 0.25rem 0.5rem;
     border-bottom: 1px solid var(--color-border);
+  }
+
+  .emma-module-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    column-gap: 0.25rem;
   }
 
   .emma-module.changed {
@@ -74,15 +119,8 @@
   }
 
   .emma-module-version {
-    font-size: var(--font-size-12);
+    display: flex;
     color: var(--color-text-secondary);
-  }
-
-  .emma-module-authors {
-    grid-column: 1 / -1;
-    padding-left: 1.75rem;
-    font-size: var(--font-size-12);
-    color: var(--color-text-subtle);
   }
 
   .emma-empty {

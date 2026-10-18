@@ -8,7 +8,10 @@ const ENTRIES: ModuleEntry[] = ['a', 'b', 'c'].map(id => ({
   id,
   title: id,
   version: '1.0.0',
+  badge: null,
+  description: '',
   authors: [],
+  languages: [],
   requires: [],
 }));
 
@@ -57,6 +60,16 @@ describe('ModuleState reactivity', () => {
     flushSync();
 
     expect(selected).toEqual([false, true, false]);
+  });
+
+  test('updates which drawers are open', () => {
+    const state = new ModuleState(ENTRIES, {});
+    const expanded = track(() => state.isExpanded('b'));
+
+    state.toggleExpanded('b');
+    flushSync();
+
+    expect(expanded).toEqual([false, true]);
   });
 
   test('updates whether changes are staged', () => {

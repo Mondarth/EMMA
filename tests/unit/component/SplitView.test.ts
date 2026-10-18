@@ -15,8 +15,8 @@ const ACTIVE = 'MONDARTH-EMMA.Split.Active';
  * @returns The titles, in display order
  */
 function titles(name: string): string[] {
-  return within(screen.getByRole('listbox', { name: new RegExp(`^${name}`) }))
-    .queryAllByRole('option')
+  return within(screen.getByRole('treegrid', { name: new RegExp(`^${name}`) }))
+    .queryAllByRole('row')
     .map(element => element.querySelector('.emma-option-title')?.textContent ?? '');
 }
 
@@ -28,12 +28,12 @@ describe('SplitView', () => {
   test('shows inactive modules on the left, the transfer buttons, then active modules on the right', () => {
     render(SplitView, { modules: createModules(), canManage: true });
 
-    const [inactive, active] = screen.getAllByRole('listbox');
-    const [deactivate] = screen.getAllByRole('button');
+    const [inactive, active] = screen.getAllByRole('treegrid');
+    const deactivate = screen.getByRole('button', { name: 'MONDARTH-EMMA.Split.Deactivate' });
     expect(inactive).toHaveAccessibleName(expect.stringMatching(new RegExp(`^${INACTIVE}`)));
     expect(active).toHaveAccessibleName(expect.stringMatching(new RegExp(`^${ACTIVE}`)));
-    expect(inactive?.compareDocumentPosition(deactivate as Node)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(deactivate?.compareDocumentPosition(active as Node)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(inactive?.compareDocumentPosition(deactivate)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(deactivate.compareDocumentPosition(active as Node)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(titles(INACTIVE)).toEqual(['Dice So Nice!', 'EMMA']);
     expect(titles(ACTIVE)).toEqual(['libWrapper']);
   });
@@ -50,9 +50,9 @@ describe('SplitView', () => {
     render(SplitView, { modules, canManage: true });
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('option', { name: /^Dice So Nice!/ }));
+    await user.click(screen.getByRole('row', { name: /^Dice So Nice!/ }));
     await user.keyboard('{Shift>}');
-    await user.click(screen.getByRole('option', { name: /^EMMA/ }));
+    await user.click(screen.getByRole('row', { name: /^EMMA/ }));
     await user.keyboard('{/Shift}');
     await user.click(screen.getByRole('button', { name: 'MONDARTH-EMMA.Split.Activate' }));
 
@@ -86,18 +86,18 @@ describe('SplitView', () => {
   test('keeps the selections of the two sides apart', async () => {
     render(SplitView, { modules: createModules(), canManage: true });
 
-    await userEvent.click(screen.getByRole('option', { name: /^EMMA/ }));
-    await userEvent.click(screen.getByRole('option', { name: /^libWrapper/ }));
+    await userEvent.click(screen.getByRole('row', { name: /^EMMA/ }));
+    await userEvent.click(screen.getByRole('row', { name: /^libWrapper/ }));
 
-    expect(screen.getAllByRole('option', { selected: true })).toHaveLength(2);
+    expect(screen.getAllByRole('row', { selected: true })).toHaveLength(2);
   });
 
   test('lets a user who may not manage modules select, but not move, modules', async () => {
     render(SplitView, { modules: createModules(), canManage: false });
 
-    await userEvent.click(screen.getByRole('option', { name: /^EMMA/ }));
+    await userEvent.click(screen.getByRole('row', { name: /^EMMA/ }));
 
-    expect(screen.getByRole('option', { name: /^EMMA/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('row', { name: /^EMMA/ })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('button', { name: 'MONDARTH-EMMA.Split.Activate' })).toBeDisabled();
   });
 

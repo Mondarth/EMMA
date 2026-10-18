@@ -6,13 +6,48 @@
  * Management window does. A change only takes effect once the world reloads.
  */
 
+/** One of a module's authors, with the ways the manifest gives to reach them. */
+export interface ModuleAuthor {
+  readonly name: string;
+  readonly url?: string;
+  readonly email?: string;
+  /** A Discord user name, which has no link. */
+  readonly discord?: string;
+}
+
+/** A language a module is translated into. */
+export interface ModuleLanguage {
+  /** The language tag, such as `en` or `pt-BR`. */
+  readonly lang: string;
+  /** The language's name, from the manifest or else in the user's language. */
+  readonly name: string;
+}
+
+/** How compatible a module is with this Foundry version, as Foundry's own Module Management shows it. */
+export interface VersionBadge {
+  /** The badge's colour: `success` (verified), `neutral`, `warning` or `error`. */
+  readonly type: 'success' | 'warning' | 'neutral' | 'error';
+  /** Font Awesome classes for the badge's icon. */
+  readonly icon: string;
+  /** Foundry's explanation, as HTML for a tooltip; the tooltip manager cleans it before showing it. */
+  readonly tooltip: string;
+  /** The same explanation as plain text, for screen readers. */
+  readonly text: string;
+}
+
 /** An installed module, as EMMA shows it. */
 export interface ModuleEntry {
   readonly id: string;
   readonly title: string;
   readonly version: string;
-  /** Author names, in manifest order. */
-  readonly authors: readonly string[];
+  /** The compatibility badge shown with the version, or `null` if Foundry gives none. */
+  readonly badge: VersionBadge | null;
+  /** The manifest's description: HTML, cleaned by Foundry so it is safe to insert. */
+  readonly description: string;
+  /** The module's authors, in manifest order. */
+  readonly authors: readonly ModuleAuthor[];
+  /** The languages the module is translated into, in manifest order. */
+  readonly languages: readonly ModuleLanguage[];
   /** The IDs of the modules this one requires, which must be active whenever it is. */
   readonly requires: readonly string[];
 }
@@ -26,16 +61,73 @@ export type ActivationMap = Readonly<Record<string, boolean>>;
  */
 export function listInstalledModules(): ModuleEntry[] {
   const collator = new Intl.Collator(game.i18n.lang, { sensitivity: 'base', numeric: true });
+  const languageNames = new Intl.DisplayNames(game.i18n.lang, { type: 'language', fallback: 'code' });
   return Array.from(game.modules.values(), pkg => ({
     id: pkg.id,
     title: pkg.title,
     version: pkg.version,
-    authors: Array.from(pkg.authors, author => author.name),
+    badge: toBadge(pkg.getVersionBadge()),
+    description: foundry.utils.cleanHTML(pkg.description),
+    authors: Array.from(pkg.authors, toAuthor),
+    languages: Array.from(pkg.languages, ({ lang, name }) => ({
+      lang,
+      name: name === undefined || name === '' ? (languageNames.of(lang) ?? lang) : name,
+    })),
     // Only module requirements matter here: a required system or world is not something EMMA can activate.
     requires: Array.from(pkg.relationships.requires)
       .filter(({ type }) => type === 'module')
       .map(({ id }) => id),
   })).sort((a, b) => collator.compare(a.title, b.title) || a.id.localeCompare(b.id));
+}
+
+/**
+ * Describe the compatibility badge Foundry gives a module.
+ * @param badge - Foundry's badge, from `Module#getVersionBadge`
+ * @returns The badge, or `null` if there is none
+ */
+function toBadge(badge: ReturnType<foundry.packages.Module['getVersionBadge']>): VersionBadge | null {
+  if (badge === null) return null;
+  const { type, icon = 'fa-solid fa-code-branch', tooltip } = badge;
+  const text = new DOMParser().parseFromString(tooltip, 'text/html').body.textContent;
+  return { type, icon, tooltip, text };
+}
+
+/** An author as a manifest gives them, where each contact detail may be missing. */
+interface Author {
+  name: string;
+  url?: string | undefined;
+  email?: string | undefined;
+  discord?: string | undefined;
+}
+
+/**
+ * Describe a module author, keeping only the contact details that are given and safe to show.
+ * @param author - The author, as the manifest gives them
+ * @param author.name - Their name
+ * @param author.url - Their web page
+ * @param author.email - Their email address
+ * @param author.discord - Their Discord user name
+ * @returns The author
+ */
+function toAuthor({ name, url, email, discord }: Author) {
+  const link = webUrl(url);
+  return {
+    name,
+    ...(link === undefined ? {} : { url: link }),
+    ...(email === undefined ? {} : { email }),
+    ...(discord === undefined ? {} : { discord }),
+  } satisfies ModuleAuthor;
+}
+
+/**
+ * A manifest URL, if it is safe to link to: only web pages are, so a `javascript:` URL cannot run when clicked.
+ * @param url - The URL from the manifest
+ * @returns The URL, or `undefined` if it is missing, malformed, or not `http` or `https`
+ */
+function webUrl(url: string | undefined): string | undefined {
+  if (url === undefined || !URL.canParse(url)) return undefined;
+  const { protocol } = new URL(url);
+  return protocol === 'http:' || protocol === 'https:' ? url : undefined;
 }
 
 /**

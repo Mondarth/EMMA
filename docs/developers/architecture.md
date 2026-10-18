@@ -14,11 +14,16 @@ adapters is plain TypeScript and Svelte, tested without a Foundry server.
 `src/module/adapters/`
 : The only code that reads or changes Foundry's game data. `modules.ts` lists the installed modules and reads and
   writes which are active (the world setting `core.moduleConfiguration`, as Foundry's own window uses). It returns
-  plain values, such as `ModuleEntry`, never Foundry documents.
+  plain values, such as `ModuleEntry`, never Foundry documents. It also makes manifest data safe to show: descriptions
+  are cleaned with Foundry's `foundry.utils.cleanHTML`, and author links other than `http` and `https` are dropped.
+  The version badge comes from Foundry's `Module#getVersionBadge`, so EMMA judges compatibility exactly as Foundry
+  does; only its styles are EMMA's, since Foundry's apply only inside its own package lists.
 
 `src/module/state/`
 : Reactive state built with Svelte 5 runes, in `.svelte.ts` files. `ModuleState` holds the saved activation, the
-  changes staged on top of it, and the selection on each side of the split view. Moving modules only stages changes;
+  changes staged on top of it, the selection on each side of the split view, and which modules' details drawers are
+  open (shared by both views, so a drawer stays open when its module moves or the view changes). Moving modules only
+  stages changes;
   they reach Foundry when saved through the adapter.
 
 `src/module/app/`
@@ -26,7 +31,11 @@ adapters is plain TypeScript and Svelte, tested without a Foundry server.
 
 `src/component/`
 : The Svelte components. They read and change a `ModuleState` and never use `game` directly; text comes through
-  `localize` in `src/module/lib/i18n.ts`.
+  `localize` in `src/module/lib/i18n.ts`. The split view's lists are ARIA treegrids rather than listboxes, because an
+  open drawer holds links, which a listbox option cannot contain: each module is a selectable level-1 row, and its
+  drawer a level-2 row below it. The treegrid keeps focus and points at the keyboard's row with
+  `aria-activedescendant`, so its triangles are left out of the Tab order and its key handling ignores keys pressed
+  on a drawer's links.
 
 ## Activation changes
 
