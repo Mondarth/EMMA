@@ -226,8 +226,14 @@ export function createFoundryNamespaceMock() {
   const reloadConfirm = vi.fn((_options?: { world?: boolean }) => Promise.resolve());
   // Resolves as a dismissed dialog does, unless a test says otherwise.
   const confirm = vi.fn((_config?: object): Promise<boolean | null> => Promise.resolve(null));
-  // Foundry removes every tag and attribute it does not allow; removing scripts is enough to see it was called.
-  const cleanHTML = vi.fn((raw: string): string => raw.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ''));
+  // Foundry removes every tag and attribute it does not allow; removing scripts is enough to see it was called. The
+  // HTML is parsed rather than matched with a regular expression, which cannot reliably find script elements.
+  const cleanHTML = vi.fn((raw: string): string => {
+    const template = document.createElement('template');
+    template.innerHTML = raw;
+    for (const script of template.content.querySelectorAll('script')) script.remove();
+    return template.innerHTML;
+  });
 
   return {
     applications: {
