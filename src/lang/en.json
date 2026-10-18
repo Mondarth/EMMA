@@ -87,7 +87,8 @@
     },
     "Requirements": {
       "Unmet": "{module} requires {missing}, which must be active too.",
-      "Locked": "{module} is required by {parents}, so it must stay active while they are."
+      "LockedOne": "{module} is required by {parent}, so it must stay active while it is.",
+      "LockedMany": "{module} is required by {parents}, so it must stay active while they are."
     },
     "Relation": {
       "required": "Required",

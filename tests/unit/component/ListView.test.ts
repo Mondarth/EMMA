@@ -322,7 +322,7 @@ describe('ListView', () => {
         expect(checkbox.closest('li')).toHaveClass('locked');
         expect(checkbox.closest('.emma-module-row')).toHaveAttribute(
           'data-tooltip',
-          'MONDARTH-EMMA.Requirements.Locked {"module":"lib","parents":"app and tool"}',
+          'MONDARTH-EMMA.Requirements.LockedMany {"module":"lib","parents":"app and tool"}',
         );
       }
       expect(screen.getByRole('checkbox', { name: 'app' })).toBeEnabled();

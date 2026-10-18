@@ -415,7 +415,7 @@ describe('SelectableList', () => {
     expect(library).toHaveClass('locked');
     expect(library).toHaveAttribute(
       'data-tooltip',
-      'MONDARTH-EMMA.Requirements.Locked {"module":"libWrapper","parents":"Dice So Nice!"}',
+      'MONDARTH-EMMA.Requirements.LockedOne {"module":"libWrapper","parent":"Dice So Nice!"}',
     );
     expect(option('Dice So Nice!')).not.toHaveAttribute('aria-disabled');
 

@@ -486,7 +486,7 @@ test.describe('Saving', () => {
     await (await moduleManagementButton(page)).click();
     const emma = page.locator(EMMA_WINDOW);
     const library = emma.getByRole('checkbox', { name: LIBRARY.title });
-    const why = `${LIBRARY.title} is required by ${ADDON.title}, so it must stay active while they are.`;
+    const why = `${LIBRARY.title} is required by ${ADDON.title}, so it must stay active while it is.`;
 
     await emma.getByRole('checkbox', { name: ADDON.title }).check();
 
