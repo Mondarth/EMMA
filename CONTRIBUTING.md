@@ -116,20 +116,29 @@ The Playwright tests in `tests/e2e` run against a real Foundry VTT server and ar
 workflow, on pull requests to `main`, which are the release pull requests from `dev`, and on manual dispatch). The workflow needs four repository secrets:
 `FOUNDRY_USERNAME`, `FOUNDRY_PASSWORD`, `FOUNDRY_LICENSE_KEY` and `FOUNDRY_ADMIN_KEY`.
 
-To run them locally, export the same four variables, then:
+To run them locally, the test server and the tests take the credentials from `.foundryvtt/secrets.json`, the file the
+development server uses (see `docs/developers/setup.md`), so nothing needs exporting. The test server runs on port 30001,
+beside a development server on port 30000. To use a different secrets file, name it in `FOUNDRY_SECRETS_FILE`; a key it
+lacks falls back to the matching variable above. Then:
 
 ```sh
 pnpm build
-pnpm run e2e:packages                    # install the pinned game system into tests/e2e/.data
-pnpm run e2e:server                      # start the pinned Foundry VTT server on http://localhost:30000
+pnpm run e2e:packages                    # install the pinned game system and the fixture modules into tests/e2e/.data
+pnpm run e2e:server                      # start the pinned Foundry VTT server on http://localhost:30001
 pnpm exec playwright install chromium    # once per Playwright version
 pnpm run test:e2e --project=chromium
 pnpm run e2e:server:stop
 ```
 
+The fixture modules in `tests/e2e/fixtures/modules` are empty modules that the tests activate, so that saving can be
+tested without touching EMMA. After changing them, run `pnpm run e2e:packages` again and restart the server, which only
+finds new modules when it starts.
+
 The first test run accepts the licence agreement, creates and launches a world, enables the module and creates a
 player user. Delete `tests/e2e/.data` to start again from nothing. The Firefox project opens a browser window: headless
-Firefox cannot create the WebGL context Foundry VTT needs (CI runs it on a virtual display with `xvfb-run`). Start the server with `pnpm run e2e:server` rather than
+Firefox cannot create the WebGL context Foundry VTT needs. Without a desktop session (over SSH, in a container, in CI),
+run the tests with `pnpm run test:e2e:xvfb` instead, which gives the browsers a virtual 1920x1080 display (`xvfb` must
+and `xauth` must be installed: `sudo apt-get install xvfb xauth` on Debian or Ubuntu); it takes the same arguments, such as `--project=firefox`. Start the server with `pnpm run e2e:server` rather than
 `docker compose` directly: the script first creates the directories the server mounts, which Docker would otherwise
 create as root, and runs Foundry VTT as you, so that it can write to them; otherwise it hangs. The script replaces any
 server left running, so a hung one is not reused.
@@ -143,5 +152,5 @@ This project was scaffolded with [create-fvtt-module](https://github.com/ulenaro
 tooling and configuration it started from were written in part with AI assistance (Claude Opus 5.5) and reviewed by a
 human.
 
-This statement covers the scaffold only, not work added since. Keep, amend or remove it to reflect how this project is
-developed.
+Development of the module itself continues with AI assistance (Claude Opus 5.5). All changes, whether written by a
+person or with AI assistance, are reviewed by a human before they are merged.

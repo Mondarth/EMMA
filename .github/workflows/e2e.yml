@@ -69,19 +69,26 @@ jobs:
           path: |
             tests/e2e/.data/Data/systems
             tests/e2e/.data/Data/modules
-          key: foundry-packages-${{ hashFiles('scripts/e2e/install-packages.ts') }}
+          key: foundry-packages-${{ hashFiles('scripts/e2e/install-packages.ts', 'tests/e2e/fixtures/modules/**') }}
 
       - name: Install the pinned system and module
         run: pnpm run e2e:packages
+
+      # The credentials come from the environment: the server's secrets file, which would override them, is left empty.
+      - name: Provide an empty secrets file
+        run: |
+          echo '{}' > "$RUNNER_TEMP/foundry-secrets.json"
+          echo "FOUNDRY_SECRETS_FILE=$RUNNER_TEMP/foundry-secrets.json" >> "$GITHUB_ENV"
 
       # The script makes the directories Docker mounts first, as the runner's user, and runs Foundry VTT as that user.
       # Created by Docker, they would belong to root; either way Foundry VTT could not write to /data, and would hang.
       - name: Start Foundry VTT
         run: pnpm run e2e:server --wait-timeout 300
 
-      # Firefox runs headed, for WebGL (see playwright.config.ts), so it needs a display.
+      # Firefox runs headed, for WebGL (see playwright.config.ts), so it needs a display: a virtual 1920x1080 screen,
+      # comfortably above Foundry VTT's 1024x768 minimum and the 1280x800 test viewport plus the browser frame.
       - name: Run Playwright
-        run: xvfb-run --auto-servernum pnpm run test:e2e --project=${{ matrix.browser }}
+        run: pnpm run test:e2e:xvfb --project=${{ matrix.browser }}
 
       - name: Foundry VTT logs
         if: ${{ failure() }}

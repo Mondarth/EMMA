@@ -8,6 +8,7 @@
   },
   "relationships": {},
   "esmodules": ["dist/mondarth-emma.js"],
+  "styles": ["dist/mondarth-emma.css"],
   "languages": [
     {
       "lang": "en",

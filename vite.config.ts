@@ -1,8 +1,7 @@
 import { svelte } from '@sveltejs/vite-plugin-svelte';
+import { svelteTesting } from '@testing-library/svelte/vite';
 import fs from 'node:fs';
 import path from 'node:path';
-
-import { sveltePreprocess } from 'svelte-preprocess';
 
 import autoprefixer from 'autoprefixer';
 import dts from 'unplugin-dts/vite';
@@ -42,7 +41,7 @@ const mountConfigSchema = z.object({
  */
 function loadMountConfig(): typeof DEFAULTS {
   const override = process.env.PDT_MOUNT_CONFIG;
-  const file = path.resolve(__dirname, override ?? DEFAULT_MOUNT_CONFIG);
+  const file = path.resolve(import.meta.dirname, override ?? DEFAULT_MOUNT_CONFIG);
 
   if (!fs.existsSync(file)) {
     // The default file is optional, but a file that was asked for explicitly must exist.
@@ -85,7 +84,7 @@ const s_SOURCEMAPS = true; // Generate sourcemaps for the bundle (recommended).
  * @returns A Vite plugin
  */
 function copyLang(): Plugin {
-  const langDir = path.resolve(__dirname, 'src/lang');
+  const langDir = path.resolve(import.meta.dirname, 'src/lang');
 
   return {
     name: 'mondarth-emma:copy-lang',
@@ -120,13 +119,14 @@ export default defineConfig(({ mode }) => {
       : {};
 
   return {
-    root: 'src/', // Source location / esbuild root.
+    root: 'src/', // Source location / bundler root.
     base: `/${s_PACKAGE_ID}/dist`, // Base module path that 30001 / served dev directory.
     publicDir: false, // No public resources to copy.
     cacheDir: '../.vite-cache', // Relative from root directory.
     test: {
       include: ['**/*.{test,spec}.?(c|m)[jt]s?(x)', '../tests/unit/**/*.{test,spec}.?(c|m)[jt]s?(x)'],
       environment: 'happy-dom',
+      setupFiles: ['../tests/unit/setup.ts'],
       restoreMocks: true,
       unstubGlobals: true,
       coverage: {
@@ -146,12 +146,13 @@ export default defineConfig(({ mode }) => {
     resolve: {
       conditions: ['browser', 'import'],
       alias: {
-        '@module': path.resolve(__dirname, 'src/module/'),
+        '@module': path.resolve(import.meta.dirname, 'src/module/'),
+        '@component': path.resolve(import.meta.dirname, 'src/component/'),
       },
     },
 
-    esbuild: {
-      target: ['es2022'],
+    oxc: {
+      target: 'es2022',
     },
 
     css: {
@@ -197,14 +198,14 @@ export default defineConfig(({ mode }) => {
       outDir: '../dist',
       emptyOutDir: false,
       sourcemap: s_SOURCEMAPS,
-      minify: s_COMPRESS ? 'esbuild' : false,
+      minify: s_COMPRESS ? 'oxc' : false,
       target: ['es2022'],
       lib: {
         entry: './index.ts',
         formats: ['es'],
         fileName: moduleJSON.id,
       },
-      rollupOptions: {
+      rolldownOptions: {
         output: {
           // Rewrite the default style.css to a more recognizable file name.
           assetFileNames: assetInfo =>
@@ -213,30 +214,23 @@ export default defineConfig(({ mode }) => {
       },
     },
 
-    // Necessary when using the dev server for top-level await usage inside TRL.
-    optimizeDeps: {
-      esbuildOptions: {
-        target: 'es2022',
-      },
-    },
-
     plugins: [
       tsconfigPaths(),
       copyLang(),
       dts({
         // Vite's root is `src/`; resolve the tsconfig and its `include` globs from the project root instead.
-        root: __dirname,
+        root: import.meta.dirname,
         tsconfigPath: './tsconfig.json',
-        outDirs: path.resolve(__dirname, 'dist'),
+        outDirs: path.resolve(import.meta.dirname, 'dist'),
         afterBuild: emittedFiles => {
           console.log('Emitted files:', [...emittedFiles.keys()]);
         },
         compilerOptions: { noEmitOnError: false },
       }),
-      svelte({
-        compilerOptions,
-        preprocess: sveltePreprocess(),
-      }),
+      // Preprocessing comes from svelte.config.js, which svelte-check and the ESLint plugin also read.
+      svelte({ compilerOptions }),
+      // Test runs only: resolves Svelte's browser build and unmounts rendered components after each test.
+      ...(mode === 'test' ? [svelteTesting()] : []),
     ],
   };
 });

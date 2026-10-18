@@ -6,7 +6,7 @@ for (const [role, userName] of Object.entries(USERS)) {
     await joinAs(page, userName);
 
     const active = await page.evaluate(id => {
-      const moduleUnderTest = game.modules?.get(id);
+      const moduleUnderTest = game.modules.get(id);
       return moduleUnderTest?.active ?? false;
     }, MODULE_ID);
 

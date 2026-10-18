@@ -1,0 +1,26 @@
+{
+  "id": "emma-fixture-addon",
+  "title": "EMMA Fixture Add-on",
+  "description": "An empty module that requires EMMA Fixture Library, for the EMMA end-to-end tests of requirements.",
+  "version": "1.0.0",
+  "compatibility": {
+    "minimum": "14",
+    "verified": "14"
+  },
+  "authors": [
+    {
+      "name": "EMMA tests"
+    }
+  ],
+  "relationships": {
+    "requires": [
+      {
+        "id": "emma-fixture-library",
+        "type": "module",
+        "reason": "It adds to what the library does."
+      }
+    ]
+  },
+  "readme": "README.md",
+  "bugs": "https://github.com/Mondarth/EMMA/issues"
+}

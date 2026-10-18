@@ -1,0 +1,12 @@
+{
+  "id": "emma-fixture-library",
+  "title": "EMMA Fixture Library",
+  "description": "<p>An empty module the <strong>EMMA</strong> end-to-end tests activate and deactivate.</p>",
+  "version": "1.0.0",
+  "compatibility": { "minimum": "14", "verified": "14" },
+  "authors": [{ "name": "EMMA tests", "url": "https://github.com/Mondarth/EMMA" }],
+  "languages": [
+    { "lang": "en", "name": "English", "path": "lang/en.json" },
+    { "lang": "fr", "name": "Français", "path": "lang/fr.json" }
+  ]
+}

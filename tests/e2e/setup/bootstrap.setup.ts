@@ -1,5 +1,6 @@
 import { expect, test as setup } from '@playwright/test';
 
+import { adminKey } from '../support/credentials';
 import { joinAs, MODULE_ID, USERS, waitForReady, WORLD } from '../support/foundry';
 
 /**
@@ -24,10 +25,12 @@ setup('prepare the Foundry world', async ({ page }) => {
 
   // 2. Administrator login.
   if (new URL(page.url()).pathname.startsWith('/auth')) {
-    const adminKey = process.env.FOUNDRY_ADMIN_KEY;
-    if (!adminKey) throw new Error('FOUNDRY_ADMIN_KEY must be set to log in to the Foundry setup screen');
+    const key = adminKey();
+    if (key === undefined) {
+      throw new Error('Give foundry_admin_key in .foundryvtt/secrets.json, or set FOUNDRY_ADMIN_KEY, to log in');
+    }
 
-    await page.locator('input[name="adminPassword"]').fill(adminKey);
+    await page.locator('input[name="adminPassword"]').fill(key);
     await page.getByRole('button', { name: 'Log In' }).click();
     await page.waitForURL(/\/(setup|join|game)/);
   }
@@ -35,6 +38,9 @@ setup('prepare the Foundry world', async ({ page }) => {
   // 3. Create and launch the world (when the server is still on the setup screen).
   if (new URL(page.url()).pathname.startsWith('/setup')) {
     const worldTile = page.locator(`[data-package-id="${WORLD.id}"]`);
+    // The world tiles render with the Create World button, after the page loads; count them any sooner and an
+    // existing world looks missing.
+    await expect(page.getByRole('button', { name: 'Create World' })).toBeVisible();
 
     if ((await worldTile.count()) === 0) {
       // v14 creates worlds on a page of their own, and launches the new world straight away. On its first launch it
@@ -85,7 +91,7 @@ setup('prepare the Foundry world', async ({ page }) => {
   }
 
   const active = await page.evaluate(id => {
-    const moduleUnderTest = game.modules?.get(id);
+    const moduleUnderTest = game.modules.get(id);
     return moduleUnderTest?.active ?? false;
   }, MODULE_ID);
   expect(active, `${MODULE_ID} should be active in the test world`).toBe(true);

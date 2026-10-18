@@ -30,10 +30,11 @@ export default defineConfig({
       ]
     : [['list'], ['html', { outputFolder: './playwright-report', open: 'never' }]],
   use: {
-    baseURL: process.env.FOUNDRY_URL ?? 'http://localhost:30000',
+    baseURL: process.env.FOUNDRY_URL ?? 'http://localhost:30001',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    // Recording costs time on every test, failing or not; locally, the trace and screenshot of a failure are enough.
+    video: process.env.CI ? 'retain-on-failure' : 'off',
   },
   projects: [
     // Accepts the licence agreement, creates and launches the test world and enables the modules.
@@ -45,7 +46,7 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], viewport: VIEWPORT },
     },
     // Headless Firefox cannot create the WebGL context Foundry VTT needs. Headed, it renders WebGL in software, so it
-    // opens a window; CI gives it a virtual display (xvfb-run in .github/workflows/e2e.yml).
+    // opens a window, which needs a display: `pnpm test:e2e:xvfb` provides a virtual 1920x1080 one, in CI and locally.
     {
       name: 'firefox',
       testIgnore: SETUP,
