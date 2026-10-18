@@ -33,7 +33,8 @@ export default defineConfig({
     baseURL: process.env.FOUNDRY_URL ?? 'http://localhost:30001',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    // Recording costs time on every test, failing or not; locally, the trace and screenshot of a failure are enough.
+    video: process.env.CI ? 'retain-on-failure' : 'off',
   },
   projects: [
     // Accepts the licence agreement, creates and launches the test world and enables the modules.
