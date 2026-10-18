@@ -75,6 +75,15 @@ describe('EmmaApp', () => {
     expect(app.mounted).toBe(false);
   });
 
+  test('shows the drawer details the user chose', async () => {
+    const { EmmaApp } = await loadApp({ settings: { 'mondarth-emma.drawerFields': ['id'] } });
+    const { drawerFields } = await import('@module/state/drawer-fields.svelte');
+
+    await new EmmaApp().render({ force: true });
+
+    expect(drawerFields.shown).toEqual(['id']);
+  });
+
   test('shows the installed modules with their saved activation', async () => {
     const { EmmaApp } = await loadApp({ settings: { 'core.moduleConfiguration': { dice: true } } });
 

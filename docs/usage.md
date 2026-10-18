@@ -58,7 +58,8 @@ how compatible the module is with your version of Foundry. Hover over the badge 
 ### Module details
 
 Every module in either view has a disclosure triangle at its far right. Click it to open a drawer below the module
-showing its description, its authors and the languages it is translated into; click it again to close the drawer.
+showing its details (by default its description, its authors and the languages it is translated into); click it
+again to close the drawer.
 Opening a drawer never changes which modules are selected or active, and any number can be open at once.
 
 From the keyboard, press the right arrow key to open or close the drawer: in the list view, on the module's triangle or
@@ -68,12 +69,34 @@ checkbox, and in the split view, on the module the keyboard is on.
 | ---------------------------------------------- | ------------------------ | ------------------------------------------ | -------------------------------------------- |
 | Open a module's drawer                         | Click its triangle       | **→** on the module's triangle or checkbox | **→** on the module                          |
 | Close a module's drawer                        | Click its triangle again | **→** again                                | **→** again                                  |
-| Open or close an authors or languages dropdown | Click it                 | **Tab** to it, then **Enter** or **Space** | **Tab** to it, then **Enter** or **Space**   |
-| Follow an author's link                        | Click it                 | **Tab** to it, then **Enter**              | **Tab** to it, then **Enter**                |
+| Open or close a dropdown in the drawer         | Click it                 | **Tab** to it, then **Enter** or **Space** | **Tab** to it, then **Enter** or **Space**   |
+| Follow a link in the drawer                    | Click it                 | **Tab** to it, then **Enter**              | **Tab** to it, then **Enter**                |
 
 Authors link to their web pages and email addresses where the module's manifest gives them, and their Discord names
-are shown too. A module with several authors or languages lists them in a dropdown, closed to begin with, that names
-how many there are.
+are shown too. Where a module has several of a detail, such as authors or languages, the drawer lists them in a
+dropdown, closed to begin with, that names how many there are. A detail the module's manifest does not give is left
+out.
+
+#### Choosing the details shown
+
+Each user chooses the details their drawers show: in **Game Settings**, open the section for EMMA, choose **Choose
+details** under **Module details**, check the details you want and **Save**. **Reset to defaults** checks the
+defaults again. Open drawers change at once, and your choice follows you to every device you play on.
+
+| Detail           | Shows                                                                                         |
+| ---------------- | --------------------------------------------------------------------------------------------- |
+| Description      | The module's description (shown by default)                                                   |
+| Authors          | Its authors, with their web pages, email addresses and Discord names (shown by default)       |
+| Languages        | The languages it is translated into (shown by default)                                        |
+| Links            | Its project page, readme, changelog, bug tracker, licence, manifest and download, as given    |
+| Compatibility    | The Foundry versions it declares: minimum, verified and maximum                               |
+| Game systems     | The game systems it supports                                                                  |
+| Requires         | The packages it requires, with the reasons given                                              |
+| Recommends       | The packages it recommends, with the reasons given                                            |
+| Conflicts with   | The packages it conflicts with, with the reasons given                                        |
+| Compendium packs | Its compendium packs, with the type of document each holds                                    |
+| Library          | Whether it is a library, providing features for other modules rather than its own             |
+| Module ID        | Its package ID, as used in manifests and URLs                                                 |
 
 EMMA remembers the view you last chose, separately for each user and on every device you play on. The list view is shown
 until you choose otherwise.
@@ -93,8 +116,12 @@ Only a GM or assistant GM with permission to modify configuration settings can s
 ## Settings
 
 Disable EMMA
-: A world setting, changed by the GM under **Configure Settings**. When checked, the **Manage Modules** button opens
+: A world setting, changed by the GM under **Game Settings**. When checked, the **Manage Modules** button opens
   Foundry's own Module Management window again. It takes effect immediately, without reloading.
+
+Module details
+: A menu every user can open under **Game Settings**, choosing the details their drawers show for themselves. See
+  [Module details](#module-details).
 
 ## The API
 

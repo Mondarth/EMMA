@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, test } from 'vitest';
 import SplitView from '@component/SplitView.svelte';
 import { installFoundryMocks } from '../mocks/foundry';
 import { createModules, ENTRIES } from './fixtures';
+import { DrawerFields } from '@module/state/drawer-fields.svelte';
 
 const INACTIVE = 'MONDARTH-EMMA.Split.Inactive';
 const ACTIVE = 'MONDARTH-EMMA.Split.Active';
@@ -26,7 +27,7 @@ describe('SplitView', () => {
   });
 
   test('shows inactive modules on the left, the transfer buttons, then active modules on the right', () => {
-    render(SplitView, { modules: createModules(), canManage: true });
+    render(SplitView, { fields: new DrawerFields(), modules: createModules(), canManage: true });
 
     const [inactive, active] = screen.getAllByRole('treegrid');
     const deactivate = screen.getByRole('button', { name: 'MONDARTH-EMMA.Split.Deactivate' });
@@ -39,7 +40,7 @@ describe('SplitView', () => {
   });
 
   test('counts the modules on each side', () => {
-    render(SplitView, { modules: createModules(), canManage: true });
+    render(SplitView, { fields: new DrawerFields(), modules: createModules(), canManage: true });
 
     expect(screen.getByRole('heading', { name: `${INACTIVE} 2` })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: `${ACTIVE} 1` })).toBeInTheDocument();
@@ -47,7 +48,7 @@ describe('SplitView', () => {
 
   test('moves selected modules across and back', async () => {
     const modules = createModules();
-    render(SplitView, { modules, canManage: true });
+    render(SplitView, { fields: new DrawerFields(), modules, canManage: true });
     const user = userEvent.setup();
 
     await user.click(screen.getByRole('row', { name: /^Dice So Nice!/ }));
@@ -68,7 +69,7 @@ describe('SplitView', () => {
   });
 
   test('says so when no module is active', () => {
-    render(SplitView, { modules: createModules({}), canManage: true });
+    render(SplitView, { fields: new DrawerFields(), modules: createModules({}), canManage: true });
 
     expect(screen.getByText('MONDARTH-EMMA.Split.NoneActive')).toBeInTheDocument();
     expect(screen.queryByText('MONDARTH-EMMA.Split.NoneInactive')).toBeNull();
@@ -76,6 +77,7 @@ describe('SplitView', () => {
 
   test('says so when every module is active', () => {
     render(SplitView, {
+      fields: new DrawerFields(),
       modules: createModules(Object.fromEntries(ENTRIES.map(({ id }) => [id, true]))),
       canManage: true,
     });
@@ -84,7 +86,7 @@ describe('SplitView', () => {
   });
 
   test('keeps the selections of the two sides apart', async () => {
-    render(SplitView, { modules: createModules(), canManage: true });
+    render(SplitView, { fields: new DrawerFields(), modules: createModules(), canManage: true });
 
     await userEvent.click(screen.getByRole('row', { name: /^EMMA/ }));
     await userEvent.click(screen.getByRole('row', { name: /^libWrapper/ }));
@@ -93,7 +95,7 @@ describe('SplitView', () => {
   });
 
   test('lets a user who may not manage modules select, but not move, modules', async () => {
-    render(SplitView, { modules: createModules(), canManage: false });
+    render(SplitView, { fields: new DrawerFields(), modules: createModules(), canManage: false });
 
     await userEvent.click(screen.getByRole('row', { name: /^EMMA/ }));
 
@@ -102,7 +104,11 @@ describe('SplitView', () => {
   });
 
   test('leaves nothing behind when unmounted', () => {
-    const { container, unmount } = render(SplitView, { modules: createModules(), canManage: true });
+    const { container, unmount } = render(SplitView, {
+      fields: new DrawerFields(),
+      modules: createModules(),
+      canManage: true,
+    });
 
     unmount();
 

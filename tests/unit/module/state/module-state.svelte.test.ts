@@ -3,17 +3,9 @@ import { afterEach, describe, expect, test } from 'vitest';
 
 import type { ModuleEntry } from '@module/adapters/modules';
 import { ModuleState } from '@module/state/module-state.svelte';
+import { moduleEntry } from '../../mocks/entries';
 
-const ENTRIES: ModuleEntry[] = ['a', 'b', 'c'].map(id => ({
-  id,
-  title: id,
-  version: '1.0.0',
-  badge: null,
-  description: '',
-  authors: [],
-  languages: [],
-  requires: [],
-}));
+const ENTRIES: ModuleEntry[] = ['a', 'b', 'c'].map(id => moduleEntry({ id }));
 
 let cleanup: (() => void) | undefined;
 

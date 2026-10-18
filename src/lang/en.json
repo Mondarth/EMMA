@@ -24,14 +24,53 @@
     "Drawer": {
       "Show": "Show details of {module}",
       "Hide": "Hide details of {module}",
-      "Description": "Description",
-      "Authors": "Authors",
-      "Languages": "Languages",
-      "AuthorCount": "{count} authors",
-      "LanguageCount": "{count} languages",
+      "Field": {
+        "description": "Description",
+        "authors": "Authors",
+        "languages": "Languages",
+        "links": "Links",
+        "compatibility": "Compatibility",
+        "systems": "Game systems",
+        "requires": "Requires",
+        "recommends": "Recommends",
+        "conflicts": "Conflicts with",
+        "packs": "Compendium packs",
+        "library": "Library",
+        "id": "Module ID"
+      },
+      "Count": {
+        "authors": "{count} authors",
+        "languages": "{count} languages",
+        "systems": "{count} game systems",
+        "requires": "{count} packages",
+        "recommends": "{count} packages",
+        "conflicts": "{count} packages",
+        "packs": "{count} packs"
+      },
+      "Link": {
+        "url": "Project page",
+        "readme": "Readme",
+        "changelog": "Changelog",
+        "bugs": "Report a bug",
+        "license": "Licence",
+        "manifest": "Manifest",
+        "download": "Download"
+      },
+      "Compatibility": {
+        "minimum": "Minimum",
+        "verified": "Verified",
+        "maximum": "Maximum"
+      },
+      "Type": {
+        "module": "module",
+        "system": "game system",
+        "world": "world"
+      },
+      "IsLibrary": "Yes: it provides features for other modules to use rather than its own.",
       "Email": "Email {name}",
       "Discord": "Discord",
-      "Empty": "The module's manifest gives no details."
+      "Empty": "The module's manifest gives none of the details chosen to show.",
+      "NoneChosen": "No details are chosen to show. Choose them under Game Settings, in the section for EMMA."
     },
     "Footer": {
       "Save": "Save",
@@ -52,11 +91,21 @@
       "Disabled": {
         "Name": "Disable EMMA",
         "Hint": "Use Foundry's built-in Module Management window instead of EMMA. Takes effect immediately."
+      },
+      "Fields": {
+        "Name": "Module details",
+        "Label": "Choose details",
+        "Hint": "Choose which details of each module EMMA's drawers show. Only you see your choice.",
+        "Title": "EMMA - module details",
+        "Legend": "Details shown in each module's drawer",
+        "Defaults": "Reset to defaults",
+        "Save": "Save"
       }
     },
     "Errors": {
       "OpenFailed": "EMMA could not open, so Foundry's Module Management window has been opened instead. See the console for details.",
-      "SaveFailed": "EMMA could not save which modules are active. See the console for details."
+      "SaveFailed": "EMMA could not save which modules are active. See the console for details.",
+      "FieldsFailed": "EMMA could not save which module details to show. See the console for details."
     }
   }
 }

@@ -1,17 +1,34 @@
 <script lang="ts">
-  import type { ModuleAuthor, ModuleEntry } from '@module/adapters/modules';
+  import type { ModuleAuthor, ModuleEntry, ModuleRelation } from '@module/adapters/modules';
   import { format, localize } from '@module/lib/i18n';
+  import type { DrawerFields } from '@module/state/drawer-fields.svelte';
+  import { hasDetail } from '@module/state/drawer-fields.svelte';
+
+  import CountedList from './CountedList.svelte';
 
   interface Props {
     /** The module to describe. */
     entry: ModuleEntry;
     /** The drawer's DOM ID, which the button opening it controls. */
     id: string;
+    /** The details the user has chosen to show. */
+    fields: DrawerFields;
   }
 
-  const { entry, id }: Props = $props();
+  const { entry, id, fields }: Props = $props();
 
-  const empty = $derived(entry.description === '' && entry.authors.length === 0 && entry.languages.length === 0);
+  const chosen = $derived(fields.shown);
+  const shown = $derived(chosen.filter(field => hasDetail(entry, field)));
+
+  /**
+   * The summary of a dropdown listing several of a detail.
+   * @param field - The detail
+   * @param total - How many there are
+   * @returns The summary
+   */
+  function count(field: string, total: number): string {
+    return format(`MONDARTH-EMMA.Drawer.Count.${field}`, { count: String(total) });
+  }
 </script>
 
 {#snippet author({ name, url, email, discord }: ModuleAuthor)}
@@ -34,55 +51,92 @@
   {/if}
 {/snippet}
 
+<!-- A related package, with its type where the relationship does not imply it, and the reason the manifest gives. -->
+{#snippet relation({ type, title, reason }: ModuleRelation, implied: ModuleRelation['type'])}
+  <span>{title}</span>
+  {#if type !== implied}
+    <span class="emma-drawer-secondary">({localize(`MONDARTH-EMMA.Drawer.Type.${type}`)})</span>
+  {/if}
+  {#if reason !== undefined}
+    <span class="emma-drawer-reason">{reason}</span>
+  {/if}
+{/snippet}
+
 <div {id} class="emma-drawer">
-  {#if empty}
-    <p class="emma-drawer-empty">{localize('MONDARTH-EMMA.Drawer.Empty')}</p>
+  {#if chosen.length === 0}
+    <p class="emma-drawer-secondary">{localize('MONDARTH-EMMA.Drawer.NoneChosen')}</p>
+  {:else if shown.length === 0}
+    <p class="emma-drawer-secondary">{localize('MONDARTH-EMMA.Drawer.Empty')}</p>
   {:else}
     <dl>
-      {#if entry.description !== ''}
-        <dt>{localize('MONDARTH-EMMA.Drawer.Description')}</dt>
-        <!-- The adapter cleans the description with Foundry's cleanHTML, as Foundry does before showing it. -->
-        <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-        <dd class="emma-drawer-description">{@html entry.description}</dd>
-      {/if}
-
-      {#if entry.authors.length > 0}
-        <dt>{localize('MONDARTH-EMMA.Drawer.Authors')}</dt>
-        <dd>
-          {#if entry.authors.length === 1}
-            {@render author(entry.authors[0] as ModuleAuthor)}
-          {:else}
-            <details>
-              <summary>{format('MONDARTH-EMMA.Drawer.AuthorCount', { count: String(entry.authors.length) })}</summary>
-              <ul>
-                {#each entry.authors as each, index (index)}
-                  <li>{@render author(each)}</li>
-                {/each}
-              </ul>
-            </details>
-          {/if}
-        </dd>
-      {/if}
-
-      {#if entry.languages.length > 0}
-        <dt>{localize('MONDARTH-EMMA.Drawer.Languages')}</dt>
-        <dd>
-          {#if entry.languages.length === 1}
-            {@const [language] = entry.languages}
-            <span lang={language?.lang}>{language?.name}</span>
-          {:else}
-            <details>
-              <summary
-                >{format('MONDARTH-EMMA.Drawer.LanguageCount', { count: String(entry.languages.length) })}</summary>
-              <ul>
-                {#each entry.languages as { lang, name }, index (index)}
-                  <li>{name} <span class="emma-drawer-code">({lang})</span></li>
-                {/each}
-              </ul>
-            </details>
-          {/if}
-        </dd>
-      {/if}
+      {#each shown as field (field)}
+        <dt>{localize(`MONDARTH-EMMA.Drawer.Field.${field}`)}</dt>
+        {#if field === 'description'}
+          <!-- The adapter cleans the description with Foundry's cleanHTML, as Foundry does before showing it. -->
+          <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+          <dd class="emma-drawer-description">{@html entry.description}</dd>
+        {:else if field === 'authors'}
+          <dd><CountedList items={entry.authors} summary={count(field, entry.authors.length)} item={author} /></dd>
+        {:else if field === 'languages'}
+          <dd>
+            <CountedList items={entry.languages} summary={count(field, entry.languages.length)}>
+              {#snippet item({ lang, name })}
+                <span {lang}>{name}</span> <span class="emma-drawer-secondary">({lang})</span>
+              {/snippet}
+            </CountedList>
+          </dd>
+        {:else if field === 'links'}
+          <dd>
+            <ul class="emma-drawer-inline">
+              {#each entry.links as { kind, url } (kind)}
+                <li>
+                  <a href={url} target="_blank" rel="noopener noreferrer">
+                    {localize(`MONDARTH-EMMA.Drawer.Link.${kind}`)}
+                  </a>
+                </li>
+              {/each}
+            </ul>
+          </dd>
+        {:else if field === 'compatibility'}
+          <dd>
+            <ul class="emma-drawer-inline">
+              {#each ['minimum', 'verified', 'maximum'] as const as bound (bound)}
+                {@const version = entry.compatibility[bound]}
+                {#if version !== undefined}
+                  <li>
+                    <span class="emma-drawer-secondary">
+                      {localize(`MONDARTH-EMMA.Drawer.Compatibility.${bound}`)}
+                    </span>
+                    {version}
+                  </li>
+                {/if}
+              {/each}
+            </ul>
+          </dd>
+        {:else if field === 'systems' || field === 'requires' || field === 'recommends' || field === 'conflicts'}
+          {@const related = entry.relationships[field]}
+          {@const implied = field === 'systems' ? 'system' : 'module'}
+          <dd>
+            <CountedList items={related} summary={count(field, related.length)}>
+              {#snippet item(each: ModuleRelation)}
+                {@render relation(each, implied)}
+              {/snippet}
+            </CountedList>
+          </dd>
+        {:else if field === 'packs'}
+          <dd>
+            <CountedList items={entry.packs} summary={count(field, entry.packs.length)}>
+              {#snippet item({ label, type })}
+                {label} <span class="emma-drawer-secondary">({type})</span>
+              {/snippet}
+            </CountedList>
+          </dd>
+        {:else if field === 'library'}
+          <dd>{localize('MONDARTH-EMMA.Drawer.IsLibrary')}</dd>
+        {:else}
+          <dd><code>{entry.id}</code></dd>
+        {/if}
+      {/each}
     </dl>
   {/if}
 </div>
@@ -120,25 +174,29 @@
     margin-bottom: 0;
   }
 
-  .emma-drawer summary {
-    cursor: pointer;
-  }
-
-  .emma-drawer ul {
-    margin: 0.25rem 0 0;
-    padding-left: 1rem;
+  .emma-drawer-inline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
   }
 
   .emma-drawer-contact {
     margin-left: 0.25rem;
   }
 
-  .emma-drawer-code,
-  .emma-drawer-empty {
+  .emma-drawer-reason {
+    display: block;
     color: var(--color-text-secondary);
   }
 
-  .emma-drawer-empty {
+  .emma-drawer-secondary {
+    color: var(--color-text-secondary);
+  }
+
+  .emma-drawer p {
     margin: 0;
   }
 </style>

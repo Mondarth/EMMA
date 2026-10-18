@@ -272,6 +272,74 @@ test.describe('Details drawers', () => {
   });
 });
 
+test.describe('Choosing the details drawers show', () => {
+  const SHOW = `Show details of ${ADDON.title}`;
+  const HIDE = `Hide details of ${ADDON.title}`;
+
+  /**
+   * Save the details the logged-in user's drawers show.
+   * @param page - A logged-in page
+   * @param fields - The fields, or `null` for the defaults
+   */
+  async function setDrawerFields(page: Page, fields: string[] | null): Promise<void> {
+    await page.evaluate(
+      async ([id, value]) => {
+        const setting = game.settings.settings.get(`${id}.drawerFields`);
+        await game.settings.set(id, 'drawerFields', value ?? (setting?.default as string[]));
+      },
+      [MODULE_ID, fields] as const,
+    );
+  }
+
+  test.beforeEach(async ({ page }) => {
+    await joinAs(page, USERS.player);
+    await setDrawerFields(page, null);
+    await setView(page, 'list');
+  });
+
+  test.afterEach(async ({ page }) => {
+    await closeEmma(page);
+    await setDrawerFields(page, null);
+  });
+
+  test('a player chooses them under Game Settings, and open drawers follow', async ({ page }) => {
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+    await emma.getByRole('button', { name: SHOW }).click();
+    const drawer = emma.locator(`#${await emma.getByRole('button', { name: HIDE }).getAttribute('aria-controls')}`);
+    await expect(drawer.getByText('Authors', { exact: true })).toBeVisible();
+    await expect(drawer.getByText('Links', { exact: true })).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Game Settings' }).click();
+    const settings = page.locator('#settings-config');
+    await settings.getByRole('button', { name: MODULE_TITLE }).click();
+    await settings.getByRole('button', { name: 'Choose details' }).click();
+    const menu = page.locator(`#${MODULE_ID}-fields`);
+    await expect(menu.getByRole('checkbox', { name: 'Authors' })).toBeChecked();
+    await menu.getByRole('checkbox', { name: 'Authors' }).uncheck();
+    await menu.getByRole('checkbox', { name: 'Links' }).check();
+    await menu.getByRole('checkbox', { name: 'Requires' }).check();
+    await menu.getByRole('button', { name: 'Save' }).click();
+
+    await expect(menu).toHaveCount(0);
+    await expect(drawer.getByText('Authors', { exact: true })).toHaveCount(0);
+    const readme = drawer.getByRole('link', { name: 'Readme' });
+    expect(new URL((await readme.getAttribute('href')) ?? '').pathname).toBe(`/modules/${ADDON.id}/README.md`);
+    await expect(drawer.getByRole('link', { name: 'Report a bug' })).toHaveAttribute(
+      'href',
+      'https://github.com/Mondarth/EMMA/issues',
+    );
+    await expect(drawer.getByText(LIBRARY.title, { exact: true })).toBeVisible();
+    await expect(drawer.getByText('It adds to what the library does.')).toBeVisible();
+    expect(await page.evaluate(() => game.settings.get('mondarth-emma', 'drawerFields'))).toEqual([
+      'description',
+      'languages',
+      'links',
+      'requires',
+    ]);
+  });
+});
+
 /**
  * Save the fixture modules as inactive again, without reloading, so each test starts from the same activation.
  * @param page - A page logged in as the GM

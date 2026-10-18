@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, test } from 'vitest';
 import ListView from '@component/ListView.svelte';
 import { installFoundryMocks } from '../mocks/foundry';
 import { createModules } from './fixtures';
+import { DrawerFields } from '@module/state/drawer-fields.svelte';
 
 describe('ListView', () => {
   beforeEach(() => {
@@ -12,7 +13,7 @@ describe('ListView', () => {
   });
 
   test('lists every installed module in display order', () => {
-    render(ListView, { modules: createModules(), canManage: true });
+    render(ListView, { fields: new DrawerFields(), modules: createModules(), canManage: true });
 
     const list = screen.getByRole('list', { name: 'MONDARTH-EMMA.List.Label' });
     const titles = within(list)
@@ -22,14 +23,14 @@ describe('ListView', () => {
   });
 
   test('shows each module’s version', () => {
-    render(ListView, { modules: createModules(), canManage: true });
+    render(ListView, { fields: new DrawerFields(), modules: createModules(), canManage: true });
 
     const dice = screen.getByRole('checkbox', { name: 'Dice So Nice!' }).closest('li') as HTMLElement;
     expect(within(dice).getByText('5.2.4')).toBeInTheDocument();
   });
 
   test('checks the active modules', () => {
-    render(ListView, { modules: createModules(), canManage: true });
+    render(ListView, { fields: new DrawerFields(), modules: createModules(), canManage: true });
 
     expect(screen.getByRole('checkbox', { name: 'libWrapper' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'EMMA' })).not.toBeChecked();
@@ -37,7 +38,7 @@ describe('ListView', () => {
 
   test('stages a change when a module is checked or unchecked', async () => {
     const modules = createModules();
-    render(ListView, { modules, canManage: true });
+    render(ListView, { fields: new DrawerFields(), modules, canManage: true });
 
     await userEvent.click(screen.getByRole('checkbox', { name: 'EMMA' }));
     await userEvent.click(screen.getByRole('checkbox', { name: 'libWrapper' }));
@@ -48,7 +49,7 @@ describe('ListView', () => {
 
   test('toggles a module from its title too', async () => {
     const modules = createModules();
-    render(ListView, { modules, canManage: true });
+    render(ListView, { fields: new DrawerFields(), modules, canManage: true });
 
     await userEvent.click(screen.getByText('EMMA'));
 
@@ -56,7 +57,7 @@ describe('ListView', () => {
   });
 
   test('marks modules with a staged change', async () => {
-    render(ListView, { modules: createModules(), canManage: true });
+    render(ListView, { fields: new DrawerFields(), modules: createModules(), canManage: true });
     const emma = screen.getByRole('checkbox', { name: 'EMMA' });
 
     await userEvent.click(emma);
@@ -68,7 +69,7 @@ describe('ListView', () => {
 
   test('follows changes made elsewhere', async () => {
     const modules = createModules();
-    render(ListView, { modules, canManage: true });
+    render(ListView, { fields: new DrawerFields(), modules, canManage: true });
 
     modules.select('inactive', 'dice');
     modules.activateSelected();
@@ -77,7 +78,7 @@ describe('ListView', () => {
   });
 
   test('disables the checkboxes for a user who may not manage modules', () => {
-    render(ListView, { modules: createModules(), canManage: false });
+    render(ListView, { fields: new DrawerFields(), modules: createModules(), canManage: false });
 
     for (const checkbox of screen.getAllByRole('checkbox')) expect(checkbox).toBeDisabled();
     expect(screen.getByRole('checkbox', { name: 'libWrapper' })).toBeChecked();
@@ -88,7 +89,7 @@ describe('ListView', () => {
     const HIDE_DICE = 'MONDARTH-EMMA.Drawer.Hide {"module":"Dice So Nice!"}';
 
     test('puts a closed disclosure triangle at the far right of each module', () => {
-      render(ListView, { modules: createModules(), canManage: true });
+      render(ListView, { fields: new DrawerFields(), modules: createModules(), canManage: true });
 
       const button = screen.getByRole('button', { name: SHOW_DICE });
       expect(button).toHaveAttribute('aria-expanded', 'false');
@@ -99,7 +100,7 @@ describe('ListView', () => {
 
     test('opens a drawer below the module, then closes it', async () => {
       const modules = createModules();
-      render(ListView, { modules, canManage: true });
+      render(ListView, { fields: new DrawerFields(), modules, canManage: true });
 
       await userEvent.click(screen.getByRole('button', { name: SHOW_DICE }));
 
@@ -120,7 +121,7 @@ describe('ListView', () => {
 
     test('does not change the module’s activation', async () => {
       const modules = createModules();
-      render(ListView, { modules, canManage: true });
+      render(ListView, { fields: new DrawerFields(), modules, canManage: true });
 
       await userEvent.click(screen.getByRole('button', { name: SHOW_DICE }));
 
@@ -128,7 +129,7 @@ describe('ListView', () => {
     });
 
     test('keeps several drawers open at once', async () => {
-      render(ListView, { modules: createModules(), canManage: true });
+      render(ListView, { fields: new DrawerFields(), modules: createModules(), canManage: true });
 
       for (const button of screen.getAllByRole('button')) await userEvent.click(button);
 
@@ -137,7 +138,7 @@ describe('ListView', () => {
 
     test('toggles with the right arrow key from the triangle or the checkbox', async () => {
       const modules = createModules();
-      render(ListView, { modules, canManage: true });
+      render(ListView, { fields: new DrawerFields(), modules, canManage: true });
 
       screen.getByRole('button', { name: SHOW_DICE }).focus();
       await userEvent.keyboard('{ArrowRight}');
@@ -151,7 +152,7 @@ describe('ListView', () => {
 
     test.each(['Alt', 'Control', 'Meta', 'Shift'])('ignores the right arrow key with %s', async modifier => {
       const modules = createModules();
-      render(ListView, { modules, canManage: true });
+      render(ListView, { fields: new DrawerFields(), modules, canManage: true });
 
       screen.getByRole('checkbox', { name: 'Dice So Nice!' }).focus();
       await userEvent.keyboard(`{${modifier}>}{ArrowRight}{/${modifier}}{ArrowLeft}`);
@@ -161,7 +162,7 @@ describe('ListView', () => {
 
     test('opens for a user who may not manage modules', async () => {
       const modules = createModules();
-      render(ListView, { modules, canManage: false });
+      render(ListView, { fields: new DrawerFields(), modules, canManage: false });
 
       await userEvent.click(screen.getByRole('button', { name: SHOW_DICE }));
 
@@ -170,7 +171,7 @@ describe('ListView', () => {
   });
 
   test('says so when no module is installed', () => {
-    render(ListView, { modules: createModules({}, []), canManage: true });
+    render(ListView, { fields: new DrawerFields(), modules: createModules({}, []), canManage: true });
 
     expect(screen.getByText('MONDARTH-EMMA.List.Empty')).toBeInTheDocument();
     expect(screen.queryByRole('list')).toBeNull();

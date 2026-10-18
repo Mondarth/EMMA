@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import type { ActivationMap, ModuleEntry } from '@module/adapters/modules';
 import type { Side } from '@module/state/module-state.svelte';
 import { ModuleState } from '@module/state/module-state.svelte';
+import { moduleEntry } from '../../mocks/entries';
 
 /**
  * Build a module entry.
@@ -11,7 +12,7 @@ import { ModuleState } from '@module/state/module-state.svelte';
  * @returns The entry
  */
 function entry(id: string, requires: string[] = []): ModuleEntry {
-  return { id, title: id, version: '1.0.0', badge: null, description: '', authors: [], languages: [], requires };
+  return moduleEntry({ id, requires });
 }
 
 const ENTRIES = ['a', 'b', 'c', 'd', 'e', 'f'].map(id => entry(id));

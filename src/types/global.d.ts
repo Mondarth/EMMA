@@ -14,6 +14,7 @@ declare module 'fvtt-types/configuration' {
   interface SettingConfig {
     'mondarth-emma.disabled': boolean;
     'mondarth-emma.view': 'list' | 'split';
+    'mondarth-emma.drawerFields': string[];
   }
 }
 
