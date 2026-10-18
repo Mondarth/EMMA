@@ -360,6 +360,33 @@ export class ModuleState {
   }
 
   /**
+   * Whether every installed module will be active. Never, when none is installed.
+   * @returns `true` if all are active
+   */
+  get allActive(): boolean {
+    return this.entries.length > 0 && this.entries.every(({ id }) => this.#pending[id] === true);
+  }
+
+  /**
+   * Whether no installed module will be active.
+   * @returns `true` if none is active
+   */
+  get noneActive(): boolean {
+    return this.entries.every(({ id }) => this.#pending[id] !== true);
+  }
+
+  /**
+   * Stage every module to become active, or every one inactive, as the list view's select-all checkbox does. Locks do
+   * not apply, since the modules that require a locked module change with it. Every module is deselected on both
+   * sides, and none counts as implied any more: each was set by the user.
+   * @param active - Whether every module should be active
+   */
+  setAllActive(active: boolean): void {
+    this.#implied.clear();
+    for (const { id } of this.entries) this.#stage(id, active);
+  }
+
+  /**
    * Whether a module was activated only because an active module requires or recommends it.
    * @param id - A module ID
    * @returns `true` if it will be deactivated again once no active module needs it

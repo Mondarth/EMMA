@@ -111,4 +111,42 @@ describe('Toolbar', () => {
       expect(screen.getByRole('button', { name: EXPAND })).toBeDisabled();
     });
   });
+
+  describe('grouping toggle', () => {
+    const GROUP = 'MONDARTH-EMMA.Toolbar.Group';
+
+    test('is offered in the list view only, to the left of the view buttons', async () => {
+      const { rerender } = render(Toolbar, { modules: createModules(), view: 'list', onViewChange: vi.fn() });
+
+      const group = screen.getByRole('button', { name: GROUP });
+      expect(group).toHaveClass('icon', 'fa-solid', 'fa-sitemap');
+      expect(group).toHaveAttribute('data-tooltip', GROUP);
+      expect(
+        group.compareDocumentPosition(screen.getByRole('button', { name: LIST })) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+
+      await rerender({ view: 'split' });
+
+      expect(screen.queryByRole('button', { name: GROUP })).toBeNull();
+    });
+
+    test.each([true, false])('shows grouping as pressed or not (%s), and asks for the opposite', async grouped => {
+      const onGroupedChange = vi.fn();
+      render(Toolbar, { modules: createModules(), view: 'list', grouped, onViewChange: vi.fn(), onGroupedChange });
+      const group = screen.getByRole('button', { name: GROUP });
+      expect(group).toHaveAttribute('aria-pressed', String(grouped));
+
+      await userEvent.click(group);
+
+      expect(onGroupedChange).toHaveBeenCalledExactlyOnceWith(!grouped);
+    });
+
+    test('is harmless without a handler', async () => {
+      render(Toolbar, { modules: createModules(), view: 'list', onViewChange: vi.fn() });
+
+      await userEvent.click(screen.getByRole('button', { name: GROUP }));
+
+      expect(screen.getByRole('button', { name: GROUP })).toHaveAttribute('aria-pressed', 'true');
+    });
+  });
 });

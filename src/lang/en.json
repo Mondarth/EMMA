@@ -10,11 +10,13 @@
       "List": "List view",
       "Split": "Split view",
       "Expand": "Expand all module details",
-      "Collapse": "Collapse all module details"
+      "Collapse": "Collapse all module details",
+      "Group": "Group related modules"
     },
     "List": {
       "Label": "Installed modules",
-      "Empty": "No modules are installed."
+      "Empty": "No modules are installed.",
+      "All": "All modules"
     },
     "Split": {
       "Inactive": "Inactive",
@@ -80,7 +82,8 @@
       "Save": "Save",
       "Reset": "Reset",
       "Changes": "Changes staged: {count}",
-      "ReadOnly": "Only a GM can change which modules are active."
+      "ReadOnly": "Only a GM can change which modules are active.",
+      "DisablesEmma": "Saving deactivates EMMA itself, so Foundry's own Module Management window will open from then on."
     },
     "Requirements": {
       "Unmet": "{module} requires {missing}, which must be active too.",

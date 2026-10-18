@@ -32,6 +32,15 @@ List view
 : Every installed module, with its version, under a title counting how many are active and inactive. Check or
   uncheck a module to activate or deactivate it. Modules you have changed are marked at their left edge.
 
+  The checkbox at the start of the title row shows whether every module is active (checked), none is (unchecked), or
+  some are (a dash). Click it to activate every module, or, when every module is active, to deactivate every one,
+  EMMA included.
+
+  In the list view only, the toolbar has a **Group related modules** button, just left of the view buttons. While it
+  is pressed, related modules are grouped under the modules that relate to them (see
+  [Related modules in the list view](#related-modules-in-the-list-view)); press it again for a flat list in
+  alphabetical order. EMMA remembers your choice, as it does the view.
+
 Split view
 : Inactive modules on the left, active modules on the right, each side's count in parentheses beside its title. Select modules on one side, then move them across with
   the buttons between the lists: **<** deactivates the modules selected on the active side, and **>** activates the
@@ -151,6 +160,9 @@ or keep editing.
 A module that requires other modules can only be saved as active together with them. EMMA keeps them active while it
 is, but if the world was saved with one missing, or a required module is not installed, the footer names it and
 **Save** stays disabled.
+
+If your changes would deactivate EMMA itself, the footer warns you: once saved, the **Manage Modules** button opens
+Foundry's own Module Management window instead, from which you can activate EMMA again.
 
 Only a GM or assistant GM with permission to modify configuration settings can save. Everyone else sees EMMA read-only.
 

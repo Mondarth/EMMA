@@ -13,6 +13,8 @@
     modules: ModuleState;
     /** The view to show first. */
     initialView: View;
+    /** Whether the list view groups related modules at first. */
+    initialGrouped: boolean;
     /** Whether the user may change which modules are active. */
     canManage: boolean;
     /** The details shown in module drawers. */
@@ -21,28 +23,38 @@
     onSave: () => Promise<unknown>;
     /** Called when the user switches view, so the choice can be remembered. */
     onViewChange?: (view: View) => void;
+    /** Called when the user turns the list view's grouping on or off, so the choice can be remembered. */
+    onGroupedChange?: (grouped: boolean) => void;
   }
 
-  const { modules, initialView, canManage, fields, onSave, onViewChange }: Props = $props();
+  const { modules, initialView, initialGrouped, canManage, fields, onSave, onViewChange, onGroupedChange }: Props =
+    $props();
 
-  // The window is mounted afresh each time it opens, so the initial view is only read once.
+  // The window is mounted afresh each time it opens, so the initial view and grouping are only read once.
   // svelte-ignore state_referenced_locally
   let view: View = $state(initialView);
+  // svelte-ignore state_referenced_locally
+  let grouped: boolean = $state(initialGrouped);
 </script>
 
 <div class="emma-root">
   <Toolbar
     {view}
     {modules}
+    {grouped}
     onViewChange={(next: View) => {
       if (next === view) return;
       view = next;
       onViewChange?.(next);
+    }}
+    onGroupedChange={(next: boolean) => {
+      grouped = next;
+      onGroupedChange?.(next);
     }} />
 
   <div class="emma-pane">
     {#if view === 'list'}
-      <ListView {modules} {canManage} {fields} />
+      <ListView {modules} {canManage} {fields} {grouped} />
     {:else}
       <SplitView {modules} {canManage} {fields} />
     {/if}

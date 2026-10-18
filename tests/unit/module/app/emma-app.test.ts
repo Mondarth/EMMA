@@ -147,6 +147,35 @@ describe('EmmaApp', () => {
     expect(screen.getByRole('button', { name: 'MONDARTH-EMMA.Toolbar.Split' })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  test('opens with the grouping the user last chose, and remembers a change', async () => {
+    const { EmmaApp, game } = await loadApp({ settings: { 'mondarth-emma.grouped': false } });
+    await new EmmaApp().render({ force: true });
+    const group = screen.getByRole('button', { name: 'MONDARTH-EMMA.Toolbar.Group' });
+    expect(group).toHaveAttribute('aria-pressed', 'false');
+
+    await userEvent.click(group);
+
+    expect(game.settings.set).toHaveBeenCalledExactlyOnceWith('mondarth-emma', 'grouped', true);
+  });
+
+  test('logs, and keeps the new grouping, if it cannot be saved', async () => {
+    const { EmmaApp, game } = await loadApp();
+    const failure = new Error('offline');
+    game.settings.set.mockRejectedValueOnce(failure);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await new EmmaApp().render({ force: true });
+
+    await userEvent.click(screen.getByRole('button', { name: 'MONDARTH-EMMA.Toolbar.Group' }));
+
+    await vi.waitFor(() => {
+      expect(console.error).toHaveBeenCalledWith('mondarth-emma |', 'Unable to remember the grouping', failure);
+    });
+    expect(screen.getByRole('button', { name: 'MONDARTH-EMMA.Toolbar.Group' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
+
   describe('closing with staged changes', () => {
     /**
      * Open EMMA and stage a change.

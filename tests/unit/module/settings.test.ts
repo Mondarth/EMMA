@@ -5,8 +5,10 @@ import {
   getView,
   isAutoRecommended,
   isEmmaDisabled,
+  isGrouped,
   registerSettings,
   setDrawerFields,
+  setGrouped,
   setView,
 } from '@module/settings';
 import { drawerFields } from '@module/state/drawer-fields.svelte';
@@ -181,5 +183,31 @@ describe('setDrawerFields', () => {
 
     await game.settings.set('mondarth-emma', 'drawerFields', 'not a list');
     expect(drawerFields.shown).toEqual(['description', 'authors', 'languages']);
+  });
+});
+
+describe('isGrouped', () => {
+  test('registers the hidden, per-user setting, grouping by default', () => {
+    const { game } = installFoundryMocks();
+
+    registerSettings();
+
+    expect(game.settings.register).toHaveBeenCalledWith('mondarth-emma', 'grouped', {
+      scope: 'user',
+      config: false,
+      type: Boolean,
+      default: true,
+    });
+    expect(isGrouped()).toBe(true);
+  });
+
+  test('is what the user last chose', async () => {
+    const { game } = installFoundryMocks();
+    registerSettings();
+
+    await setGrouped(false);
+
+    expect(game.settings.set).toHaveBeenCalledExactlyOnceWith('mondarth-emma', 'grouped', false);
+    expect(isGrouped()).toBe(false);
   });
 });

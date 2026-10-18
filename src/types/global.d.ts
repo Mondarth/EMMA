@@ -16,6 +16,7 @@ declare module 'fvtt-types/configuration' {
     'mondarth-emma.view': 'list' | 'split';
     'mondarth-emma.drawerFields': string[];
     'mondarth-emma.autoRecommended': boolean;
+    'mondarth-emma.grouped': boolean;
   }
 }
 
