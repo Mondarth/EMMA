@@ -116,12 +116,15 @@ The Playwright tests in `tests/e2e` run against a real Foundry VTT server and ar
 workflow, on pull requests to `main`, which are the release pull requests from `dev`, and on manual dispatch). The workflow needs four repository secrets:
 `FOUNDRY_USERNAME`, `FOUNDRY_PASSWORD`, `FOUNDRY_LICENSE_KEY` and `FOUNDRY_ADMIN_KEY`.
 
-To run them locally, export the same four variables, then:
+To run them locally, the test server and the tests take the credentials from `.foundryvtt/secrets.json`, the file the
+development server uses (see `docs/developers/setup.md`), so nothing needs exporting. The test server runs on port 30001,
+beside a development server on port 30000. To use a different secrets file, name it in `FOUNDRY_SECRETS_FILE`; a key it
+lacks falls back to the matching variable above. Then:
 
 ```sh
 pnpm build
 pnpm run e2e:packages                    # install the pinned game system and the fixture modules into tests/e2e/.data
-pnpm run e2e:server                      # start the pinned Foundry VTT server on http://localhost:30000
+pnpm run e2e:server                      # start the pinned Foundry VTT server on http://localhost:30001
 pnpm exec playwright install chromium    # once per Playwright version
 pnpm run test:e2e --project=chromium
 pnpm run e2e:server:stop

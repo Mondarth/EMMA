@@ -74,6 +74,12 @@ jobs:
       - name: Install the pinned system and module
         run: pnpm run e2e:packages
 
+      # The credentials come from the environment: the server's secrets file, which would override them, is left empty.
+      - name: Provide an empty secrets file
+        run: |
+          echo '{}' > "$RUNNER_TEMP/foundry-secrets.json"
+          echo "FOUNDRY_SECRETS_FILE=$RUNNER_TEMP/foundry-secrets.json" >> "$GITHUB_ENV"
+
       # The script makes the directories Docker mounts first, as the runner's user, and runs Foundry VTT as that user.
       # Created by Docker, they would belong to root; either way Foundry VTT could not write to /data, and would hang.
       - name: Start Foundry VTT
