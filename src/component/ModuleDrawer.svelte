@@ -143,7 +143,11 @@
 
 <style>
   .emma-drawer {
-    padding: 0.25rem 0.5rem 0.5rem;
+    margin-top: 0.25rem;
+    padding: 0.375rem 0.5rem 0.5rem;
+    border-radius: 3px;
+    /* A faint tint of the theme's text colour: a very pale grey on the light theme, a slight lift on the dark one. */
+    background: color-mix(in srgb, var(--color-text-primary) 6%, transparent);
     font-size: var(--font-size-12);
     cursor: auto;
     user-select: text;
