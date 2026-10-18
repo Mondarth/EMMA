@@ -188,6 +188,23 @@ export class ModuleState {
   }
 
   /**
+   * Whether every module's details drawer is open. Never, when no module is installed.
+   * @returns `true` if every drawer is open
+   */
+  get allExpanded(): boolean {
+    return this.entries.length > 0 && this.entries.every(({ id }) => this.#expanded.has(id));
+  }
+
+  /**
+   * Open every module's details drawer, or close them all, leaving the selection alone.
+   * @param expanded - `true` to open them, `false` to close them
+   */
+  setAllExpanded(expanded: boolean): void {
+    if (!expanded) this.#expanded.clear();
+    else for (const { id } of this.entries) this.#expanded.add(id);
+  }
+
+  /**
    * Stage the modules selected on the inactive side to become active. They move to the active side, where they are
    * selected so the move can be seen, and undone with {@link ModuleState.deactivateSelected}.
    * @returns The number of modules moved

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { localize } from '@module/lib/i18n';
+  import { format, localize } from '@module/lib/i18n';
   import type { DrawerFields } from '@module/state/drawer-fields.svelte';
   import type { ModuleState } from '@module/state/module-state.svelte';
 
@@ -41,10 +41,24 @@
   }
 </script>
 
+<!-- The counts follow the staged changes, as the split view's do. -->
+{#snippet count(side: 'active' | 'inactive', label: string)}
+  <span class="emma-list-count">
+    {localize(label)}
+    {format('MONDARTH-EMMA.Count', { count: String(modules[side].length) })}
+  </span>
+{/snippet}
+
+<h3 class="emma-list-heading">
+  <span id={`${uid}-heading`}>{localize('MONDARTH-EMMA.List.Label')}</span>
+  {@render count('active', 'MONDARTH-EMMA.Split.Active')}
+  {@render count('inactive', 'MONDARTH-EMMA.Split.Inactive')}
+</h3>
+
 {#if modules.entries.length === 0}
   <p class="emma-empty">{localize('MONDARTH-EMMA.List.Empty')}</p>
 {:else}
-  <ul class="emma-list" aria-label={localize('MONDARTH-EMMA.List.Label')}>
+  <ul class="emma-list" aria-labelledby={`${uid}-heading`}>
     {#each modules.entries as entry (entry.id)}
       {@const expanded = modules.isExpanded(entry.id)}
       <li class={['emma-module', { changed: entry.id in modules.changes }]}>
@@ -83,6 +97,20 @@
 {/if}
 
 <style>
+  .emma-list-heading {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    margin: 0 0 0.25rem;
+    border: none;
+    font-size: var(--font-size-14);
+  }
+
+  .emma-list-count {
+    font-weight: normal;
+    color: var(--color-text-secondary);
+  }
+
   .emma-list {
     flex: 1;
     margin: 0;

@@ -26,7 +26,7 @@ export class EmmaApp extends foundry.applications.api.ApplicationV2 {
     classes: [MODULE_ID],
     window: {
       title: 'MONDARTH-EMMA.App.Title',
-      icon: 'fa-solid fa-cubes',
+      icon: 'fa-solid fa-cube',
       resizable: true,
     },
     position: { width: 720, height: 640 },

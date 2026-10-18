@@ -227,6 +227,48 @@ describe('ModuleState', () => {
     });
   });
 
+  describe('setAllExpanded', () => {
+    test('opens every module’s drawer, then closes them all', () => {
+      const state = createState();
+      state.toggleExpanded('b');
+      expect(state.allExpanded).toBe(false);
+
+      state.setAllExpanded(true);
+      expect(ENTRIES.every(({ id }) => state.isExpanded(id))).toBe(true);
+      expect(state.allExpanded).toBe(true);
+
+      state.setAllExpanded(false);
+      expect(ENTRIES.some(({ id }) => state.isExpanded(id))).toBe(false);
+      expect(state.allExpanded).toBe(false);
+    });
+
+    test('stops counting every drawer as open once one closes', () => {
+      const state = createState();
+      state.setAllExpanded(true);
+
+      state.toggleExpanded('c');
+
+      expect(state.allExpanded).toBe(false);
+    });
+
+    test('leaves the selection alone', () => {
+      const state = createState();
+      state.select('inactive', 'c');
+
+      state.setAllExpanded(true);
+
+      expect([...state.selected('inactive')]).toEqual(['c']);
+    });
+
+    test('never counts every drawer as open when there are no modules', () => {
+      const state = new ModuleState([], {});
+
+      state.setAllExpanded(true);
+
+      expect(state.allExpanded).toBe(false);
+    });
+  });
+
   describe('toggleExpanded', () => {
     test('opens and closes a module’s drawer', () => {
       const state = createState();

@@ -25,14 +25,15 @@ manage your modules.
 
 ## Views
 
-The toolbar at the top of the window switches between two views with the icon buttons on its right:
+The toolbar at the top of the window switches between two views with the icon buttons on its right. Set apart at its
+far right, the double chevron opens or closes every module's drawer (see [Module details](#module-details)).
 
 List view
-: Every installed module, with its version. Check or uncheck a module to activate or deactivate it.
-  Modules you have changed are marked at their left edge.
+: Every installed module, with its version, under a title counting how many are active and inactive. Check or
+  uncheck a module to activate or deactivate it. Modules you have changed are marked at their left edge.
 
 Split view
-: Inactive modules on the left, active modules on the right. Select modules on one side, then move them across with
+: Inactive modules on the left, active modules on the right, each side's count in parentheses beside its title. Select modules on one side, then move them across with
   the buttons between the lists: **<** deactivates the modules selected on the active side, and **>** activates the
   modules selected on the inactive side. Moved modules stay selected, so the opposite button undoes a move.
 
@@ -60,7 +61,9 @@ how compatible the module is with your version of Foundry. Hover over the badge 
 Every module in either view has a disclosure triangle at its far right. Click it to open a drawer below the module
 showing its details (by default its description, its authors and the languages it is translated into); click it
 again to close the drawer.
-Opening a drawer never changes which modules are selected or active, and any number can be open at once.
+Opening a drawer never changes which modules are selected or active, and any number can be open at once. The double
+chevron at the far right of the toolbar, as in Foundry's own Module Management, opens every drawer; once they are all
+open, it closes them all.
 
 From the keyboard, press the right arrow key to open or close the drawer: in the list view, on the module's triangle or
 checkbox, and in the split view, on the module the keyboard is on.
@@ -69,6 +72,7 @@ checkbox, and in the split view, on the module the keyboard is on.
 | ---------------------------------------------- | ------------------------ | ------------------------------------------ | -------------------------------------------- |
 | Open a module's drawer                         | Click its triangle       | **→** on the module's triangle or checkbox | **→** on the module                          |
 | Close a module's drawer                        | Click its triangle again | **→** again                                | **→** again                                  |
+| Open or close every drawer                     | Click the double chevron | **Tab** to it, then **Enter** or **Space** | **Tab** to it, then **Enter** or **Space**   |
 | Open or close a dropdown in the drawer         | Click it                 | **Tab** to it, then **Enter** or **Space** | **Tab** to it, then **Enter** or **Space**   |
 | Follow a link in the drawer                    | Click it                 | **Tab** to it, then **Enter**              | **Tab** to it, then **Enter**                |
 

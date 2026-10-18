@@ -32,6 +32,12 @@ describe('EmmaApp', () => {
     expect(new EmmaApp().options.window.title).toBe('MONDARTH-EMMA.App.Title');
   });
 
+  test('shows the cube icon of the Settings sidebar’s Manage Modules button', async () => {
+    const { EmmaApp } = await loadApp();
+
+    expect(new EmmaApp().options.window.icon).toBe('fa-solid fa-cube');
+  });
+
   test('mounts the Svelte root into the window content when it renders', async () => {
     const { EmmaApp } = await loadApp();
     const app = new EmmaApp();

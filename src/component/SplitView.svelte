@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { localize } from '@module/lib/i18n';
+  import { format, localize } from '@module/lib/i18n';
   import type { DrawerFields } from '@module/state/drawer-fields.svelte';
   import type { ModuleState, Side } from '@module/state/module-state.svelte';
 
@@ -30,7 +30,7 @@
   <section class="emma-split-pane">
     <h3 id={headingId}>
       {localize(TEXT[side].heading)}
-      <span class="emma-split-count">{modules[side].length}</span>
+      <span class="emma-split-count">{format('MONDARTH-EMMA.Count', { count: String(modules[side].length) })}</span>
     </h3>
     <SelectableList {modules} {side} labelledby={headingId} {fields} />
     {#if modules[side].length === 0}
@@ -63,7 +63,7 @@
 
   .emma-split-pane h3 {
     display: flex;
-    justify-content: space-between;
+    gap: 0.25rem;
     margin: 0;
     border: none;
     font-size: var(--font-size-14);
