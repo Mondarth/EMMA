@@ -78,8 +78,7 @@ project mounted as the `mondarth-emma` module.
 You may also need to set various other values in `module.json` (e.g. `socket` if your module uses sockets), but
 these will vary widely according to what your module does.
 
-If you use {program}`github` for your versioning and distribution then you can leave the following entries alone and
-the release workflow will maintain them for you. (Otherwise, see [](#replacing-github).)
+The release workflow maintains the following entries, so leave them alone:
 
 - `version`
 - `manifest`

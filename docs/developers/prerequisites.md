@@ -4,7 +4,7 @@
 : This template is tested against `nodejs` version 24.
 
 `pnpm`
-: The package manager of choice. (See [](#replace-pnpm) if you object to efficiency.)
+: The package manager.
 
 `docker`
 : (And `docker compose`---commonly bundled when you install Docker.)

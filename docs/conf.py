@@ -27,7 +27,6 @@ myst_heading_anchors = 3
 myst_substitutions = {
     'LSP': '{abbr}`LSP (Language Server Protocol)`',
     'HMR': '{abbr}`HMR (Hot Module Reload)`',
-    'IMHO': '{abbr}`IMHO (In My Humble Opinion)`',
 }
 
 
