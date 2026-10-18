@@ -190,6 +190,8 @@
     min-height: 0;
     margin: 0;
     padding: 0;
+    /* Keeps the disclosure triangles clear of a scrollbar drawn over the content. */
+    padding-inline-end: 0.75rem;
     overflow-y: auto;
     list-style: none;
     border: 1px solid var(--color-border);
