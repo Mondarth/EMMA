@@ -1,5 +1,6 @@
 import { expect, test as setup } from '@playwright/test';
 
+import { adminKey } from '../support/credentials';
 import { joinAs, MODULE_ID, USERS, waitForReady, WORLD } from '../support/foundry';
 
 /**
@@ -24,10 +25,12 @@ setup('prepare the Foundry world', async ({ page }) => {
 
   // 2. Administrator login.
   if (new URL(page.url()).pathname.startsWith('/auth')) {
-    const adminKey = process.env.FOUNDRY_ADMIN_KEY;
-    if (!adminKey) throw new Error('FOUNDRY_ADMIN_KEY must be set to log in to the Foundry setup screen');
+    const key = adminKey();
+    if (key === undefined) {
+      throw new Error('Give foundry_admin_key in .foundryvtt/secrets.json, or set FOUNDRY_ADMIN_KEY, to log in');
+    }
 
-    await page.locator('input[name="adminPassword"]').fill(adminKey);
+    await page.locator('input[name="adminPassword"]').fill(key);
     await page.getByRole('button', { name: 'Log In' }).click();
     await page.waitForURL(/\/(setup|join|game)/);
   }

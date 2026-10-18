@@ -99,6 +99,9 @@ test.describe('Module Management', () => {
   });
 });
 
+const LIBRARY = { id: 'emma-fixture-library', title: 'EMMA Fixture Library' } as const;
+const ADDON = { id: 'emma-fixture-addon', title: 'EMMA Fixture Add-on' } as const;
+
 test.describe('EMMA views', () => {
   test.beforeEach(async ({ page }) => {
     await joinAs(page, USERS.gm);
@@ -121,6 +124,19 @@ test.describe('EMMA views', () => {
     await expect(emma.getByRole('list', { name: 'Installed modules' }).getByRole('listitem')).toHaveCount(installed);
   });
 
+  test('versions carry the compatibility badge Foundry gives them', async ({ page }) => {
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+    const expected = await page.evaluate(id => game.modules.get(id)?.getVersionBadge() ?? null, LIBRARY.id);
+    expect(expected).not.toBeNull();
+
+    const row = emma.getByRole('listitem').filter({ has: page.getByRole('checkbox', { name: LIBRARY.title }) });
+    const badge = row.locator('[data-tooltip-html]');
+
+    await expect(badge).toHaveClass(new RegExp(`\\b${expected?.type ?? ''}\\b`));
+    await expect(badge).toContainText('1.0.0');
+  });
+
   test('a change staged in the list view is not saved', async ({ page }) => {
     await (await moduleManagementButton(page)).click();
 
@@ -136,7 +152,7 @@ test.describe('EMMA views', () => {
     const emma = page.locator(EMMA_WINDOW);
 
     await emma.getByRole('button', { name: 'Split view' }).click();
-    await expect(emma.getByRole('listbox', { name: /^Active/ })).toBeVisible();
+    await expect(emma.getByRole('treegrid', { name: /^Active/ })).toBeVisible();
     await expect.poll(() => page.evaluate(() => game.settings.get('mondarth-emma', 'view'))).toBe('split');
 
     await closeEmma(page);
@@ -150,11 +166,11 @@ test.describe('EMMA views', () => {
     await setView(page, 'split');
     await (await moduleManagementButton(page)).click();
     const emma = page.locator(EMMA_WINDOW);
-    const inactive = emma.getByRole('listbox', { name: /^Inactive/ });
-    const active = emma.getByRole('listbox', { name: /^Active/ });
+    const inactive = emma.getByRole('treegrid', { name: /^Inactive/ });
+    const active = emma.getByRole('treegrid', { name: /^Active/ });
     const deactivate = emma.getByRole('button', { name: 'Deactivate the selected modules', exact: true });
     const activate = emma.getByRole('button', { name: 'Activate the selected modules', exact: true });
-    const emmaOption = (side: typeof active) => side.getByRole('option', { name: new RegExp(`^${MODULE_TITLE}`) });
+    const emmaOption = (side: typeof active) => side.getByRole('row', { name: MODULE_TITLE, exact: true });
 
     await expect(deactivate).toBeDisabled();
     await expect(activate).toBeDisabled();
@@ -177,20 +193,84 @@ test.describe('EMMA views', () => {
     await setView(page, 'split');
     await (await moduleManagementButton(page)).click();
     const emma = page.locator(EMMA_WINDOW);
-    const active = emma.getByRole('listbox', { name: /^Active/ });
+    const active = emma.getByRole('treegrid', { name: /^Active/ });
 
     await active.focus();
     await page.keyboard.press('Home');
     await page.keyboard.press('ControlOrMeta+a');
 
-    const count = await active.getByRole('option').count();
-    await expect(active.getByRole('option', { selected: true })).toHaveCount(count);
+    const count = await active.getByRole('row').count();
+    await expect(active.getByRole('row', { selected: true })).toHaveCount(count);
     await expect(emma.getByRole('button', { name: 'Deactivate the selected modules', exact: true })).toBeEnabled();
   });
 });
 
-const LIBRARY = { id: 'emma-fixture-library', title: 'EMMA Fixture Library' } as const;
-const ADDON = { id: 'emma-fixture-addon', title: 'EMMA Fixture Add-on' } as const;
+test.describe('Details drawers', () => {
+  const SHOW = `Show details of ${LIBRARY.title}`;
+  const HIDE = `Hide details of ${LIBRARY.title}`;
+
+  test.beforeEach(async ({ page }) => {
+    await joinAs(page, USERS.gm);
+    await setDisabled(page, false);
+  });
+
+  test.afterEach(async ({ page }) => {
+    await closeEmma(page);
+    await setView(page, 'list');
+  });
+
+  test('the list view opens a module’s drawer below it, and closes it', async ({ page }) => {
+    await setView(page, 'list');
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+    const checkbox = emma.getByRole('checkbox', { name: LIBRARY.title });
+
+    await emma.getByRole('button', { name: SHOW }).click();
+
+    const drawer = emma.locator(`#${await emma.getByRole('button', { name: HIDE }).getAttribute('aria-controls')}`);
+    await expect(drawer.getByText('end-to-end tests activate and deactivate')).toBeVisible();
+    await expect(drawer.getByRole('link', { name: 'EMMA tests' })).toHaveAttribute(
+      'href',
+      'https://github.com/Mondarth/EMMA',
+    );
+    await drawer.getByText('2 languages').click();
+    await expect(drawer.getByText('Français (fr)')).toBeVisible();
+    await expect(checkbox).not.toBeChecked();
+
+    await checkbox.focus();
+    await page.keyboard.press('ArrowRight');
+
+    await expect(drawer).toHaveCount(0);
+    await expect(emma.getByRole('button', { name: SHOW })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  test('the split view opens drawers without changing the selection', async ({ page }) => {
+    await setView(page, 'split');
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+    const inactive = emma.getByRole('treegrid', { name: /^Inactive/ });
+    const library = inactive.getByRole('row', { name: LIBRARY.title, exact: true });
+    const addon = inactive.getByRole('row', { name: ADDON.title, exact: true });
+
+    await addon.click();
+    await inactive.getByRole('button', { name: SHOW }).click();
+
+    await expect(library).toHaveAttribute('aria-expanded', 'true');
+    await expect(inactive.getByText('end-to-end tests activate and deactivate')).toBeVisible();
+    await expect(inactive.getByRole('row', { selected: true })).toHaveCount(1);
+    await expect(addon).toHaveAttribute('aria-selected', 'true');
+
+    // The keyboard is on the add-on, which was clicked: the right arrow key opens its drawer too.
+    await inactive.focus();
+    await page.keyboard.press('ArrowRight');
+
+    await expect(addon).toHaveAttribute('aria-expanded', 'true');
+    await expect(library).toHaveAttribute('aria-expanded', 'true');
+
+    await page.keyboard.press('ArrowRight');
+    await expect(addon).toHaveAttribute('aria-expanded', 'false');
+  });
+});
 
 /**
  * Save the fixture modules as inactive again, without reloading, so each test starts from the same activation.

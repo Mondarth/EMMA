@@ -21,6 +21,18 @@
       "NoneInactive": "Every module is active.",
       "NoneActive": "No module is active."
     },
+    "Drawer": {
+      "Show": "Show details of {module}",
+      "Hide": "Hide details of {module}",
+      "Description": "Description",
+      "Authors": "Authors",
+      "Languages": "Languages",
+      "AuthorCount": "{count} authors",
+      "LanguageCount": "{count} languages",
+      "Email": "Email {name}",
+      "Discord": "Discord",
+      "Empty": "The module's manifest gives no details."
+    },
     "Footer": {
       "Save": "Save",
       "Reset": "Reset",

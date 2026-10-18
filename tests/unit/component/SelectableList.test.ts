@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, test } from 'vitest';
 
@@ -13,7 +13,7 @@ const ALL_INACTIVE = {};
 /**
  * Render the inactive side of `modules`, labelled by a heading.
  * @param modules - The state
- * @returns The listbox
+ * @returns The treegrid
  */
 function renderInactive(modules: ModuleState): HTMLElement {
   const heading = document.createElement('h3');
@@ -21,25 +21,25 @@ function renderInactive(modules: ModuleState): HTMLElement {
   heading.textContent = 'Inactive';
   document.body.append(heading);
   render(SelectableList, { modules, side: 'inactive', labelledby: 'heading' });
-  return screen.getByRole('listbox');
+  return screen.getByRole('treegrid');
 }
 
 /**
- * The option for a fixture module.
+ * The row for a fixture module.
  * @param title - The module title
- * @returns The option
+ * @returns The row
  */
 function option(title: string): HTMLElement {
-  return screen.getByRole('option', { name: new RegExp(`^${title}`) });
+  return screen.getByRole('row', { name: new RegExp(`^${title}`) });
 }
 
 /**
- * The titles of the selected options.
+ * The titles of the selected rows.
  * @returns The titles, in display order
  */
 function selectedTitles(): string[] {
   return screen
-    .getAllByRole('option', { selected: true })
+    .getAllByRole('row', { selected: true })
     .map(element => element.querySelector('.emma-option-title')?.textContent ?? '');
 }
 
@@ -50,19 +50,19 @@ describe('SelectableList', () => {
   });
 
   describe('structure', () => {
-    test('is a multi-select listbox named by its heading', () => {
-      const listbox = renderInactive(createModules());
+    test('is a multi-select treegrid named by its heading', () => {
+      const grid = renderInactive(createModules());
 
-      expect(screen.getByRole('listbox', { name: 'Inactive' })).toBe(listbox);
-      expect(listbox).toHaveAttribute('aria-multiselectable', 'true');
-      expect(listbox).toHaveAttribute('tabindex', '0');
+      expect(screen.getByRole('treegrid', { name: 'Inactive' })).toBe(grid);
+      expect(grid).toHaveAttribute('aria-multiselectable', 'true');
+      expect(grid).toHaveAttribute('tabindex', '0');
     });
 
     test('lists only the modules on its side, with their versions', () => {
       renderInactive(createModules());
 
-      expect(screen.getAllByRole('option').map(element => element.textContent.replace(/\s+/g, ' ').trim())).toEqual([
-        'Dice So Nice! 5.2.4',
+      expect(screen.getAllByRole('row').map(element => element.textContent.replace(/\s+/g, ' ').trim())).toEqual([
+        'Dice So Nice! 5.2.4 Verified',
         'EMMA 0.1.0',
       ]);
     });
@@ -80,19 +80,19 @@ describe('SelectableList', () => {
       expect(option('Dice So Nice!')).not.toHaveClass('changed');
     });
 
-    test('gives each option a document-unique ID', () => {
+    test('gives each row a document-unique ID', () => {
       const modules = createModules(ALL_INACTIVE);
       renderInactive(modules);
       render(SelectableList, { modules, side: 'inactive', labelledby: 'heading' });
 
-      const ids = screen.getAllByRole('option').map(element => element.id);
+      const ids = screen.getAllByRole('row').map(element => element.id);
       expect(new Set(ids).size).toBe(ids.length);
     });
 
     test('lists nothing when its side is empty', () => {
       renderInactive(createModules(Object.fromEntries(ENTRIES.map(({ id }) => [id, true]))));
 
-      expect(screen.queryAllByRole('option')).toHaveLength(0);
+      expect(screen.queryAllByRole('row')).toHaveLength(0);
     });
   });
 
@@ -133,39 +133,138 @@ describe('SelectableList', () => {
     });
 
     test('moves the keyboard to the clicked module', async () => {
-      const listbox = renderInactive(createModules(ALL_INACTIVE));
+      const grid = renderInactive(createModules(ALL_INACTIVE));
 
       await userEvent.click(option('EMMA'));
 
-      expect(listbox).toHaveAttribute('aria-activedescendant', option('EMMA').id);
+      expect(grid).toHaveAttribute('aria-activedescendant', option('EMMA').id);
+    });
+  });
+
+  describe('drawers', () => {
+    const SHOW_EMMA = 'MONDARTH-EMMA.Drawer.Show {"module":"EMMA"}';
+
+    test('names each row by its module title alone', () => {
+      renderInactive(createModules(ALL_INACTIVE));
+
+      expect(screen.getAllByRole('row').map(row => row.getAttribute('aria-level'))).toEqual(['1', '1', '1']);
+      expect(screen.getByRole('row', { name: 'EMMA' })).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    test('keeps the triangles out of the Tab order, since the treegrid holds focus', () => {
+      renderInactive(createModules(ALL_INACTIVE));
+
+      expect(screen.getByRole('button', { name: SHOW_EMMA })).toHaveAttribute('tabindex', '-1');
+    });
+
+    test('puts each triangle in the last cell of its row', () => {
+      renderInactive(createModules(ALL_INACTIVE));
+
+      const cells = within(option('EMMA')).getAllByRole('gridcell');
+      expect(cells.at(-1)).toContainElement(screen.getByRole('button', { name: SHOW_EMMA }));
+    });
+
+    test('opens a drawer in a child row below the module without selecting it, then closes it', async () => {
+      renderInactive(createModules(ALL_INACTIVE));
+
+      await userEvent.click(screen.getByRole('button', { name: SHOW_EMMA }));
+
+      const row = option('EMMA');
+      const drawerRow = row.nextElementSibling as HTMLElement;
+      expect(row).toHaveAttribute('aria-expanded', 'true');
+      expect(row).toHaveAttribute('aria-selected', 'false');
+      expect(drawerRow).toHaveAttribute('role', 'row');
+      expect(drawerRow).toHaveAttribute('aria-level', '2');
+      expect(drawerRow).not.toHaveAttribute('aria-selected');
+      expect(within(drawerRow).getByRole('gridcell')).toHaveTextContent('MONDARTH-EMMA.Drawer.Empty');
+
+      await userEvent.click(screen.getByRole('button', { name: 'MONDARTH-EMMA.Drawer.Hide {"module":"EMMA"}' }));
+
+      expect(row).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.getAllByRole('row')).toHaveLength(3);
+    });
+
+    test('keeps the selection when a drawer opens', async () => {
+      renderInactive(createModules(ALL_INACTIVE));
+
+      await userEvent.click(option('libWrapper'));
+      await userEvent.click(screen.getByRole('button', { name: SHOW_EMMA }));
+
+      expect(selectedTitles()).toEqual(['libWrapper']);
+    });
+
+    test('toggles the keyboard’s row with the right arrow key, leaving the selection alone', async () => {
+      const modules = createModules(ALL_INACTIVE);
+      const grid = renderInactive(modules);
+      grid.focus();
+
+      await userEvent.keyboard('{ArrowDown}{Control>}{ArrowDown}{/Control}{ArrowRight}');
+      expect(modules.isExpanded('emma')).toBe(true);
+      expect(selectedTitles()).toEqual(['Dice So Nice!']);
+
+      await userEvent.keyboard('{ArrowRight}');
+      expect(modules.isExpanded('emma')).toBe(false);
+    });
+
+    test('moves over open drawers to the next module', async () => {
+      const modules = createModules(ALL_INACTIVE);
+      modules.toggleExpanded('dice');
+      const grid = renderInactive(modules);
+      grid.focus();
+
+      await userEvent.keyboard('{ArrowDown}{ArrowDown}');
+
+      expect(selectedTitles()).toEqual(['EMMA']);
+    });
+
+    test('ignores the right arrow key before the keyboard is on a row', async () => {
+      const modules = createModules(ALL_INACTIVE);
+      const grid = renderInactive(modules);
+      grid.focus();
+
+      await userEvent.keyboard('{ArrowRight}');
+
+      expect(ENTRIES.some(({ id }) => modules.isExpanded(id))).toBe(false);
+    });
+
+    test('leaves keys pressed on a drawer’s links to the link', async () => {
+      const modules = createModules(ALL_INACTIVE);
+      modules.toggleExpanded('dice');
+      renderInactive(modules);
+
+      screen.getByRole('link', { name: 'Simone' }).focus();
+      await userEvent.keyboard('{ArrowDown}{ArrowRight}');
+
+      expect(screen.queryAllByRole('row', { selected: true })).toHaveLength(0);
+      expect(modules.isExpanded('dice')).toBe(true);
     });
   });
 
   describe('keyboard', () => {
-    test('has no active option until the keyboard moves', () => {
-      const listbox = renderInactive(createModules(ALL_INACTIVE));
+    test('has no active row until the keyboard moves', () => {
+      const grid = renderInactive(createModules(ALL_INACTIVE));
 
-      expect(listbox).not.toHaveAttribute('aria-activedescendant');
+      expect(grid).not.toHaveAttribute('aria-activedescendant');
     });
 
     test('moves and selects with the arrow keys, stopping at the ends', async () => {
-      const listbox = renderInactive(createModules(ALL_INACTIVE));
-      listbox.focus();
+      const grid = renderInactive(createModules(ALL_INACTIVE));
+      grid.focus();
 
       await userEvent.keyboard('{ArrowDown}');
       expect(selectedTitles()).toEqual(['Dice So Nice!']);
 
       await userEvent.keyboard('{ArrowDown}{ArrowDown}{ArrowDown}');
       expect(selectedTitles()).toEqual(['libWrapper']);
-      expect(listbox).toHaveAttribute('aria-activedescendant', option('libWrapper').id);
+      expect(grid).toHaveAttribute('aria-activedescendant', option('libWrapper').id);
 
       await userEvent.keyboard('{ArrowUp}{ArrowUp}{ArrowUp}');
       expect(selectedTitles()).toEqual(['Dice So Nice!']);
     });
 
     test('starts at the top when ArrowUp is pressed first', async () => {
-      const listbox = renderInactive(createModules(ALL_INACTIVE));
-      listbox.focus();
+      const grid = renderInactive(createModules(ALL_INACTIVE));
+      grid.focus();
 
       await userEvent.keyboard('{ArrowUp}');
 
@@ -173,8 +272,8 @@ describe('SelectableList', () => {
     });
 
     test('jumps to the ends with Home and End', async () => {
-      const listbox = renderInactive(createModules(ALL_INACTIVE));
-      listbox.focus();
+      const grid = renderInactive(createModules(ALL_INACTIVE));
+      grid.focus();
 
       await userEvent.keyboard('{End}');
       expect(selectedTitles()).toEqual(['libWrapper']);
@@ -184,8 +283,8 @@ describe('SelectableList', () => {
     });
 
     test('extends the selection with Shift', async () => {
-      const listbox = renderInactive(createModules(ALL_INACTIVE));
-      listbox.focus();
+      const grid = renderInactive(createModules(ALL_INACTIVE));
+      grid.focus();
 
       await userEvent.keyboard('{ArrowDown}{Shift>}{ArrowDown}{ArrowDown}{/Shift}');
 
@@ -193,8 +292,8 @@ describe('SelectableList', () => {
     });
 
     test('only moves with Ctrl, then toggles with Space', async () => {
-      const listbox = renderInactive(createModules(ALL_INACTIVE));
-      listbox.focus();
+      const grid = renderInactive(createModules(ALL_INACTIVE));
+      grid.focus();
 
       await userEvent.keyboard('{ArrowDown}{Control>}{ArrowDown}{ArrowDown}{/Control}');
       expect(selectedTitles()).toEqual(['Dice So Nice!']);
@@ -207,18 +306,18 @@ describe('SelectableList', () => {
     });
 
     test('puts the keyboard on the first module when Space is pressed first, selecting nothing', async () => {
-      const listbox = renderInactive(createModules(ALL_INACTIVE));
-      listbox.focus();
+      const grid = renderInactive(createModules(ALL_INACTIVE));
+      grid.focus();
 
       await userEvent.keyboard(' ');
 
-      expect(listbox).toHaveAttribute('aria-activedescendant', option('Dice So Nice!').id);
-      expect(screen.queryAllByRole('option', { selected: true })).toHaveLength(0);
+      expect(grid).toHaveAttribute('aria-activedescendant', option('Dice So Nice!').id);
+      expect(screen.queryAllByRole('row', { selected: true })).toHaveLength(0);
     });
 
     test.each(['Control', 'Meta'])('selects everything with %s+A', async modifier => {
-      const listbox = renderInactive(createModules(ALL_INACTIVE));
-      listbox.focus();
+      const grid = renderInactive(createModules(ALL_INACTIVE));
+      grid.focus();
 
       await userEvent.keyboard(`{${modifier}>}a{/${modifier}}`);
 
@@ -226,8 +325,8 @@ describe('SelectableList', () => {
     });
 
     test('selects everything with Ctrl+Shift+A too', async () => {
-      const listbox = renderInactive(createModules(ALL_INACTIVE));
-      listbox.focus();
+      const grid = renderInactive(createModules(ALL_INACTIVE));
+      grid.focus();
 
       await userEvent.keyboard('{Control>}{Shift>}A{/Shift}{/Control}');
 
@@ -235,44 +334,44 @@ describe('SelectableList', () => {
     });
 
     test('ignores A without Ctrl or Cmd, and other keys', async () => {
-      const listbox = renderInactive(createModules(ALL_INACTIVE));
-      listbox.focus();
+      const grid = renderInactive(createModules(ALL_INACTIVE));
+      grid.focus();
 
       await userEvent.keyboard('a{Enter}x');
 
-      expect(screen.queryAllByRole('option', { selected: true })).toHaveLength(0);
-      expect(listbox).not.toHaveAttribute('aria-activedescendant');
+      expect(screen.queryAllByRole('row', { selected: true })).toHaveLength(0);
+      expect(grid).not.toHaveAttribute('aria-activedescendant');
     });
 
     test('ignores keys when its side is empty', async () => {
-      const listbox = renderInactive(createModules(Object.fromEntries(ENTRIES.map(({ id }) => [id, true]))));
-      listbox.focus();
+      const grid = renderInactive(createModules(Object.fromEntries(ENTRIES.map(({ id }) => [id, true]))));
+      grid.focus();
 
       await userEvent.keyboard('{ArrowDown} ');
 
-      expect(listbox).not.toHaveAttribute('aria-activedescendant');
+      expect(grid).not.toHaveAttribute('aria-activedescendant');
     });
 
-    test('forgets the active option once it moves to the other side', async () => {
+    test('forgets the active row once it moves to the other side', async () => {
       const modules = createModules(ALL_INACTIVE);
-      const listbox = renderInactive(modules);
-      listbox.focus();
+      const grid = renderInactive(modules);
+      grid.focus();
       await userEvent.keyboard('{ArrowDown}');
 
       modules.activateSelected();
 
-      await expect.poll(() => listbox.getAttribute('aria-activedescendant')).toBeNull();
+      await expect.poll(() => grid.getAttribute('aria-activedescendant')).toBeNull();
     });
 
-    test('scrolls the active option into view', async () => {
-      const listbox = renderInactive(createModules(ALL_INACTIVE));
+    test('scrolls the active row into view', async () => {
+      const grid = renderInactive(createModules(ALL_INACTIVE));
       const scrolled: string[] = [];
-      for (const element of screen.getAllByRole('option')) {
+      for (const element of screen.getAllByRole('row')) {
         element.scrollIntoView = () => {
           scrolled.push(element.id);
         };
       }
-      listbox.focus();
+      grid.focus();
 
       await userEvent.keyboard('{End}');
 

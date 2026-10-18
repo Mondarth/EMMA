@@ -1,8 +1,15 @@
 # Throwaway Foundry VTT server for the end-to-end tests.
 #
-# Requires FOUNDRY_USERNAME, FOUNDRY_PASSWORD, FOUNDRY_LICENSE_KEY and FOUNDRY_ADMIN_KEY in the environment.
+# Takes its credentials from a JSON secrets file, by default the development server's .foundryvtt/secrets.json (see
+# .foundryvtt/secrets.example.json), or another named by FOUNDRY_SECRETS_FILE. A key missing from the file falls back to
+# the environment variable: FOUNDRY_USERNAME, FOUNDRY_PASSWORD, FOUNDRY_LICENSE_KEY or FOUNDRY_ADMIN_KEY. CI sets those
+# and points FOUNDRY_SECRETS_FILE at an empty file.
 # Prepare tests/e2e/.data first with `pnpm run e2e:packages`, and start the server with `pnpm run e2e:server`, which
 # makes the directories mounted here before Docker would make them as root.
+secrets:
+  config_json:
+    file: ${FOUNDRY_SECRETS_FILE:-../../.foundryvtt/secrets.json}
+
 services:
   foundry:
     # Keep in step with VERSION in .foundryvtt/.env.
@@ -18,9 +25,13 @@ services:
       - FOUNDRY_ADMIN_KEY
       # Keeps the downloaded server release in /data/container_cache so CI can cache it between runs.
       - CONTAINER_CACHE=/data/container_cache
+    secrets:
+      - source: config_json
+        target: config.json
     volumes:
       - ./.data:/data
       # The module under test: module.json plus the built dist/ from the repository root.
       - ../..:/data/Data/modules/mondarth-emma:ro
     ports:
-      - "30000:30000"
+      # Port 30001 on the host, so a development Foundry VTT can keep port 30000.
+      - "30001:30000"

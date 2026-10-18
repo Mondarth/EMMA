@@ -1,6 +1,10 @@
 <script lang="ts">
   import type { ModuleState, SelectMode, Side } from '@module/state/module-state.svelte';
 
+  import DisclosureButton from './DisclosureButton.svelte';
+  import ModuleDrawer from './ModuleDrawer.svelte';
+  import VersionBadge from './VersionBadge.svelte';
+
   interface Props {
     /** The modules and their selection. */
     modules: ModuleState;
@@ -16,19 +20,28 @@
 
   const entries = $derived(modules[side]);
 
-  /** The option the keyboard is on, shown with a focus ring while the list has focus. */
+  /** The row the keyboard is on, shown with a focus ring while the list has focus. */
   let activeId: string | null = $state(null);
 
-  /** The keyboard's option, if it is still on this side. */
+  /** The keyboard's row, if it is still on this side. */
   const active = $derived(entries.find(({ id }) => id === activeId)?.id ?? null);
 
   /**
-   * The DOM ID of a module's option.
+   * The DOM ID of a module's row.
    * @param id - The module ID
    * @returns A document-unique ID
    */
   function optionId(id: string): string {
     return `${uid}-${side}-${id}`;
+  }
+
+  /**
+   * The DOM ID of a module's drawer.
+   * @param id - The module ID
+   * @returns A document-unique ID
+   */
+  function drawerId(id: string): string {
+    return `${optionId(id)}-drawer`;
   }
 
   /**
@@ -62,13 +75,14 @@
   }
 
   /**
-   * Move through and select modules from the keyboard: the arrow keys, Home and End move and select (extending the
-   * selection with Shift, or only moving with Ctrl/Cmd), Space toggles the module the keyboard is on, and Ctrl/Cmd+A
-   * selects every module.
+   * Move through and select modules from the keyboard: the up and down arrow keys, Home and End move and select
+   * (extending the selection with Shift, or only moving with Ctrl/Cmd), Space toggles the module the keyboard is on,
+   * the right arrow key opens or closes its drawer, and Ctrl/Cmd+A selects every module. Keys pressed on a link in an
+   * open drawer are left to the link.
    * @param event - The key press
    */
   function onKeydown(event: KeyboardEvent): void {
-    if (entries.length === 0) return;
+    if (event.target !== event.currentTarget || entries.length === 0) return;
     const ids = entries.map(({ id }) => id);
     const index = active === null ? -1 : ids.indexOf(active);
     const command = event.ctrlKey || event.metaKey;
@@ -87,6 +101,11 @@
       case 'End':
         target = ids.length - 1;
         break;
+      case 'ArrowRight':
+        if (active === null) return;
+        event.preventDefault();
+        modules.toggleExpanded(active);
+        return;
       case ' ':
         event.preventDefault();
         if (active === null) activate(ids[0] as string);
@@ -110,30 +129,57 @@
   }
 </script>
 
-<ul
+<!-- A treegrid rather than a listbox, so that an open drawer's links are not hidden inside an option. -->
+<div
   class="emma-listbox"
-  role="listbox"
+  role="treegrid"
   tabindex="0"
   aria-multiselectable="true"
   aria-labelledby={labelledby}
   aria-activedescendant={active === null ? undefined : optionId(active)}
   onkeydown={onKeydown}>
   {#each entries as entry (entry.id)}
-    <!-- Options are chosen with the keyboard through the listbox, which holds focus. -->
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <li
+    {@const expanded = modules.isExpanded(entry.id)}
+    <!-- Rows are chosen with the keyboard through the treegrid, which holds focus and points at the keyboard's row with
+         aria-activedescendant; a focusable row would take focus from it when clicked. -->
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_interactive_supports_focus -->
+    <div
       id={optionId(entry.id)}
       class={['emma-option', { active: entry.id === active, changed: entry.id in modules.changes }]}
-      role="option"
+      role="row"
+      aria-level="1"
+      aria-expanded={expanded}
       aria-selected={modules.isSelected(side, entry.id)}
+      aria-labelledby={`${optionId(entry.id)}-title`}
       onclick={event => {
         onClick(event, entry.id);
       }}>
-      <span class="emma-option-title">{entry.title}</span>
-      <span class="emma-option-version">{entry.version}</span>
-    </li>
+      <div class="emma-option-main" role="gridcell">
+        <span id={`${optionId(entry.id)}-title`} class="emma-option-title">{entry.title}</span>
+      </div>
+      <div class="emma-option-version" role="gridcell">
+        <VersionBadge version={entry.version} badge={entry.badge} />
+      </div>
+      <div class="emma-option-toggle" role="gridcell">
+        <DisclosureButton
+          title={entry.title}
+          {expanded}
+          controls={drawerId(entry.id)}
+          focusable={false}
+          onToggle={() => {
+            modules.toggleExpanded(entry.id);
+          }} />
+      </div>
+    </div>
+    {#if expanded}
+      <div class="emma-option-details" role="row" aria-level="2">
+        <div role="gridcell">
+          <ModuleDrawer {entry} id={drawerId(entry.id)} />
+        </div>
+      </div>
+    {/if}
   {/each}
-</ul>
+</div>
 
 <style>
   .emma-listbox {
@@ -153,10 +199,10 @@
 
   .emma-option {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
-    padding: 0.25rem 0.5rem;
+    padding: 0.25rem 0.25rem 0.25rem 0.5rem;
     cursor: pointer;
     user-select: none;
     border-left: 3px solid transparent;
@@ -176,15 +222,30 @@
     outline-offset: -2px;
   }
 
+  .emma-option-main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .emma-option-toggle {
+    display: flex;
+    flex: none;
+  }
+
+  .emma-option-details {
+    border-left: 3px solid transparent;
+    border-bottom: 1px solid var(--color-border);
+  }
+
   .emma-option-title {
+    display: block;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .emma-option-version {
+    display: flex;
     flex: none;
-    font-size: var(--font-size-12);
-    opacity: 0.75;
   }
 </style>

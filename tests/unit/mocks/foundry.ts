@@ -55,8 +55,14 @@ export interface ModuleMockData {
   title?: string;
   /** Defaults to `1.0.0`. */
   version?: string;
-  /** Author names. */
-  authors?: string[];
+  /** What `getVersionBadge` returns. Defaults to `null`, as for a package Foundry cannot place. */
+  badge?: { type: 'success' | 'warning' | 'neutral' | 'error'; tooltip: string; label?: string; icon?: string } | null;
+  /** Defaults to empty. */
+  description?: string;
+  /** Authors: a name, or a name with contact details. */
+  authors?: (string | { name: string; url?: string; email?: string; discord?: string })[];
+  /** Languages the module is translated into: a language tag, or a tag with a name. */
+  languages?: (string | { lang: string; name?: string })[];
   /** Packages it requires: a module ID, or an ID and package type, which defaults to `module` as in Foundry. */
   requires?: (string | { id: string; type?: 'module' | 'system' | 'world' })[];
   api?: unknown;
@@ -82,13 +88,32 @@ export interface GameMockOptions {
  * @returns The mock module
  */
 function createModuleMock(id: string, data: ModuleMockData) {
-  const { active = false, title = id, version = '1.0.0', authors = [], requires = [], api } = data;
+  const {
+    active = false,
+    title = id,
+    version = '1.0.0',
+    badge = null,
+    description = '',
+    authors = [],
+    languages = [],
+    requires = [],
+    api,
+  } = data;
   return {
     id,
     active,
     title,
     version,
-    authors: new Set(authors.map(name => ({ name }))),
+    getVersionBadge: () => badge,
+    description,
+    authors: new Set(authors.map(author => (typeof author === 'string' ? { name: author } : author))),
+    languages: new Set(
+      languages.map(language =>
+        typeof language === 'string'
+          ? { lang: language, path: `lang/${language}.json` }
+          : { path: `lang/${language.lang}.json`, ...language },
+      ),
+    ),
     relationships: {
       requires: new Set(
         requires.map(required =>
@@ -193,8 +218,7 @@ export class ApplicationV2Mock {
 
 /**
  * Create a stand-in for the `foundry` namespace: `ApplicationV2`, `DialogV2.confirm`, `SettingsConfig.reloadConfirm`,
- * and a native
- * `ModuleManagement` window whose instances are recorded so tests can see when it opened.
+ * `utils.cleanHTML`, and a native `ModuleManagement` window whose instances are recorded so tests can see when it opened.
  * @returns The mock namespace
  */
 export function createFoundryNamespaceMock() {
@@ -202,6 +226,14 @@ export function createFoundryNamespaceMock() {
   const reloadConfirm = vi.fn((_options?: { world?: boolean }) => Promise.resolve());
   // Resolves as a dismissed dialog does, unless a test says otherwise.
   const confirm = vi.fn((_config?: object): Promise<boolean | null> => Promise.resolve(null));
+  // Foundry removes every tag and attribute it does not allow; removing scripts is enough to see it was called. The
+  // HTML is parsed rather than matched with a regular expression, which cannot reliably find script elements.
+  const cleanHTML = vi.fn((raw: string): string => {
+    const template = document.createElement('template');
+    template.innerHTML = raw;
+    for (const script of template.content.querySelectorAll('script')) script.remove();
+    return template.innerHTML;
+  });
 
   return {
     applications: {
@@ -215,12 +247,15 @@ export function createFoundryNamespaceMock() {
         },
       },
     },
+    utils: { cleanHTML },
     /** Called each time a native Module Management window is rendered. */
     moduleManagementRender,
     /** `SettingsConfig.reloadConfirm`, which asks the user to reload. */
     reloadConfirm,
     /** `DialogV2.confirm`, which asks the user a yes-or-no question. */
     confirm,
+    /** `utils.cleanHTML`, which makes HTML safe to insert. */
+    cleanHTML,
   };
 }
 
