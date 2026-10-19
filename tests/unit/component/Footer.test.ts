@@ -23,7 +23,7 @@ describe('Footer', () => {
 
       expect(screen.getByRole('button', { name: RESET })).toBeDisabled();
       expect(screen.getByRole('button', { name: SAVE })).toBeDisabled();
-      expect(screen.getByRole('status')).toBeEmptyDOMElement();
+      expect(screen.getByRole('status').textContent.trim()).toBe('');
     });
 
     test('enables both and counts the changes once some are staged', async () => {
@@ -131,6 +131,32 @@ describe('Footer', () => {
 
       expect(screen.getByRole('status')).toHaveTextContent('MONDARTH-EMMA.Footer.ReadOnly');
       expect(screen.queryByRole('button')).toBeNull();
+    });
+  });
+
+  describe('deactivating EMMA itself', () => {
+    const WARNING = 'MONDARTH-EMMA.Footer.DisablesEmma';
+    const ENTRIES = [moduleEntry({ id: 'mondarth-emma', title: 'EMMA' }), moduleEntry({ id: 'other' })];
+
+    test('warns that saving deactivates EMMA, alongside the count of changes', () => {
+      const modules = new ModuleState(ENTRIES, { 'mondarth-emma': true });
+      modules.setActive('mondarth-emma', false);
+      render(Footer, { modules, canManage: true, onSave: vi.fn() });
+
+      expect(screen.getByRole('status')).toHaveTextContent(WARNING);
+      expect(screen.getByRole('status')).toHaveTextContent('MONDARTH-EMMA.Footer.Changes');
+    });
+
+    test('does not warn while EMMA stays active, or for a user who cannot save', () => {
+      const modules = new ModuleState(ENTRIES, { 'mondarth-emma': true });
+      modules.setActive('other', true);
+      const { unmount } = render(Footer, { modules, canManage: true, onSave: vi.fn() });
+      expect(screen.getByRole('status')).not.toHaveTextContent(WARNING);
+      unmount();
+
+      modules.setActive('mondarth-emma', false);
+      render(Footer, { modules, canManage: false, onSave: vi.fn() });
+      expect(screen.getByRole('status')).not.toHaveTextContent(WARNING);
     });
   });
 });

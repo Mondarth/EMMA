@@ -72,7 +72,7 @@ describe('ListView', () => {
     const modules = createModules();
     render(ListView, { fields: new DrawerFields(), modules, canManage: true });
 
-    const heading = screen.getByRole('heading', { name: /^MONDARTH-EMMA.List.Label/ });
+    const heading = screen.getByRole('heading', { name: /MONDARTH-EMMA.List.Label/ });
     expect(heading).toHaveTextContent(
       'MONDARTH-EMMA.List.Label MONDARTH-EMMA.Split.Active MONDARTH-EMMA.Count {"count":"1"} MONDARTH-EMMA.Split.Inactive MONDARTH-EMMA.Count {"count":"2"}',
     );
@@ -322,7 +322,7 @@ describe('ListView', () => {
         expect(checkbox.closest('li')).toHaveClass('locked');
         expect(checkbox.closest('.emma-module-row')).toHaveAttribute(
           'data-tooltip',
-          'MONDARTH-EMMA.Requirements.Locked {"module":"lib","parents":"app and tool"}',
+          'MONDARTH-EMMA.Requirements.LockedMany {"module":"lib","parents":"app and tool"}',
         );
       }
       expect(screen.getByRole('checkbox', { name: 'app' })).toBeEnabled();
@@ -368,5 +368,74 @@ describe('ListView', () => {
       expect(icon.closest('li')).toHaveClass('conflicted');
       expect(icon.nextElementSibling).toHaveTextContent('rival');
     });
+  });
+
+  describe('select-all checkbox', () => {
+    const ALL = 'MONDARTH-EMMA.List.All';
+
+    test('sits in the title row, a dash while some modules are active', () => {
+      render(ListView, { fields: new DrawerFields(), modules: createModules(), canManage: true });
+
+      const all = screen.getByRole<HTMLInputElement>('checkbox', { name: ALL });
+      expect(all.closest('h3')).toBe(screen.getByRole('heading'));
+      expect(all).toHaveAttribute('data-tooltip', ALL);
+      expect(all.indeterminate).toBe(true);
+      expect(all).not.toBeChecked();
+    });
+
+    test('activates every module from a dash, then deactivates every one, showing each state', async () => {
+      const modules = createModules();
+      render(ListView, { fields: new DrawerFields(), modules, canManage: true });
+      const all = screen.getByRole<HTMLInputElement>('checkbox', { name: ALL });
+
+      await userEvent.click(all);
+
+      expect(modules.allActive).toBe(true);
+      expect(all).toBeChecked();
+      expect(all.indeterminate).toBe(false);
+
+      await userEvent.click(all);
+
+      expect(modules.noneActive).toBe(true);
+      expect(all).not.toBeChecked();
+      expect(all.indeterminate).toBe(false);
+
+      await userEvent.click(all);
+
+      expect(modules.allActive).toBe(true);
+    });
+
+    test('becomes a dash again when a module is changed by hand', async () => {
+      const modules = createModules();
+      render(ListView, { fields: new DrawerFields(), modules, canManage: true });
+      const all = screen.getByRole<HTMLInputElement>('checkbox', { name: ALL });
+      await userEvent.click(all);
+
+      // With every module active, EMMA is grouped under Dice So Nice!, which recommends it.
+      await userEvent.click(screen.getByRole('checkbox', { name: /(^| )EMMA$/ }));
+
+      expect(all.indeterminate).toBe(true);
+    });
+
+    test('is disabled for a user who may not manage modules, and with nothing installed', () => {
+      const { unmount } = render(ListView, { fields: new DrawerFields(), modules: createModules(), canManage: false });
+      expect(screen.getByRole('checkbox', { name: ALL })).toBeDisabled();
+      unmount();
+
+      render(ListView, { fields: new DrawerFields(), modules: createModules({}, []), canManage: true });
+      expect(screen.getByRole('checkbox', { name: ALL })).toBeDisabled();
+    });
+  });
+
+  test('lists every module flat, in display order, when not grouping', () => {
+    const modules = new ModuleState(
+      [related('app', { requires: ['lib'], recommends: ['extra'] }), related('extra'), related('lib')],
+      { app: true, lib: true },
+    );
+    render(ListView, { fields: new DrawerFields(), modules, canManage: true, grouped: false });
+
+    expect(outline()).toEqual(['app', 'extra', 'lib']);
+    // Still locked: grouping only changes how the list is arranged.
+    expect(screen.getByRole('checkbox', { name: 'lib' })).toBeDisabled();
   });
 });

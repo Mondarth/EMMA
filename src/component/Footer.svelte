@@ -1,5 +1,6 @@
 <script lang="ts">
   import { format, formatList, localize } from '@module/lib/i18n';
+  import { MODULE_ID } from '@module/lib/constants';
   import { log } from '@module/lib/logger';
   import type { ModuleState } from '@module/state/module-state.svelte';
 
@@ -17,6 +18,8 @@
   let saving = $state(false);
 
   const changeCount = $derived(Object.keys(modules.changes).length);
+  // Saving would switch EMMA itself off, so the Settings sidebar would open Foundry's own window instead.
+  const disablesEmma = $derived(modules.changes[MODULE_ID] === false);
   const canSave = $derived(canManage && modules.dirty && modules.unmet.length === 0 && !saving);
 
   /**
@@ -53,6 +56,12 @@
       </ul>
     {:else if modules.dirty}
       <p>{format('MONDARTH-EMMA.Footer.Changes', { count: String(changeCount) })}</p>
+    {/if}
+    {#if canManage && disablesEmma}
+      <p class="emma-disables">
+        <i class="fa-solid fa-triangle-exclamation" inert></i>
+        {localize('MONDARTH-EMMA.Footer.DisablesEmma')}
+      </p>
     {/if}
   </div>
 
