@@ -1,3 +1,13 @@
+## [0.3.0](https://github.com/Mondarth/EMMA/compare/v0.2.0...v0.3.0) (2026-10-19)
+
+### Features
+
+* **ui:** add a select-all checkbox and a grouping toggle ([7c40904](https://github.com/Mondarth/EMMA/commit/7c4090418302541294b90b3d5f5682ba29903a1e))
+
+### Bug Fixes
+
+* **ui:** word the lock tooltip for one requiring module ([69a1e7e](https://github.com/Mondarth/EMMA/commit/69a1e7ef614cdc413e0c5bf9d42d236cd9739f51)), closes [#25](https://github.com/Mondarth/EMMA/issues/25)
+
 ## [0.2.0](https://github.com/Mondarth/EMMA/compare/v0.1.1...v0.2.0) (2026-10-18)
 
 ### Features
