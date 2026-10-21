@@ -1,6 +1,7 @@
 <script lang="ts">
   import { format, localize } from '@module/lib/i18n';
   import type { DrawerFields } from '@module/state/drawer-fields.svelte';
+  import type { HypotheticalState } from '@module/state/hypothetical.svelte';
   import type { ModuleState, Side } from '@module/state/module-state.svelte';
 
   import SelectableList from './SelectableList.svelte';
@@ -13,9 +14,11 @@
     canManage: boolean;
     /** The details shown in module drawers. */
     fields: DrawerFields;
+    /** Hypothetical mode's versions while it is on, offering a choice of version for each active module. */
+    versions?: HypotheticalState | undefined;
   }
 
-  const { modules, canManage, fields }: Props = $props();
+  const { modules, canManage, fields, versions }: Props = $props();
 
   const uid = $props.id();
 
@@ -32,7 +35,7 @@
       {localize(TEXT[side].heading)}
       <span class="emma-split-count">{format('MONDARTH-EMMA.Count', { count: String(modules[side].length) })}</span>
     </h3>
-    <SelectableList {modules} {side} labelledby={headingId} {fields} {canManage} />
+    <SelectableList {modules} {side} labelledby={headingId} {fields} {canManage} {versions} />
     {#if modules[side].length === 0}
       <p class="emma-split-empty">{localize(TEXT[side].empty)}</p>
     {/if}

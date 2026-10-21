@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import Toolbar from '@component/Toolbar.svelte';
 import { installFoundryMocks } from '../mocks/foundry';
 import { createModules } from './fixtures';
+import { HypotheticalState } from '@module/state/hypothetical.svelte';
+import { fakeJudge, loadedVersions } from '../mocks/versions';
 
 const LIST = 'MONDARTH-EMMA.Toolbar.List';
 const SPLIT = 'MONDARTH-EMMA.Toolbar.Split';
@@ -147,6 +149,290 @@ describe('Toolbar', () => {
       await userEvent.click(screen.getByRole('button', { name: GROUP }));
 
       expect(screen.getByRole('button', { name: GROUP })).toHaveAttribute('aria-pressed', 'true');
+    });
+  });
+
+  describe('hypothetical mode', () => {
+    const HYPOTHETICAL = 'MONDARTH-EMMA.Toolbar.Hypothetical';
+    const CORE = 'MONDARTH-EMMA.Toolbar.CoreTooltip {"version":"14.368"}';
+    const SYSTEM = 'MONDARTH-EMMA.Toolbar.SystemTooltip {"title":"D&D 5e","version":"5.1.0"}';
+    const platform = { core: '14.368', system: { id: 'dnd5e', title: 'D&D 5e', version: '5.1.0' } };
+
+    test('is not offered without the platform, which only GMs are given', () => {
+      render(Toolbar, { modules: createModules(), view: 'list', onViewChange: vi.fn() });
+
+      expect(screen.queryByRole('button', { name: HYPOTHETICAL })).toBeNull();
+    });
+
+    test.each(['list', 'split'] as const)('is toggled from the far left of the toolbar in the %s view', view => {
+      render(Toolbar, { modules: createModules(), view, platform, onViewChange: vi.fn() });
+
+      const toggle = screen.getByRole('button', { name: HYPOTHETICAL, pressed: false });
+      expect(toggle).toHaveClass('icon', 'fa-solid', 'fa-flask');
+      expect(toggle).toHaveAttribute('data-tooltip', HYPOTHETICAL);
+      expect(screen.getAllByRole('button')[0]).toBe(toggle);
+    });
+
+    test('shows no core or system button while off', () => {
+      render(Toolbar, { modules: createModules(), view: 'list', platform, onViewChange: vi.fn() });
+
+      expect(screen.queryByRole('button', { name: CORE })).toBeNull();
+      expect(screen.queryByRole('button', { name: SYSTEM })).toBeNull();
+    });
+
+    test('shows the bare Foundry version and the system ID with its version, right of the toggle, while on', () => {
+      render(Toolbar, { modules: createModules(), view: 'list', platform, hypothetical: true, onViewChange: vi.fn() });
+
+      const [toggle, core, system] = screen.getAllByRole('button');
+      expect(toggle).toHaveAccessibleName(HYPOTHETICAL);
+      expect(toggle).toHaveAttribute('aria-pressed', 'true');
+      expect(toggle).toHaveClass('active');
+      expect(core).toHaveTextContent(/^14\.368$/);
+      expect(core).toHaveAccessibleName(CORE);
+      expect(core).toHaveAttribute('data-tooltip', CORE);
+      expect(system).toHaveTextContent('MONDARTH-EMMA.Toolbar.System {"id":"dnd5e","version":"5.1.0"}');
+      expect(system).toHaveAccessibleName(SYSTEM);
+      expect(system).toHaveAttribute('data-tooltip', SYSTEM);
+    });
+
+    test.each([true, false])('asks for the opposite of its state (%s)', async hypothetical => {
+      const onHypotheticalChange = vi.fn();
+      render(Toolbar, {
+        modules: createModules(),
+        view: 'list',
+        platform,
+        hypothetical,
+        onViewChange: vi.fn(),
+        onHypotheticalChange,
+      });
+
+      await userEvent.click(screen.getByRole('button', { name: HYPOTHETICAL }));
+
+      expect(onHypotheticalChange).toHaveBeenCalledExactlyOnceWith(!hypothetical);
+    });
+
+    test('is harmless without a handler', async () => {
+      render(Toolbar, { modules: createModules(), view: 'list', platform, onViewChange: vi.fn() });
+
+      await userEvent.click(screen.getByRole('button', { name: HYPOTHETICAL }));
+
+      expect(screen.getByRole('button', { name: HYPOTHETICAL })).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    describe('version lookup', () => {
+      /**
+       * Render the toolbar in hypothetical mode.
+       * @param versions - Hypothetical mode's versions
+       */
+      function renderOn(versions: HypotheticalState): void {
+        render(Toolbar, {
+          modules: createModules(),
+          view: 'list',
+          platform,
+          hypothetical: true,
+          versions,
+          onViewChange: vi.fn(),
+        });
+      }
+
+      test('says nothing before the lookup starts, or once every version was found', async () => {
+        renderOn(
+          new HypotheticalState(
+            () => fakeJudge({}),
+            () => [],
+          ),
+        );
+        expect(screen.queryByRole('status')).toBeNull();
+
+        document.body.replaceChildren();
+        renderOn((await loadedVersions({})).state);
+        expect(screen.queryByRole('status')).toBeNull();
+      });
+
+      test('shows a spinner while versions are looked up', async () => {
+        const judge = fakeJudge({});
+        judge.lookUp.mockReturnValue(new Promise(() => undefined));
+        const versions = new HypotheticalState(
+          () => judge,
+          () => [],
+        );
+        void versions.load();
+        renderOn(versions);
+
+        const status = await screen.findByRole('status', { name: 'MONDARTH-EMMA.Versions.Loading' });
+        expect(status).toHaveClass('fa-spinner', 'fa-spin');
+      });
+
+      test('warns when the lookup failed', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        const judge = fakeJudge({});
+        judge.lookUp.mockRejectedValue(new Error('offline'));
+        const versions = new HypotheticalState(
+          () => judge,
+          () => [],
+        );
+        await versions.load();
+        renderOn(versions);
+
+        const status = screen.getByRole('status', { name: 'MONDARTH-EMMA.Versions.Failed' });
+        expect(status).toHaveClass('fa-triangle-exclamation', 'failed');
+        expect(status).toHaveAttribute('data-tooltip', 'MONDARTH-EMMA.Versions.Failed');
+      });
+
+      test('names, by title, the packages not every version of which was found', async () => {
+        const { state } = await loadedVersions(
+          {},
+          {
+            unreached: [
+              { type: 'core', id: 'core' },
+              { type: 'system', id: 'dnd5e' },
+              { type: 'module', id: 'dice' },
+              { type: 'module', id: 'gone' },
+              { type: 'system', id: 'other' },
+            ],
+          },
+        );
+        renderOn(state);
+
+        expect(
+          screen.getByRole('status', {
+            name: 'MONDARTH-EMMA.Versions.Unreached {"packages":"MONDARTH-EMMA.Versions.Core, D&D 5e, Dice So Nice!, gone, and other"}',
+          }),
+        ).not.toHaveClass('failed');
+      });
+
+      test('advises setting a proxy only when none is set', async () => {
+        const unreached = [{ type: 'module' as const, id: 'dice' }];
+        renderOn((await loadedVersions({}, { unreached, proxied: true })).state);
+        expect(
+          screen.getByRole('status', { name: 'MONDARTH-EMMA.Versions.Unreached {"packages":"Dice So Nice!"}' }),
+        ).toHaveAttribute('data-tooltip', 'MONDARTH-EMMA.Versions.Unreached {"packages":"Dice So Nice!"}');
+
+        document.body.replaceChildren();
+        renderOn((await loadedVersions({}, { unreached, proxied: false })).state);
+        expect(
+          screen.getByRole('status', { name: 'MONDARTH-EMMA.Versions.UnreachedNoProxy {"packages":"Dice So Nice!"}' }),
+        ).toHaveAttribute('data-tooltip', 'MONDARTH-EMMA.Versions.UnreachedNoProxy {"packages":"Dice So Nice!"}');
+      });
+    });
+
+    describe('report', () => {
+      const REPORT = 'MONDARTH-EMMA.Report.Button';
+
+      test('sits right of the System button, enabled once versions are looked up, and asks for a report', async () => {
+        const onReport = vi.fn();
+        const { state } = await loadedVersions({});
+        render(Toolbar, {
+          modules: createModules(),
+          view: 'list',
+          platform,
+          hypothetical: true,
+          versions: state,
+          onViewChange: vi.fn(),
+          onReport,
+        });
+
+        const report = screen.getByRole('button', { name: REPORT });
+        const buttons = screen.getAllByRole('button');
+        expect(buttons.indexOf(report)).toBe(buttons.indexOf(screen.getByRole('button', { name: SYSTEM })) + 1);
+        expect(report).toHaveClass('emma-toolbar-report');
+        expect(report).toHaveAttribute('data-tooltip', 'MONDARTH-EMMA.Report.Tooltip');
+        await userEvent.click(report);
+
+        expect(onReport).toHaveBeenCalledOnce();
+      });
+
+      test('is disabled before versions are looked up, and harmless without a handler', async () => {
+        render(Toolbar, {
+          modules: createModules(),
+          view: 'list',
+          platform,
+          hypothetical: true,
+          onViewChange: vi.fn(),
+        });
+        expect(screen.getByRole('button', { name: REPORT })).toBeDisabled();
+
+        document.body.replaceChildren();
+        const { state } = await loadedVersions({});
+        render(Toolbar, {
+          modules: createModules(),
+          view: 'list',
+          platform,
+          hypothetical: true,
+          versions: state,
+          onViewChange: vi.fn(),
+        });
+        await userEvent.click(screen.getByRole('button', { name: REPORT }));
+        expect(screen.getByRole('button', { name: REPORT })).toBeEnabled();
+      });
+    });
+
+    describe('core and system versions', () => {
+      const CHOOSE_CORE = 'MONDARTH-EMMA.Versions.Choose {"module":"MONDARTH-EMMA.Versions.Core","version":"14.368"}';
+      const CHOOSE_SYSTEM = 'MONDARTH-EMMA.Versions.Choose {"module":"D&D 5e","version":"5.1.0"}';
+
+      /**
+       * Render the toolbar in hypothetical mode, with the core's and the system's versions given.
+       * @param platforms - The core's and the system's versions, the one in use first
+       * @returns The state behind it
+       */
+      async function renderWith(platforms: Parameters<typeof loadedVersions>[1]) {
+        const { state, judge } = await loadedVersions({ dice: ['1.0.0'] }, platforms);
+        render(Toolbar, {
+          modules: createModules(),
+          view: 'list',
+          platform,
+          hypothetical: true,
+          versions: state,
+          onViewChange: vi.fn(),
+        });
+        return { state, judge };
+      }
+
+      test('keeps plain buttons while no newer version is found', async () => {
+        await renderWith({});
+
+        expect(screen.getByRole('button', { name: CORE })).not.toHaveAttribute('aria-haspopup');
+        expect(screen.getByRole('button', { name: SYSTEM })).not.toHaveAttribute('aria-haspopup');
+      });
+
+      test('offers a list of the newer versions of whichever has one', async () => {
+        await renderWith({ platforms: { system: ['5.1.0', '5.2.0'] } });
+
+        expect(screen.getByRole('button', { name: CORE })).not.toHaveAttribute('aria-haspopup');
+        const system = screen.getByRole('button', { name: CHOOSE_SYSTEM });
+        expect(system).toHaveAttribute('aria-haspopup', 'listbox');
+        // It reads as the plain button did, with a caret.
+        expect(system).toHaveTextContent('MONDARTH-EMMA.Toolbar.System {"id":"dnd5e","version":"5.1.0"}');
+        expect(system).not.toHaveClass('bare');
+        expect(system.querySelector('.fa-caret-down')).not.toBeNull();
+      });
+
+      test('lists each version in the colour of its fit, and shows the version chosen', async () => {
+        const { judge } = await renderWith({
+          platforms: { core: ['14.368', '14.370'], system: ['5.1.0', '5.2.0'] },
+          bad: ['14.370'],
+        });
+
+        await userEvent.click(screen.getByRole('button', { name: CHOOSE_CORE }));
+        const [option] = screen.getAllByRole('option');
+        expect(option).toHaveTextContent('14.370');
+        expect(option?.querySelector('.emma-badge')).toHaveClass('error');
+        expect(judge.judgePlatform.mock.lastCall?.[2]).toBe('core');
+        await userEvent.click(option as HTMLElement);
+
+        const core = screen.getByRole('button', {
+          name: 'MONDARTH-EMMA.Versions.Choose {"module":"MONDARTH-EMMA.Versions.Core","version":"14.370"}',
+        });
+        expect(core).toHaveTextContent(/^14\.370$/);
+
+        await userEvent.click(screen.getByRole('button', { name: CHOOSE_SYSTEM }));
+        await userEvent.click(screen.getByRole('option', { name: /5\.2\.0/ }));
+
+        expect(
+          screen.getByRole('button', { name: 'MONDARTH-EMMA.Versions.Choose {"module":"D&D 5e","version":"5.2.0"}' }),
+        ).toHaveTextContent('MONDARTH-EMMA.Toolbar.System {"id":"dnd5e","version":"5.2.0"}');
+      });
     });
   });
 });

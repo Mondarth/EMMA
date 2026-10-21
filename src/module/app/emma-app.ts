@@ -2,13 +2,26 @@ import { mount, unmount } from 'svelte';
 
 import EmmaRoot from '@component/EmmaRoot.svelte';
 import { canManageModules, listInstalledModules, readActivation } from '@module/adapters/modules';
+import { isGM, readPlatform } from '@module/adapters/platform';
+import { createVersionJudge } from '@module/adapters/versions';
+import type { SetupReportData } from '@module/app/setup-report';
+import { closeSetupReport, showSetupReport } from '@module/app/setup-report';
 import type { DiscardClosingOptions, DiscardQuestion } from '@module/app/confirm-discard';
 import { confirmDiscard } from '@module/app/confirm-discard';
 import { saveModules } from '@module/app/save';
 import { MODULE_ID } from '@module/lib/constants';
 import { log } from '@module/lib/logger';
 import type { View } from '@module/settings';
-import { getDrawerFields, getView, isAutoRecommended, isGrouped, setGrouped, setView } from '@module/settings';
+import {
+  getDrawerFields,
+  getVersionProxy,
+  getVersionProxyKey,
+  getView,
+  isAutoRecommended,
+  isGrouped,
+  setGrouped,
+  setView,
+} from '@module/settings';
 import { drawerFields } from '@module/state/drawer-fields.svelte';
 import { ModuleState } from '@module/state/module-state.svelte';
 
@@ -83,6 +96,16 @@ export class EmmaApp extends foundry.applications.api.ApplicationV2 {
         initialView: getView(),
         initialGrouped: isGrouped(),
         canManage: canManageModules(),
+        platform: isGM() ? readPlatform() : undefined,
+        // The proxy and its key are read when the first lookup starts, so a change made before then is used.
+        createVersionJudge: isGM()
+          ? () => createVersionJudge({ proxy: getVersionProxy(), apiKey: getVersionProxyKey() })
+          : undefined,
+        onReport: (report: SetupReportData) => {
+          showSetupReport(report).catch((error: unknown) => {
+            log.error('Unable to show the setup report', error);
+          });
+        },
         fields: drawerFields,
         onSave: () => saveModules(modules),
         onViewChange: (view: View) => {
@@ -107,7 +130,10 @@ export class EmmaApp extends foundry.applications.api.ApplicationV2 {
    */
   override async close(options: EmmaApp.ClosingOptions = {}): Promise<this | undefined> {
     const { discard = false, ...closing } = options;
-    if (!discard && this.#modules?.dirty === true) {
+    // In hypothetical mode, only what was staged before it was entered is the user's to lose.
+    const unsaved =
+      this.#modules?.hypothetical === true ? this.#modules.stagedBeforeHypothetical : this.#modules?.dirty;
+    if (!discard && unsaved === true) {
       if (this.#confirming) return;
       this.#confirming = true;
       try {
@@ -129,6 +155,8 @@ export class EmmaApp extends foundry.applications.api.ApplicationV2 {
   ): Promise<void> {
     await super._onClose(options);
     this.#modules = null;
+    // The report's update would apply to a hypothetical setup that has gone.
+    await closeSetupReport();
     if (this.#component === null) return;
     void unmount(this.#component);
     this.#component = null;

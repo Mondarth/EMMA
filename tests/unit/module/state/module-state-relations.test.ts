@@ -64,6 +64,24 @@ function createState(saved: ActivationMap = {}, options: ModuleStateOptions = {}
   return new ModuleState(ENTRIES, saved, options);
 }
 
+describe('hypothetical mode', () => {
+  test('restores the modules activated only because others need them, as they were on entering', () => {
+    const state = createState();
+    state.setActive('app', true);
+    state.enterHypothetical();
+    state.setActive('app', false);
+    expect(state.isImplied('lib')).toBe(false);
+
+    state.resetHypothetical();
+
+    expect(activeIds(state)).toEqual(['app', 'core', 'lib']);
+    expect(state.isImplied('lib')).toBe(true);
+    // Deactivating it again releases them, as before.
+    state.setActive('app', false);
+    expect(activeIds(state)).toEqual([]);
+  });
+});
+
 describe('activating a module', () => {
   test('activates the modules it requires, following the chain', () => {
     const state = createState();

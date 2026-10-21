@@ -49,6 +49,14 @@ export function createHooksMock() {
   return { on, once, off, callAll, run };
 }
 
+/** A badge as Foundry gives it. */
+export interface BadgeMockData {
+  type: 'success' | 'warning' | 'neutral' | 'error';
+  tooltip: string;
+  label?: string;
+  icon?: string;
+}
+
 export interface ModuleMockData {
   active?: boolean;
   /** Defaults to the module ID. */
@@ -56,7 +64,7 @@ export interface ModuleMockData {
   /** Defaults to `1.0.0`. */
   version?: string;
   /** What `getVersionBadge` returns. Defaults to `null`, as for a package Foundry cannot place. */
-  badge?: { type: 'success' | 'warning' | 'neutral' | 'error'; tooltip: string; label?: string; icon?: string } | null;
+  badge?: BadgeMockData | null;
   /** Defaults to empty. */
   description?: string;
   /** Authors: a name, or a name with contact details. */
@@ -83,7 +91,15 @@ export interface ModuleMockData {
 }
 
 /** A related package: an ID, or an ID with a package type and the reason for the relationship. */
-export type RelatedMockData = string | { id: string; type?: 'module' | 'system' | 'world'; reason?: string };
+export type RelatedMockData =
+  | string
+  | {
+      id: string;
+      type?: 'module' | 'system' | 'world';
+      reason?: string;
+      /** The versions of the related package admitted. Defaults to any. */
+      compatibility?: { minimum?: string; maximum?: string };
+    };
 
 /**
  * Build the set of related packages Foundry gives a relationship.
@@ -110,8 +126,19 @@ export interface GameMockOptions {
   modules?: Record<string, ModuleMockData>;
   /** Initial stored setting values, keyed by `namespace.key`. */
   settings?: Record<string, unknown>;
-  /** The game system in use, `game.system`. Defaults to `dnd5e`. */
-  system?: { id: string; title: string };
+  /**
+   * The game system in use, `game.system`. Defaults to `dnd5e`; its version defaults to `5.1.0`, verified with Foundry
+   * 14, with no manifest.
+   */
+  system?: {
+    id: string;
+    title: string;
+    version?: string;
+    manifest?: string;
+    compatibility?: { minimum?: string; verified?: string; maximum?: string };
+  };
+  /** The Foundry version, `game.version`. Defaults to `14.368`. */
+  version?: string;
 }
 
 /**
@@ -139,12 +166,27 @@ function createModuleMock(id: string, data: ModuleMockData) {
     library = false,
     api,
   } = data;
+  const relationships = {
+    requires: relatedSet(requires, 'module'),
+    recommends: relatedSet(recommends, 'module'),
+    conflicts: relatedSet(conflicts, 'module'),
+    systems: relatedSet(systems, 'system'),
+  };
   return {
     id,
     active,
     title,
     version,
     getVersionBadge: () => badge,
+    // The module's manifest, as Foundry keeps it.
+    toObject: () => ({
+      id,
+      title,
+      version,
+      compatibility,
+      ...(links.manifest !== undefined && { manifest: links.manifest }),
+      relationships: Object.fromEntries(Object.entries(relationships).map(([kind, set]) => [kind, [...set]])),
+    }),
     description,
     authors: new Set(authors.map(author => (typeof author === 'string' ? { name: author } : author))),
     languages: new Set(
@@ -156,12 +198,7 @@ function createModuleMock(id: string, data: ModuleMockData) {
     ),
     ...links,
     compatibility,
-    relationships: {
-      requires: relatedSet(requires, 'module'),
-      recommends: relatedSet(recommends, 'module'),
-      conflicts: relatedSet(conflicts, 'module'),
-      systems: relatedSet(systems, 'system'),
-    },
+    relationships,
     packs: new Set(packs),
     library,
     api,
@@ -180,6 +217,7 @@ export function createGameMock(options: GameMockOptions = {}) {
     modules = {},
     settings = {},
     system = { id: 'dnd5e', title: 'Dungeons & Dragons Fifth Edition' },
+    version = '14.368',
   } = options;
   const canModifySettings = options.canModifySettings ?? isGM === true;
   const stored = new Map<string, unknown>(Object.entries(settings));
@@ -193,7 +231,23 @@ export function createGameMock(options: GameMockOptions = {}) {
         ? null
         : { isGM, can: vi.fn((permission: string): boolean => permission === 'SETTINGS_MODIFY' && canModifySettings) },
     modules: new Map(Object.entries(modules).map(([id, data]) => [id, createModuleMock(id, data)])),
-    system,
+    system: {
+      version: '5.1.0',
+      compatibility: { minimum: '14', verified: '14' },
+      ...system,
+      toObject() {
+        return {
+          id: this.id,
+          title: this.title,
+          version: this.version,
+          manifest: this.manifest,
+          compatibility: this.compatibility,
+        };
+      },
+    },
+    version,
+    // Foundry 14's release, from the version.
+    release: { generation: Number(version.split('.')[0]), build: Number(version.split('.')[1]), channel: 'stable' },
     settings: {
       register: vi.fn(
         (namespace: string, key: string, data: { default?: unknown; onChange?: (value: unknown) => void }): void => {
@@ -292,6 +346,39 @@ export function createFoundryNamespaceMock() {
     return template.innerHTML;
   });
 
+  const badgeOf = (availability: number, data: { version: string }): BadgeMockData => ({
+    type:
+      availability === 1
+        ? 'success'
+        : availability === 2
+          ? 'neutral'
+          : [3, 4].includes(availability)
+            ? 'warning'
+            : 'error',
+    tooltip: `availability ${String(availability)}`,
+    label: data.version,
+    icon: availability === 1 ? 'fa-solid fa-code-branch' : `fa-solid icon-${String(availability)}`,
+  });
+  // As Foundry's does, an unverified system's tooltip looks the module's systems up in `options.systems`, or in
+  // `game.systems`, which exists only on the Setup screen, so throws inside a world.
+  const saveDataToFile = vi.fn((_data: string, _type: string, _filename: string): void => undefined);
+  const getVersionBadge = vi.fn(
+    (
+      availability: number,
+      data: { version: string; relationships?: { systems?: { id: string }[] } },
+      options?: { systems?: { get(id: string): unknown } },
+    ) => {
+      if (availability === 3) {
+        const systems = options?.systems ?? (game as unknown as { systems: { get(id: string): unknown } }).systems;
+        for (const { id } of data.relationships?.systems ?? []) systems.get(id);
+      }
+      return badgeOf(availability, data);
+    },
+  );
+  const systemVersionBadge = vi.fn((availability: number, data: { version: string }, _options?: object) =>
+    badgeOf(availability, data),
+  );
+
   return {
     applications: {
       api: { ApplicationV2: ApplicationV2Mock, DialogV2: { confirm } },
@@ -304,8 +391,17 @@ export function createFoundryNamespaceMock() {
         },
       },
     },
+    // Foundry's badges by availability, as `Module.getVersionBadge` gives them, with the code as the tooltip.
+    packages: { Module: { getVersionBadge }, System: { getVersionBadge: systemVersionBadge } },
     // Foundry adds the server's route prefix, which these tests leave unset.
-    utils: { cleanHTML, getRoute: (path: string): string => `/${path}` },
+    utils: {
+      // Foundry's `Collection` is a `Map` with more methods, none of which EMMA's callers use.
+      Collection: Map,
+      cleanHTML,
+      escapeHTML: (raw: string): string => raw.replaceAll('&', '&amp;').replaceAll('<', '&lt;'),
+      saveDataToFile,
+      getRoute: (path: string): string => `/${path}`,
+    },
     /** Called each time a native Module Management window is rendered. */
     moduleManagementRender,
     /** `SettingsConfig.reloadConfirm`, which asks the user to reload. */
@@ -314,6 +410,12 @@ export function createFoundryNamespaceMock() {
     confirm,
     /** `utils.cleanHTML`, which makes HTML safe to insert. */
     cleanHTML,
+    /** `packages.Module.getVersionBadge`, which gives the badge for a package's availability. */
+    getVersionBadge,
+    /** `packages.System.getVersionBadge`, as `getVersionBadge` for the system. */
+    systemVersionBadge,
+    /** `utils.saveDataToFile`, which downloads text as a file. */
+    saveDataToFile,
   };
 }
 

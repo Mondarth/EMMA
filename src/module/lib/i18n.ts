@@ -19,10 +19,11 @@ export function format(key: string, data: Record<string, string>): string {
 }
 
 /**
- * Join items into a list in the user's language, such as "A, B and C".
+ * Join items into a list in the user's language, such as "A, B and C", or "A, B or C".
  * @param items - The items
+ * @param type - `conjunction` for "and", the default; `disjunction` for "or"
  * @returns The list
  */
-export function formatList(items: readonly string[]): string {
-  return new Intl.ListFormat(game.i18n.lang, { type: 'conjunction' }).format(items);
+export function formatList(items: readonly string[], type: 'conjunction' | 'disjunction' = 'conjunction'): string {
+  return new Intl.ListFormat(game.i18n.lang, { type }).format(items);
 }

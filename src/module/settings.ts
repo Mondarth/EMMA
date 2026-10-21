@@ -14,7 +14,14 @@ export const SETTINGS = {
   autoRecommended: 'autoRecommended',
   /** Whether this user's list view groups related modules under the modules that relate to them, or lists them flat. */
   grouped: 'grouped',
+  /** A CORS proxy that hypothetical mode fetches version data through, as a URL template containing `{url}`. */
+  versionProxy: 'versionProxy',
+  /** The API key sent to the proxy, kept in the GM's browser only. */
+  versionProxyKey: 'versionProxyKey',
 } as const;
+
+/** Where a proxy URL template puts the URL it fetches. */
+export const PROXY_PLACEHOLDER = '{url}';
 
 /** EMMA's main views. */
 export type View = 'list' | 'split';
@@ -57,6 +64,22 @@ export function registerSettings(): void {
     config: false,
     type: Boolean,
     default: true,
+  });
+
+  // Both are set in the GM-only Version lookup proxy menu. The key is a client setting, kept in the browser it is
+  // entered in: every world and user setting is sent to every user who joins, so any player could read it.
+  game.settings.register(MODULE_ID, SETTINGS.versionProxy, {
+    scope: 'world',
+    config: false,
+    type: String,
+    default: '',
+  });
+
+  game.settings.register(MODULE_ID, SETTINGS.versionProxyKey, {
+    scope: 'client',
+    config: false,
+    type: String,
+    default: '',
   });
 
   game.settings.register(MODULE_ID, SETTINGS.drawerFields, {
@@ -151,4 +174,33 @@ export function isGrouped(): boolean {
  */
 export async function setGrouped(grouped: boolean): Promise<void> {
   await game.settings.set(MODULE_ID, SETTINGS.grouped, grouped);
+}
+
+/**
+ * The CORS proxy the GM has set for hypothetical mode to fetch version data through.
+ * @returns The URL template, containing {@link PROXY_PLACEHOLDER}; `null` if none is set, or the value set has no
+ *   placeholder and so cannot be used
+ */
+export function getVersionProxy(): string | null {
+  const proxy = game.settings.get(MODULE_ID, SETTINGS.versionProxy).trim();
+  return proxy.includes(PROXY_PLACEHOLDER) ? proxy : null;
+}
+
+/**
+ * The API key the GM has set for the version lookup proxy, in this browser.
+ * @returns The key, trimmed; `null` if none is set
+ */
+export function getVersionProxyKey(): string | null {
+  const key = game.settings.get(MODULE_ID, SETTINGS.versionProxyKey).trim();
+  return key === '' ? null : key;
+}
+
+/**
+ * Remember the version lookup proxy and its API key.
+ * @param proxy - The proxy URL template, or blank for none
+ * @param key - The API key, kept in this browser only, or blank for none
+ */
+export async function setVersionProxy(proxy: string, key: string): Promise<void> {
+  await game.settings.set(MODULE_ID, SETTINGS.versionProxy, proxy.trim());
+  await game.settings.set(MODULE_ID, SETTINGS.versionProxyKey, key.trim());
 }
