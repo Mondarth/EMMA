@@ -39,8 +39,11 @@ import {
 
 import { format, formatList, localize } from '@module/lib/i18n';
 
+import { explanationMessages } from './explanation';
 import type { VersionBadge } from './modules';
 import { toBadge } from './modules';
+import type { PlanEntry, SetupCheck, SetupSolve } from './report';
+import { checkReport, planReport, solveReport } from './report';
 
 /** A package, by type and ID; Foundry itself is the package of type `core`, with the ID `core`. */
 export interface PackageRef {
@@ -114,6 +117,31 @@ export interface VersionJudge {
    * @returns Each version, newest first, with its badge
    */
   judgePlatform(active: Iterable<string>, choices: VersionChoices, part: PlatformPart): readonly VersionOption[];
+  /**
+   * Check the setup the choices make, in words: what keeps each package from being used, what it prefers and is not
+   * given, and what it advises.
+   * @param active - The IDs of the modules the setup has
+   * @param choices - The versions chosen
+   * @returns What the check found
+   */
+  reportCheck(active: Iterable<string>, choices: VersionChoices): SetupCheck;
+  /**
+   * Find the best versions of the active modules: the newest of each that works with the others and with the core and
+   * system chosen, or say in words why there are none. It may fetch the manifests of releases known only from a
+   * listing.
+   * @param active - The IDs of the modules the setup has
+   * @param choices - The versions chosen
+   * @returns The best setup, or why there is none
+   */
+  reportSolve(active: Iterable<string>, choices: VersionChoices): Promise<SetupSolve>;
+  /**
+   * Plan the setup the choices make: each active module at the version chosen, with its manifest URL, those others
+   * depend on first.
+   * @param active - The IDs of the modules the setup has
+   * @param choices - The versions chosen
+   * @returns The plan, in order
+   */
+  reportPlan(active: Iterable<string>, choices: VersionChoices): readonly PlanEntry[];
 }
 
 /** The releases found so far, and what is needed to judge them. */
@@ -352,7 +380,46 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
       platformVersions(catalogue, part).map(version =>
         fitOf(catalogue, setupOf(catalogue, active, { ...choices, [part]: version }), version),
       ),
+    reportCheck: (active, choices) =>
+      checkReport(
+        universeOf(catalogue),
+        setupOf(catalogue, active, choices),
+        messagesOf(catalogue),
+        (checked, all) => optionOf(checked, all).badge,
+      ),
+    reportPlan: (active, choices) =>
+      planReport(
+        universeOf(catalogue),
+        setupOf(catalogue, active, choices),
+        messagesOf(catalogue),
+        catalogue.installed,
+      ),
+    reportSolve: (active, choices) =>
+      solveReport(
+        universeOf(catalogue),
+        setupOf(catalogue, active, choices),
+        messagesOf(catalogue),
+        set.load.bind(set),
+      ),
   };
+}
+
+/**
+ * The releases found, as the resolver reads them.
+ * @param catalogue - The releases found
+ * @returns The universe
+ */
+function universeOf(catalogue: VersionCatalogue): { core: readonly CoreRelease[]; releases: readonly Release[] } {
+  return { core: catalogue.cores, releases: catalogue.releases };
+}
+
+/**
+ * The resolver's explanations in the user's language, naming packages by their titles.
+ * @param catalogue - The releases found
+ * @returns The wording
+ */
+function messagesOf(catalogue: VersionCatalogue) {
+  return explanationMessages(key => catalogue.titles.get(key));
 }
 
 /** Foundry itself, as a package whose versions are looked up. */
@@ -442,7 +509,7 @@ function withModule(setup: Setup, id: string, version: string): Setup {
  * @returns What checking found of the system and each module whose release is known
  */
 function checkSetup(catalogue: VersionCatalogue, setup: SetupSpec): readonly ReleaseCheck[] {
-  return check({ core: catalogue.cores, releases: catalogue.releases }, setup).releases;
+  return check(universeOf(catalogue), setup).releases;
 }
 
 /**

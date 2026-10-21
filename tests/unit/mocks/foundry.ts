@@ -361,6 +361,7 @@ export function createFoundryNamespaceMock() {
   });
   // As Foundry's does, an unverified system's tooltip looks the module's systems up in `options.systems`, or in
   // `game.systems`, which exists only on the Setup screen, so throws inside a world.
+  const saveDataToFile = vi.fn((_data: string, _type: string, _filename: string): void => undefined);
   const getVersionBadge = vi.fn(
     (
       availability: number,
@@ -398,6 +399,7 @@ export function createFoundryNamespaceMock() {
       Collection: Map,
       cleanHTML,
       escapeHTML: (raw: string): string => raw.replaceAll('&', '&amp;').replaceAll('<', '&lt;'),
+      saveDataToFile,
       getRoute: (path: string): string => `/${path}`,
     },
     /** Called each time a native Module Management window is rendered. */
@@ -412,6 +414,8 @@ export function createFoundryNamespaceMock() {
     getVersionBadge,
     /** `packages.System.getVersionBadge`, as `getVersionBadge` for the system. */
     systemVersionBadge,
+    /** `utils.saveDataToFile`, which downloads text as a file. */
+    saveDataToFile,
   };
 }
 

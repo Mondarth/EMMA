@@ -411,6 +411,17 @@ test.describe('Choosing the details drawers show', () => {
 });
 
 /**
+ * Read a downloaded file as text.
+ * @param stream - The download's stream
+ * @returns The text
+ */
+async function readText(stream: NodeJS.ReadableStream): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(Buffer.from(chunk as Buffer));
+  return Buffer.concat(chunks).toString('utf8');
+}
+
+/**
  * Save the fixture modules as inactive again, without reloading, so each test starts from the same activation.
  * @param page - A page logged in as the GM
  */
@@ -735,6 +746,61 @@ test.describe('Hypothetical mode', () => {
     await closeEmma(page);
   });
 
+  test('changes staged in it are reset or discarded, leaving those staged before it, and nothing is saved', async ({
+    page,
+  }) => {
+    await deactivateFixtures(page);
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+    const save = emma.getByRole('button', { name: 'Save' });
+    const reset = emma.getByRole('button', { name: 'Reset' });
+    const library = emma.getByRole('checkbox', { name: LIBRARY.title });
+    const rival = emma.getByRole('checkbox', { name: RIVAL.title });
+    const toggle = emma.getByRole('button', { name: 'Hypothetical mode', exact: true });
+    await library.check();
+    await expect(save).toBeEnabled();
+
+    await toggle.click();
+    await expect(save).toBeDisabled();
+    await expect(reset).toBeDisabled();
+    await rival.check();
+    await expect(reset).toBeEnabled();
+
+    await reset.click();
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(rival).not.toBeChecked();
+    await expect(library).toBeChecked();
+
+    await rival.check();
+    await toggle.click();
+    await expect(rival).not.toBeChecked();
+    await expect(library).toBeChecked();
+    await expect(save).toBeEnabled();
+    expect(await savedActive(page, LIBRARY.id)).toBe(false);
+  });
+
+  test('closing EMMA in it asks only when changes were staged before it', async ({ page }) => {
+    await deactivateFixtures(page);
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+    await emma.getByRole('button', { name: 'Hypothetical mode', exact: true }).click();
+    await emma.getByRole('checkbox', { name: RIVAL.title }).check();
+
+    await clickClose(page);
+
+    await expect(emma).toHaveCount(0);
+    await expect(page.locator(`#${MODULE_ID}-discard`)).toHaveCount(0);
+
+    await (await moduleManagementButton(page)).click();
+    await emma.getByRole('checkbox', { name: LIBRARY.title }).check();
+    await emma.getByRole('button', { name: 'Hypothetical mode', exact: true }).click();
+    await clickClose(page);
+    const question = page.locator(`#${MODULE_ID}-discard`);
+    await expect(question.getByRole('button', { name: 'Discard and close' })).toBeVisible();
+    await question.getByRole('button', { name: 'Discard and close' }).click();
+    await expect(emma).toHaveCount(0);
+  });
+
   test('GMs turn it on to see the Foundry and system versions, and it is off when EMMA reopens', async ({ page }) => {
     const { core, system } = await page.evaluate(() => ({
       core: game.version,
@@ -868,6 +934,128 @@ test.describe('Hypothetical versions', () => {
 
     await library.uncheck();
     await expect(picker).toHaveCount(0);
+  });
+
+  test('the report button reports on the setup chosen in the style picked, and downloads it as text', async ({
+    page,
+  }) => {
+    // GitHub lists the version installed too, so the plan has a manifest URL for that version alone.
+    const installed = await page.evaluate(id => game.modules.get(id)?.version ?? '', MODULE_ID);
+    await page.route(RELEASES, async route => {
+      await route.fulfill({
+        headers: { 'Access-Control-Allow-Origin': '*' },
+        json: releases('Mondarth/EMMA', ['9.9.0', installed]),
+      });
+    });
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+    const report = emma.getByRole('button', { name: 'Report', exact: true });
+    await expect(report).toHaveCount(0);
+
+    await emma.getByRole('button', { name: 'Hypothetical mode', exact: true }).click();
+    // An icon right of the System button, enabled once the versions are looked up.
+    await expect(report).toHaveText('');
+    await expect(report).toBeEnabled();
+    await report.click();
+
+    const dialog = page.locator(`#${MODULE_ID}-report`);
+    await expect(dialog.getByRole('heading', { name: 'EMMA - setup report' })).toBeVisible();
+    const style = dialog.getByLabel('Report style');
+    await expect(style).toHaveValue('plan');
+    const plan = dialog.getByRole('region', { name: /^Plan: / });
+    await expect(plan.locator('pre')).toContainText(
+      `mondarth-emma  EMMA - Enhanced Module Manager Application  https://github.com/Mondarth/EMMA/releases/download/v${installed}/module.json`,
+    );
+
+    const download = page.waitForEvent('download');
+    await dialog.getByRole('button', { name: 'Download this report as text' }).click();
+    const saved = await download;
+    expect(saved.suggestedFilename()).toBe('emma-plan.txt');
+    expect(await readText(await saved.createReadStream())).toContain('mondarth-emma');
+
+    await style.selectOption('check');
+    await expect(dialog.getByRole('region', { name: 'Check of the setup chosen' })).toContainText(
+      'Every package can be used in this setup.',
+    );
+    await expect(plan).toHaveCount(0);
+
+    await style.selectOption('update');
+    // EMMA 9.9.0's manifest cannot be read without a proxy, so it declares no compatibility and is not taken.
+    await expect(dialog.getByRole('region', { name: /^Best versions of the active modules/ })).toContainText(
+      'The best versions are found. Every active module is already at its best version.',
+    );
+
+    await clickClose(page, `#${MODULE_ID}-report`);
+    await expect(dialog).toHaveCount(0);
+  });
+
+  test('the update’s best versions can be chosen, and every report then follows them', async ({ page }) => {
+    const installed = await page.evaluate(id => game.modules.get(id)?.version ?? '', MODULE_ID);
+    const library = 'https://github.com/emma-tests/emma-fixture-library/releases/download/v2.0.0/module.json';
+    const emmaRelease = 'https://github.com/Mondarth/EMMA/releases/download/v9.9.0/module.json';
+    // Library 2.0.0 needs EMMA 9.9.0 or later; both work with this Foundry, so both are the best versions.
+    const answers: Record<string, unknown> = {
+      [RELEASES]: releases('Mondarth/EMMA', ['9.9.0']),
+      [LIBRARY_RELEASES]: releases('emma-tests/emma-fixture-library', ['2.0.0']),
+      [library]: {
+        id: LIBRARY.id,
+        title: LIBRARY.title,
+        version: '2.0.0',
+        compatibility: { minimum: '14', verified: '14' },
+        relationships: { requires: [{ id: MODULE_ID, type: 'module', compatibility: { minimum: '9.9.0' } }] },
+      },
+      [emmaRelease]: {
+        id: MODULE_ID,
+        title: MODULE_TITLE,
+        version: '9.9.0',
+        compatibility: { minimum: '14', verified: '14' },
+      },
+    };
+    await page.route('https://proxy.test/**', async route => {
+      const target = new URL(route.request().url()).searchParams.get('url') ?? '';
+      await route.fulfill({ headers: { 'Access-Control-Allow-Origin': '*' }, json: answers[target] ?? [] });
+    });
+    await page.evaluate(async () => {
+      await game.settings.set('mondarth-emma', 'versionProxy', 'https://proxy.test/?url={url}');
+    });
+    try {
+      await (await moduleManagementButton(page)).click();
+      const emma = page.locator(EMMA_WINDOW);
+      await emma.getByRole('checkbox', { name: LIBRARY.title }).check();
+      await emma.getByRole('button', { name: 'Hypothetical mode', exact: true }).click();
+      await expect(emma.getByRole('button', { name: 'Report', exact: true })).toBeEnabled();
+      await emma.getByRole('button', { name: 'Report', exact: true }).click();
+      const dialog = page.locator(`#${MODULE_ID}-report`);
+      const style = dialog.getByLabel('Report style');
+      await style.selectOption('update');
+      const update = dialog.getByRole('region', { name: /^Best versions of the active modules/ });
+      await expect(update).toContainText(`${MODULE_TITLE}: ${installed} to 9.9.0`);
+      await expect(update).toContainText(`${LIBRARY.title}: 1.0.0 to 2.0.0`);
+
+      await dialog.getByRole('button', { name: 'Choose these versions in the hypothetical setup' }).click();
+
+      await expect(
+        emma.getByRole('button', { name: `${MODULE_TITLE} version 9.9.0: choose another version` }),
+      ).toBeVisible();
+      await expect(
+        emma.getByRole('button', { name: `${LIBRARY.title} version 2.0.0: choose another version` }),
+      ).toBeVisible();
+      // Every style reports on the setup with the versions chosen, without opening the report again.
+      await expect(update).toContainText('Every active module is already at its best version.');
+      await expect(dialog.getByRole('button', { name: 'Choose these versions in the hypothetical setup' })).toHaveCount(
+        0,
+      );
+      await style.selectOption('plan');
+      const install = dialog.getByRole('region', { name: /^Install:/ });
+      await expect(install).toContainText(library);
+      await expect(install).toContainText(emmaRelease);
+      await style.selectOption('check');
+      await expect(dialog.getByRole('region', { name: 'Check of the setup chosen' })).toContainText('9.9.0');
+    } finally {
+      await page.evaluate(async () => {
+        await game.settings.set('mondarth-emma', 'versionProxy', '');
+      });
+    }
   });
 
   test('the system offers its newer versions without a proxy, which the footer explains', async ({ page }) => {

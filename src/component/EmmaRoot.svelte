@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Platform } from '@module/adapters/platform';
+  import type { SetupReportData } from '@module/app/setup-report';
   import type { VersionJudge } from '@module/adapters/versions';
   import type { DrawerFields } from '@module/state/drawer-fields.svelte';
   import type { View } from '@module/settings';
@@ -32,6 +33,8 @@
     platform?: Platform | undefined;
     /** Sets up looking up module versions for hypothetical mode; given to GMs with the platform. */
     createVersionJudge?: (() => VersionJudge) | undefined;
+    /** Shows a report on the setup chosen in hypothetical mode. */
+    onReport?: ((report: SetupReportData) => void) | undefined;
   }
 
   const {
@@ -45,6 +48,7 @@
     onGroupedChange,
     platform,
     createVersionJudge,
+    onReport,
   }: Props = $props();
 
   // The window is mounted afresh each time it opens, so the initial view and grouping are only read once.
@@ -55,8 +59,9 @@
   // Hypothetical mode is not remembered: each time the window opens, it shows the world as it is.
   let hypothetical = $state(false);
 
-  // Kept while the window is open, so turning the mode off and on again keeps the versions found and chosen. The
-  // setup judged is the modules staged active, so staging a module changes how every version is judged.
+  // Kept while the window is open, so turning the mode off and on again keeps the versions found; those chosen are
+  // forgotten on leaving it. The setup judged is the modules staged active, so staging a module changes how every
+  // version is judged.
   // svelte-ignore state_referenced_locally
   const versions =
     createVersionJudge === undefined
@@ -91,6 +96,16 @@
     {versions}
     onHypotheticalChange={(next: boolean) => {
       hypothetical = next;
+      // What is staged and chosen in hypothetical mode is only for it: leaving it restores what was staged before.
+      if (next) modules.enterHypothetical();
+      else {
+        modules.leaveHypothetical();
+        versions?.clearChoices();
+      }
+    }}
+    onReport={() => {
+      const report = versions?.report();
+      if (report !== null && report !== undefined) onReport?.(report);
     }} />
 
   <div class="emma-pane">
@@ -101,7 +116,20 @@
     {/if}
   </div>
 
-  <Footer {modules} {canManage} {onSave} unproxied={hypothetical && versions?.proxied === false} />
+  <Footer
+    {modules}
+    {canManage}
+    {onSave}
+    unproxied={hypothetical && versions?.proxied === false}
+    hypothetical={hypothetical
+      ? {
+          canReset: modules.changedInHypothetical || versions?.hasChoices === true,
+          reset: () => {
+            modules.resetHypothetical();
+            versions?.clearChoices();
+          },
+        }
+      : undefined} />
 </div>
 
 <style>

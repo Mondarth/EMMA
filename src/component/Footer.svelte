@@ -13,16 +13,24 @@
     onSave: () => Promise<unknown>;
     /** Whether hypothetical mode is looking up versions without a proxy, so finds fewer. */
     unproxied?: boolean;
+    /**
+     * Hypothetical mode, while it is on: nothing can be saved, and Reset restores what was staged when it was entered,
+     * through `reset`, enabled while `canReset`.
+     */
+    hypothetical?: { readonly canReset: boolean; readonly reset: () => void } | undefined;
   }
 
-  const { modules, canManage, onSave, unproxied = false }: Props = $props();
+  const { modules, canManage, onSave, unproxied = false, hypothetical }: Props = $props();
 
   let saving = $state(false);
 
   const changeCount = $derived(Object.keys(modules.changes).length);
   // Saving would switch EMMA itself off, so the Settings sidebar would open Foundry's own window instead.
   const disablesEmma = $derived(modules.changes[MODULE_ID] === false);
-  const canSave = $derived(canManage && modules.dirty && modules.unmet.length === 0 && !saving);
+  const canSave = $derived(
+    canManage && hypothetical === undefined && modules.dirty && modules.unmet.length === 0 && !saving,
+  );
+  const canReset = $derived((hypothetical === undefined ? modules.dirty : hypothetical.canReset) && !saving);
 
   /**
    * Save the staged changes, keeping the buttons disabled until saving finishes. `onSave` reports its own problems to
@@ -77,9 +85,10 @@
     <div class="emma-footer-actions">
       <button
         type="button"
-        disabled={!modules.dirty || saving}
+        disabled={!canReset}
         onclick={() => {
-          modules.reset();
+          if (hypothetical === undefined) modules.reset();
+          else hypothetical.reset();
         }}>
         <i class="fa-solid fa-arrow-rotate-left" inert></i>
         {localize('MONDARTH-EMMA.Footer.Reset')}

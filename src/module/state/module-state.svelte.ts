@@ -61,6 +61,9 @@ export class ModuleState {
    */
   readonly #implied = new SvelteSet<string>();
   readonly #autoRecommended: () => boolean;
+  /** What was staged when hypothetical mode was entered, restored when it is reset or left; `null` outside it. */
+  #beforeHypothetical: { readonly pending: Record<string, boolean>; readonly implied: readonly string[] } | null =
+    $state.raw(null);
 
   /** The modules that will be inactive once the staged changes are saved, in display order. */
   readonly inactive: readonly ModuleEntry[] = $derived.by(() => this.#side('inactive'));
@@ -403,6 +406,61 @@ export class ModuleState {
     this.#implied.clear();
     this.clearSelection('inactive');
     this.clearSelection('active');
+  }
+
+  /**
+   * Whether hypothetical mode is on, so that what is staged may be reset to what it was when the mode was entered.
+   * @returns `true` while it is on
+   */
+  get hypothetical(): boolean {
+    return this.#beforeHypothetical !== null;
+  }
+
+  /**
+   * Whether changes had been staged when hypothetical mode was entered: those are the user's own, which closing would
+   * lose; what is staged in hypothetical mode is not.
+   * @returns `true` if any were; `false` outside hypothetical mode
+   */
+  get stagedBeforeHypothetical(): boolean {
+    const before = this.#beforeHypothetical;
+    return before !== null && this.entries.some(({ id }) => before.pending[id] !== this.#saved[id]);
+  }
+
+  /**
+   * Whether anything has been staged or unstaged since hypothetical mode was entered.
+   * @returns `true` if what is staged differs from then; `false` outside hypothetical mode
+   */
+  get changedInHypothetical(): boolean {
+    const before = this.#beforeHypothetical;
+    return before !== null && this.entries.some(({ id }) => before.pending[id] !== this.#pending[id]);
+  }
+
+  /**
+   * Enter hypothetical mode, remembering what is staged so that it can be restored.
+   */
+  enterHypothetical(): void {
+    this.#beforeHypothetical = { pending: { ...this.#pending }, implied: [...this.#implied] };
+  }
+
+  /**
+   * Restore what was staged when hypothetical mode was entered, staying in it. Outside it, nothing changes.
+   */
+  resetHypothetical(): void {
+    const before = this.#beforeHypothetical;
+    if (before === null) return;
+    this.#pending = { ...before.pending };
+    this.#implied.clear();
+    for (const id of before.implied) this.#implied.add(id);
+    this.clearSelection('inactive');
+    this.clearSelection('active');
+  }
+
+  /**
+   * Leave hypothetical mode, restoring what was staged when it was entered.
+   */
+  leaveHypothetical(): void {
+    this.resetHypothetical();
+    this.#beforeHypothetical = null;
   }
 
   /**

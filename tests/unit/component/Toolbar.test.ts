@@ -300,6 +300,71 @@ describe('Toolbar', () => {
           }),
         ).not.toHaveClass('failed');
       });
+
+      test('advises setting a proxy only when none is set', async () => {
+        const unreached = [{ type: 'module' as const, id: 'dice' }];
+        renderOn((await loadedVersions({}, { unreached, proxied: true })).state);
+        expect(
+          screen.getByRole('status', { name: 'MONDARTH-EMMA.Versions.Unreached {"packages":"Dice So Nice!"}' }),
+        ).toHaveAttribute('data-tooltip', 'MONDARTH-EMMA.Versions.Unreached {"packages":"Dice So Nice!"}');
+
+        document.body.replaceChildren();
+        renderOn((await loadedVersions({}, { unreached, proxied: false })).state);
+        expect(
+          screen.getByRole('status', { name: 'MONDARTH-EMMA.Versions.UnreachedNoProxy {"packages":"Dice So Nice!"}' }),
+        ).toHaveAttribute('data-tooltip', 'MONDARTH-EMMA.Versions.UnreachedNoProxy {"packages":"Dice So Nice!"}');
+      });
+    });
+
+    describe('report', () => {
+      const REPORT = 'MONDARTH-EMMA.Report.Button';
+
+      test('sits right of the System button, enabled once versions are looked up, and asks for a report', async () => {
+        const onReport = vi.fn();
+        const { state } = await loadedVersions({});
+        render(Toolbar, {
+          modules: createModules(),
+          view: 'list',
+          platform,
+          hypothetical: true,
+          versions: state,
+          onViewChange: vi.fn(),
+          onReport,
+        });
+
+        const report = screen.getByRole('button', { name: REPORT });
+        const buttons = screen.getAllByRole('button');
+        expect(buttons.indexOf(report)).toBe(buttons.indexOf(screen.getByRole('button', { name: SYSTEM })) + 1);
+        expect(report).toHaveClass('emma-toolbar-report');
+        expect(report).toHaveAttribute('data-tooltip', 'MONDARTH-EMMA.Report.Tooltip');
+        await userEvent.click(report);
+
+        expect(onReport).toHaveBeenCalledOnce();
+      });
+
+      test('is disabled before versions are looked up, and harmless without a handler', async () => {
+        render(Toolbar, {
+          modules: createModules(),
+          view: 'list',
+          platform,
+          hypothetical: true,
+          onViewChange: vi.fn(),
+        });
+        expect(screen.getByRole('button', { name: REPORT })).toBeDisabled();
+
+        document.body.replaceChildren();
+        const { state } = await loadedVersions({});
+        render(Toolbar, {
+          modules: createModules(),
+          view: 'list',
+          platform,
+          hypothetical: true,
+          versions: state,
+          onViewChange: vi.fn(),
+        });
+        await userEvent.click(screen.getByRole('button', { name: REPORT }));
+        expect(screen.getByRole('button', { name: REPORT })).toBeEnabled();
+      });
     });
 
     describe('core and system versions', () => {

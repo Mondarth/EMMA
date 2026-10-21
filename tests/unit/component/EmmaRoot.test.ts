@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import EmmaRoot from '@component/EmmaRoot.svelte';
+import type { SetupReportData } from '@module/app/setup-report';
 import { installFoundryMocks } from '../mocks/foundry';
 import { createModules } from './fixtures';
 import { fakeJudge } from '../mocks/versions';
@@ -253,6 +254,96 @@ describe('EmmaRoot', () => {
     expect(screen.queryByRole('button', { name: /^MONDARTH-EMMA\.Toolbar\.Core/ })).toBeNull();
   });
 
+  describe('staging in hypothetical mode', () => {
+    const SAVE = 'MONDARTH-EMMA.Footer.Save';
+    const RESET = 'MONDARTH-EMMA.Footer.Reset';
+
+    /**
+     * Render the root for a GM, with Dice So Nice! staged active before hypothetical mode.
+     * @returns The modules and the judge behind the versions
+     */
+    function renderStaged() {
+      const modules = createModules();
+      modules.setActive('dice', true);
+      const judge = fakeJudge({ 'lib-wrapper': ['1.13.2', '1.14.0'], dice: ['5.2.4', '5.3.0'] });
+      render(EmmaRoot, {
+        fields: new DrawerFields(),
+        modules,
+        initialView: 'list',
+        initialGrouped: true,
+        canManage: true,
+        onSave,
+        platform: { core: '14.368', system: { id: 'dnd5e', title: 'D&D 5e', version: '5.1.0' } },
+        createVersionJudge: () => judge,
+      });
+      return { modules, judge };
+    }
+
+    test('disables Save, and enables Reset only once something changes in the mode', async () => {
+      const { modules } = renderStaged();
+      expect(screen.getByRole('button', { name: SAVE })).toBeEnabled();
+
+      await userEvent.click(screen.getByRole('button', { name: HYPOTHETICAL }));
+
+      expect(screen.getByRole('button', { name: SAVE })).toBeDisabled();
+      expect(screen.getByRole('button', { name: RESET })).toBeDisabled();
+      modules.setActive('emma', true);
+      await vi.waitFor(() => {
+        expect(screen.getByRole('button', { name: RESET })).toBeEnabled();
+      });
+    });
+
+    test('resets what was staged and chosen in the mode, to what was staged before it, staying in it', async () => {
+      const { modules, judge } = renderStaged();
+      await userEvent.click(screen.getByRole('button', { name: HYPOTHETICAL }));
+      const choose = await screen.findByRole('button', {
+        name: 'MONDARTH-EMMA.Versions.Choose {"module":"libWrapper","version":"1.13.2"}',
+      });
+      await userEvent.click(choose);
+      await userEvent.click(screen.getAllByRole('option')[0] as HTMLElement);
+      modules.setActive('emma', true);
+      expect(modules.changes).toEqual({ dice: true, emma: true });
+
+      await userEvent.click(screen.getByRole('button', { name: RESET }));
+
+      expect(modules.changes).toEqual({ dice: true });
+      expect(screen.getByRole('button', { name: HYPOTHETICAL })).toHaveAttribute('aria-pressed', 'true');
+      expect(
+        await screen.findByRole('button', {
+          name: 'MONDARTH-EMMA.Versions.Choose {"module":"libWrapper","version":"1.13.2"}',
+        }),
+      ).toBeInTheDocument();
+      expect([...(judge.judgeChoices.mock.lastCall?.[1].modules ?? [])]).toEqual([]);
+      expect(screen.getByRole('button', { name: RESET })).toBeDisabled();
+    });
+
+    test('discards what was staged and chosen in the mode on leaving it', async () => {
+      const { modules, judge } = renderStaged();
+      await userEvent.click(screen.getByRole('button', { name: HYPOTHETICAL }));
+      await userEvent.click(
+        await screen.findByRole('button', {
+          name: 'MONDARTH-EMMA.Versions.Choose {"module":"libWrapper","version":"1.13.2"}',
+        }),
+      );
+      await userEvent.click(screen.getAllByRole('option')[0] as HTMLElement);
+      modules.setActive('emma', true);
+
+      await userEvent.click(screen.getByRole('button', { name: HYPOTHETICAL }));
+
+      expect(modules.changes).toEqual({ dice: true });
+      expect(modules.hypothetical).toBe(false);
+      expect(screen.getByRole('button', { name: SAVE })).toBeEnabled();
+      // On again, the version chosen before is forgotten.
+      await userEvent.click(screen.getByRole('button', { name: HYPOTHETICAL }));
+      expect(
+        await screen.findByRole('button', {
+          name: 'MONDARTH-EMMA.Versions.Choose {"module":"libWrapper","version":"1.13.2"}',
+        }),
+      ).toBeInTheDocument();
+      expect(judge.judgeChoices.mock.lastCall?.[1].modules.size).toBe(0);
+    });
+  });
+
   describe('hypothetical versions', () => {
     const CHOOSE = /^MONDARTH-EMMA\.Versions\.Choose/;
     const NO_PROXY = 'MONDARTH-EMMA.Footer.NoProxy';
@@ -307,6 +398,35 @@ describe('EmmaRoot', () => {
       await userEvent.click(screen.getByRole('button', { name: HYPOTHETICAL }));
 
       expect(screen.getByRole('contentinfo')).not.toHaveTextContent(NO_PROXY);
+    });
+
+    test('reports on the setup chosen when asked', async () => {
+      const onReport = vi.fn();
+      const judge = fakeJudge({ 'lib-wrapper': ['1.13.2'] });
+      render(EmmaRoot, {
+        fields: new DrawerFields(),
+        modules: createModules(),
+        initialView: 'list',
+        initialGrouped: true,
+        canManage: true,
+        onSave,
+        platform: { core: '14.368', system: { id: 'dnd5e', title: 'D&D 5e', version: '5.1.0' } },
+        createVersionJudge: () => judge,
+        onReport,
+      });
+      await userEvent.click(screen.getByRole('button', { name: HYPOTHETICAL }));
+      const report = screen.getByRole('button', { name: 'MONDARTH-EMMA.Report.Button' });
+      await vi.waitFor(() => {
+        expect(report).toBeEnabled();
+      });
+
+      await userEvent.click(report);
+
+      expect(onReport).toHaveBeenCalledOnce();
+      const [shown] = onReport.mock.lastCall as [SetupReportData];
+      expect(shown.check.setup.modules).toBe(1);
+      await expect(shown.solve).resolves.toEqual({ solution: { kind: 'found', changes: [] }, unloaded: [] });
+      expect(judge.reportCheck.mock.lastCall?.[0]).toEqual(['lib-wrapper']);
     });
 
     test('re-judges the modules when the system is changed', async () => {

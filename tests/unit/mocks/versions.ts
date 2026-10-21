@@ -1,5 +1,6 @@
 import { vi } from 'vitest';
 
+import type { PlanEntry, SetupCheck, SetupSolve } from '@module/adapters/report';
 import type { PackageRef, PlatformPart, VersionChoices, VersionJudge, VersionOption } from '@module/adapters/versions';
 import { HypotheticalState } from '@module/state/hypothetical.svelte';
 
@@ -86,6 +87,25 @@ export function fakeJudge(
     platformVersions: vi.fn(platformVersions),
     judgePlatform: vi.fn((_active: Iterable<string>, _choices: VersionChoices, part: PlatformPart) =>
       platformVersions(part).map(version => option(version, unusable)),
+    ),
+    reportCheck: vi.fn((active: Iterable<string>, choices: VersionChoices): SetupCheck => ({
+      setup: { core: '14.368', system: 'dnd5e 5.1.0', modules: [...active].length },
+      valid: true,
+      modules: [...active].map(id => {
+        const version = choices.modules.get(id) ?? installed(id) ?? '';
+        return { id, title: id, version, badge: option(version, unusable).badge, notes: [] };
+      }),
+    })),
+    reportPlan: vi.fn((active: Iterable<string>, choices: VersionChoices): readonly PlanEntry[] =>
+      [...active].map(id => ({
+        id,
+        title: id,
+        changes: choices.modules.has(id),
+        manifest: `https://example.test/${id}/module.json`,
+      })),
+    ),
+    reportSolve: vi.fn((_active: Iterable<string>, _choices: VersionChoices): Promise<SetupSolve> =>
+      Promise.resolve({ solution: { kind: 'found', changes: [] }, unloaded: [] }),
     ),
   } satisfies VersionJudge;
 }

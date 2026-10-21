@@ -225,6 +225,95 @@ describe('HypotheticalState', () => {
     expect(state.proxied).toBe(false);
   });
 
+  test('reports on the setup chosen once versions are looked up, and not while more are', async () => {
+    const judge = fakeJudge({ dice: ['1.0.0', '2.0.0'] });
+    const state = new HypotheticalState(
+      () => judge,
+      () => ['dice'],
+    );
+    expect(state.canReport).toBe(false);
+    expect(state.report()).toBeNull();
+    await state.load();
+    state.choose('dice', '2.0.0');
+    state.choosePlatform('system', '5.2.0');
+
+    expect(state.canReport).toBe(true);
+    const report = state.report();
+
+    expect(report?.check.setup.modules).toBe(1);
+    await expect(report?.solve).resolves.toEqual({ solution: { kind: 'found', changes: [] }, unloaded: [] });
+    expect(judge.reportCheck.mock.lastCall?.[0]).toEqual(['dice']);
+    expect(judge.reportSolve.mock.lastCall?.[1]).toMatchObject({ system: '5.2.0' });
+    expect([...(judge.reportSolve.mock.lastCall?.[1].modules ?? [])]).toEqual([['dice', '2.0.0']]);
+  });
+
+  test('chooses the versions an update recommends, leaving every other choice as it is', async () => {
+    const { state, judge } = await loadedVersions({ dice: ['1.0.0', '2.0.0'], lib: ['1.0.0', '3.0.0'] });
+    state.choose('dice', '2.0.0');
+    const report = state.report();
+
+    const after = report?.apply([
+      { package: { type: 'core', id: 'core' }, title: 'Foundry', from: '14.368', to: '14.369' },
+      { package: { type: 'system', id: 'dnd5e' }, title: 'D&D', from: '5.1.0', to: '5.2.0' },
+      { package: { type: 'module', id: 'lib' }, title: 'Lib', from: '1.0.0', to: '3.0.0' },
+      { package: { type: 'module', id: 'helper' }, title: 'Helper', from: null, to: '1.0.0' },
+    ]);
+    flushSync();
+
+    expect(state.platformChosen('core')).toBe('14.369');
+    expect(state.platformChosen('system')).toBe('5.2.0');
+    expect(state.chosen('lib')?.version).toBe('3.0.0');
+    expect(state.chosen('dice')?.version).toBe('2.0.0');
+    expect([...(judge.judgeChoices.mock.lastCall?.[1].modules ?? [])]).toEqual([
+      ['dice', '2.0.0'],
+      ['lib', '3.0.0'],
+      ['helper', '1.0.0'],
+    ]);
+    // A report on the setup the versions chosen make.
+    expect(after?.check.modules.find(({ id }) => id === 'lib')?.version).toBe('3.0.0');
+    expect(judge.reportPlan.mock.lastCall?.[1]).toMatchObject({ core: '14.369', system: '5.2.0' });
+  });
+
+  test('knows whether any version is chosen, and forgets them all', async () => {
+    const { state } = await loadedVersions({ dice: ['1.0.0', '2.0.0'] });
+    expect(state.hasChoices).toBe(false);
+
+    state.choose('dice', '2.0.0');
+    expect(state.hasChoices).toBe(true);
+    state.clearChoices();
+    expect(state.hasChoices).toBe(false);
+    state.choosePlatform('core', '14.369');
+    expect(state.hasChoices).toBe(true);
+    state.clearChoices();
+    state.choosePlatform('system', '5.2.0');
+    expect(state.hasChoices).toBe(true);
+
+    state.clearChoices();
+    flushSync();
+
+    expect(state.hasChoices).toBe(false);
+    expect(state.platformChosen('core')).toBeUndefined();
+    expect(state.platformChosen('system')).toBeUndefined();
+    expect(state.chosen('dice')?.version).toBe('1.0.0');
+  });
+
+  test('cannot report while a further lookup runs', async () => {
+    const active = new SvelteSet(['dice']);
+    const judge = fakeJudge({ dice: ['1.0.0'], lib: ['1.0.0'] });
+    const state = new HypotheticalState(
+      () => judge,
+      () => active,
+    );
+    await state.load();
+    expect(state.canReport).toBe(true);
+    judge.lookUp.mockReturnValue(new Promise(() => undefined));
+
+    active.add('lib');
+    void state.load();
+
+    expect(state.canReport).toBe(false);
+  });
+
   test('passes on the packages not reached', async () => {
     const { state } = await loadedVersions({}, { unreached: [{ type: 'module', id: 'dice' }] });
 

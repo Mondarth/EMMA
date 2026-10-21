@@ -183,4 +183,38 @@ describe('Footer', () => {
       expect(screen.getByRole('status')).not.toHaveTextContent(NO_PROXY);
     });
   });
+
+  describe('in hypothetical mode', () => {
+    test('saves nothing, however much is staged', () => {
+      const modules = createModules();
+      modules.setActive('dice', true);
+      const onSave = vi.fn();
+      render(Footer, { modules, canManage: true, onSave, hypothetical: { canReset: true, reset: vi.fn() } });
+
+      expect(screen.getByRole('button', { name: SAVE })).toBeDisabled();
+      expect(modules.dirty).toBe(true);
+      expect(onSave).not.toHaveBeenCalled();
+    });
+
+    test('resets through hypothetical mode, when it says there is something to reset', async () => {
+      const modules = createModules();
+      modules.setActive('dice', true);
+      const reset = vi.fn();
+      const { rerender } = render(Footer, {
+        modules,
+        canManage: true,
+        onSave: vi.fn(),
+        hypothetical: { canReset: false, reset },
+      });
+      // Staged before the mode was entered, so not the mode's to reset.
+      expect(screen.getByRole('button', { name: RESET })).toBeDisabled();
+
+      await rerender({ hypothetical: { canReset: true, reset } });
+      await userEvent.click(screen.getByRole('button', { name: RESET }));
+
+      expect(reset).toHaveBeenCalledOnce();
+      // The mode's reset restores what was staged; the footer leaves that to it.
+      expect(modules.dirty).toBe(true);
+    });
+  });
 });

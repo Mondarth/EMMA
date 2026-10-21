@@ -27,6 +27,8 @@
     onHypotheticalChange?: (hypothetical: boolean) => void;
     /** Hypothetical mode's versions, whose lookup the toolbar reports on while the mode is on. */
     versions?: HypotheticalState | undefined;
+    /** Called when the user asks for a report on the setup chosen in hypothetical mode. */
+    onReport?: () => void;
   }
 
   const {
@@ -39,6 +41,7 @@
     hypothetical = false,
     onHypotheticalChange,
     versions,
+    onReport,
   }: Props = $props();
 
   /**
@@ -64,9 +67,13 @@
           ? null
           : {
               icon: 'fa-triangle-exclamation',
-              label: format('MONDARTH-EMMA.Versions.Unreached', {
-                packages: formatList(versions.unreached.map(titleOf)),
-              }),
+              // A proxy is advised only when none is set.
+              label: format(
+                versions.proxied === false
+                  ? 'MONDARTH-EMMA.Versions.UnreachedNoProxy'
+                  : 'MONDARTH-EMMA.Versions.Unreached',
+                { packages: formatList(versions.unreached.map(titleOf)) },
+              ),
             };
       default:
         return null;
@@ -134,6 +141,16 @@
             format('MONDARTH-EMMA.Toolbar.System', { id: platform.system.id, version: system }),
             format('MONDARTH-EMMA.Toolbar.SystemTooltip', { title: platform.system.title, version: system }),
           )}
+          <!-- Reports on the setup chosen, once its versions are looked up. -->
+          <button
+            type="button"
+            class="emma-toolbar-report icon fa-solid fa-clipboard-list"
+            aria-label={localize('MONDARTH-EMMA.Report.Button')}
+            data-tooltip={localize('MONDARTH-EMMA.Report.Tooltip')}
+            disabled={versions?.canReport !== true}
+            onclick={() => {
+              onReport?.();
+            }}></button>
           {#if lookup !== null}
             <i
               class={['emma-toolbar-lookup', 'fa-solid', lookup.icon, { failed: versions?.status === 'failed' }]}
@@ -208,11 +225,16 @@
     margin-inline-start: 0.5rem;
   }
 
-  .emma-toolbar-platform > :global(button) {
+  .emma-toolbar-platform > :global(button:not(.icon)) {
     flex: none;
     width: auto;
     padding-inline: 0.5rem;
     white-space: nowrap;
+  }
+
+  /* A little apart from the Core and System buttons, as it reports on them rather than choosing a version. */
+  .emma-toolbar-report {
+    margin-inline-start: 0.5rem;
   }
 
   .emma-toolbar-lookup {

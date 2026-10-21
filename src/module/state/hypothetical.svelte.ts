@@ -1,6 +1,7 @@
 import { untrack } from 'svelte';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
+import type { SetupChange, SetupReportData } from '@module/adapters/report';
 import type { PackageRef, PlatformPart, VersionChoices, VersionJudge, VersionOption } from '@module/adapters/versions';
 import { log } from '@module/lib/logger';
 
@@ -171,6 +172,65 @@ export class HypotheticalState {
    */
   platformVersionsOf(part: PlatformPart): readonly VersionOption[] {
     return this.#looked?.judge.judgePlatform(this.#active(), this.#choicesMade(), part) ?? [];
+  }
+
+  /**
+   * Whether the setup chosen can be reported on: once versions are looked up, and not while more are.
+   * @returns `true` if {@link HypotheticalState.report} has a setup to report on
+   */
+  get canReport(): boolean {
+    return this.#looked !== null && this.#status !== 'loading';
+  }
+
+  /**
+   * Report on the setup chosen: a plan and a check of it, at once, and the best setup keeping the versions chosen,
+   * which may take requests to work out.
+   * @returns The plan, the check and the solve, or `null` before versions are looked up
+   */
+  report(): SetupReportData | null {
+    const judge = this.#looked?.judge;
+    if (judge === undefined) return null;
+    const active = [...this.#active()];
+    const choices = this.#choicesMade();
+    return {
+      plan: judge.reportPlan(active, choices),
+      check: judge.reportCheck(active, choices),
+      solve: judge.reportSolve(active, choices),
+      apply: changes => {
+        this.apply(changes);
+        // The report on the setup the versions chosen make; there is one, as there was one to apply.
+        return this.report() as SetupReportData;
+      },
+    };
+  }
+
+  /**
+   * Choose the versions an update recommends, leaving every other choice as it is. A module the update would add is
+   * given its version, which it takes if it is staged active, but is not staged: that would change the world.
+   * @param changes - The changes the best setup makes
+   */
+  apply(changes: readonly SetupChange[]): void {
+    for (const { package: changed, to } of changes) {
+      if (changed.type === 'module') this.choose(changed.id, to);
+      else this.choosePlatform(changed.type, to);
+    }
+  }
+
+  /**
+   * Whether any version has been chosen: of the core, the system or a module.
+   * @returns `true` if any has
+   */
+  get hasChoices(): boolean {
+    return this.#core !== undefined || this.#system !== undefined || this.#choices.size > 0;
+  }
+
+  /**
+   * Forget every version chosen, so the core, the system and every module are judged at the versions in use again.
+   */
+  clearChoices(): void {
+    this.#core = undefined;
+    this.#system = undefined;
+    this.#choices.clear();
   }
 
   /**

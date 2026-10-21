@@ -177,6 +177,20 @@ describe('createVersionJudge without a proxy', () => {
     for (const [, init] of send.mock.calls) expect(new Headers(init?.headers).has('X-API-Key')).toBe(false);
   });
 
+  test('tries to load the manifest of a version known only from a release list when solving, and says it could not', async () => {
+    const { judge, active, send } = await lookUp({ modules: { dice: onGithub('owner/dice', { version: '1.0.0' }) } }, [
+      githubReleases('owner/dice', ['2.0.0']),
+    ]);
+
+    const solved = await judge.reportSolve(active, { modules: new Map([['dice', '2.0.0']]) });
+
+    // GitHub's download sends no CORS headers, so without a proxy it is not asked.
+    expect(send.mock.calls.map(([url]) => urlOf(url))).not.toContain(
+      'https://github.com/owner/dice/releases/download/v2.0.0/module.json',
+    );
+    expect(solved.unloaded).toEqual(['MONDARTH-EMMA.Report.Explain.Term {"name":"dice","versions":"2.0.0"}']);
+  });
+
   test('never asks for Foundry’s listing, which browsers may not read', async () => {
     const { send } = await lookUp({ modules: { dice: onGithub('owner/dice', {}) } }, [
       githubReleases('owner/dice', ['1.0.0']),
@@ -493,6 +507,43 @@ describe('the core and the system', () => {
     expect([...options.systems]).toEqual([['dnd5e', { id: 'dnd5e', version: '5.2.0', unavailable: false }]]);
     // Only the modules in the setup, so a module installed but not staged active counts as missing.
     expect([...options.modules.keys()].sort()).toEqual(['dice', 'lib']);
+  });
+
+  test('reports on the setup chosen, naming packages by their titles', async () => {
+    const { judge, active } = await lookUp({ modules, system }, proxied([newerSystem, notes]), PROXY);
+
+    const check = judge.reportCheck(active, { system: '5.2.0', modules: new Map() });
+
+    expect(check.setup).toEqual({
+      core: '14.368',
+      system: 'MONDARTH-EMMA.Report.Explain.Term {"name":"D&D 5e","versions":"5.2.0"}',
+      modules: 1,
+    });
+    expect(check.modules.map(({ title, badge }) => [title, badge?.type])).toEqual([['Dice & Co', 'warning']]);
+    expect(judge.reportPlan(active, { modules: new Map() })).toEqual([
+      { id: 'dice', title: 'Dice & Co', changes: false, manifest: null },
+    ]);
+  });
+
+  test('finds the best module versions for the core and system chosen, whatever module versions were chosen', async () => {
+    const lib = { active: true, title: 'Lib', version: '1.0.0', compatibility: { minimum: '14', verified: '14' } };
+    const { judge, active } = await lookUp(
+      { modules: { ...modules, lib }, system },
+      proxied([newerSystem, notes]),
+      PROXY,
+    );
+
+    const kept = await judge.reportSolve(active, { modules: new Map([['lib', '1.0.0']]) });
+    // Dice works with Foundry 14.368 at most, and runs only in dnd5e 5.1.0 or earlier.
+    const newerCore = await judge.reportSolve(active, { core: '14.369', modules: new Map() });
+    const newerSystem520 = await judge.reportSolve(active, { system: '5.2.0', modules: new Map() });
+
+    expect(kept.solution).toEqual({ kind: 'found', changes: [] });
+    // The core chosen is kept, so the explanation names it as chosen.
+    expect(newerCore.solution.kind === 'none' ? newerCore.solution.lines.join(' ') : '').toContain(
+      'Report.Explain.Pin',
+    );
+    expect(newerSystem520.solution.kind).toBe('none');
   });
 
   test('names both what will not work and what may not', async () => {

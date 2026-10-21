@@ -186,6 +186,68 @@ describe('EmmaApp', () => {
     expect(new Headers(send.mock.calls[0]?.[1]?.headers).get('X-API-Key')).toBe('k3y');
   });
 
+  test('opens a report on the setup chosen in hypothetical mode', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))),
+    );
+    const { EmmaApp } = await loadApp();
+    await new EmmaApp().render({ force: true });
+    await userEvent.click(screen.getByRole('button', { name: 'MONDARTH-EMMA.Toolbar.Hypothetical' }));
+    const report = screen.getByRole('button', { name: 'MONDARTH-EMMA.Report.Button' });
+    await vi.waitFor(() => {
+      expect(report).toBeEnabled();
+    });
+
+    await userEvent.click(report);
+
+    expect(await screen.findByRole('region', { name: 'MONDARTH-EMMA.Report.Plan.Heading' })).toBeInTheDocument();
+  });
+
+  test('closes the report on its hypothetical setup when it closes', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))),
+    );
+    const { EmmaApp } = await loadApp();
+    const app = new EmmaApp();
+    await app.render({ force: true });
+    await userEvent.click(screen.getByRole('button', { name: 'MONDARTH-EMMA.Toolbar.Hypothetical' }));
+    const report = screen.getByRole('button', { name: 'MONDARTH-EMMA.Report.Button' });
+    await vi.waitFor(() => {
+      expect(report).toBeEnabled();
+    });
+    await userEvent.click(report);
+    await screen.findByRole('region', { name: 'MONDARTH-EMMA.Report.Plan.Heading' });
+
+    await app.close();
+
+    expect(document.querySelector('.emma-report')).toBeNull();
+  });
+
+  test('logs a report window that fails to open', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))),
+    );
+    const { EmmaApp, foundry } = await loadApp();
+    const failure = new Error('no window');
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await new EmmaApp().render({ force: true });
+    await userEvent.click(screen.getByRole('button', { name: 'MONDARTH-EMMA.Toolbar.Hypothetical' }));
+    const report = screen.getByRole('button', { name: 'MONDARTH-EMMA.Report.Button' });
+    await vi.waitFor(() => {
+      expect(report).toBeEnabled();
+    });
+    vi.spyOn(foundry.applications.api.ApplicationV2.prototype, 'render').mockRejectedValueOnce(failure);
+
+    await userEvent.click(report);
+
+    await vi.waitFor(() => {
+      expect(console.error).toHaveBeenCalledWith('mondarth-emma |', 'Unable to show the setup report', failure);
+    });
+  });
+
   test('does not offer players hypothetical mode', async () => {
     const { EmmaApp } = await loadApp({ isGM: false });
     await new EmmaApp().render({ force: true });
@@ -243,6 +305,29 @@ describe('EmmaApp', () => {
       await expect(app.close()).resolves.toBe(app);
 
       expect(foundry.confirm).not.toHaveBeenCalled();
+      expect(app.rendered).toBe(false);
+    });
+
+    test('in hypothetical mode, closes without asking when nothing was staged before the mode', async () => {
+      const { EmmaApp, foundry } = await loadApp();
+      const app = new EmmaApp();
+      await app.render({ force: true });
+      await userEvent.click(screen.getByRole('button', { name: 'MONDARTH-EMMA.Toolbar.Hypothetical' }));
+      await userEvent.click(screen.getByRole('checkbox', { name: 'EMMA' }));
+
+      await expect(app.close()).resolves.toBe(app);
+
+      expect(foundry.confirm).not.toHaveBeenCalled();
+    });
+
+    test('in hypothetical mode, asks when changes were staged before the mode', async () => {
+      const { app, foundry } = await openWithChange();
+      await userEvent.click(screen.getByRole('button', { name: 'MONDARTH-EMMA.Toolbar.Hypothetical' }));
+      foundry.confirm.mockResolvedValueOnce(true);
+
+      await app.close();
+
+      expect(foundry.confirm).toHaveBeenCalledOnce();
       expect(app.rendered).toBe(false);
     });
 
