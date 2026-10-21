@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import {
   getDrawerFields,
+  getVersionProxy,
   getView,
   isAutoRecommended,
   isEmmaDisabled,
@@ -209,5 +210,37 @@ describe('isGrouped', () => {
 
     expect(game.settings.set).toHaveBeenCalledExactlyOnceWith('mondarth-emma', 'grouped', false);
     expect(isGrouped()).toBe(false);
+  });
+});
+
+describe('getVersionProxy', () => {
+  test('registers the world setting for GMs to configure, with no proxy by default', () => {
+    const { game } = installFoundryMocks();
+
+    registerSettings();
+
+    expect(game.settings.register).toHaveBeenCalledWith('mondarth-emma', 'versionProxy', {
+      name: 'MONDARTH-EMMA.Settings.VersionProxy.Name',
+      hint: 'MONDARTH-EMMA.Settings.VersionProxy.Hint',
+      scope: 'world',
+      config: true,
+      type: String,
+      default: '',
+    });
+    expect(getVersionProxy()).toBeNull();
+  });
+
+  test('is the URL template set, trimmed', () => {
+    installFoundryMocks({ settings: { 'mondarth-emma.versionProxy': ' https://proxy.test/?url={url} ' } });
+    registerSettings();
+
+    expect(getVersionProxy()).toBe('https://proxy.test/?url={url}');
+  });
+
+  test('is none when the template has nowhere to put the URL', () => {
+    installFoundryMocks({ settings: { 'mondarth-emma.versionProxy': 'https://proxy.test/' } });
+    registerSettings();
+
+    expect(getVersionProxy()).toBeNull();
   });
 });

@@ -1,5 +1,8 @@
 <script lang="ts">
-  import { localize } from '@module/lib/i18n';
+  import type { Platform } from '@module/adapters/platform';
+  import type { PackageRef } from '@module/adapters/versions';
+  import { format, formatList, localize } from '@module/lib/i18n';
+  import type { HypotheticalState } from '@module/state/hypothetical.svelte';
   import type { View } from '@module/settings';
   import type { ModuleState } from '@module/state/module-state.svelte';
 
@@ -14,9 +17,60 @@
     onViewChange: (view: View) => void;
     /** Called when the user turns the list view's grouping on or off. */
     onGroupedChange?: (grouped: boolean) => void;
+    /** The Foundry version and game system in use. Only given to GMs, who alone are offered hypothetical mode. */
+    platform?: Platform | undefined;
+    /** Whether hypothetical mode is on. */
+    hypothetical?: boolean;
+    /** Called when the user turns hypothetical mode on or off. */
+    onHypotheticalChange?: (hypothetical: boolean) => void;
+    /** Hypothetical mode's versions, whose lookup the toolbar reports on while the mode is on. */
+    versions?: HypotheticalState | undefined;
   }
 
-  const { view, modules, grouped = true, onViewChange, onGroupedChange }: Props = $props();
+  const {
+    view,
+    modules,
+    grouped = true,
+    onViewChange,
+    onGroupedChange,
+    platform,
+    hypothetical = false,
+    onHypotheticalChange,
+    versions,
+  }: Props = $props();
+
+  /**
+   * The title of a package in use.
+   * @param ref - The package
+   * @returns Its title, or its ID if it is not known
+   */
+  function titleOf(ref: PackageRef): string {
+    if (ref.type === 'system') return platform?.system.id === ref.id ? platform.system.title : ref.id;
+    return modules.entries.find(entry => entry.id === ref.id)?.title ?? ref.id;
+  }
+
+  /** What the toolbar says about looking up versions: nothing once every version was found. */
+  const lookup = $derived.by((): { icon: string; label: string } | null => {
+    switch (versions?.status) {
+      case 'loading':
+        return { icon: 'fa-spinner fa-spin', label: localize('MONDARTH-EMMA.Versions.Loading') };
+      case 'failed':
+        return { icon: 'fa-triangle-exclamation', label: localize('MONDARTH-EMMA.Versions.Failed') };
+      case 'ready':
+        return versions.unreached.length === 0
+          ? null
+          : {
+              icon: 'fa-triangle-exclamation',
+              label: format('MONDARTH-EMMA.Versions.Unreached', {
+                packages: formatList(versions.unreached.map(titleOf)),
+              }),
+            };
+      default:
+        return null;
+    }
+  });
+
+  const hypotheticalLabel = $derived(localize('MONDARTH-EMMA.Toolbar.Hypothetical'));
 
   const groupLabel = $derived(localize('MONDARTH-EMMA.Toolbar.Group'));
 
@@ -32,6 +86,42 @@
 </script>
 
 <div class="emma-toolbar" role="toolbar" aria-label={localize('MONDARTH-EMMA.Toolbar.Label')}>
+  {#if platform !== undefined}
+    <div class="emma-toolbar-hypothetical">
+      <button
+        type="button"
+        class={['icon', 'fa-solid', 'fa-flask', { active: hypothetical }]}
+        aria-label={hypotheticalLabel}
+        aria-pressed={hypothetical}
+        data-tooltip={hypotheticalLabel}
+        onclick={() => {
+          onHypotheticalChange?.(!hypothetical);
+        }}></button>
+      {#if hypothetical}
+        {@const coreLabel = format('MONDARTH-EMMA.Toolbar.CoreTooltip', { version: platform.core })}
+        {@const systemLabel = format('MONDARTH-EMMA.Toolbar.SystemTooltip', {
+          title: platform.system.title,
+          version: platform.system.version,
+        })}
+        <div class="emma-toolbar-platform">
+          <!-- The buttons show just the versions; their names and tooltips say what each is. -->
+          <button type="button" aria-label={coreLabel} data-tooltip={coreLabel}>{platform.core}</button>
+          <button type="button" aria-label={systemLabel} data-tooltip={systemLabel}
+            >{format('MONDARTH-EMMA.Toolbar.System', {
+              id: platform.system.id,
+              version: platform.system.version,
+            })}</button>
+          {#if lookup !== null}
+            <i
+              class={['emma-toolbar-lookup', 'fa-solid', lookup.icon, { failed: versions?.status === 'failed' }]}
+              role="status"
+              aria-label={lookup.label}
+              data-tooltip={lookup.label}></i>
+          {/if}
+        </div>
+      {/if}
+    </div>
+  {/if}
   {#if view === 'list'}
     <button
       type="button"
@@ -77,6 +167,38 @@
     gap: 0.5rem;
     padding-bottom: 0.5rem;
     border-bottom: 1px solid var(--color-border);
+  }
+
+  /* Hypothetical mode sits at the far left, apart from the controls that arrange the list. */
+  .emma-toolbar-hypothetical {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-inline-end: auto;
+  }
+
+  /* Slightly apart from the toggle, as they only appear while it is on. */
+  .emma-toolbar-platform {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-inline-start: 0.5rem;
+  }
+
+  .emma-toolbar-platform button {
+    flex: none;
+    width: auto;
+    padding-inline: 0.5rem;
+    white-space: nowrap;
+  }
+
+  .emma-toolbar-lookup {
+    margin-inline-start: 0.25rem;
+    color: var(--color-text-secondary);
+  }
+
+  .emma-toolbar-lookup.failed {
+    color: var(--color-level-error);
   }
 
   .emma-toolbar-views {

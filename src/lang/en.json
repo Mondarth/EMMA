@@ -11,7 +11,18 @@
       "Split": "Split view",
       "Expand": "Expand all module details",
       "Collapse": "Collapse all module details",
-      "Group": "Group related modules"
+      "Group": "Group related modules",
+      "Hypothetical": "Hypothetical mode",
+      "CoreTooltip": "Foundry Virtual Tabletop {version}",
+      "System": "{id} {version}",
+      "SystemTooltip": "{title} {version}"
+    },
+    "Versions": {
+      "Choose": "{module} version {version}: choose another version",
+      "List": "Versions of {module}",
+      "Loading": "Looking up module versions…",
+      "Failed": "Module versions could not be looked up. See the console for details.",
+      "Unreached": "Not every version could be looked up for: {packages}. Set a version lookup proxy in EMMA's settings to look further."
     },
     "List": {
       "Label": "Installed modules",
@@ -109,6 +120,10 @@
       "AutoRecommended": {
         "Name": "Automatically activate/deactivate recommended modules",
         "Hint": "When you activate a module in EMMA, also activate the modules it recommends, and deactivate them again with it. Required modules always follow the module that requires them."
+      },
+      "VersionProxy": {
+        "Name": "Version lookup proxy",
+        "Hint": "Browsers may not read Foundry's package listing or most module manifests, so hypothetical mode can only list versions published on GitHub or GitLab, without knowing which suit this world. To look further, enter the URL of a CORS proxy you trust, with {url} where the address to fetch goes, such as https://proxy.example.com/?url={url}. Leave blank to use no proxy."
       },
       "Fields": {
         "Name": "Module details",

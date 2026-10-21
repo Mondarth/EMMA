@@ -725,6 +725,152 @@ test.describe('Closing with staged changes', () => {
   });
 });
 
+test.describe('Hypothetical mode', () => {
+  test.beforeEach(async ({ page }) => {
+    await joinAs(page, USERS.gm);
+    await setDisabled(page, false);
+  });
+
+  test.afterEach(async ({ page }) => {
+    await closeEmma(page);
+  });
+
+  test('GMs turn it on to see the Foundry and system versions, and it is off when EMMA reopens', async ({ page }) => {
+    const { core, system } = await page.evaluate(() => ({
+      core: game.version,
+      system: { id: game.system.id, title: game.system.title, version: game.system.version },
+    }));
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+    const toggle = emma.getByRole('button', { name: 'Hypothetical mode', exact: true });
+    const coreButton = emma.getByRole('button', { name: `Foundry Virtual Tabletop ${core}`, exact: true });
+    const systemButton = emma.getByRole('button', { name: `${system.title} ${system.version}`, exact: true });
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await expect(coreButton).toHaveCount(0);
+
+    await toggle.click();
+
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(coreButton).toHaveText(core);
+    await expect(systemButton).toHaveText(`${system.id} ${system.version}`);
+
+    await closeEmma(page);
+    await (await moduleManagementButton(page)).click();
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await expect(systemButton).toHaveCount(0);
+  });
+});
+
+test.describe('Hypothetical versions', () => {
+  const RELEASES = 'https://api.github.com/repos/Mondarth/EMMA/releases?per_page=100';
+  const LIBRARY_RELEASES = 'https://api.github.com/repos/emma-tests/emma-fixture-library/releases?per_page=100';
+
+  /**
+   * GitHub's list of releases, each with a module manifest attached.
+   * @param repo - The repository, `<owner>/<repo>`
+   * @param versions - The versions released
+   * @returns The list
+   */
+  function releases(repo: string, versions: string[]) {
+    return versions.map(version => ({
+      tag_name: `v${version}`,
+      assets: [
+        {
+          name: 'module.json',
+          browser_download_url: `https://github.com/${repo}/releases/download/v${version}/module.json`,
+        },
+      ],
+    }));
+  }
+
+  test.beforeEach(async ({ page }) => {
+    // The GitHub releases are made up: EMMA's are newer than any it has, so none is the version installed, and the
+    // library's are one older and one newer than the fixture's 1.0.0.
+    await page.route(RELEASES, async route => {
+      await route.fulfill({
+        headers: { 'Access-Control-Allow-Origin': '*' },
+        json: releases('Mondarth/EMMA', ['9.9.0', '9.8.0']),
+      });
+    });
+    await page.route(LIBRARY_RELEASES, async route => {
+      await route.fulfill({
+        headers: { 'Access-Control-Allow-Origin': '*' },
+        json: releases('emma-tests/emma-fixture-library', ['0.9.0', '2.0.0']),
+      });
+    });
+    await joinAs(page, USERS.gm);
+    await setDisabled(page, false);
+    await setView(page, 'list');
+    await deactivateFixtures(page);
+  });
+
+  test.afterEach(async ({ page }) => {
+    await closeEmma(page);
+  });
+
+  test('an active module’s badge becomes a list of its other versions, in their badges’ colours', async ({ page }) => {
+    const installed = await page.evaluate(id => game.modules.get(id)?.version ?? '', MODULE_ID);
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+    const picker = (version: string) =>
+      emma.getByRole('button', { name: `${MODULE_TITLE} version ${version}: choose another version`, exact: true });
+
+    await expect(picker(installed)).toHaveCount(0);
+    await emma.getByRole('button', { name: 'Hypothetical mode', exact: true }).click();
+    await picker(installed).click();
+
+    const list = page.getByRole('listbox', { name: `Versions of ${MODULE_TITLE}` });
+    const options = list.getByRole('option');
+    // The installed version is on the button, so is left out.
+    await expect(options).toHaveText([/^\s*9\.9\.0/, /^\s*9\.8\.0/]);
+    // Known only from GitHub's release list, so Foundry cannot place them.
+    await expect(options.first().locator('.emma-badge')).toHaveClass(/error/);
+    await expect(
+      emma.getByRole('status', { name: new RegExp(`^Not every version could be looked up for: .*${MODULE_TITLE}`) }),
+    ).toBeVisible();
+
+    await options.filter({ hasText: '9.8.0' }).click();
+
+    await expect(list).toBeHidden();
+    await expect(picker('9.8.0')).toBeVisible();
+    await expect(picker('9.8.0')).toBeFocused();
+    await expect(picker('9.8.0').locator('.emma-badge')).toHaveClass(/error/);
+
+    await picker('9.8.0').click();
+    await expect(options).toHaveText([/^\s*9\.9\.0/, new RegExp(`^\\s*${installed.replaceAll('.', '\\.')}`)]);
+    await page.keyboard.press('Escape');
+
+    await emma.getByRole('button', { name: 'Hypothetical mode', exact: true }).click();
+    await expect(picker('9.8.0')).toHaveCount(0);
+  });
+
+  test('a module staged active is looked up, offering only its newer versions; staged inactive, it is not', async ({
+    page,
+  }) => {
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+    const picker = emma.getByRole('button', {
+      name: `${LIBRARY.title} version 1.0.0: choose another version`,
+      exact: true,
+    });
+    const library = emma.getByRole('checkbox', { name: LIBRARY.title });
+    await emma.getByRole('button', { name: 'Hypothetical mode', exact: true }).click();
+    await expect(emma.getByRole('button', { name: new RegExp(`^${MODULE_TITLE} version`) })).toBeVisible();
+    await expect(picker).toHaveCount(0);
+
+    await library.check();
+
+    await picker.click();
+    await expect(page.getByRole('listbox', { name: `Versions of ${LIBRARY.title}` }).getByRole('option')).toHaveText([
+      /^\s*2\.0\.0/,
+    ]);
+    await page.keyboard.press('Escape');
+
+    await library.uncheck();
+    await expect(picker).toHaveCount(0);
+  });
+});
+
 test.describe('Players', () => {
   test.afterEach(async ({ page }) => {
     await closeEmma(page);
@@ -738,5 +884,6 @@ test.describe('Players', () => {
     await expect(emma.getByText('Only a GM can change which modules are active.')).toBeVisible();
     await expect(emma.getByRole('checkbox', { name: MODULE_TITLE })).toBeDisabled();
     await expect(emma.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
+    await expect(emma.getByRole('button', { name: 'Hypothetical mode', exact: true })).toHaveCount(0);
   });
 });

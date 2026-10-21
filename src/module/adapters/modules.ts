@@ -151,7 +151,7 @@ export function listInstalledModules(): ModuleEntry[] {
  * @param badge - Foundry's badge, from `Module#getVersionBadge`
  * @returns The badge, or `null` if there is none
  */
-function toBadge(badge: ReturnType<foundry.packages.Module['getVersionBadge']>): VersionBadge | null {
+export function toBadge(badge: ReturnType<foundry.packages.Module['getVersionBadge']>): VersionBadge | null {
   if (badge === null) return null;
   const { type, icon = 'fa-solid fa-code-branch', tooltip } = badge;
   const text = new DOMParser().parseFromString(tooltip, 'text/html').body.textContent;

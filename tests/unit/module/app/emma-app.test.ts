@@ -147,6 +147,44 @@ describe('EmmaApp', () => {
     expect(screen.getByRole('button', { name: 'MONDARTH-EMMA.Toolbar.Split' })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  test('offers GMs hypothetical mode, showing the Foundry and system versions', async () => {
+    const { EmmaApp } = await loadApp({ version: '14.370', system: { id: 'pf2e', title: 'PF2e', version: '7.0.1' } });
+    await new EmmaApp().render({ force: true });
+
+    await userEvent.click(screen.getByRole('button', { name: 'MONDARTH-EMMA.Toolbar.Hypothetical' }));
+
+    expect(
+      screen.getByRole('button', { name: 'MONDARTH-EMMA.Toolbar.CoreTooltip {"version":"14.370"}' }),
+    ).toHaveTextContent('14.370');
+    expect(
+      screen.getByRole('button', { name: 'MONDARTH-EMMA.Toolbar.SystemTooltip {"title":"PF2e","version":"7.0.1"}' }),
+    ).toHaveTextContent('MONDARTH-EMMA.Toolbar.System {"id":"pf2e","version":"7.0.1"}');
+  });
+
+  test('looks versions up for GMs through the proxy set', async () => {
+    const send = vi.fn(() => Promise.reject(new TypeError('Failed to fetch')));
+    vi.stubGlobal('fetch', send);
+    const { EmmaApp } = await loadApp({ settings: { 'mondarth-emma.versionProxy': 'https://proxy.test/?url={url}' } });
+    await new EmmaApp().render({ force: true });
+
+    await userEvent.click(screen.getByRole('button', { name: 'MONDARTH-EMMA.Toolbar.Hypothetical' }));
+
+    await vi.waitFor(() => {
+      expect(send).toHaveBeenCalled();
+    });
+    expect(send).toHaveBeenCalledWith(
+      `https://proxy.test/?url=${encodeURIComponent('https://r2.foundryvtt.com/package-api-public/index-latest.json')}`,
+      expect.anything(),
+    );
+  });
+
+  test('does not offer players hypothetical mode', async () => {
+    const { EmmaApp } = await loadApp({ isGM: false });
+    await new EmmaApp().render({ force: true });
+
+    expect(screen.queryByRole('button', { name: 'MONDARTH-EMMA.Toolbar.Hypothetical' })).toBeNull();
+  });
+
   test('opens with the grouping the user last chose, and remembers a change', async () => {
     const { EmmaApp, game } = await loadApp({ settings: { 'mondarth-emma.grouped': false } });
     await new EmmaApp().render({ force: true });

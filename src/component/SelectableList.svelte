@@ -3,11 +3,12 @@
   import { lockedTooltip } from '@module/lib/locked';
   import type { DrawerFields } from '@module/state/drawer-fields.svelte';
   import type { ModuleRow } from '@module/state/grouping';
+  import type { HypotheticalState } from '@module/state/hypothetical.svelte';
   import type { ModuleState, SelectMode, Side } from '@module/state/module-state.svelte';
 
   import DisclosureButton from './DisclosureButton.svelte';
   import ModuleDrawer from './ModuleDrawer.svelte';
-  import VersionBadge from './VersionBadge.svelte';
+  import ModuleVersion from './ModuleVersion.svelte';
 
   interface Props {
     /** The modules and their selection. */
@@ -20,9 +21,11 @@
     fields: DrawerFields;
     /** Whether the user may change which modules are active, as confirming a recommended module does. */
     canManage: boolean;
+    /** Hypothetical mode's versions while it is on, offering a choice of version for each active module. */
+    versions?: HypotheticalState | undefined;
   }
 
-  const { modules, side, labelledby, fields, canManage }: Props = $props();
+  const { modules, side, labelledby, fields, canManage, versions }: Props = $props();
 
   const uid = $props.id();
 
@@ -218,7 +221,7 @@
         <span id={`${optionId(key)}-title`} class="emma-option-title">{entry.title}</span>
       </div>
       <div class="emma-option-version" role="gridcell">
-        <VersionBadge version={entry.version} badge={entry.badge} />
+        <ModuleVersion {entry} {versions} focusable={false} />
       </div>
       <div class="emma-option-toggle" role="gridcell">
         <DisclosureButton

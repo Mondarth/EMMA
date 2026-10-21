@@ -21,9 +21,21 @@ adapters is plain TypeScript and Svelte, tested without a Foundry server.
   server (resolved with `foundry.utils.getRoute`, so a route prefix is kept).
   The version badge comes from Foundry's `Module#getVersionBadge`, so EMMA judges compatibility exactly as Foundry
   does; only its styles are EMMA's, since Foundry's apply only inside its own package lists.
+  `platform.ts` reads the Foundry version and the game system in use, and whether the user is a GM, for hypothetical
+  mode. `versions.ts` looks up the versions of the system and the active modules with `@mondarth/fvtt-resolver`: the
+  installed manifests (from `toObject()`), GitHub's and GitLab's release lists, declared manifest URLs and, through
+  the proxy setting only, Foundry's package listing. Without a proxy it never asks a host that sends no CORS headers
+  (GitHub's release downloads, Foundry's listing), as the browser could not read the answer and would log an error.
+  Modules are looked up one by one as they are needed (`VersionJudge.lookUp`), as GitHub allows 60 requests an hour
+  without a token. It offers the installed version and the newer ones, and judges a version with the resolver's
+  `check`, in the setup of the core, the system and the other modules staged active at their chosen versions, and turns the verdict into a badge with Foundry's public `Module.getVersionBadge`, so the colours
+  and tooltips are Foundry's own. It returns a `VersionJudge`, keeping resolver types out of the UI.
 
 `src/module/state/`
-: Reactive state built with Svelte 5 runes, in `.svelte.ts` files. `ModuleState` holds the saved activation, the
+: Reactive state built with Svelte 5 runes, in `.svelte.ts` files. `HypotheticalState` holds hypothetical mode's
+  lookup status, the versions found and the version chosen for each module. `EmmaRoot` calls its `load` in an
+  effect while the mode is on, so the modules staged active are looked up as they are staged; the setup it judges is
+  read from `ModuleState`, so it is re-judged whenever a module is staged or a version chosen. `ModuleState` holds the saved activation, the
   changes staged on top of it, the selection on each side of the split view, and which modules' details drawers are
   open (shared by both views, so a drawer stays open when its module moves or the view changes). Moving modules only
   stages changes;

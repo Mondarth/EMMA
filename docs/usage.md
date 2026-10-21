@@ -150,6 +150,56 @@ window with your choice changed and not saved asks first whether to discard the 
 EMMA remembers the view you last chose, separately for each user and on every device you play on. The list view is shown
 until you choose otherwise.
 
+## Hypothetical mode
+
+GMs have a **Hypothetical mode** button, a flask, at the far left of the toolbar. Click it to turn the mode on; it
+stays pressed while on, and two buttons appear just to its right:
+
+- **Core**, showing the Foundry version you are running, such as `14.368`.
+- **System**, showing the ID and version of the game system in use, such as `dnd5e 5.1.0`. Hover over it for the
+  system's full name.
+
+When you turn the mode on, EMMA looks up the versions of the game system and of every module staged active, using
+[@mondarth/fvtt-resolver](https://www.npmjs.com/package/@mondarth/fvtt-resolver). While the mode is on, a module
+you stage active, by checking it or moving it to the active side, is looked up then. Each module is looked up only
+once while EMMA is open. A spinner shows beside the System button while it looks.
+
+### Choosing versions
+
+Once the versions are found, each module staged active that has a newer version than the one installed has its
+version badge replaced by a drop-down, in the same colours. Click it, or **Tab** to it and press **Enter**, to list
+the module's newer versions, newest first. The version shown on the badge is left out of the list, and once you
+have chosen a newer version, the installed one is listed too, to go back to. Each version has the badge Foundry would give
+it: green when verified for your Foundry version, red when it needs another Foundry version or a module it requires
+is missing, and so on. Hover over a version for Foundry's explanation.
+
+Choose a version to see it on the module's badge. Nothing in the world changes: choosing only changes how other
+versions are judged. Each version is checked against the core, the system and the modules staged active at their
+chosen versions, so staging a module active or inactive judges every badge again: a module whose required module
+is staged inactive, for instance, turns red.
+
+| To                         | Mouse                    | Keyboard, list view                         |
+| -------------------------- | ------------------------ | ------------------------------------------- |
+| Open a module's versions   | Click its badge          | **Tab** to the badge, then **Enter**        |
+| Move through the versions  | Point at a version       | **↑**, **↓**, **Home**, **End**             |
+| Choose a version           | Click it                 | **Enter** or **Space**                      |
+| Close without choosing     | Click elsewhere          | **Escape**                                  |
+
+In the split view, the badges are mouse-only, as the lists handle the keyboard themselves.
+
+### Where versions come from
+
+Browsers may not read Foundry's own package listing, or the manifests attached to GitHub releases, because those
+sites send no CORS headers. Without a proxy, EMMA lists the versions released on GitHub and GitLab, but does not
+know which Foundry versions those releases support, so Foundry marks them **Compatibility unknown**. A warning
+beside the System button names the packages whose versions could not all be looked up.
+
+For a fuller picture, a GM can set a **Version lookup proxy** (see [Settings](#settings)): EMMA then reads Foundry's
+package listing through it, so each version is judged on the Foundry versions it declares.
+
+Click the flask again to turn the mode off. The versions found and chosen are kept until EMMA closes. Hypothetical
+mode is not remembered: it is off each time EMMA opens. Players are not offered it.
+
 ## Saving
 
 Changes you make in either view are staged, not applied: the footer counts them, and modules you have changed are
@@ -180,6 +230,12 @@ Automatically activate/deactivate recommended modules
 Module details
 : A menu every user can open under **Game Settings**, choosing the details their drawers show for themselves. See
   [Module details](#module-details).
+
+Version lookup proxy
+: A world setting, changed by the GM, blank by default. The URL of a CORS proxy for hypothetical mode to look
+  versions up through, with `{url}` where the address to fetch goes, such as `https://proxy.example.com/?url={url}`.
+  Every request hypothetical mode makes is sent through it, so use only a proxy you trust. A value without `{url}`
+  is ignored. See [Where versions come from](#where-versions-come-from).
 
 ## The API
 

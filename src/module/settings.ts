@@ -14,7 +14,12 @@ export const SETTINGS = {
   autoRecommended: 'autoRecommended',
   /** Whether this user's list view groups related modules under the modules that relate to them, or lists them flat. */
   grouped: 'grouped',
+  /** A CORS proxy that hypothetical mode fetches version data through, as a URL template containing `{url}`. */
+  versionProxy: 'versionProxy',
 } as const;
+
+/** Where a proxy URL template puts the URL it fetches. */
+export const PROXY_PLACEHOLDER = '{url}';
 
 /** EMMA's main views. */
 export type View = 'list' | 'split';
@@ -57,6 +62,15 @@ export function registerSettings(): void {
     config: false,
     type: Boolean,
     default: true,
+  });
+
+  game.settings.register(MODULE_ID, SETTINGS.versionProxy, {
+    name: 'MONDARTH-EMMA.Settings.VersionProxy.Name',
+    hint: 'MONDARTH-EMMA.Settings.VersionProxy.Hint',
+    scope: 'world',
+    config: true,
+    type: String,
+    default: '',
   });
 
   game.settings.register(MODULE_ID, SETTINGS.drawerFields, {
@@ -151,4 +165,14 @@ export function isGrouped(): boolean {
  */
 export async function setGrouped(grouped: boolean): Promise<void> {
   await game.settings.set(MODULE_ID, SETTINGS.grouped, grouped);
+}
+
+/**
+ * The CORS proxy the GM has set for hypothetical mode to fetch version data through.
+ * @returns The URL template, containing {@link PROXY_PLACEHOLDER}; `null` if none is set, or the value set has no
+ *   placeholder and so cannot be used
+ */
+export function getVersionProxy(): string | null {
+  const proxy = game.settings.get(MODULE_ID, SETTINGS.versionProxy).trim();
+  return proxy.includes(PROXY_PLACEHOLDER) ? proxy : null;
 }

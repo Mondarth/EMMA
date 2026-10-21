@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, test } from 'vitest';
 import SelectableList from '@component/SelectableList.svelte';
 import type { ModuleState } from '@module/state/module-state.svelte';
 import { installFoundryMocks } from '../mocks/foundry';
+import { loadedVersions } from '../mocks/versions';
 import { createModules, ENTRIES } from './fixtures';
 import { DrawerFields } from '@module/state/drawer-fields.svelte';
 
@@ -544,6 +545,45 @@ describe('SelectableList', () => {
       expect(selectedTitles()).toEqual(['libWrapper']);
       expect(outline()).toEqual(['Dice So Nice!', 'EMMA', 'libWrapper']);
       expect(list.getAttribute('aria-activedescendant')).toBe(option('libWrapper').id);
+    });
+  });
+
+  describe('hypothetical versions', () => {
+    const CHOOSE = 'MONDARTH-EMMA.Versions.Choose {"module":"libWrapper","version":"1.13.2"}';
+
+    /**
+     * Render the active side, where libWrapper is, with versions to choose for it.
+     * @returns The state
+     */
+    async function renderActive() {
+      const { state } = await loadedVersions({ 'lib-wrapper': ['1.13.2', '1.14.0'] });
+      const modules = createModules();
+      render(SelectableList, {
+        canManage: true,
+        fields: new DrawerFields(),
+        modules,
+        side: 'active',
+        labelledby: 'heading',
+        versions: state,
+      });
+      return { modules, state };
+    }
+
+    test('offers a choice of version, kept out of the Tab order as the list handles the keyboard', async () => {
+      await renderActive();
+
+      expect(screen.getByRole('button', { name: CHOOSE })).toHaveAttribute('tabindex', '-1');
+    });
+
+    test('opening and using the version list leaves the selection alone', async () => {
+      const { state, modules } = await renderActive();
+
+      await userEvent.click(screen.getByRole('button', { name: CHOOSE }));
+      await userEvent.keyboard('{ArrowDown}');
+      await userEvent.click(screen.getAllByRole('option')[0] as HTMLElement);
+
+      expect(state.chosen('lib-wrapper')?.version).toBe('1.14.0');
+      expect(modules.isSelected('active', 'lib-wrapper')).toBe(false);
     });
   });
 });

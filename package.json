@@ -90,5 +90,8 @@
   "browserslist": [
     ">5%",
     "not IE 11"
-  ]
+  ],
+  "dependencies": {
+    "@mondarth/fvtt-resolver": "0.3.0"
+  }
 }

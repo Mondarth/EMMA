@@ -5,12 +5,14 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import EmmaRoot from '@component/EmmaRoot.svelte';
 import { installFoundryMocks } from '../mocks/foundry';
 import { createModules } from './fixtures';
+import { fakeJudge } from '../mocks/versions';
 import { DrawerFields } from '@module/state/drawer-fields.svelte';
 
 const onSave = () => Promise.resolve();
 const LIST = 'MONDARTH-EMMA.Toolbar.List';
 const SPLIT = 'MONDARTH-EMMA.Toolbar.Split';
 const GROUP = 'MONDARTH-EMMA.Toolbar.Group';
+const HYPOTHETICAL = 'MONDARTH-EMMA.Toolbar.Hypothetical';
 
 describe('EmmaRoot', () => {
   beforeEach(() => {
@@ -226,5 +228,139 @@ describe('EmmaRoot', () => {
 
     expect(screen.getByRole('button', { name: GROUP })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.queryByRole('img', { name: 'MONDARTH-EMMA.Relation.required' })).toBeNull();
+  });
+
+  test('turns hypothetical mode on and off, starting off', async () => {
+    render(EmmaRoot, {
+      fields: new DrawerFields(),
+      modules: createModules(),
+      initialView: 'list',
+      initialGrouped: true,
+      canManage: true,
+      onSave,
+      platform: { core: '14.368', system: { id: 'dnd5e', title: 'D&D 5e', version: '5.1.0' } },
+    });
+    const toggle = screen.getByRole('button', { name: HYPOTHETICAL });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+
+    await userEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /^MONDARTH-EMMA\.Toolbar\.Core/ })).toBeInTheDocument();
+
+    await userEvent.click(toggle);
+
+    expect(screen.queryByRole('button', { name: /^MONDARTH-EMMA\.Toolbar\.Core/ })).toBeNull();
+  });
+
+  describe('hypothetical versions', () => {
+    const CHOOSE = /^MONDARTH-EMMA\.Versions\.Choose/;
+
+    /**
+     * Render the root for a GM. libWrapper, the one module active, and Dice So Nice! have newer versions.
+     * @param view - The view to show
+     * @returns The judge behind the versions, and the function setting it up
+     */
+    function renderForGM(view: 'list' | 'split' = 'list') {
+      const judge = fakeJudge({ 'lib-wrapper': ['1.13.2', '1.14.0'], dice: ['5.2.4', '5.3.0'] });
+      const createVersionJudge = vi.fn(() => judge);
+      render(EmmaRoot, {
+        fields: new DrawerFields(),
+        modules: createModules(),
+        initialView: view,
+        initialGrouped: true,
+        canManage: true,
+        onSave,
+        platform: { core: '14.368', system: { id: 'dnd5e', title: 'D&D 5e', version: '5.1.0' } },
+        createVersionJudge,
+      });
+      return { judge, createVersionJudge };
+    }
+
+    test('looks the modules staged active up only once hypothetical mode is turned on', async () => {
+      const { judge, createVersionJudge } = renderForGM();
+      expect(createVersionJudge).not.toHaveBeenCalled();
+
+      await userEvent.click(screen.getByRole('button', { name: HYPOTHETICAL }));
+
+      expect(judge.lookUp).toHaveBeenCalledExactlyOnceWith(['lib-wrapper']);
+      expect(await screen.findAllByRole('button', { name: CHOOSE })).toHaveLength(1);
+    });
+
+    test('looks a module up when it is staged active, and judges the setup it makes', async () => {
+      const { judge } = renderForGM();
+      await userEvent.click(screen.getByRole('button', { name: HYPOTHETICAL }));
+      await screen.findByRole('button', { name: CHOOSE });
+
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Dice So Nice!' }));
+
+      await vi.waitFor(() => {
+        expect(judge.lookUp).toHaveBeenLastCalledWith(['dice']);
+      });
+      expect(await screen.findAllByRole('button', { name: CHOOSE })).toHaveLength(2);
+      expect([...(judge.judgeChoices.mock.lastCall?.[0] ?? [])].sort()).toEqual(['dice', 'lib-wrapper']);
+
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Dice So Nice!' }));
+
+      await vi.waitFor(() => {
+        expect(screen.getAllByRole('button', { name: CHOOSE })).toHaveLength(1);
+      });
+      expect(judge.lookUp).toHaveBeenCalledTimes(2);
+    });
+
+    test.each(['list', 'split'] as const)(
+      're-judges the other modules when one is staged active, then inactive, in the %s view',
+      async view => {
+        // libWrapper is judged unusable without Dice So Nice! in the setup.
+        const judge = fakeJudge(
+          { 'lib-wrapper': ['1.13.2', '1.14.0'], dice: ['5.2.4'] },
+          { needs: { 'lib-wrapper': 'dice' } },
+        );
+        const modules = createModules();
+        render(EmmaRoot, {
+          fields: new DrawerFields(),
+          modules,
+          initialView: view,
+          initialGrouped: true,
+          canManage: true,
+          onSave,
+          platform: { core: '14.368', system: { id: 'dnd5e', title: 'D&D 5e', version: '5.1.0' } },
+          createVersionJudge: () => judge,
+        });
+        const badge = async () =>
+          (await screen.findByRole('button', { name: CHOOSE })).querySelector('.emma-badge')?.className ?? '';
+        await userEvent.click(screen.getByRole('button', { name: HYPOTHETICAL }));
+        expect(await badge()).toMatch(/\berror\b/);
+
+        modules.setActive('dice', true);
+
+        await vi.waitFor(async () => {
+          expect(await badge()).toMatch(/\bsuccess\b/);
+        });
+
+        modules.setActive('dice', false);
+
+        await vi.waitFor(async () => {
+          expect(await badge()).toMatch(/\berror\b/);
+        });
+      },
+    );
+
+    test.each(['list', 'split'] as const)('offers versions in the %s view only while the mode is on', async view => {
+      const { createVersionJudge, judge } = renderForGM(view);
+      const toggle = screen.getByRole('button', { name: HYPOTHETICAL });
+
+      await userEvent.click(toggle);
+      expect(await screen.findByRole('button', { name: CHOOSE })).toBeInTheDocument();
+
+      await userEvent.click(toggle);
+      expect(screen.queryByRole('button', { name: CHOOSE })).toBeNull();
+
+      await userEvent.click(toggle);
+      expect(await screen.findByRole('button', { name: CHOOSE })).toBeInTheDocument();
+      // The versions found are kept while the window is open.
+      expect(createVersionJudge).toHaveBeenCalledOnce();
+      expect(judge.lookUp).toHaveBeenCalledOnce();
+    });
   });
 });
