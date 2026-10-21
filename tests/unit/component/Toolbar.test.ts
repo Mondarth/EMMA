@@ -284,6 +284,7 @@ describe('Toolbar', () => {
           {},
           {
             unreached: [
+              { type: 'core', id: 'core' },
               { type: 'system', id: 'dnd5e' },
               { type: 'module', id: 'dice' },
               { type: 'module', id: 'gone' },
@@ -295,9 +296,77 @@ describe('Toolbar', () => {
 
         expect(
           screen.getByRole('status', {
-            name: 'MONDARTH-EMMA.Versions.Unreached {"packages":"D&D 5e, Dice So Nice!, gone, and other"}',
+            name: 'MONDARTH-EMMA.Versions.Unreached {"packages":"MONDARTH-EMMA.Versions.Core, D&D 5e, Dice So Nice!, gone, and other"}',
           }),
         ).not.toHaveClass('failed');
+      });
+    });
+
+    describe('core and system versions', () => {
+      const CHOOSE_CORE = 'MONDARTH-EMMA.Versions.Choose {"module":"MONDARTH-EMMA.Versions.Core","version":"14.368"}';
+      const CHOOSE_SYSTEM = 'MONDARTH-EMMA.Versions.Choose {"module":"D&D 5e","version":"5.1.0"}';
+
+      /**
+       * Render the toolbar in hypothetical mode, with the core's and the system's versions given.
+       * @param platforms - The core's and the system's versions, the one in use first
+       * @returns The state behind it
+       */
+      async function renderWith(platforms: Parameters<typeof loadedVersions>[1]) {
+        const { state, judge } = await loadedVersions({ dice: ['1.0.0'] }, platforms);
+        render(Toolbar, {
+          modules: createModules(),
+          view: 'list',
+          platform,
+          hypothetical: true,
+          versions: state,
+          onViewChange: vi.fn(),
+        });
+        return { state, judge };
+      }
+
+      test('keeps plain buttons while no newer version is found', async () => {
+        await renderWith({});
+
+        expect(screen.getByRole('button', { name: CORE })).not.toHaveAttribute('aria-haspopup');
+        expect(screen.getByRole('button', { name: SYSTEM })).not.toHaveAttribute('aria-haspopup');
+      });
+
+      test('offers a list of the newer versions of whichever has one', async () => {
+        await renderWith({ platforms: { system: ['5.1.0', '5.2.0'] } });
+
+        expect(screen.getByRole('button', { name: CORE })).not.toHaveAttribute('aria-haspopup');
+        const system = screen.getByRole('button', { name: CHOOSE_SYSTEM });
+        expect(system).toHaveAttribute('aria-haspopup', 'listbox');
+        // It reads as the plain button did, with a caret.
+        expect(system).toHaveTextContent('MONDARTH-EMMA.Toolbar.System {"id":"dnd5e","version":"5.1.0"}');
+        expect(system).not.toHaveClass('bare');
+        expect(system.querySelector('.fa-caret-down')).not.toBeNull();
+      });
+
+      test('lists each version in the colour of its fit, and shows the version chosen', async () => {
+        const { judge } = await renderWith({
+          platforms: { core: ['14.368', '14.370'], system: ['5.1.0', '5.2.0'] },
+          bad: ['14.370'],
+        });
+
+        await userEvent.click(screen.getByRole('button', { name: CHOOSE_CORE }));
+        const [option] = screen.getAllByRole('option');
+        expect(option).toHaveTextContent('14.370');
+        expect(option?.querySelector('.emma-badge')).toHaveClass('error');
+        expect(judge.judgePlatform.mock.lastCall?.[2]).toBe('core');
+        await userEvent.click(option as HTMLElement);
+
+        const core = screen.getByRole('button', {
+          name: 'MONDARTH-EMMA.Versions.Choose {"module":"MONDARTH-EMMA.Versions.Core","version":"14.370"}',
+        });
+        expect(core).toHaveTextContent(/^14\.370$/);
+
+        await userEvent.click(screen.getByRole('button', { name: CHOOSE_SYSTEM }));
+        await userEvent.click(screen.getByRole('option', { name: /5\.2\.0/ }));
+
+        expect(
+          screen.getByRole('button', { name: 'MONDARTH-EMMA.Versions.Choose {"module":"D&D 5e","version":"5.2.0"}' }),
+        ).toHaveTextContent('MONDARTH-EMMA.Toolbar.System {"id":"dnd5e","version":"5.2.0"}');
       });
     });
   });

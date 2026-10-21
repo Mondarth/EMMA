@@ -869,6 +869,48 @@ test.describe('Hypothetical versions', () => {
     await library.uncheck();
     await expect(picker).toHaveCount(0);
   });
+
+  test('the system offers its newer versions without a proxy, which the footer explains', async ({ page }) => {
+    const { core, system } = await page.evaluate(() => ({
+      core: game.version,
+      system: {
+        id: game.system.id,
+        title: game.system.title,
+        version: game.system.version,
+        manifest: game.system.manifest ?? '',
+        compatibility: game.system.compatibility,
+      },
+    }));
+    // A made-up newer release, from the manifest the system declares.
+    await page.route(system.manifest, async route => {
+      await route.fulfill({
+        headers: { 'Access-Control-Allow-Origin': '*' },
+        json: { id: system.id, title: system.title, version: '99.0.0', compatibility: system.compatibility },
+      });
+    });
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+    const choose = (version: string) =>
+      emma.getByRole('button', { name: `${system.title} version ${version}: choose another version`, exact: true });
+    const explanation = emma.getByText(/No version lookup proxy is set/);
+    await expect(explanation).toHaveCount(0);
+
+    await emma.getByRole('button', { name: 'Hypothetical mode', exact: true }).click();
+    await expect(explanation).toBeVisible();
+    await choose(system.version).click();
+
+    const options = page.getByRole('listbox', { name: `Versions of ${system.title}` }).getByRole('option');
+    await expect(options).toHaveText([/^\s*99\.0\.0/]);
+    await expect(options.first().locator('.emma-badge')).toBeVisible();
+    await options.first().click();
+
+    await expect(choose('99.0.0')).toHaveText(`${system.id} 99.0.0`);
+    // Without a proxy, Foundry's release notes are not read, so no newer core is offered.
+    await expect(emma.getByRole('button', { name: `Foundry Virtual Tabletop ${core}`, exact: true })).toBeVisible();
+
+    await emma.getByRole('button', { name: 'Hypothetical mode', exact: true }).click();
+    await expect(explanation).toHaveCount(0);
+  });
 });
 
 test.describe('Players', () => {

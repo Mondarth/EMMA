@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
+import { createRawSnippet } from 'svelte';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { VersionOption } from '@module/adapters/versions';
@@ -46,6 +47,7 @@ describe('VersionPicker', () => {
     expect(button).toHaveAttribute('aria-haspopup', 'listbox');
     expect(button).toHaveAttribute('aria-expanded', 'false');
     expect(button.querySelector('.emma-badge.success')).toHaveTextContent('2.0.0');
+    expect(button).toHaveClass('bare');
   });
 
   test('judges the versions only when the list opens', async () => {
@@ -156,6 +158,25 @@ describe('VersionPicker', () => {
 
     expect(options[0]).toHaveClass('active');
     expect(screen.getByRole('listbox')).toHaveAttribute('aria-activedescendant', options[0]?.id);
+  });
+
+  test('shows what it is given in place of the badge, as an ordinary button', async () => {
+    const onChoose = vi.fn();
+    render(VersionPicker, {
+      title: 'Dice',
+      chosen: option('2.0.0'),
+      versions: () => OPTIONS,
+      onChoose,
+      children: createRawSnippet(() => ({ render: () => '<span>dice 2.0.0</span>' })),
+    });
+
+    const button = screen.getByRole('button', { name: CHOOSE });
+    expect(button).toHaveTextContent('dice 2.0.0');
+    expect(button).not.toHaveClass('bare');
+    expect(button.querySelector('.emma-badge')).toBeNull();
+    await userEvent.click(button);
+    await userEvent.click(screen.getAllByRole('option')[0] as HTMLElement);
+    expect(onChoose).toHaveBeenCalledExactlyOnceWith('3.0.0');
   });
 
   test('is skipped by Tab where the list handles the keyboard', () => {

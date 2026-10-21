@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
+import { tick } from 'svelte';
 import { beforeEach, describe, expect, test } from 'vitest';
 
 import ListView from '@component/ListView.svelte';
@@ -465,6 +466,24 @@ describe('ListView', () => {
       });
       expect(picker.querySelector('.emma-badge')).toHaveClass('error');
       expect(picker).toHaveFocus();
+    });
+
+    test('shows the badge judged in the setup for a module with no other version, re-judged as the setup changes', async () => {
+      const { state } = await loadedVersions(
+        { emma: ['0.1.0'] },
+        { platforms: { system: ['5.1.0', '5.2.0'] }, bad: ['5.2.0'] },
+      );
+      render(ListView, { modules: createModules(), canManage: true, fields: new DrawerFields(), versions: state });
+      const badge = () =>
+        screen.getByText('EMMA', { selector: '.emma-module-title' }).closest('li')?.querySelector('.emma-badge');
+      expect(badge()).toHaveAttribute('data-tooltip-html', '0.1.0 success');
+
+      state.choosePlatform('system', '5.2.0');
+
+      await tick();
+      expect(badge()).toHaveAttribute('data-tooltip-html', '0.1.0 error');
+      // Nothing to choose, so still no picker.
+      expect(screen.queryByRole('button', { name: /^MONDARTH-EMMA\.Versions\.Choose \{"module":"EMMA"/ })).toBeNull();
     });
 
     test('shows the installed badges without them', () => {

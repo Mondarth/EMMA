@@ -1,10 +1,12 @@
 <script lang="ts">
   import type { Platform } from '@module/adapters/platform';
-  import type { PackageRef } from '@module/adapters/versions';
+  import type { PackageRef, PlatformPart } from '@module/adapters/versions';
   import { format, formatList, localize } from '@module/lib/i18n';
   import type { HypotheticalState } from '@module/state/hypothetical.svelte';
   import type { View } from '@module/settings';
   import type { ModuleState } from '@module/state/module-state.svelte';
+
+  import VersionPicker from './VersionPicker.svelte';
 
   interface Props {
     /** The view shown. */
@@ -45,6 +47,7 @@
    * @returns Its title, or its ID if it is not known
    */
   function titleOf(ref: PackageRef): string {
+    if (ref.type === 'core') return localize('MONDARTH-EMMA.Versions.Core');
     if (ref.type === 'system') return platform?.system.id === ref.id ? platform.system.title : ref.id;
     return modules.entries.find(entry => entry.id === ref.id)?.title ?? ref.id;
   }
@@ -85,6 +88,21 @@
   ];
 </script>
 
+<!-- The core's or the system's version: a list to choose from once a newer one is found. -->
+{#snippet platformButton(part: PlatformPart, title: string, version: string, text: string, label: string)}
+  {#if versions !== undefined && versions.hasPlatformVersions(part)}
+    <VersionPicker
+      {title}
+      chosen={{ version, badge: null }}
+      versions={() => versions.platformVersionsOf(part)}
+      onChoose={(chosen: string) => {
+        versions.choosePlatform(part, chosen);
+      }}>{text}</VersionPicker>
+  {:else}
+    <button type="button" aria-label={label} data-tooltip={label}>{text}</button>
+  {/if}
+{/snippet}
+
 <div class="emma-toolbar" role="toolbar" aria-label={localize('MONDARTH-EMMA.Toolbar.Label')}>
   {#if platform !== undefined}
     <div class="emma-toolbar-hypothetical">
@@ -98,19 +116,24 @@
           onHypotheticalChange?.(!hypothetical);
         }}></button>
       {#if hypothetical}
-        {@const coreLabel = format('MONDARTH-EMMA.Toolbar.CoreTooltip', { version: platform.core })}
-        {@const systemLabel = format('MONDARTH-EMMA.Toolbar.SystemTooltip', {
-          title: platform.system.title,
-          version: platform.system.version,
-        })}
+        {@const core = versions?.platformChosen('core') ?? platform.core}
+        {@const system = versions?.platformChosen('system') ?? platform.system.version}
         <div class="emma-toolbar-platform">
           <!-- The buttons show just the versions; their names and tooltips say what each is. -->
-          <button type="button" aria-label={coreLabel} data-tooltip={coreLabel}>{platform.core}</button>
-          <button type="button" aria-label={systemLabel} data-tooltip={systemLabel}
-            >{format('MONDARTH-EMMA.Toolbar.System', {
-              id: platform.system.id,
-              version: platform.system.version,
-            })}</button>
+          {@render platformButton(
+            'core',
+            localize('MONDARTH-EMMA.Versions.Core'),
+            core,
+            core,
+            format('MONDARTH-EMMA.Toolbar.CoreTooltip', { version: core }),
+          )}
+          {@render platformButton(
+            'system',
+            platform.system.title,
+            system,
+            format('MONDARTH-EMMA.Toolbar.System', { id: platform.system.id, version: system }),
+            format('MONDARTH-EMMA.Toolbar.SystemTooltip', { title: platform.system.title, version: system }),
+          )}
           {#if lookup !== null}
             <i
               class={['emma-toolbar-lookup', 'fa-solid', lookup.icon, { failed: versions?.status === 'failed' }]}
@@ -185,7 +208,7 @@
     margin-inline-start: 0.5rem;
   }
 
-  .emma-toolbar-platform button {
+  .emma-toolbar-platform > :global(button) {
     flex: none;
     width: auto;
     padding-inline: 0.5rem;

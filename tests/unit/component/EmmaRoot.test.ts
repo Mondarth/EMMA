@@ -255,14 +255,16 @@ describe('EmmaRoot', () => {
 
   describe('hypothetical versions', () => {
     const CHOOSE = /^MONDARTH-EMMA\.Versions\.Choose/;
+    const NO_PROXY = 'MONDARTH-EMMA.Footer.NoProxy';
 
     /**
      * Render the root for a GM. libWrapper, the one module active, and Dice So Nice! have newer versions.
      * @param view - The view to show
+     * @param options - As for {@link fakeJudge}
      * @returns The judge behind the versions, and the function setting it up
      */
-    function renderForGM(view: 'list' | 'split' = 'list') {
-      const judge = fakeJudge({ 'lib-wrapper': ['1.13.2', '1.14.0'], dice: ['5.2.4', '5.3.0'] });
+    function renderForGM(view: 'list' | 'split' = 'list', options?: Parameters<typeof fakeJudge>[1]) {
+      const judge = fakeJudge({ 'lib-wrapper': ['1.13.2', '1.14.0'], dice: ['5.2.4', '5.3.0'] }, options);
       const createVersionJudge = vi.fn(() => judge);
       render(EmmaRoot, {
         fields: new DrawerFields(),
@@ -285,6 +287,45 @@ describe('EmmaRoot', () => {
 
       expect(judge.lookUp).toHaveBeenCalledExactlyOnceWith(['lib-wrapper']);
       expect(await screen.findAllByRole('button', { name: CHOOSE })).toHaveLength(1);
+    });
+
+    test('explains in the footer, while the mode is on, what is not looked up without a proxy', async () => {
+      renderForGM('list', { proxied: false });
+      const footer = () => screen.getByRole('contentinfo');
+      expect(footer()).not.toHaveTextContent(NO_PROXY);
+
+      await userEvent.click(screen.getByRole('button', { name: HYPOTHETICAL }));
+      expect(footer()).toHaveTextContent(NO_PROXY);
+
+      await userEvent.click(screen.getByRole('button', { name: HYPOTHETICAL }));
+      expect(footer()).not.toHaveTextContent(NO_PROXY);
+    });
+
+    test('says nothing of a proxy when one is set', async () => {
+      renderForGM();
+
+      await userEvent.click(screen.getByRole('button', { name: HYPOTHETICAL }));
+
+      expect(screen.getByRole('contentinfo')).not.toHaveTextContent(NO_PROXY);
+    });
+
+    test('re-judges the modules when the system is changed', async () => {
+      const { judge } = renderForGM('list', { platforms: { system: ['5.1.0', '5.2.0'] } });
+      await userEvent.click(screen.getByRole('button', { name: HYPOTHETICAL }));
+      const system = await screen.findByRole('button', {
+        name: 'MONDARTH-EMMA.Versions.Choose {"module":"D&D 5e","version":"5.1.0"}',
+      });
+
+      await userEvent.click(system);
+      await userEvent.click(screen.getByRole('option', { name: /5\.2\.0/ }));
+
+      expect(judge.judgeChoices.mock.lastCall?.[1]).toMatchObject({ system: '5.2.0' });
+      // libWrapper's badge is judged again, in the setup with the system chosen.
+      expect(
+        screen.getByRole('button', {
+          name: 'MONDARTH-EMMA.Versions.Choose {"module":"libWrapper","version":"1.13.2"}',
+        }),
+      ).toBeInTheDocument();
     });
 
     test('looks a module up when it is staged active, and judges the setup it makes', async () => {

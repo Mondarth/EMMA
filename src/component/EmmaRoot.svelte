@@ -101,7 +101,7 @@
     {/if}
   </div>
 
-  <Footer {modules} {canManage} {onSave} />
+  <Footer {modules} {canManage} {onSave} unproxied={hypothetical && versions?.proxied === false} />
 </div>
 
 <style>

@@ -159,4 +159,28 @@ describe('Footer', () => {
       expect(screen.getByRole('status')).not.toHaveTextContent(WARNING);
     });
   });
+
+  describe('hypothetical mode without a proxy', () => {
+    const NO_PROXY = 'MONDARTH-EMMA.Footer.NoProxy';
+
+    test('explains what is not looked up, for a GM or not', () => {
+      const { unmount } = render(Footer, {
+        modules: createModules(),
+        canManage: true,
+        onSave: vi.fn(),
+        unproxied: true,
+      });
+      expect(screen.getByRole('status')).toHaveTextContent(NO_PROXY);
+      unmount();
+
+      render(Footer, { modules: createModules(), canManage: false, onSave: vi.fn(), unproxied: true });
+      expect(screen.getByRole('status')).toHaveTextContent(NO_PROXY);
+    });
+
+    test('says nothing of it otherwise', () => {
+      render(Footer, { modules: createModules(), canManage: true, onSave: vi.fn() });
+
+      expect(screen.getByRole('status')).not.toHaveTextContent(NO_PROXY);
+    });
+  });
 });

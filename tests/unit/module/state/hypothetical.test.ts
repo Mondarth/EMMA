@@ -137,7 +137,7 @@ describe('HypotheticalState', () => {
     expect(state.chosen('dice')?.version).toBe('2.0.0');
     expect(state.chosen('dice')?.badge?.type).toBe('error');
     // The choices are kept in a reactive map, so are compared by their entries.
-    expect([...(judge.judgeChoices.mock.lastCall?.[1] ?? [])]).toEqual([['dice', '2.0.0']]);
+    expect([...(judge.judgeChoices.mock.lastCall?.[1].modules ?? [])]).toEqual([['dice', '2.0.0']]);
   });
 
   test('re-judges the setup when the modules staged active change', async () => {
@@ -164,8 +164,65 @@ describe('HypotheticalState', () => {
     expect(state.versionsOf('dice').map(({ version }) => version)).toEqual(['2.0.0', '1.0.0']);
     const [active, choices, id] = judge.judgeVersions.mock.lastCall ?? [];
     expect([...(active ?? [])]).toEqual(['dice', 'lib']);
-    expect([...(choices ?? [])]).toEqual([['lib', '3.0.0']]);
+    expect([...(choices?.modules ?? [])]).toEqual([['lib', '3.0.0']]);
     expect(id).toBe('dice');
+  });
+
+  test('offers the core and the system once a newer version of either is found', async () => {
+    const { state } = await loadedVersions({}, { platforms: { system: ['5.1.0', '5.2.0'] } });
+
+    expect(state.hasPlatformVersions('core')).toBe(false);
+    expect(state.hasPlatformVersions('system')).toBe(true);
+    expect(state.platformVersionsOf('system').map(({ version }) => version)).toEqual(['5.2.0', '5.1.0']);
+  });
+
+  test('offers nothing of the core or the system before a lookup', () => {
+    const state = new HypotheticalState(
+      () => fakeJudge({}),
+      () => [],
+    );
+
+    expect(state.hasPlatformVersions('system')).toBe(false);
+    expect(state.platformVersionsOf('system')).toEqual([]);
+  });
+
+  test('re-judges every module when the core or the system is chosen', async () => {
+    const { state, judge } = await loadedVersions(
+      { dice: ['1.0.0'] },
+      { platforms: { core: ['14.368', '14.370'], system: ['5.1.0', '5.2.0'] } },
+    );
+    expect(state.chosen('dice')).toBeDefined();
+    expect(state.platformChosen('core')).toBeUndefined();
+    const judged = judge.judgeChoices.mock.calls.length;
+
+    state.choosePlatform('core', '14.370');
+    flushSync();
+    expect(state.chosen('dice')).toBeDefined();
+    state.choosePlatform('system', '5.2.0');
+    flushSync();
+    expect(state.chosen('dice')).toBeDefined();
+
+    expect(judge.judgeChoices.mock.calls.length).toBe(judged + 2);
+    expect(judge.judgeChoices.mock.lastCall?.[1]).toMatchObject({ core: '14.370', system: '5.2.0' });
+    expect(state.platformChosen('core')).toBe('14.370');
+    expect(state.platformChosen('system')).toBe('5.2.0');
+    state.versionsOf('dice');
+    expect(judge.judgeVersions.mock.lastCall?.[1]).toMatchObject({ core: '14.370', system: '5.2.0' });
+    state.platformVersionsOf('core');
+    expect(judge.judgePlatform.mock.lastCall?.[1]).toMatchObject({ core: '14.370', system: '5.2.0' });
+    expect(judge.judgePlatform.mock.lastCall?.[2]).toBe('core');
+  });
+
+  test('says whether versions are looked up through a proxy once the lookup starts', async () => {
+    const state = new HypotheticalState(
+      () => fakeJudge({}, { proxied: false }),
+      () => [],
+    );
+    expect(state.proxied).toBeNull();
+
+    await state.load();
+
+    expect(state.proxied).toBe(false);
   });
 
   test('passes on the packages not reached', async () => {

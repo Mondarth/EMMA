@@ -159,7 +159,7 @@ stays pressed while on, and two buttons appear just to its right:
 - **System**, showing the ID and version of the game system in use, such as `dnd5e 5.1.0`. Hover over it for the
   system's full name.
 
-When you turn the mode on, EMMA looks up the versions of the game system and of every module staged active, using
+When you turn the mode on, EMMA looks up the versions of Foundry, the game system and every module staged active, using
 [@mondarth/fvtt-resolver](https://www.npmjs.com/package/@mondarth/fvtt-resolver). While the mode is on, a module
 you stage active, by checking it or moving it to the active side, is looked up then. Each module is looked up only
 once while EMMA is open. A spinner shows beside the System button while it looks.
@@ -176,7 +176,8 @@ is missing, and so on. Hover over a version for Foundry's explanation.
 Choose a version to see it on the module's badge. Nothing in the world changes: choosing only changes how other
 versions are judged. Each version is checked against the core, the system and the modules staged active at their
 chosen versions, so staging a module active or inactive judges every badge again: a module whose required module
-is staged inactive, for instance, turns red.
+is staged inactive, for instance, turns red. Modules with no newer version have no drop-down, but their badges are
+judged the same way, so they change too.
 
 | To                         | Mouse                    | Keyboard, list view                         |
 | -------------------------- | ------------------------ | ------------------------------------------- |
@@ -187,15 +188,29 @@ is staged inactive, for instance, turns red.
 
 In the split view, the badges are mouse-only, as the lists handle the keyboard themselves.
 
+### Choosing the Foundry and system versions
+
+The **Core** and **System** buttons become drop-downs too, marked with a caret, once a newer version of Foundry or of
+the game system is found. They open, and are driven from the keyboard, as a module's badge is. Foundry versions are
+offered from the release channel of the build you are running or a more stable one: on a stable build, only newer
+stable builds; on a testing build, testing builds too.
+
+Each version in these lists is coloured by how well the setup it would make fits: by the worst badge it would leave
+the game system or a module staged active with. Hover over a version to see which packages will not work with it, and
+which may not. Choose a version to see it on the button; every module's badge is then judged again against it.
+
 ### Where versions come from
 
-Browsers may not read Foundry's own package listing, or the manifests attached to GitHub releases, because those
-sites send no CORS headers. Without a proxy, EMMA lists the versions released on GitHub and GitLab, but does not
-know which Foundry versions those releases support, so Foundry marks them **Compatibility unknown**. A warning
-beside the System button names the packages whose versions could not all be looked up.
+Browsers may not read Foundry's own package listing, its release notes, or the manifests attached to GitHub
+releases, because those sites send no CORS headers. Without a proxy, EMMA lists the versions released on GitHub and
+GitLab, but does not know which Foundry versions those releases support, so Foundry marks them **Compatibility
+unknown**; and as it cannot read Foundry's release notes, it offers no newer Foundry version. A note in the footer
+says so while the mode is on. A warning beside the System button names the packages whose versions could not all be
+looked up.
 
 For a fuller picture, a GM can set a **Version lookup proxy** (see [Settings](#settings)): EMMA then reads Foundry's
-package listing through it, so each version is judged on the Foundry versions it declares.
+package listing and release notes through it, so each version is judged on the Foundry versions it declares, and
+newer Foundry builds are offered.
 
 Click the flask again to turn the mode off. The versions found and chosen are kept until EMMA closes. Hypothetical
 mode is not remembered: it is off each time EMMA opens. Players are not offered it.

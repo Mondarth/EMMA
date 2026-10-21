@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
 
-import type { PackageRef, VersionChoices, VersionJudge, VersionOption } from '@module/adapters/versions';
+import type { PackageRef, PlatformPart, VersionChoices, VersionJudge, VersionOption } from '@module/adapters/versions';
 import { HypotheticalState } from '@module/state/hypothetical.svelte';
 
 /**
@@ -35,6 +35,8 @@ function compare(a: string, b: string): number {
  * @param options.bad - Versions judged unusable wherever they are chosen
  * @param options.unreached - Packages whose versions could not all be looked up
  * @param options.needs - For each module, a module it is judged unusable without in the setup
+ * @param options.platforms - The core's and the system's versions, the one in use first; only it by default
+ * @param options.proxied - Whether it fetches through a proxy; by default it does
  * @returns The judge, with its methods as spies
  */
 export function fakeJudge(
@@ -43,30 +45,47 @@ export function fakeJudge(
     bad = [],
     unreached = [],
     needs = {},
-  }: { bad?: readonly string[]; unreached?: readonly PackageRef[]; needs?: Readonly<Record<string, string>> } = {},
+    platforms = {},
+    proxied = true,
+  }: {
+    bad?: readonly string[];
+    unreached?: readonly PackageRef[];
+    needs?: Readonly<Record<string, string>>;
+    platforms?: Partial<Record<PlatformPart, readonly string[]>>;
+    proxied?: boolean;
+  } = {},
 ) {
   const unusable = new Set(bad);
   const installed = (id: string): string | undefined => versions[id]?.[0];
   // The installed version and every newer one, newest first.
   const choosable = (id: string): readonly string[] =>
     (versions[id] ?? []).filter(version => compare(version, installed(id) ?? '') >= 0).sort((a, b) => compare(b, a));
+  const platformVersions = (part: PlatformPart): readonly string[] =>
+    [...(platforms[part] ?? [part === 'core' ? '14.368' : '5.1.0'])].sort((a, b) => compare(b, a));
   return {
     unreached,
+    proxied,
     lookUp: vi.fn((_ids: Iterable<string>): Promise<void> => Promise.resolve()),
     versionsOf: vi.fn(choosable),
     judgeChoices: vi.fn((active: Iterable<string>, choices: VersionChoices): ReadonlyMap<string, VersionOption> => {
       const setup = new Set(active);
       const chosen = new Map<string, VersionOption>();
       for (const id of setup) {
-        const version = choices.get(id) ?? installed(id);
+        const version = choices.modules.get(id) ?? installed(id);
         const needed = needs[id];
         const missing = needed !== undefined && !setup.has(needed);
-        if (version !== undefined) chosen.set(id, option(version, missing ? new Set([version]) : unusable));
+        // Every module is judged unusable with a system version in `bad`.
+        const misfit = missing || (choices.system !== undefined && unusable.has(choices.system));
+        if (version !== undefined) chosen.set(id, option(version, misfit ? new Set([version]) : unusable));
       }
       return chosen;
     }),
     judgeVersions: vi.fn((_active: Iterable<string>, _choices: VersionChoices, id: string): readonly VersionOption[] =>
       choosable(id).map(version => option(version, unusable)),
+    ),
+    platformVersions: vi.fn(platformVersions),
+    judgePlatform: vi.fn((_active: Iterable<string>, _choices: VersionChoices, part: PlatformPart) =>
+      platformVersions(part).map(version => option(version, unusable)),
     ),
   } satisfies VersionJudge;
 }

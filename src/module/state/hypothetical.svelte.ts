@@ -1,16 +1,16 @@
 import { untrack } from 'svelte';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
-import type { PackageRef, VersionJudge, VersionOption } from '@module/adapters/versions';
+import type { PackageRef, PlatformPart, VersionChoices, VersionJudge, VersionOption } from '@module/adapters/versions';
 import { log } from '@module/lib/logger';
 
 /** How far looking up versions has got. */
 export type VersionStatus = 'idle' | 'loading' | 'ready' | 'failed';
 
 /**
- * Hypothetical mode's state: the versions found of the modules staged active, and the version chosen for each.
- * Choosing a version changes nothing in the world; it only changes how the versions are judged, as each is judged in
- * the setup of the modules staged active at their chosen versions.
+ * Hypothetical mode's state: the versions found of the core, the system and the modules staged active, and the version
+ * chosen for each. Choosing a version changes nothing in the world; it only changes how the versions are judged, as
+ * each is judged in the setup of the core, the system and the modules staged active at their chosen versions.
  *
  * Versions are looked up when {@link HypotheticalState.load} is called, which EMMA does when hypothetical mode is
  * turned on and whenever another module is staged active while it is on, so nothing is fetched for a GM who never
@@ -27,6 +27,9 @@ export class HypotheticalState {
   #status: VersionStatus = $state('idle');
   #unreached: readonly PackageRef[] = $state.raw([]);
   readonly #choices = new SvelteMap<string, string>();
+  #core: string | undefined = $state();
+  #system: string | undefined = $state();
+  #proxied: boolean | null = $state(null);
 
   /** The modules looked up or being looked up; only read untracked. */
   readonly #asked = new SvelteSet<string>();
@@ -43,7 +46,15 @@ export class HypotheticalState {
   constructor(createJudge: () => VersionJudge, active: () => Iterable<string>) {
     this.#createJudge = createJudge;
     this.#active = active;
-    this.#chosen = $derived(this.#looked?.judge.judgeChoices(this.#active(), this.#choices));
+    this.#chosen = $derived(this.#looked?.judge.judgeChoices(this.#active(), this.#choicesMade()));
+  }
+
+  /**
+   * The versions chosen, read reactively.
+   * @returns The choices
+   */
+  #choicesMade(): VersionChoices {
+    return { core: this.#core, system: this.#system, modules: this.#choices };
   }
 
   /**
@@ -63,6 +74,14 @@ export class HypotheticalState {
   }
 
   /**
+   * Whether versions are looked up through a proxy, without which fewer are found.
+   * @returns `null` until the first lookup starts
+   */
+  get proxied(): boolean | null {
+    return this.#proxied;
+  }
+
+  /**
    * Look up the versions of the modules staged active that have not been looked up. Lookups run one after another.
    * Called in an effect, it runs again whenever the modules staged active change.
    * @returns Once the lookup is done; it never rejects, a failure being kept as the status
@@ -75,6 +94,7 @@ export class HypotheticalState {
       for (const id of needed) this.#asked.add(id);
       this.#judge ??= this.#createJudge();
       const judge = this.#judge;
+      this.#proxied = judge.proxied;
       this.#lookups += 1;
       this.#status = 'loading';
       this.#queue = this.#queue.then(async () => {
@@ -122,7 +142,45 @@ export class HypotheticalState {
    * @returns The versions, newest first
    */
   versionsOf(id: string): readonly VersionOption[] {
-    return this.#looked?.judge.judgeVersions(this.#active(), this.#choices, id) ?? [];
+    return this.#looked?.judge.judgeVersions(this.#active(), this.#choicesMade(), id) ?? [];
+  }
+
+  /**
+   * Whether the core or the system has a newer version than the one in use, so there is a version to choose.
+   * @param part - The core or the system
+   * @returns `true` if it has versions to choose between
+   */
+  hasPlatformVersions(part: PlatformPart): boolean {
+    return (this.#looked?.judge.platformVersions(part).length ?? 0) > 1;
+  }
+
+  /**
+   * The version chosen of the core or the system.
+   * @param part - The core or the system
+   * @returns The version, or `undefined` while the one in use is kept
+   */
+  platformChosen(part: PlatformPart): string | undefined {
+    return part === 'core' ? this.#core : this.#system;
+  }
+
+  /**
+   * The versions of the core or the system that may be chosen, each with a badge for how well the setup it would make
+   * fits. Judged afresh on each call, so call it when the versions are shown.
+   * @param part - The core or the system
+   * @returns The versions, newest first
+   */
+  platformVersionsOf(part: PlatformPart): readonly VersionOption[] {
+    return this.#looked?.judge.judgePlatform(this.#active(), this.#choicesMade(), part) ?? [];
+  }
+
+  /**
+   * Choose a version of the core or the system, which re-judges every module.
+   * @param part - The core or the system
+   * @param version - One of its versions
+   */
+  choosePlatform(part: PlatformPart, version: string): void {
+    if (part === 'core') this.#core = version;
+    else this.#system = version;
   }
 
   /**

@@ -126,8 +126,17 @@ export interface GameMockOptions {
   modules?: Record<string, ModuleMockData>;
   /** Initial stored setting values, keyed by `namespace.key`. */
   settings?: Record<string, unknown>;
-  /** The game system in use, `game.system`. Defaults to `dnd5e`; its version defaults to `5.1.0`, with no manifest. */
-  system?: { id: string; title: string; version?: string; manifest?: string };
+  /**
+   * The game system in use, `game.system`. Defaults to `dnd5e`; its version defaults to `5.1.0`, verified with Foundry
+   * 14, with no manifest.
+   */
+  system?: {
+    id: string;
+    title: string;
+    version?: string;
+    manifest?: string;
+    compatibility?: { minimum?: string; verified?: string; maximum?: string };
+  };
   /** The Foundry version, `game.version`. Defaults to `14.368`. */
   version?: string;
 }
@@ -224,9 +233,16 @@ export function createGameMock(options: GameMockOptions = {}) {
     modules: new Map(Object.entries(modules).map(([id, data]) => [id, createModuleMock(id, data)])),
     system: {
       version: '5.1.0',
+      compatibility: { minimum: '14', verified: '14' },
       ...system,
       toObject() {
-        return { id: this.id, title: this.title, version: this.version, manifest: this.manifest };
+        return {
+          id: this.id,
+          title: this.title,
+          version: this.version,
+          manifest: this.manifest,
+          compatibility: this.compatibility,
+        };
       },
     },
     version,
@@ -330,20 +346,36 @@ export function createFoundryNamespaceMock() {
     return template.innerHTML;
   });
 
+  const badgeOf = (availability: number, data: { version: string }): BadgeMockData => ({
+    type:
+      availability === 1
+        ? 'success'
+        : availability === 2
+          ? 'neutral'
+          : [3, 4].includes(availability)
+            ? 'warning'
+            : 'error',
+    tooltip: `availability ${String(availability)}`,
+    label: data.version,
+    icon: availability === 1 ? 'fa-solid fa-code-branch' : `fa-solid icon-${String(availability)}`,
+  });
+  // As Foundry's does, an unverified system's tooltip looks the module's systems up in `options.systems`, or in
+  // `game.systems`, which exists only on the Setup screen, so throws inside a world.
   const getVersionBadge = vi.fn(
-    (availability: number, data: { version: string }, _options?: object): BadgeMockData => ({
-      type:
-        availability === 1
-          ? 'success'
-          : availability === 2
-            ? 'neutral'
-            : [3, 4].includes(availability)
-              ? 'warning'
-              : 'error',
-      tooltip: `availability ${String(availability)}`,
-      label: data.version,
-      icon: 'fa-solid fa-code-branch',
-    }),
+    (
+      availability: number,
+      data: { version: string; relationships?: { systems?: { id: string }[] } },
+      options?: { systems?: { get(id: string): unknown } },
+    ) => {
+      if (availability === 3) {
+        const systems = options?.systems ?? (game as unknown as { systems: { get(id: string): unknown } }).systems;
+        for (const { id } of data.relationships?.systems ?? []) systems.get(id);
+      }
+      return badgeOf(availability, data);
+    },
+  );
+  const systemVersionBadge = vi.fn((availability: number, data: { version: string }, _options?: object) =>
+    badgeOf(availability, data),
   );
 
   return {
@@ -359,9 +391,15 @@ export function createFoundryNamespaceMock() {
       },
     },
     // Foundry's badges by availability, as `Module.getVersionBadge` gives them, with the code as the tooltip.
-    packages: { Module: { getVersionBadge } },
+    packages: { Module: { getVersionBadge }, System: { getVersionBadge: systemVersionBadge } },
     // Foundry adds the server's route prefix, which these tests leave unset.
-    utils: { cleanHTML, getRoute: (path: string): string => `/${path}` },
+    utils: {
+      // Foundry's `Collection` is a `Map` with more methods, none of which EMMA's callers use.
+      Collection: Map,
+      cleanHTML,
+      escapeHTML: (raw: string): string => raw.replaceAll('&', '&amp;').replaceAll('<', '&lt;'),
+      getRoute: (path: string): string => `/${path}`,
+    },
     /** Called each time a native Module Management window is rendered. */
     moduleManagementRender,
     /** `SettingsConfig.reloadConfirm`, which asks the user to reload. */
@@ -372,6 +410,8 @@ export function createFoundryNamespaceMock() {
     cleanHTML,
     /** `packages.Module.getVersionBadge`, which gives the badge for a package's availability. */
     getVersionBadge,
+    /** `packages.System.getVersionBadge`, as `getVersionBadge` for the system. */
+    systemVersionBadge,
   };
 }
 

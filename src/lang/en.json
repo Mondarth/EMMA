@@ -22,7 +22,13 @@
       "List": "Versions of {module}",
       "Loading": "Looking up module versions…",
       "Failed": "Module versions could not be looked up. See the console for details.",
-      "Unreached": "Not every version could be looked up for: {packages}. Set a version lookup proxy in EMMA's settings to look further."
+      "Unreached": "Not every version could be looked up for: {packages}. Set a version lookup proxy in EMMA's settings to look further.",
+      "Core": "Foundry Virtual Tabletop",
+      "Fit": {
+        "Verified": "The system and every active module are verified with this version.",
+        "Unusable": "Will not work: {packages}.",
+        "Unverified": "May not work: {packages}."
+      }
     },
     "List": {
       "Label": "Installed modules",
@@ -94,7 +100,8 @@
       "Reset": "Reset",
       "Changes": "Changes staged: {count}",
       "ReadOnly": "Only a GM can change which modules are active.",
-      "DisablesEmma": "Saving deactivates EMMA itself, so Foundry's own Module Management window will open from then on."
+      "DisablesEmma": "Saving deactivates EMMA itself, so Foundry's own Module Management window will open from then on.",
+      "NoProxy": "No version lookup proxy is set, so Foundry's package listing and release notes can't be read: fewer module versions are found, and no newer Foundry version is offered. Set a proxy in EMMA's settings to look further."
     },
     "Requirements": {
       "Unmet": "{module} requires {missing}, which must be active too.",

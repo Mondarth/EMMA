@@ -16,11 +16,13 @@
 
   const { entry, versions, focusable = true }: Props = $props();
 
-  // A module with only one version found has nothing to choose, so keeps its badge.
-  const chosen = $derived(versions?.hasVersions(entry.id) === true ? versions.chosen(entry.id) : undefined);
+  // The version chosen, judged in the setup of the core, the system and the modules staged active; undefined for a
+  // module not judged, which keeps the badge Foundry gives the installed version.
+  const chosen = $derived(versions?.chosen(entry.id));
 </script>
 
-{#if versions !== undefined && chosen !== undefined}
+<!-- A module with only one version found has nothing to choose, so shows its judged badge alone. -->
+{#if versions !== undefined && chosen !== undefined && versions.hasVersions(entry.id)}
   <VersionPicker
     title={entry.title}
     {chosen}
@@ -29,6 +31,8 @@
     onChoose={(version: string) => {
       versions.choose(entry.id, version);
     }} />
+{:else if chosen !== undefined}
+  <VersionBadge version={chosen.version} badge={chosen.badge} />
 {:else}
   <VersionBadge version={entry.version} badge={entry.badge} />
 {/if}

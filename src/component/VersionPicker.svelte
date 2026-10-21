@@ -1,16 +1,18 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
+
   import type { VersionOption } from '@module/adapters/versions';
   import { format } from '@module/lib/i18n';
 
   import VersionBadge from './VersionBadge.svelte';
 
   interface Props {
-    /** The title of the module whose version is chosen. */
+    /** The title of the package whose version is chosen. */
     title: string;
     /** The version chosen, with its badge. */
     chosen: VersionOption;
     /**
-     * Every version of the module, newest first, the chosen one among them; read each time the list opens, as judging
+     * Every version of the package, newest first, the chosen one among them; read each time the list opens, as judging
      * them takes time. The list leaves out the chosen version, which the button already shows.
      */
     versions: () => readonly VersionOption[];
@@ -18,9 +20,11 @@
     onChoose: (version: string) => void;
     /** Whether Tab stops on the button; the split view's lists handle the keyboard themselves. */
     focusable?: boolean;
+    /** What the button shows, making it an ordinary button; the chosen version's badge, by default. */
+    children?: Snippet;
   }
 
-  const { title, chosen, versions, onChoose, focusable = true }: Props = $props();
+  const { title, chosen, versions, onChoose, focusable = true, children }: Props = $props();
 
   const uid = $props.id();
 
@@ -112,7 +116,7 @@
 <button
   bind:this={button}
   type="button"
-  class="emma-version-picker"
+  class={['emma-version-picker', { bare: children === undefined }]}
   aria-label={label}
   aria-haspopup="listbox"
   aria-expanded={expanded}
@@ -124,7 +128,11 @@
     if (expanded) hide(true);
     else show(event.currentTarget);
   }}>
-  <VersionBadge version={chosen.version} badge={chosen.badge} />
+  {#if children === undefined}
+    <VersionBadge version={chosen.version} badge={chosen.badge} />
+  {:else}
+    {@render children()}
+  {/if}
   <i class="fa-solid fa-caret-down" inert></i>
 </button>
 
@@ -174,16 +182,20 @@
     align-items: center;
     gap: 0.25rem;
     width: auto;
+    cursor: pointer;
+  }
+
+  /* Only the badge shows, as in the module lists. */
+  .emma-version-picker.bare {
     height: auto;
     min-height: 0;
     padding: 0;
     border: none;
     background: none;
     color: inherit;
-    cursor: pointer;
   }
 
-  .emma-version-picker:focus-visible {
+  .emma-version-picker.bare:focus-visible {
     outline: 1px solid var(--color-border-highlight);
     outline-offset: 1px;
   }

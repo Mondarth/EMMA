@@ -110,8 +110,8 @@ importers:
   .:
     dependencies:
       '@mondarth/fvtt-resolver':
-        specifier: 0.3.0
-        version: 0.3.0
+        specifier: 0.4.0
+        version: 0.4.0
     devDependencies:
       '@commitlint/cli':
         specifier: 21.2.3
@@ -571,8 +571,8 @@ packages:
   '@massifrg/prosemirror-tables-sections@0.6.3':
     resolution: {integrity: sha512-DTYZuYrisLpxu7YzYpIJ0gEx2dSAXQ/Zg+Up505VUbsD1+8kFKYzIoKiX+gAk87OTrdCi0VQOg1NREV9MXMN0Q==}
 
-  '@mondarth/fvtt-resolver@0.3.0':
-    resolution: {integrity: sha512-XMAfOIUusRz9nXlIIbTafOUhn2LkE0Yedjv2FlsGWoKUiIPtBAqZ2pY8GLMPVk+saHRv5nW2YpJUl6tJxvBmpw==}
+  '@mondarth/fvtt-resolver@0.4.0':
+    resolution: {integrity: sha512-a5UJ41GUpbFFIC8cEnsVeCTT51AzKmaMJwoVMkOQjNfJFp0qMxcNcZ01CsJhL3FeYIX7wq9X7nAt6LENJDdOLA==}
     engines: {node: '>=24'}
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
@@ -4746,7 +4746,7 @@ snapshots:
       prosemirror-transform: 1.12.2
       prosemirror-view: 1.42.6
 
-  '@mondarth/fvtt-resolver@0.3.0':
+  '@mondarth/fvtt-resolver@0.4.0':
     dependencies:
       zod: 4.6.7
 

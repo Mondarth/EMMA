@@ -11,9 +11,11 @@
     canManage: boolean;
     /** Saves the staged changes. */
     onSave: () => Promise<unknown>;
+    /** Whether hypothetical mode is looking up versions without a proxy, so finds fewer. */
+    unproxied?: boolean;
   }
 
-  const { modules, canManage, onSave }: Props = $props();
+  const { modules, canManage, onSave, unproxied = false }: Props = $props();
 
   let saving = $state(false);
 
@@ -56,6 +58,12 @@
       </ul>
     {:else if modules.dirty}
       <p>{format('MONDARTH-EMMA.Footer.Changes', { count: String(changeCount) })}</p>
+    {/if}
+    {#if unproxied}
+      <p class="emma-unproxied">
+        <i class="fa-solid fa-circle-info" inert></i>
+        {localize('MONDARTH-EMMA.Footer.NoProxy')}
+      </p>
     {/if}
     {#if canManage && disablesEmma}
       <p class="emma-disables">
