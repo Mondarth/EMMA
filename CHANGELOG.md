@@ -1,3 +1,12 @@
+## [0.4.0](https://github.com/Mondarth/EMMA/compare/v0.3.0...v0.4.0) (2026-10-21)
+
+### Features
+
+* **settings:** add an API key for the version lookup proxy ([f970f40](https://github.com/Mondarth/EMMA/commit/f970f40b01932d73979206d56ba914a8239d6048))
+* **ui:** add a hypothetical mode for choosing module versions ([583a0ea](https://github.com/Mondarth/EMMA/commit/583a0eaaeb0507b82802f6c74d2a163c57c7deff))
+* **ui:** add core and system version lists to hypothetical mode ([2ccf101](https://github.com/Mondarth/EMMA/commit/2ccf101e95563f4c642387257d2075384bb970a8))
+* **ui:** add setup reports and safe staging to hypothetical mode ([e1115a6](https://github.com/Mondarth/EMMA/commit/e1115a6cc7c2778a43f672d837f63909ce1cd6f5))
+
 ## [0.3.0](https://github.com/Mondarth/EMMA/compare/v0.2.0...v0.3.0) (2026-10-19)
 
 ### Features

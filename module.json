@@ -1,7 +1,7 @@
 {
   "id": "mondarth-emma",
   "title": "EMMA - Enhanced Module Manager Application",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "compatibility": {
     "minimum": "14",
     "verified": "14"
@@ -31,5 +31,5 @@
   "bugs": "https://github.com/Mondarth/EMMA/issues",
   "changelog": "https://github.com/Mondarth/EMMA/releases/latest",
   "manifest": "https://github.com/Mondarth/EMMA/releases/latest/download/module.json",
-  "download": "https://github.com/Mondarth/EMMA/releases/download/v0.3.0/module-v0.3.0.zip"
+  "download": "https://github.com/Mondarth/EMMA/releases/download/v0.4.0/module-v0.4.0.zip"
 }
