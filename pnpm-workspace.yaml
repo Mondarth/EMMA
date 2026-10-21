@@ -5,3 +5,6 @@ allowBuilds:
   esbuild: true
   foundry-vtt-types: true
   svelte-preprocess: true
+minimumReleaseAgeExclude:
+  # The resolver is the maintainer's own package, released and adopted the same day.
+  - "@mondarth/fvtt-resolver"

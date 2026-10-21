@@ -108,6 +108,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@mondarth/fvtt-resolver':
+        specifier: 0.6.0
+        version: 0.6.0
     devDependencies:
       '@commitlint/cli':
         specifier: 21.2.3
@@ -566,6 +570,10 @@ packages:
 
   '@massifrg/prosemirror-tables-sections@0.6.3':
     resolution: {integrity: sha512-DTYZuYrisLpxu7YzYpIJ0gEx2dSAXQ/Zg+Up505VUbsD1+8kFKYzIoKiX+gAk87OTrdCi0VQOg1NREV9MXMN0Q==}
+
+  '@mondarth/fvtt-resolver@0.6.0':
+    resolution: {integrity: sha512-F+a3fOlnAhtPONY+4YV+F8PqRCmp9BMkjEZhS8ZCnD5OtFBUmn8PPXoqZ79f1Yfs3DR2S5IocSIwQ4rNnbuEjg==}
+    engines: {node: '>=24'}
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     resolution: {integrity: sha512-oTXEIha4SsuXdTA4Iyskj0kpdx2yVXdhd75c2v3xGrHFfVMsbhTPZU/nMPL4sWKo4pBHm3aucLaqGlF696dTyQ==}
@@ -4248,6 +4256,9 @@ packages:
   zod@4.6.5:
     resolution: {integrity: sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==}
 
+  zod@4.6.7:
+    resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
+
 snapshots:
 
   '@actions/core@3.0.1':
@@ -4734,6 +4745,10 @@ snapshots:
       prosemirror-state: 1.4.4
       prosemirror-transform: 1.12.2
       prosemirror-view: 1.42.6
+
+  '@mondarth/fvtt-resolver@0.6.0':
+    dependencies:
+      zod: 4.6.7
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     optional: true
@@ -8256,3 +8271,5 @@ snapshots:
   zimmerframe@1.1.5: {}
 
   zod@4.6.5: {}
+
+  zod@4.6.7: {}

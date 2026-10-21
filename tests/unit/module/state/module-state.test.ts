@@ -450,6 +450,78 @@ describe('ModuleState', () => {
     });
   });
 
+  describe('hypothetical mode', () => {
+    test('is off until entered, with nothing staged before it or in it', () => {
+      const state = createState();
+      state.setActive('a', true);
+
+      expect(state.hypothetical).toBe(false);
+      expect(state.stagedBeforeHypothetical).toBe(false);
+      expect(state.changedInHypothetical).toBe(false);
+    });
+
+    test('remembers what was staged on entering, and knows what changed since', () => {
+      const state = createState();
+      state.setActive('a', true);
+
+      state.enterHypothetical();
+      expect(state.hypothetical).toBe(true);
+      expect(state.stagedBeforeHypothetical).toBe(true);
+      expect(state.changedInHypothetical).toBe(false);
+
+      state.setActive('c', true);
+      expect(state.changedInHypothetical).toBe(true);
+      state.setActive('c', false);
+      expect(state.changedInHypothetical).toBe(false);
+    });
+
+    test('knows when nothing was staged before it, however much is staged in it', () => {
+      const state = createState();
+      state.enterHypothetical();
+
+      state.setActive('a', true);
+
+      expect(state.stagedBeforeHypothetical).toBe(false);
+      expect(state.dirty).toBe(true);
+    });
+
+    test('resets to what was staged on entering, staying in the mode', () => {
+      const state = createState();
+      state.setActive('a', true);
+      state.enterHypothetical();
+      state.setActive('c', true);
+      state.setActive('b', false);
+      state.select('active', 'd');
+
+      state.resetHypothetical();
+
+      expect(state.hypothetical).toBe(true);
+      expect(state.changes).toEqual({ a: true });
+      expect(state.selected('active').size).toBe(0);
+    });
+
+    test('restores what was staged on leaving', () => {
+      const state = createState();
+      state.setActive('a', true);
+      state.enterHypothetical();
+      state.setActive('e', true);
+
+      state.leaveHypothetical();
+
+      expect(state.hypothetical).toBe(false);
+      expect(state.changes).toEqual({ a: true });
+    });
+
+    test('changes nothing when reset outside the mode', () => {
+      const state = createState();
+      state.setActive('a', true);
+
+      state.resetHypothetical();
+
+      expect(state.changes).toEqual({ a: true });
+    });
+  });
+
   describe('markSaved', () => {
     test('makes the staged activation the new baseline', () => {
       const state = createState();

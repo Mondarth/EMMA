@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
+import { tick } from 'svelte';
 import { beforeEach, describe, expect, test } from 'vitest';
 
 import ListView from '@component/ListView.svelte';
@@ -8,6 +9,7 @@ import { DrawerFields } from '@module/state/drawer-fields.svelte';
 import { ModuleState } from '@module/state/module-state.svelte';
 import { moduleEntry } from '../mocks/entries';
 import { installFoundryMocks } from '../mocks/foundry';
+import { loadedVersions } from '../mocks/versions';
 import { createModules } from './fixtures';
 
 /**
@@ -437,5 +439,57 @@ describe('ListView', () => {
     expect(outline()).toEqual(['app', 'extra', 'lib']);
     // Still locked: grouping only changes how the list is arranged.
     expect(screen.getByRole('checkbox', { name: 'lib' })).toBeDisabled();
+  });
+
+  describe('hypothetical versions', () => {
+    const CHOOSE = 'MONDARTH-EMMA.Versions.Choose {"module":"libWrapper","version":"1.13.2"}';
+
+    test('replaces the badge of a module with versions to choose by a picker, in the badge’s colours', async () => {
+      const { state } = await loadedVersions({ 'lib-wrapper': ['1.13.2', '1.14.0'], emma: ['0.1.0'] });
+      render(ListView, { modules: createModules(), canManage: true, fields: new DrawerFields(), versions: state });
+
+      const picker = screen.getByRole('button', { name: CHOOSE });
+      expect(picker.querySelector('.emma-badge')).toHaveClass('success');
+      // EMMA has only the one version, and Dice So Nice! is not active.
+      expect(screen.getAllByRole('button', { name: /^MONDARTH-EMMA\.Versions\.Choose/ })).toHaveLength(1);
+    });
+
+    test('shows the version chosen', async () => {
+      const { state } = await loadedVersions({ 'lib-wrapper': ['1.13.2', '1.14.0'] }, { bad: ['1.14.0'] });
+      render(ListView, { modules: createModules(), canManage: true, fields: new DrawerFields(), versions: state });
+
+      await userEvent.click(screen.getByRole('button', { name: CHOOSE }));
+      await userEvent.click(screen.getAllByRole('option')[0] as HTMLElement);
+
+      const picker = screen.getByRole('button', {
+        name: 'MONDARTH-EMMA.Versions.Choose {"module":"libWrapper","version":"1.14.0"}',
+      });
+      expect(picker.querySelector('.emma-badge')).toHaveClass('error');
+      expect(picker).toHaveFocus();
+    });
+
+    test('shows the badge judged in the setup for a module with no other version, re-judged as the setup changes', async () => {
+      const { state } = await loadedVersions(
+        { emma: ['0.1.0'] },
+        { platforms: { system: ['5.1.0', '5.2.0'] }, bad: ['5.2.0'] },
+      );
+      render(ListView, { modules: createModules(), canManage: true, fields: new DrawerFields(), versions: state });
+      const badge = () =>
+        screen.getByText('EMMA', { selector: '.emma-module-title' }).closest('li')?.querySelector('.emma-badge');
+      expect(badge()).toHaveAttribute('data-tooltip-html', '0.1.0 success');
+
+      state.choosePlatform('system', '5.2.0');
+
+      await tick();
+      expect(badge()).toHaveAttribute('data-tooltip-html', '0.1.0 error');
+      // Nothing to choose, so still no picker.
+      expect(screen.queryByRole('button', { name: /^MONDARTH-EMMA\.Versions\.Choose \{"module":"EMMA"/ })).toBeNull();
+    });
+
+    test('shows the installed badges without them', () => {
+      render(ListView, { modules: createModules(), canManage: true, fields: new DrawerFields() });
+
+      expect(screen.queryByRole('button', { name: /^MONDARTH-EMMA\.Versions\.Choose/ })).toBeNull();
+    });
   });
 });

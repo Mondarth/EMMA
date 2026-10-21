@@ -43,6 +43,7 @@ describe('module entry point', () => {
 
     expect(game.settings.register).toHaveBeenCalledWith('mondarth-emma', 'disabled', expect.any(Object));
     expect(game.settings.registerMenu).toHaveBeenCalledWith('mondarth-emma', 'drawerFieldsMenu', expect.any(Object));
+    expect(game.settings.registerMenu).toHaveBeenCalledWith('mondarth-emma', 'versionProxyMenu', expect.any(Object));
     expect(hooks.on).toHaveBeenCalledWith('renderSettings', expect.any(Function));
   });
 

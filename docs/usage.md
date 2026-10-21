@@ -150,6 +150,121 @@ window with your choice changed and not saved asks first whether to discard the 
 EMMA remembers the view you last chose, separately for each user and on every device you play on. The list view is shown
 until you choose otherwise.
 
+## Hypothetical mode
+
+GMs have a **Hypothetical mode** button, a flask, at the far left of the toolbar. Click it to turn the mode on; it
+stays pressed while on, and two buttons appear just to its right:
+
+- **Core**, showing the Foundry version you are running, such as `14.368`.
+- **System**, showing the ID and version of the game system in use, such as `dnd5e 5.1.0`. Hover over it for the
+  system's full name.
+
+When you turn the mode on, EMMA looks up the versions of Foundry, the game system and every module staged active, using
+[@mondarth/fvtt-resolver](https://www.npmjs.com/package/@mondarth/fvtt-resolver). While the mode is on, a module
+you stage active, by checking it or moving it to the active side, is looked up then. Each module is looked up only
+once while EMMA is open. A spinner shows beside the System button while it looks.
+
+### Choosing versions
+
+Once the versions are found, each module staged active that has a newer version than the one installed has its
+version badge replaced by a drop-down, in the same colours. Click it, or **Tab** to it and press **Enter**, to list
+the module's newer versions, newest first. The version shown on the badge is left out of the list, and once you
+have chosen a newer version, the installed one is listed too, to go back to. Each version has the badge Foundry would give
+it: green when verified for your Foundry version, red when it needs another Foundry version or a module it requires
+is missing, and so on. Hover over a version for Foundry's explanation.
+
+Choose a version to see it on the module's badge. Nothing in the world changes: choosing only changes how other
+versions are judged. Each version is checked against the core, the system and the modules staged active at their
+chosen versions, so staging a module active or inactive judges every badge again: a module whose required module
+is staged inactive, for instance, turns red. Modules with no newer version have no drop-down, but their badges are
+judged the same way, so they change too.
+
+| To                         | Mouse                    | Keyboard, list view                         |
+| -------------------------- | ------------------------ | ------------------------------------------- |
+| Open a module's versions   | Click its badge          | **Tab** to the badge, then **Enter**        |
+| Move through the versions  | Point at a version       | **↑**, **↓**, **Home**, **End**             |
+| Choose a version           | Click it                 | **Enter** or **Space**                      |
+| Close without choosing     | Click elsewhere          | **Escape**                                  |
+
+In the split view, the badges are mouse-only, as the lists handle the keyboard themselves.
+
+### Choosing the Foundry and system versions
+
+The **Core** and **System** buttons become drop-downs too, marked with a caret, once a newer version of Foundry or of
+the game system is found. They open, and are driven from the keyboard, as a module's badge is. Foundry versions are
+offered from the release channel of the build you are running or a more stable one: on a stable build, only newer
+stable builds; on a testing build, testing builds too.
+
+Each version in these lists is coloured by how well the setup it would make fits: by the worst badge it would leave
+the game system or a module staged active with. Hover over a version to see which packages will not work with it, and
+which may not. Choose a version to see it on the button; every module's badge is then judged again against it.
+
+### Reporting on the setup
+
+Just right of the **System** button, the report button (a clipboard) opens a report on the setup hypothetical mode
+shows: the Foundry version, the system and the modules staged active, at the versions chosen. It is enabled once the
+versions are looked up. Pick what the report shows under **Report style**:
+
+- **Plan** (shown first): the active modules in the order to install them, numbered, in three columns: each module's
+  ID, its name, and a manifest URL for the version chosen alone, such as a GitHub release's own `module.json`, so that
+  installing from it installs that version. A module's own manifest URL usually gives whatever version is newest, so
+  it is never shown; where no source gives a URL for the version, the plan says _none for this version_. The proxy
+  lets EMMA find more of them. The plan is in two lists, each under its title and numbered from 1: first the modules
+  to install (a version other than the one installed, or a module not installed), then those kept at the version
+  installed. In each, a module comes before the modules that depend on it: the modules are ordered by how deep the
+  tree of active modules depending on each one goes, deepest first, so the libraries others build on come first.
+- **Check**: whether every package can be used in the setup, then every active module with its badge, Foundry's
+  verdict and, in words, everything found about it: what keeps it from being used (a module it depends on at the wrong
+  version, a system it does not run in), what it prefers and is not given (a Foundry version or system version it is
+  not verified with), what it advises (a module it recommends that is not active), and whether it is not known, or
+  known only from a listing and so checked without its dependencies.
+- **Update**: the best versions of the active modules for the Foundry version and system chosen: the newest version of
+  each that works with the others' and with that Foundry version and system, whatever module versions you chose. A
+  version that is only a compatibility risk (not verified for this Foundry, but not ruled out) is acceptable; one that
+  needs another Foundry version, does not support the system version, or declares no compatibility at all is not, nor
+  is a pre-release. It lists the versions to change, and modules an active module needs that it would add; or, when no
+  versions work together, explains why in numbered sentences. It may need the manifests of versions known only from a
+  listing, which it tries to fetch, so it can take a moment; versions whose manifests could not be loaded are named.
+  Without a proxy, versions known only from GitHub cannot be read, so are not taken.
+
+When the **Update** changes any version, a button (a wand) just left of the download button chooses the versions it
+recommends in the hypothetical setup, as if you had picked each from its drop-down. Every other choice is left as it
+is, and nothing in the world changes. A module the update would add, which is not active, is given its version but not
+staged active. Every style of the report then reports on the setup with those versions, without closing the window:
+the **Update** is worked out again, and the plan and the check follow.
+
+The button beside **Report style** downloads the report shown as a plain text file (`emma-plan.txt`,
+`emma-check.txt` or `emma-update.txt`). The report shows the setup as it was when opened; choose other versions and
+open it again to report afresh.
+
+### Where versions come from
+
+Browsers may not read Foundry's own package listing, its release notes, or the manifests attached to GitHub
+releases, because those sites send no CORS headers. Without a proxy, EMMA lists the versions released on GitHub and
+GitLab, but does not know which Foundry versions those releases support, so Foundry marks them **Compatibility
+unknown**; and as it cannot read Foundry's release notes, it offers no newer Foundry version. A note in the footer
+says so while the mode is on. A warning beside the System button names the packages whose versions could not all be
+looked up.
+
+For a fuller picture, a GM can set a **Version lookup proxy** (see [Settings](#settings)): EMMA then reads Foundry's
+package listing and release notes through it, so each version is judged on the Foundry versions it declares, and
+newer Foundry builds are offered.
+
+### Staging in hypothetical mode
+
+Hypothetical mode is for trying setups out, so nothing in it is saved:
+
+- **Save** is disabled while the mode is on.
+- **Reset** undoes everything done in the mode, both the modules staged or unstaged and the versions chosen, and
+  restores what was staged when you turned the mode on, including changes you staged before it. You stay in the mode.
+- Turning the mode off, by clicking the flask again, does the same: everything done in it is discarded, and what you
+  had staged before is back, ready to save. The versions looked up are kept until EMMA closes, so turning the mode on
+  again does not look them up again.
+- Closing EMMA while the mode is on asks first only if you had staged changes before turning it on; what was staged in
+  the mode is discarded without asking.
+
+Hypothetical mode is not remembered: it is off each time EMMA opens. Players are not offered it.
+
 ## Saving
 
 Changes you make in either view are staged, not applied: the footer counts them, and modules you have changed are
@@ -180,6 +295,21 @@ Automatically activate/deactivate recommended modules
 Module details
 : A menu every user can open under **Game Settings**, choosing the details their drawers show for themselves. See
   [Module details](#module-details).
+
+Version lookup proxy
+: A menu under **Game Settings** for GMs only (Foundry shows it only to users who may change configuration
+  settings). Its **Set proxy** button opens a window with two fields:
+
+  - **Proxy URL**: the URL of a CORS proxy for hypothetical mode to look versions up through, with `{url}` where
+    the address to fetch goes, such as `https://proxy.example.com/?url={url}`. Shared by the whole world and blank by
+    default. Every request hypothetical mode makes is sent through it, so use only a proxy you trust. The window
+    will not save a URL without `{url}`.
+  - **API key**: sent to the proxy in an `X-API-Key` header, for a proxy that asks for one. Blank by default, and
+    never sent without a proxy. It is kept only in the browser it is entered in, as Foundry sends every world and
+    user setting to every user who joins, where any player could read it. Each GM enters it once on each browser
+    they use.
+
+  See [Where versions come from](#where-versions-come-from).
 
 ## The API
 

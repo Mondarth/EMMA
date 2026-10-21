@@ -3,11 +3,12 @@
   import { lockedTooltip } from '@module/lib/locked';
   import type { DrawerFields } from '@module/state/drawer-fields.svelte';
   import type { ModuleRow } from '@module/state/grouping';
+  import type { HypotheticalState } from '@module/state/hypothetical.svelte';
   import type { ModuleState } from '@module/state/module-state.svelte';
 
   import DisclosureButton from './DisclosureButton.svelte';
   import ModuleDrawer from './ModuleDrawer.svelte';
-  import VersionBadge from './VersionBadge.svelte';
+  import ModuleVersion from './ModuleVersion.svelte';
 
   interface Props {
     /** The modules to show and stage changes in. */
@@ -18,9 +19,11 @@
     fields: DrawerFields;
     /** Whether related modules are grouped under the modules that relate to them, or every module listed flat. */
     grouped?: boolean;
+    /** Hypothetical mode's versions while it is on, offering a choice of version for each active module. */
+    versions?: HypotheticalState | undefined;
   }
 
-  const { modules, canManage, fields, grouped = true }: Props = $props();
+  const { modules, canManage, fields, grouped = true, versions }: Props = $props();
 
   const rows: readonly ModuleRow[] = $derived(
     grouped ? modules.rows : modules.entries.map(entry => ({ key: entry.id, entry, depth: 0, relation: null })),
@@ -119,7 +122,7 @@
             {/if}
             <span class="emma-module-title">{entry.title}</span>
           </label>
-          <span class="emma-module-version"><VersionBadge version={entry.version} badge={entry.badge} /></span>
+          <span class="emma-module-version"><ModuleVersion {entry} {versions} /></span>
           <DisclosureButton
             title={entry.title}
             {expanded}
