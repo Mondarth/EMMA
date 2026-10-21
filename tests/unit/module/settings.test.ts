@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import {
   getDrawerFields,
   getVersionProxy,
+  getVersionProxyKey,
   getView,
   isAutoRecommended,
   isEmmaDisabled,
@@ -10,6 +11,7 @@ import {
   registerSettings,
   setDrawerFields,
   setGrouped,
+  setVersionProxy,
   setView,
 } from '@module/settings';
 import { drawerFields } from '@module/state/drawer-fields.svelte';
@@ -214,16 +216,14 @@ describe('isGrouped', () => {
 });
 
 describe('getVersionProxy', () => {
-  test('registers the world setting for GMs to configure, with no proxy by default', () => {
+  test('registers a world setting, set in the GM-only menu, with no proxy by default', () => {
     const { game } = installFoundryMocks();
 
     registerSettings();
 
     expect(game.settings.register).toHaveBeenCalledWith('mondarth-emma', 'versionProxy', {
-      name: 'MONDARTH-EMMA.Settings.VersionProxy.Name',
-      hint: 'MONDARTH-EMMA.Settings.VersionProxy.Hint',
       scope: 'world',
-      config: true,
+      config: false,
       type: String,
       default: '',
     });
@@ -242,5 +242,46 @@ describe('getVersionProxy', () => {
     registerSettings();
 
     expect(getVersionProxy()).toBeNull();
+  });
+});
+
+describe('getVersionProxyKey', () => {
+  test('registers a client setting, kept in this browser, with no key by default', () => {
+    const { game } = installFoundryMocks();
+
+    registerSettings();
+
+    // Not world or user: Foundry sends those to every user who joins.
+    expect(game.settings.register).toHaveBeenCalledWith('mondarth-emma', 'versionProxyKey', {
+      scope: 'client',
+      config: false,
+      type: String,
+      default: '',
+    });
+    expect(getVersionProxyKey()).toBeNull();
+  });
+
+  test('is the key set, trimmed, or none when it is blank', () => {
+    installFoundryMocks({ settings: { 'mondarth-emma.versionProxyKey': ' k3y ' } });
+    registerSettings();
+    expect(getVersionProxyKey()).toBe('k3y');
+
+    installFoundryMocks({ settings: { 'mondarth-emma.versionProxyKey': '  ' } });
+    registerSettings();
+    expect(getVersionProxyKey()).toBeNull();
+  });
+});
+
+describe('setVersionProxy', () => {
+  test('saves the proxy and its key, trimmed', async () => {
+    const { game } = installFoundryMocks();
+    registerSettings();
+
+    await setVersionProxy(' https://proxy.test/?url={url} ', ' k3y ');
+
+    expect(game.settings.set).toHaveBeenCalledWith('mondarth-emma', 'versionProxy', 'https://proxy.test/?url={url}');
+    expect(game.settings.set).toHaveBeenCalledWith('mondarth-emma', 'versionProxyKey', 'k3y');
+    expect(getVersionProxy()).toBe('https://proxy.test/?url={url}');
+    expect(getVersionProxyKey()).toBe('k3y');
   });
 });

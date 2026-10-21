@@ -157,6 +157,8 @@ const sessionCache = memoryCache();
 export interface FindOptions {
   /** A CORS proxy URL template containing `{url}`, or `null` to fetch directly. */
   readonly proxy: string | null;
+  /** An API key to send the proxy, in an `X-API-Key` header, or `null` for none. Never sent without a proxy. */
+  readonly apiKey?: string | null;
   /** Fetches; the browser's by default. */
   readonly fetch?: typeof globalThis.fetch;
   /** Where fetched data is kept; for the session by default. */
@@ -199,6 +201,20 @@ function direct(send: typeof globalThis.fetch): typeof globalThis.fetch {
 }
 
 /**
+ * Send requests with an API key, for a proxy that asks for one.
+ * @param send - The fetch to send them with
+ * @param apiKey - The key, sent in an `X-API-Key` header
+ * @returns A fetch that adds the key to every request
+ */
+function withApiKey(send: typeof globalThis.fetch, apiKey: string): typeof globalThis.fetch {
+  return (input, init) => {
+    const headers = new Headers(init?.headers);
+    headers.set('X-API-Key', apiKey);
+    return send(input, { ...init, headers });
+  };
+}
+
+/**
  * Sort versions newest first, in Foundry's order.
  * @param versions - The versions
  * @returns A new array, newest first
@@ -223,10 +239,10 @@ function readCore(): CoreRelease {
  * @returns The judge, with nothing looked up yet
  */
 export function createVersionJudge(options: FindOptions): VersionJudge {
-  const { proxy, cache = sessionCache } = options;
+  const { proxy, apiKey = null, cache = sessionCache } = options;
   const send = options.fetch ?? globalThis.fetch.bind(globalThis);
   const http = httpClient({
-    fetch: proxy === null ? direct(send) : proxiedFetch(send, proxy),
+    fetch: proxy === null ? direct(send) : proxiedFetch(apiKey === null ? send : withApiKey(send, apiKey), proxy),
     cache,
     budget: { maxRequests: MAX_REQUESTS },
   });

@@ -27,7 +27,7 @@ adapters is plain TypeScript and Svelte, tested without a Foundry server.
   the proxy setting only (the resolver's `proxiedFetch`), Foundry's package listing and, with the system, Foundry's
   core builds from its release notes (`foundryCoreReleases`). Without a proxy it never asks a host that sends no CORS
   headers (GitHub's release downloads, foundryvtt.com), as the browser could not read the answer and would log an
-  error.
+  error. With a proxy, an API key set for it goes with every request in an `X-API-Key` header.
   Modules are looked up one by one as they are needed (`VersionJudge.lookUp`), as GitHub allows 60 requests an hour
   without a token. It offers the installed version and the newer ones, and judges a version with the resolver's
   `check`, in the setup of the core, the system and the other modules staged active at their chosen versions, and turns the verdict into a badge with Foundry's public `Module.getVersionBadge`, so the colours
@@ -59,11 +59,14 @@ adapters is plain TypeScript and Svelte, tested without a Foundry server.
   inactive, for the user to confirm), and moving modules follows the same activation rules as checking them.
 
 `src/module/app/`
-: The `ApplicationV2` windows. `EmmaApp` is EMMA itself, and `DrawerFieldsConfig` the Module details settings menu,
-  registered with `game.settings.registerMenu` and open to every user, in which they choose the details drawers show.
-  Each mounts its Svelte component on first render and unmounts it on close. Both ask before closing with unsaved
-  changes (staged activation in `EmmaApp`, a changed `DrawerFieldsDraft` in the menu), through `confirmDiscard` in
-  `confirm-discard.ts`; `close({ discard: true })` closes without asking.
+: The `ApplicationV2` windows. `EmmaApp` is EMMA itself; `DrawerFieldsConfig` is the Module details settings menu,
+  registered with `game.settings.registerMenu` and open to every user, in which they choose the details drawers show;
+  and `VersionProxyConfig` is the Version lookup proxy menu, registered `restricted`, so Foundry shows it only to
+  users who may change configuration settings, in which a GM sets the proxy (a world setting) and its API key. The key
+  is a client setting, kept in the browser's local storage, because Foundry sends every world and user setting to
+  every user who joins. Each mounts its Svelte component on first render and unmounts it on close. All three ask
+  before closing with unsaved changes (staged activation in `EmmaApp`, a changed draft in the menus), through
+  `confirmDiscard` in `confirm-discard.ts`; `close({ discard: true })` closes without asking.
 
 `src/component/`
 : The Svelte components. They read and change a `ModuleState` and never use `game` directly; text comes through

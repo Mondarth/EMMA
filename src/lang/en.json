@@ -130,7 +130,19 @@
       },
       "VersionProxy": {
         "Name": "Version lookup proxy",
-        "Hint": "Browsers may not read Foundry's package listing or most module manifests, so hypothetical mode can only list versions published on GitHub or GitLab, without knowing which suit this world. To look further, enter the URL of a CORS proxy you trust, with {url} where the address to fetch goes, such as https://proxy.example.com/?url={url}. Leave blank to use no proxy."
+        "Label": "Set proxy",
+        "Hint": "Browsers may not read Foundry's package listing, its release notes or most module manifests, so hypothetical mode finds fewer versions, without knowing which suit this world. Set a CORS proxy you trust to look further.",
+        "Title": "EMMA - version lookup proxy",
+        "Url": "Proxy URL",
+        "UrlHint": "The URL of a CORS proxy you trust, with {url} where the address to fetch goes, such as https://proxy.example.com/?url={url}. Every lookup is sent through it. Leave blank to use no proxy.",
+        "Invalid": "The URL needs {url} where the address to fetch goes.",
+        "Key": "API key",
+        "KeyHint": "Sent to the proxy in an X-API-Key header, for a proxy that asks for one. Kept in this browser only, so other users never see it: enter it again on each browser you use. Leave blank to send none.",
+        "Save": "Save",
+        "Discard": {
+          "Title": "Discard proxy changes?",
+          "Body": "The proxy changes you made have not been saved. Closing the window discards them."
+        }
       },
       "Fields": {
         "Name": "Module details",
@@ -149,7 +161,8 @@
     "Errors": {
       "OpenFailed": "EMMA could not open, so Foundry's Module Management window has been opened instead. See the console for details.",
       "SaveFailed": "EMMA could not save which modules are active. See the console for details.",
-      "FieldsFailed": "EMMA could not save which module details to show. See the console for details."
+      "FieldsFailed": "EMMA could not save which module details to show. See the console for details.",
+      "ProxyFailed": "EMMA could not save the version lookup proxy. See the console for details."
     }
   }
 }

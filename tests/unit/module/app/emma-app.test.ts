@@ -161,10 +161,17 @@ describe('EmmaApp', () => {
     ).toHaveTextContent('MONDARTH-EMMA.Toolbar.System {"id":"pf2e","version":"7.0.1"}');
   });
 
-  test('looks versions up for GMs through the proxy set', async () => {
-    const send = vi.fn(() => Promise.reject(new TypeError('Failed to fetch')));
+  test('looks versions up for GMs through the proxy set, with its API key', async () => {
+    const send = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
+      Promise.reject(new TypeError('Failed to fetch')),
+    );
     vi.stubGlobal('fetch', send);
-    const { EmmaApp } = await loadApp({ settings: { 'mondarth-emma.versionProxy': 'https://proxy.test/?url={url}' } });
+    const { EmmaApp } = await loadApp({
+      settings: {
+        'mondarth-emma.versionProxy': 'https://proxy.test/?url={url}',
+        'mondarth-emma.versionProxyKey': 'k3y',
+      },
+    });
     await new EmmaApp().render({ force: true });
 
     await userEvent.click(screen.getByRole('button', { name: 'MONDARTH-EMMA.Toolbar.Hypothetical' }));
@@ -176,6 +183,7 @@ describe('EmmaApp', () => {
       `https://proxy.test/?url=${encodeURIComponent('https://r2.foundryvtt.com/package-api-public/index-latest.json')}`,
       expect.anything(),
     );
+    expect(new Headers(send.mock.calls[0]?.[1]?.headers).get('X-API-Key')).toBe('k3y');
   });
 
   test('does not offer players hypothetical mode', async () => {

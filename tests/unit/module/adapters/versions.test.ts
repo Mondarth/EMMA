@@ -80,7 +80,7 @@ function urlOf(input: RequestInfo | URL): string {
  */
 function fakeFetch(routes: [string, unknown][]) {
   const answers = new Map(routes);
-  return vi.fn((input: RequestInfo | URL): Promise<Response> => {
+  return vi.fn((input: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
     const url = urlOf(input);
     const body = answers.get(url);
     if (body === undefined) return Promise.reject(new TypeError('Failed to fetch'));
@@ -164,6 +164,17 @@ describe('createVersionJudge without a proxy', () => {
     await judge.lookUp(['dice']);
 
     expect(judge.judgeChoices(['dice'], { modules: new Map() }).get('dice')?.badge?.type).toBe('success');
+  });
+
+  test('never sends an API key without a proxy', async () => {
+    installFoundryMocks({ modules: { dice: onGithub('owner/dice', {}) } });
+    const send = fakeFetch([githubReleases('owner/dice', ['1.0.0'])]);
+    const judge = createVersionJudge({ proxy: null, apiKey: 'k3y', fetch: send, cache: memoryCache() });
+
+    await judge.lookUp(['dice']);
+
+    expect(send).toHaveBeenCalled();
+    for (const [, init] of send.mock.calls) expect(new Headers(init?.headers).has('X-API-Key')).toBe(false);
   });
 
   test('never asks for Foundry’s listing, which browsers may not read', async () => {
@@ -256,6 +267,17 @@ describe('createVersionJudge through a proxy', () => {
     expect(urls.every(url => url.startsWith('https://proxy.test/?url='))).toBe(true);
     expect(urls).toContain(PROXY.replace('{url}', encodeURIComponent(INDEX)));
     expect(judge.versionsOf('dice')).toEqual(['2.0.0', '1.5.0', '1.0.0']);
+  });
+
+  test('sends the API key to the proxy with every request', async () => {
+    installFoundryMocks({ modules: { dice: onGithub('owner/dice', { version: '1.0.0' }) } });
+    const send = fakeFetch(proxied([index, details, githubReleases('owner/dice', [])]));
+    const judge = createVersionJudge({ proxy: PROXY, apiKey: 'k3y', fetch: send, cache: memoryCache() });
+
+    await judge.lookUp(['dice']);
+
+    expect(send).toHaveBeenCalled();
+    for (const [, init] of send.mock.calls) expect(new Headers(init?.headers).get('X-API-Key')).toBe('k3y');
   });
 
   test('shows a version that needs a newer Foundry, judged so', async () => {

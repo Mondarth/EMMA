@@ -16,6 +16,8 @@ export const SETTINGS = {
   grouped: 'grouped',
   /** A CORS proxy that hypothetical mode fetches version data through, as a URL template containing `{url}`. */
   versionProxy: 'versionProxy',
+  /** The API key sent to the proxy, kept in the GM's browser only. */
+  versionProxyKey: 'versionProxyKey',
 } as const;
 
 /** Where a proxy URL template puts the URL it fetches. */
@@ -64,11 +66,18 @@ export function registerSettings(): void {
     default: true,
   });
 
+  // Both are set in the GM-only Version lookup proxy menu. The key is a client setting, kept in the browser it is
+  // entered in: every world and user setting is sent to every user who joins, so any player could read it.
   game.settings.register(MODULE_ID, SETTINGS.versionProxy, {
-    name: 'MONDARTH-EMMA.Settings.VersionProxy.Name',
-    hint: 'MONDARTH-EMMA.Settings.VersionProxy.Hint',
     scope: 'world',
-    config: true,
+    config: false,
+    type: String,
+    default: '',
+  });
+
+  game.settings.register(MODULE_ID, SETTINGS.versionProxyKey, {
+    scope: 'client',
+    config: false,
     type: String,
     default: '',
   });
@@ -175,4 +184,23 @@ export async function setGrouped(grouped: boolean): Promise<void> {
 export function getVersionProxy(): string | null {
   const proxy = game.settings.get(MODULE_ID, SETTINGS.versionProxy).trim();
   return proxy.includes(PROXY_PLACEHOLDER) ? proxy : null;
+}
+
+/**
+ * The API key the GM has set for the version lookup proxy, in this browser.
+ * @returns The key, trimmed; `null` if none is set
+ */
+export function getVersionProxyKey(): string | null {
+  const key = game.settings.get(MODULE_ID, SETTINGS.versionProxyKey).trim();
+  return key === '' ? null : key;
+}
+
+/**
+ * Remember the version lookup proxy and its API key.
+ * @param proxy - The proxy URL template, or blank for none
+ * @param key - The API key, kept in this browser only, or blank for none
+ */
+export async function setVersionProxy(proxy: string, key: string): Promise<void> {
+  await game.settings.set(MODULE_ID, SETTINGS.versionProxy, proxy.trim());
+  await game.settings.set(MODULE_ID, SETTINGS.versionProxyKey, key.trim());
 }

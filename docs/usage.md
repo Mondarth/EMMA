@@ -247,10 +247,19 @@ Module details
   [Module details](#module-details).
 
 Version lookup proxy
-: A world setting, changed by the GM, blank by default. The URL of a CORS proxy for hypothetical mode to look
-  versions up through, with `{url}` where the address to fetch goes, such as `https://proxy.example.com/?url={url}`.
-  Every request hypothetical mode makes is sent through it, so use only a proxy you trust. A value without `{url}`
-  is ignored. See [Where versions come from](#where-versions-come-from).
+: A menu under **Game Settings** for GMs only (Foundry shows it only to users who may change configuration
+  settings). Its **Set proxy** button opens a window with two fields:
+
+  - **Proxy URL**: the URL of a CORS proxy for hypothetical mode to look versions up through, with `{url}` where
+    the address to fetch goes, such as `https://proxy.example.com/?url={url}`. Shared by the whole world and blank by
+    default. Every request hypothetical mode makes is sent through it, so use only a proxy you trust. The window
+    will not save a URL without `{url}`.
+  - **API key**: sent to the proxy in an `X-API-Key` header, for a proxy that asks for one. Blank by default, and
+    never sent without a proxy. It is kept only in the browser it is entered in, as Foundry sends every world and
+    user setting to every user who joins, where any player could read it. Each GM enters it once on each browser
+    they use.
+
+  See [Where versions come from](#where-versions-come-from).
 
 ## The API
 

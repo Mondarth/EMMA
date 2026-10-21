@@ -13,6 +13,7 @@ import type { View } from '@module/settings';
 import {
   getDrawerFields,
   getVersionProxy,
+  getVersionProxyKey,
   getView,
   isAutoRecommended,
   isGrouped,
@@ -94,8 +95,10 @@ export class EmmaApp extends foundry.applications.api.ApplicationV2 {
         initialGrouped: isGrouped(),
         canManage: canManageModules(),
         platform: isGM() ? readPlatform() : undefined,
-        // The proxy is read when the first lookup starts, so a change made before then is used.
-        createVersionJudge: isGM() ? () => createVersionJudge({ proxy: getVersionProxy() }) : undefined,
+        // The proxy and its key are read when the first lookup starts, so a change made before then is used.
+        createVersionJudge: isGM()
+          ? () => createVersionJudge({ proxy: getVersionProxy(), apiKey: getVersionProxyKey() })
+          : undefined,
         fields: drawerFields,
         onSave: () => saveModules(modules),
         onViewChange: (view: View) => {
