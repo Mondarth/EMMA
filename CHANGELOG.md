@@ -1,3 +1,10 @@
+## [0.6.0](https://github.com/Mondarth/EMMA/compare/v0.5.0...v0.6.0) (2026-10-22)
+
+### Features
+
+* **build:** build an obscured default proxy into releases ([3c96ae7](https://github.com/Mondarth/EMMA/commit/3c96ae7f0d0d67ea2b69aeac3c8aa5805bdd4f45))
+* **settings:** look versions up through EMMA's proxy by default ([039c96d](https://github.com/Mondarth/EMMA/commit/039c96d02c90fa542f3595e6f670c517abe24c48))
+
 ## [0.5.0](https://github.com/Mondarth/EMMA/compare/v0.4.0...v0.5.0) (2026-10-22)
 
 ### Features
