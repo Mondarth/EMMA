@@ -187,6 +187,11 @@ export interface FindOptions {
   readonly proxy: string | null;
   /** An API key to send the proxy, in an `X-API-Key` header, or `null` for none. Never sent without a proxy. */
   readonly apiKey?: string | null;
+  /**
+   * EMMA's version, sent to the proxy in an `X-EMMA-Version` header so its logs can say which version asks for what,
+   * or `null` for none. Never sent without a proxy: GitHub's API refuses a request with a header it does not know.
+   */
+  readonly clientVersion?: string | null;
   /** Fetches; the browser's by default. */
   readonly fetch?: typeof globalThis.fetch;
   /** Where fetched data is kept; for the session by default. */
@@ -229,15 +234,19 @@ function direct(send: typeof globalThis.fetch): typeof globalThis.fetch {
 }
 
 /**
- * Send requests with an API key, for a proxy that asks for one.
+ * Send requests with headers of the proxy's: its API key, and EMMA's version.
  * @param send - The fetch to send them with
- * @param apiKey - The key, sent in an `X-API-Key` header
- * @returns A fetch that adds the key to every request
+ * @param extra - The headers, each left out when `null`
+ * @returns A fetch that adds them to every request
  */
-function withApiKey(send: typeof globalThis.fetch, apiKey: string): typeof globalThis.fetch {
+function withHeaders(
+  send: typeof globalThis.fetch,
+  extra: Readonly<Record<string, string | null>>,
+): typeof globalThis.fetch {
+  const set = Object.entries(extra).filter((entry): entry is [string, string] => entry[1] !== null);
   return (input, init) => {
     const headers = new Headers(init?.headers);
-    headers.set('X-API-Key', apiKey);
+    for (const [name, value] of set) headers.set(name, value);
     return send(input, { ...init, headers });
   };
 }
@@ -267,10 +276,13 @@ function readCore(): CoreRelease {
  * @returns The judge, with nothing looked up yet
  */
 export function createVersionJudge(options: FindOptions): VersionJudge {
-  const { proxy, apiKey = null, cache = sessionCache } = options;
+  const { proxy, apiKey = null, clientVersion = null, cache = sessionCache } = options;
   const send = options.fetch ?? globalThis.fetch.bind(globalThis);
   const http = httpClient({
-    fetch: proxy === null ? direct(send) : proxiedFetch(apiKey === null ? send : withApiKey(send, apiKey), proxy),
+    fetch:
+      proxy === null
+        ? direct(send)
+        : proxiedFetch(withHeaders(send, { 'X-API-Key': apiKey, 'X-EMMA-Version': clientVersion }), proxy),
     cache,
     budget: { maxRequests: MAX_REQUESTS },
   });

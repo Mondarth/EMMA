@@ -101,6 +101,10 @@ jobs:
         run: pnpm exec semantic-release
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          # The default version lookup proxy, built into the release obscured (docs/developers/default-proxy.md).
+          # Without them, the release has no default proxy.
+          EMMA_DEFAULT_PROXY_URL: ${{ vars.EMMA_DEFAULT_PROXY_URL }}
+          EMMA_DEFAULT_PROXY_KEY: ${{ secrets.EMMA_DEFAULT_PROXY_KEY }}
           GIT_AUTHOR_NAME: ${{ steps.identity.outputs.name }}
           GIT_AUTHOR_EMAIL: ${{ steps.identity.outputs.email }}
           GIT_COMMITTER_NAME: ${{ steps.identity.outputs.name }}

@@ -3,7 +3,9 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "rootDir": ".",
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    // The tests import the build scripts, which import with `.ts` extensions to run under Node.
+    "allowImportingTsExtensions": true
   },
   "include": ["src/**/*", "tests/**/*"],
   // Playwright's output holds bundled JS (the trace viewer declares globals such as `ui`) that must not join the program.

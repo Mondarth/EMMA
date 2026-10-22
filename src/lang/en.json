@@ -23,7 +23,7 @@
       "Loading": "Looking up module versions…",
       "Failed": "Module versions could not be looked up. See the console for details.",
       "Unreached": "Not every version could be looked up for: {packages}.",
-      "UnreachedNoProxy": "Not every version could be looked up for: {packages}. Set a version lookup proxy in EMMA's settings to look further.",
+      "UnreachedNoProxy": "Not every version could be looked up for: {packages}. Choose a version lookup proxy in EMMA's settings to look further.",
       "Core": "Foundry Virtual Tabletop",
       "Fit": {
         "Verified": "The system and every active module are verified with this version.",
@@ -205,7 +205,7 @@
       "Changes": "Changes staged: {count}",
       "ReadOnly": "Only a GM can change which modules are active.",
       "DisablesEmma": "Saving deactivates EMMA itself, so Foundry's own Module Management window will open from then on.",
-      "NoProxy": "No version lookup proxy is set, so Foundry's package listing and release notes can't be read: fewer module versions are found, and no newer Foundry version is offered. Set a proxy in EMMA's settings to look further."
+      "NoProxy": "No version lookup proxy is used, so Foundry's package listing and release notes can't be read: fewer module versions are found, and no newer Foundry version is offered. Choose a proxy in EMMA's settings to look further."
     },
     "Requirements": {
       "Unmet": "{module} requires {missing}, which must be active too.",
@@ -235,14 +235,29 @@
       "VersionProxy": {
         "Name": "Version lookup proxy",
         "Label": "Set proxy",
-        "Hint": "Browsers may not read Foundry's package listing, its release notes or most module manifests, so hypothetical mode finds fewer versions, without knowing which suit this world. Set a CORS proxy you trust to look further.",
+        "Hint": "Browsers may not read Foundry's package listing, its release notes or most module manifests, so hypothetical mode looks versions up through a CORS proxy: EMMA's own, unless you set one you trust.",
         "Title": "EMMA - version lookup proxy",
+        "Choice": "Look versions up through",
+        "Modes": {
+          "Default": "EMMA's proxy",
+          "DefaultHint": "Recommended. A proxy run for EMMA, which only fetches package information: release lists, manifests and Foundry's package listing. It sees this server's address and the packages it looks up.",
+          "Own": "My own proxy",
+          "OwnHint": "A CORS proxy you run or trust, with its API key if it asks for one.",
+          "None": "No proxy",
+          "NoneHint": "Looks versions up directly, so finds far fewer of them and nothing newer of Foundry."
+        },
         "Url": "Proxy URL",
-        "UrlHint": "The URL of a CORS proxy you trust, with {url} where the address to fetch goes, such as https://proxy.example.com/?url={url}. Every lookup is sent through it. Leave blank to use no proxy.",
+        "UrlHint": "The URL of a CORS proxy you trust, with {url} where the address to fetch goes, such as https://proxy.example.com/?url={url}. Every lookup is sent through it.",
         "Invalid": "The URL needs {url} where the address to fetch goes.",
         "Key": "API key",
         "KeyHint": "Sent to the proxy in an X-API-Key header, for a proxy that asks for one. Kept in this browser only, so other users never see it: enter it again on each browser you use. Leave blank to send none.",
         "Save": "Save",
+        "NoProxy": {
+          "Title": "Look versions up without a proxy?",
+          "Body": "Without a proxy, hypothetical mode can read only GitHub's and GitLab's release lists and the manifests installed modules came with. It cannot read Foundry's package listing or release notes, nor the manifests of most releases, so it finds far fewer versions, offers no newer Foundry version, and judges many versions without knowing which Foundry or system they suit. GitHub also allows only 60 lookups an hour from this browser's address, which a large world can use up. EMMA's proxy has none of these limits.",
+          "Confirm": "Use no proxy",
+          "Cancel": "Keep a proxy"
+        },
         "Discard": {
           "Title": "Discard proxy changes?",
           "Body": "The proxy changes you made have not been saved. Closing the window discards them."

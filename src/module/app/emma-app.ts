@@ -14,13 +14,12 @@ import { log } from '@module/lib/logger';
 import type { View } from '@module/settings';
 import {
   getDrawerFields,
-  getVersionProxy,
-  getVersionProxyKey,
   getView,
   isAutoRecommended,
   isGrouped,
   setGrouped,
   setView,
+  versionLookup,
 } from '@module/settings';
 import { drawerFields } from '@module/state/drawer-fields.svelte';
 import { ModuleState } from '@module/state/module-state.svelte';
@@ -99,7 +98,11 @@ export class EmmaApp extends foundry.applications.api.ApplicationV2 {
         platform: isGM() ? readPlatform() : undefined,
         // The proxy and its key are read when the first lookup starts, so a change made before then is used.
         createVersionJudge: isGM()
-          ? () => createVersionJudge({ proxy: getVersionProxy(), apiKey: getVersionProxyKey() })
+          ? () =>
+              createVersionJudge({
+                ...versionLookup(),
+                clientVersion: game.modules.get(MODULE_ID)?.version ?? null,
+              })
           : undefined,
         onReport: (report: SetupReportData) => {
           showSetupReport(report).catch((error: unknown) => {
