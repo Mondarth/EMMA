@@ -81,7 +81,7 @@ export interface VersionJudge {
    */
   lookUp(ids: Iterable<string>): Promise<void>;
   /**
-   * The versions of a module that may be chosen: the installed one and every newer one found.
+   * The versions of a module that may be chosen: the installed one, the two before it and every newer one found.
    * @param id - The module ID
    * @returns The versions, newest first; none for a module not looked up
    */
@@ -243,12 +243,12 @@ function withApiKey(send: typeof globalThis.fetch, apiKey: string): typeof globa
 }
 
 /**
- * Sort versions newest first, in Foundry's order.
+ * Sort versions newest first, in Foundry's order, a leading `v` aside.
  * @param versions - The versions
  * @returns A new array, newest first
  */
 function newestFirst(versions: Iterable<string>): string[] {
-  return [...versions].sort((a, b) => Number(isNewerVersion(b, a)) - Number(isNewerVersion(a, b)));
+  return [...versions].sort((a, b) => Number(newer(b, a)) - Number(newer(a, b)));
 }
 
 /**
@@ -516,7 +516,8 @@ function platformVersions(catalogue: VersionCatalogue, part: PlatformPart): stri
 }
 
 /**
- * The versions of a module that may be chosen: the installed one and every newer one.
+ * The versions of a module that may be chosen: the installed one, the two before it, which leave a hypothetical setup
+ * some room, and every newer one.
  * @param catalogue - The releases found
  * @param versions - Every version found of each module, keyed by module ID
  * @param id - The module ID
@@ -527,8 +528,10 @@ function choosable(
   versions: ReadonlyMap<string, readonly string[]>,
   id: string,
 ): string[] {
-  const installed = catalogue.installed.get(id) ?? '';
-  return newestFirst((versions.get(id) ?? []).filter(version => !isNewerVersion(installed, version)));
+  const found = versions.get(id) ?? [];
+  const installed = catalogue.installed.get(id);
+  const floor = installed === undefined ? undefined : floorOf(installed, found);
+  return newestFirst(found.filter(version => floor === undefined || !newer(floor, version)));
 }
 
 /**

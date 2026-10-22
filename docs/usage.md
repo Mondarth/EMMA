@@ -160,23 +160,27 @@ stays pressed while on, and two buttons appear just to its right:
   system's full name.
 
 When you turn the mode on, EMMA looks up the versions of Foundry, the game system and every module staged active, using
-[@mondarth/fvtt-resolver](https://www.npmjs.com/package/@mondarth/fvtt-resolver). While the mode is on, a module
-you stage active, by checking it or moving it to the active side, is looked up then. Each module is looked up only
-once while EMMA is open. A spinner shows beside the System button while it looks.
+[@mondarth/fvtt-resolver](https://www.npmjs.com/package/@mondarth/fvtt-resolver). Only modules staged active are
+looked up, so inactive modules show their installed version's badge and no drop-down. While the mode is on, a
+module you stage active, by checking it or moving it to the active side, is looked up then: its drop-down appears
+after a second or two, once EMMA has found its versions and judged them. Each module is looked up only once while
+EMMA is open, so staging it inactive and active again shows its drop-down straight away. A spinner shows beside the
+System button while it looks.
 
 ### Choosing versions
 
-Once the versions are found, each module staged active that has a newer version than the one installed has its
-version badge replaced by a drop-down, in the same colours. Click it, or **Tab** to it and press **Enter**, to list
-the module's newer versions, newest first. The version shown on the badge is left out of the list, and once you
-have chosen a newer version, the installed one is listed too, to go back to. Each version has the badge Foundry would give
-it: green when verified for your Foundry version, red when it needs another Foundry version or a module it requires
+Once the versions are found, each module staged active that has other versions to choose has its version badge
+replaced by a drop-down, in the same colours. A module offers the version installed, the two versions before it, to
+give a hypothetical setup some room, and every newer one; anything older is left out. Click it, or **Tab** to it and
+press **Enter**, to list those versions, newest first. The version shown on the badge is left out of the list, and
+once you have chosen another version, the installed one is listed too, to go back to. Each version has the badge
+Foundry would give it: green when verified for your Foundry version, red when it needs another Foundry version or a module it requires
 is missing, and so on. Hover over a version for Foundry's explanation.
 
 Choose a version to see it on the module's badge. Nothing in the world changes: choosing only changes how other
 versions are judged. Each version is checked against the core, the system and the modules staged active at their
 chosen versions, so staging a module active or inactive judges every badge again: a module whose required module
-is staged inactive, for instance, turns red. Modules with no newer version have no drop-down, but their badges are
+is staged inactive, for instance, turns red. Modules with no other version have no drop-down, but their badges are
 judged the same way, so they change too.
 
 | To                         | Mouse                    | Keyboard, list view                         |

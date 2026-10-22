@@ -910,7 +910,7 @@ test.describe('Hypothetical versions', () => {
     await expect(picker('9.8.0')).toHaveCount(0);
   });
 
-  test('a module staged active is looked up, offering only its newer versions; staged inactive, it is not', async ({
+  test('a module staged active is looked up, offering its newer versions and the two before; staged inactive, it is not', async ({
     page,
   }) => {
     await (await moduleManagementButton(page)).click();
@@ -929,6 +929,7 @@ test.describe('Hypothetical versions', () => {
     await picker.click();
     await expect(page.getByRole('listbox', { name: `Versions of ${LIBRARY.title}` }).getByRole('option')).toHaveText([
       /^\s*2\.0\.0/,
+      /^\s*0\.9\.0/,
     ]);
     await page.keyboard.press('Escape');
 

@@ -106,12 +106,28 @@ async function lookUp(options: FoundryMockOptions, routes: [string, unknown][], 
 }
 
 describe('createVersionJudge without a proxy', () => {
-  test('offers the installed version and the newer ones GitHub releases, newest first', async () => {
+  test('offers the installed version, the two before it and the newer ones GitHub releases, newest first', async () => {
     const { judge } = await lookUp({ modules: { dice: onGithub('owner/dice', { version: '5.2.4' }) } }, [
-      githubReleases('owner/dice', ['5.1.0', '5.3.0', '6.0.0']),
+      githubReleases('owner/dice', ['4.0.0', '5.0.0', '5.1.0', '5.3.0', '6.0.0']),
     ]);
 
-    expect(judge.versionsOf('dice')).toEqual(['6.0.0', '5.3.0', '5.2.4']);
+    expect(judge.versionsOf('dice')).toEqual(['6.0.0', '5.3.0', '5.2.4', '5.1.0', '5.0.0']);
+  });
+
+  test('offers the two versions before the installed one even when it is the newest', async () => {
+    const { judge } = await lookUp({ modules: { dice: onGithub('owner/dice', { version: '0.4.0' }) } }, [
+      githubReleases('owner/dice', ['0.1.0', '0.2.0', '0.3.0', '0.4.0']),
+    ]);
+
+    expect(judge.versionsOf('dice')).toEqual(['0.4.0', '0.3.0', '0.2.0']);
+  });
+
+  test('counts the versions before one written with a leading v, as the release tags write them without', async () => {
+    const { judge } = await lookUp({ modules: { dice: onGithub('owner/dice', { version: 'v0.4.0' }) } }, [
+      githubReleases('owner/dice', ['0.1.0', '0.2.0', '0.3.0', '0.5.0']),
+    ]);
+
+    expect(judge.versionsOf('dice')).toEqual(['0.5.0', 'v0.4.0', '0.3.0', '0.2.0']);
   });
 
   test('fetches nothing until asked, and looks each module up once, the system with the first', async () => {
