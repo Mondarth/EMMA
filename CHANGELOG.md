@@ -1,3 +1,14 @@
+## [0.5.0](https://github.com/Mondarth/EMMA/compare/v0.4.0...v0.5.0) (2026-10-22)
+
+### Features
+
+* **ui:** offer two earlier versions in each module's drop-down ([d0dd9db](https://github.com/Mondarth/EMMA/commit/d0dd9dbc457d0bd40e5e1f36733f46e25cf07a4e))
+
+### Bug Fixes
+
+* **ui:** leave versions far older than the chosen one out of reports ([0868ffb](https://github.com/Mondarth/EMMA/commit/0868ffbdb9e86b14af61898af5e18cec7b8b7b30))
+* **ui:** scroll each report within its pane ([bea0417](https://github.com/Mondarth/EMMA/commit/bea041723c7b01db0cfc177bfa4aec7b2fe098f0))
+
 ## [0.4.0](https://github.com/Mondarth/EMMA/compare/v0.3.0...v0.4.0) (2026-10-21)
 
 ### Features
