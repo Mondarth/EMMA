@@ -10,6 +10,8 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { filesHolding } from '../build/default-proxy.ts';
+
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const MANIFEST = path.join(ROOT, 'module.json');
 const DOCS_CONF = path.join(ROOT, 'docs/conf.py');
@@ -68,11 +70,19 @@ function stampDocs(version: string): void {
 }
 
 /**
- * Build the bundle from a clean `dist/` so nothing stale ends up in the package.
+ * Build the bundle from a clean `dist/` so nothing stale ends up in the package, and refuse to package a build that
+ * holds the default proxy's key in plain text: it is only ever to be built in obscured.
  */
 function build(): void {
   fs.rmSync(DIST, { recursive: true, force: true });
   execFileSync('pnpm', ['build'], { cwd: ROOT, stdio: 'inherit' });
+  const key = process.env['EMMA_DEFAULT_PROXY_KEY'];
+  const leaks = key ? filesHolding(DIST, key) : [];
+  if (leaks.length > 0) {
+    throw new Error(
+      `The default proxy's key is in plain text in: ${leaks.map(file => path.relative(ROOT, file)).join(', ')}`,
+    );
+  }
 }
 
 /**

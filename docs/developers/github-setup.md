@@ -46,6 +46,10 @@ Under *Settings → Secrets and variables → Actions → Secrets*:
 | `FOUNDRY_LICENSE_KEY`   | E2E     | A Foundry VTT licence key for the test server                                     |
 | `FOUNDRY_ADMIN_KEY`     | E2E     | Any password; the tests use it to administer the test server                      |
 | `CODECOV_TOKEN`         | Dev CI  | Optional. Uploads coverage to [Codecov](https://about.codecov.io) (step 8)        |
+| `EMMA_DEFAULT_PROXY_KEY` | Release | Optional. The API key of the default version lookup proxy (see {doc}`default-proxy`) |
+
+And under *Variables*, `EMMA_DEFAULT_PROXY_URL`, the default proxy's URL template. Without both, a release has no
+default proxy.
 
 Pull requests from forks cannot read secrets, so the end-to-end tests are skipped for them.
 

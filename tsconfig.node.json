@@ -13,7 +13,9 @@
     "verbatimModuleSyntax": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
-    "noEmit": true
+    "noEmit": true,
+    // The scripts run under Node, which strips the types and needs the `.ts` extensions in their imports.
+    "allowImportingTsExtensions": true
   },
   "include": ["vite.config.ts", "scripts/**/*.ts"]
 }
