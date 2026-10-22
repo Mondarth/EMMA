@@ -5,6 +5,8 @@
  * `fvtt-types/configuration` (`SettingConfig`, `FlagConfig`, `ModuleConfig`, `Hooks.HookConfig`).
  * @see https://github.com/League-of-Foundry-Developers/foundry-vtt-types
  */
+import type { Obscured } from '@module/lib/obscure';
+
 declare module 'fvtt-types/configuration' {
   /** Everything EMMA runs is started from the `init` hook, so the parts of `game` set up by then can be assumed. */
   interface AssumeHookRan {
@@ -20,6 +22,14 @@ declare module 'fvtt-types/configuration' {
     'mondarth-emma.versionProxy': string;
     'mondarth-emma.versionProxyKey': string;
   }
+}
+
+declare global {
+  /**
+   * The default version lookup proxy a release is built with, obscured, or `null` for a build without one. Set by
+   * Vite's `define` from `scripts/build/default-proxy.ts`; read only through `defaultProxy()`.
+   */
+  const __EMMA_DEFAULT_PROXY__: { readonly url: Obscured; readonly key: Obscured } | null;
 }
 
 export {};
