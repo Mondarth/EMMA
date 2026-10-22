@@ -219,7 +219,7 @@ versions are looked up. Pick what the report shows under **Report style**:
   not verified with), what it advises (a module it recommends that is not active), and whether it is not known, or
   known only from a listing and so checked without its dependencies.
 - **Update**: the best versions of the active modules for the Foundry version and system chosen: the newest version of
-  each that works with the others' and with that Foundry version and system, whatever module versions you chose. A
+  each, from two versions before the one chosen up, that works with the others' and with that Foundry version and system. A
   version that is only a compatibility risk (not verified for this Foundry, but not ruled out) is acceptable; one that
   needs another Foundry version, does not support the system version, or declares no compatibility at all is not, nor
   is a pre-release. It lists the versions to change, and modules an active module needs that it would add; or, when no
@@ -233,9 +233,21 @@ is, and nothing in the world changes. A module the update would add, which is no
 staged active. Every style of the report then reports on the setup with those versions, without closing the window:
 the **Update** is worked out again, and the plan and the check follow.
 
+The reports consider the version chosen of each package, the two versions before it and every newer one. That gives a
+hypothetical setup some room, while older versions, which few go back to and which are the ones most often missing,
+incomplete or gone, are left out. So the **Update** never recommends a version more than two before the one chosen,
+and its explanations do not name older versions. A module an active module needs, which is not active, counts from
+its installed version, if it is installed. Each report scrolls beneath
+**Report style**, which stays in view.
+
 The button beside **Report style** downloads the report shown as a plain text file (`emma-plan.txt`,
-`emma-check.txt` or `emma-update.txt`). The report shows the setup as it was when opened; choose other versions and
-open it again to report afresh.
+`emma-check.txt` or `emma-update.txt`).
+
+The report is made when it opens, from the setup as it is then. Changing a version, the Foundry version or the system,
+or staging a module active or inactive, while it is open does not change it: it still reports on the setup it was
+opened on. To report on the setup as it is now, click **Report** again, which replaces the open report with a new one.
+The one exception is the **Update**'s button that chooses the versions it recommends: the report then follows the
+versions it chose.
 
 ### Where versions come from
 

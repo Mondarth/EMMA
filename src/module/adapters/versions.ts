@@ -380,27 +380,23 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
       platformVersions(catalogue, part).map(version =>
         fitOf(catalogue, setupOf(catalogue, active, { ...choices, [part]: version }), version),
       ),
-    reportCheck: (active, choices) =>
-      checkReport(
-        universeOf(catalogue),
-        setupOf(catalogue, active, choices),
+    reportCheck: (active, choices) => {
+      const setup = setupOf(catalogue, active, choices);
+      return checkReport(
+        reportUniverseOf(catalogue, setup),
+        setup,
         messagesOf(catalogue),
         (checked, all) => optionOf(checked, all).badge,
-      ),
-    reportPlan: (active, choices) =>
-      planReport(
-        universeOf(catalogue),
-        setupOf(catalogue, active, choices),
-        messagesOf(catalogue),
-        catalogue.installed,
-      ),
-    reportSolve: (active, choices) =>
-      solveReport(
-        universeOf(catalogue),
-        setupOf(catalogue, active, choices),
-        messagesOf(catalogue),
-        set.load.bind(set),
-      ),
+      );
+    },
+    reportPlan: (active, choices) => {
+      const setup = setupOf(catalogue, active, choices);
+      return planReport(reportUniverseOf(catalogue, setup), setup, messagesOf(catalogue), catalogue.installed);
+    },
+    reportSolve: (active, choices) => {
+      const setup = setupOf(catalogue, active, choices);
+      return solveReport(reportUniverseOf(catalogue, setup), setup, messagesOf(catalogue), set.load.bind(set));
+    },
   };
 }
 
@@ -411,6 +407,75 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
  */
 function universeOf(catalogue: VersionCatalogue): { core: readonly CoreRelease[]; releases: readonly Release[] } {
   return { core: catalogue.cores, releases: catalogue.releases };
+}
+
+/**
+ * A version without a leading `v` before its first digit, as the resolver counts `v1.1.4` and `1.1.4` as one version.
+ * @param version - The version
+ * @returns The version without the `v`
+ */
+function unprefixed(version: string): string {
+  return version.replace(/^[vV](?=\d)/, '');
+}
+
+/** How many versions before the one chosen a report still considers, to give a hypothetical setup some room. */
+const VERSIONS_BEFORE = 2;
+
+/**
+ * Whether Foundry counts one version as newer than another, a leading `v` aside.
+ * @param a - A version
+ * @param b - Another
+ * @returns Whether `a` is newer
+ */
+function newer(a: string, b: string): boolean {
+  return isNewerVersion(unprefixed(a), unprefixed(b));
+}
+
+/**
+ * The oldest version a report considers of a package: two versions before the one chosen, or the oldest known if
+ * fewer are older.
+ * @param chosen - The version chosen
+ * @param known - Every version known of the package
+ * @returns The oldest version to consider
+ */
+function floorOf(chosen: string, known: readonly string[]): string {
+  const older = newestFirst(known.map(unprefixed).filter(version => newer(chosen, version)));
+  return older[Math.min(VERSIONS_BEFORE, older.length) - 1] ?? chosen;
+}
+
+/**
+ * The releases a report considers: of the core, the system and each module, the version the setup has, the two
+ * before it and every newer one. Few go back further, and the oldest releases are the ones most often missing,
+ * incomplete or gone, which only filled the reports with versions that could not be judged. A module the setup does
+ * not have counts from its installed version, if it is installed.
+ * @param catalogue - The releases found
+ * @param setup - The setup reported on
+ * @returns The universe, without the older releases
+ */
+function reportUniverseOf(
+  catalogue: VersionCatalogue,
+  setup: Setup,
+): { core: readonly CoreRelease[]; releases: readonly Release[] } {
+  const chosen = new Map<string, string>([
+    ...[...catalogue.installed].map(([id, version]) => [packageKey({ type: 'module', id }), version] as const),
+    [setup.system.package, setup.system.version],
+    ...setup.modules.map(({ package: key, version }) => [key, version] as const),
+  ]);
+  const known = new Map<string, string[]>();
+  for (const release of catalogue.releases) {
+    const key = packageKey(release.package);
+    known.set(key, [...(known.get(key) ?? []), release.version]);
+  }
+  const floors = new Map([...chosen].map(([key, version]) => [key, floorOf(version, known.get(key) ?? [])] as const));
+  const coreFloor = floorOf(
+    setup.core,
+    catalogue.cores.map(({ version }) => version),
+  );
+  const atLeast = (version: string, floor: string | undefined) => floor === undefined || !newer(floor, version);
+  return {
+    core: catalogue.cores.filter(({ version }) => atLeast(version, coreFloor)),
+    releases: catalogue.releases.filter(release => atLeast(release.version, floors.get(packageKey(release.package)))),
+  };
 }
 
 /**

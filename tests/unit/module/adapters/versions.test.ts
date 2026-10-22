@@ -1,6 +1,7 @@
 import { memoryCache } from '@mondarth/fvtt-resolver/sources';
 import { describe, expect, test, vi } from 'vitest';
 
+import type { SetupSolve } from '@module/adapters/report';
 import { createVersionJudge } from '@module/adapters/versions';
 import type { FoundryMockOptions, ModuleMockData } from '../../mocks/foundry';
 import { installFoundryMocks } from '../../mocks/foundry';
@@ -563,5 +564,58 @@ describe('the core and the system', () => {
     expect(newest?.badge?.tooltip).toBe(
       'MONDARTH-EMMA.Versions.Fit.Unusable {"packages":"Dice &amp; Co"}<br>MONDARTH-EMMA.Versions.Fit.Unverified {"packages":"Lib"}',
     );
+  });
+});
+
+describe('the reports', () => {
+  /** Dice, installed at 4.0.0, which needs a newer core than the one in use, with 1.0.0 to 5.0.0 released. */
+  const dice = onGithub('owner/dice', { version: '4.0.0', compatibility: { minimum: '15', verified: '15' } });
+  const releases = githubReleases('owner/dice', ['1.0.0', '2.0.0', '3.0.0', '4.0.0', '5.0.0']);
+
+  /**
+   * Everything a solve says, in one string.
+   * @param solved - The solve
+   * @returns Its solution and its unloaded releases
+   */
+  const said = (solved: SetupSolve) => JSON.stringify(solved);
+
+  test('consider the version chosen of each module, the two before it and newer ones, never older', async () => {
+    const { judge, active } = await lookUp({ modules: { dice } }, [releases]);
+
+    const solved = await judge.reportSolve(active, { modules: new Map([['dice', '4.0.0']]) });
+
+    for (const version of ['2.0.0', '3.0.0', '5.0.0']) expect(said(solved)).toContain(version);
+    expect(said(solved)).not.toContain('1.0.0');
+  });
+
+  test('count from the version chosen, not the one installed', async () => {
+    const { judge, active } = await lookUp({ modules: { dice } }, [releases]);
+
+    const solved = await judge.reportSolve(active, { modules: new Map([['dice', '5.0.0']]) });
+
+    expect(said(solved)).toContain('3.0.0');
+    expect(said(solved)).not.toContain('2.0.0');
+    expect(said(solved)).not.toContain('1.0.0');
+  });
+
+  test('count a version written with a leading v as the same version, so the range is still found', async () => {
+    // socketlib's manifest gives `v1.1.4`, which Foundry reports as installed, where its release tags give `1.1.4`.
+    const prefixed = onGithub('owner/dice', { version: 'v4.0.0', compatibility: { minimum: '15', verified: '15' } });
+    const { judge, active } = await lookUp({ modules: { dice: prefixed } }, [
+      githubReleases('owner/dice', ['1.0.0', '2.0.0', '3.0.0', '5.0.0']),
+    ]);
+
+    const solved = await judge.reportSolve(active, { modules: new Map() });
+
+    for (const version of ['2.0.0', '3.0.0', '5.0.0']) expect(said(solved)).toContain(version);
+    expect(said(solved)).not.toContain('1.0.0');
+  });
+
+  test('consider every older version when fewer than two are known', async () => {
+    const { judge, active } = await lookUp({ modules: { dice } }, [releases]);
+
+    const solved = await judge.reportSolve(active, { modules: new Map([['dice', '2.0.0']]) });
+
+    expect(said(solved)).toContain('1.0.0');
   });
 });

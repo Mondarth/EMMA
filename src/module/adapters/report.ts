@@ -281,8 +281,9 @@ const BEST_VERSIONS_POLICY: Partial<Policy> = {
 
 /**
  * Find the best versions of the setup's modules: the newest of each that works with the others and with the core and
- * system of the setup, which are kept. The versions chosen of the modules count for nothing: only the best is sought.
- * @param universe - The releases known
+ * system of the setup, which are kept. The versions chosen of the modules only set how far back it may go, as the
+ * universe given holds nothing older than two versions before them; among the rest, only the best is sought.
+ * @param universe - The releases known, from two versions before the one chosen of each package up
  * @param setup - The setup chosen
  * @param messages - The wording
  * @param load - Loads releases known only from a listing, as the answer needs them
