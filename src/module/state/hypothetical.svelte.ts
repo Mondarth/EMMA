@@ -118,7 +118,7 @@ export class HypotheticalState {
   }
 
   /**
-   * Whether a module has a newer version than the one installed, so there is a version to choose.
+   * Whether a module has another version than the one installed, older or newer, so there is a version to choose.
    * @param id - The module ID
    * @returns `true` if it has versions to choose between
    */
@@ -136,9 +136,9 @@ export class HypotheticalState {
   }
 
   /**
-   * The versions of a module that may be chosen, the installed one and every newer one, each with the badge it would
-   * get with the other modules at their chosen versions. Judged afresh on each call, so call it when the versions are
-   * shown rather than for every module.
+   * The versions of a module that may be chosen, the installed one, the two before it and every newer one, each with
+   * the badge it would get with the other modules at their chosen versions. Judged afresh on each call, so call it
+   * when the versions are shown rather than for every module.
    * @param id - The module ID
    * @returns The versions, newest first
    */
