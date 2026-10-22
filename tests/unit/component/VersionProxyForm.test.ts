@@ -59,7 +59,7 @@ describe('VersionProxyForm', () => {
 
     await userEvent.click(screen.getByRole('radio', { name: `${MODES}.Own` }));
     // user-event reads `{` as the start of a key's name; `{{` types one.
-    await userEvent.type(screen.getByLabelText('MONDARTH-EMMA.Settings.VersionProxy.Url'), PROXY.replace('{', '{{'));
+    await userEvent.type(screen.getByLabelText('MONDARTH-EMMA.Settings.VersionProxy.Url'), PROXY.replaceAll('{', '{{'));
     await userEvent.type(screen.getByLabelText('MONDARTH-EMMA.Settings.VersionProxy.Key'), 'k3y');
     expect(draft.dirty).toBe(true);
     await userEvent.click(screen.getByRole('button', { name: SAVE }));
