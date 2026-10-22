@@ -1,4 +1,5 @@
 import { MODULE_ID } from '@module/lib/constants';
+import { defaultProxy } from '@module/lib/default-proxy';
 import type { DrawerField } from '@module/state/drawer-fields.svelte';
 import { DEFAULT_DRAWER_FIELDS, DRAWER_FIELDS, drawerFields, isDrawerField } from '@module/state/drawer-fields.svelte';
 
@@ -18,7 +19,14 @@ export const SETTINGS = {
   versionProxy: 'versionProxy',
   /** The API key sent to the proxy, kept in the GM's browser only. */
   versionProxyKey: 'versionProxyKey',
+  /** Which proxy hypothetical mode looks versions up through: EMMA's, the GM's own, or none. */
+  versionProxyMode: 'versionProxyMode',
 } as const;
+
+/** Which proxy hypothetical mode looks versions up through: EMMA's own (the default), the GM's own, or none. */
+export type ProxyMode = 'default' | 'own' | 'none';
+
+const PROXY_MODES: readonly string[] = ['default', 'own', 'none'] satisfies ProxyMode[];
 
 /** Where a proxy URL template puts the URL it fetches. */
 export const PROXY_PLACEHOLDER = '{url}';
@@ -77,6 +85,14 @@ export function registerSettings(): void {
 
   game.settings.register(MODULE_ID, SETTINGS.versionProxyKey, {
     scope: 'client',
+    config: false,
+    type: String,
+    default: '',
+  });
+
+  // Blank until a GM chooses, so that a world which set its own proxy before there was a choice keeps it.
+  game.settings.register(MODULE_ID, SETTINGS.versionProxyMode, {
+    scope: 'world',
     config: false,
     type: String,
     default: '',
@@ -196,11 +212,53 @@ export function getVersionProxyKey(): string | null {
 }
 
 /**
- * Remember the version lookup proxy and its API key.
- * @param proxy - The proxy URL template, or blank for none
- * @param key - The API key, kept in this browser only, or blank for none
+ * Which proxy hypothetical mode looks versions up through. Until a GM chooses, it is EMMA's own, unless the world set
+ * its own proxy before there was a choice, which it keeps.
+ * @returns The proxy chosen
  */
-export async function setVersionProxy(proxy: string, key: string): Promise<void> {
+export function getVersionProxyMode(): ProxyMode {
+  const mode = game.settings.get(MODULE_ID, SETTINGS.versionProxyMode);
+  if (PROXY_MODES.includes(mode)) return mode as ProxyMode;
+  return game.settings.get(MODULE_ID, SETTINGS.versionProxy).trim() === '' ? 'default' : 'own';
+}
+
+/** The proxy versions are looked up through, and the API key to send it. */
+export interface VersionLookup {
+  /** The proxy's URL template, or `null` to look up directly. */
+  readonly proxy: string | null;
+  /** The key to send the proxy, or `null` for none. */
+  readonly apiKey: string | null;
+}
+
+/**
+ * The proxy versions are looked up through, with its key: EMMA's proxy with EMMA's key, the GM's own with theirs, or
+ * none. EMMA's key only ever goes with EMMA's proxy, so a proxy a GM sets never receives it.
+ * @param built - EMMA's proxy as this build has it; this build's own unless given
+ * @returns The proxy and key, or nulls to look up directly
+ */
+export function versionLookup(built: Parameters<typeof defaultProxy>[0] = __EMMA_DEFAULT_PROXY__): VersionLookup {
+  switch (getVersionProxyMode()) {
+    case 'default': {
+      const proxy = defaultProxy(built);
+      return proxy === null ? { proxy: null, apiKey: null } : { proxy: proxy.url, apiKey: proxy.key };
+    }
+    case 'own': {
+      const proxy = getVersionProxy();
+      return proxy === null ? { proxy: null, apiKey: null } : { proxy, apiKey: getVersionProxyKey() };
+    }
+    default:
+      return { proxy: null, apiKey: null };
+  }
+}
+
+/**
+ * Remember the proxy chosen, and the GM's own proxy and its API key.
+ * @param mode - The proxy chosen
+ * @param proxy - The GM's own proxy URL template, or blank for none
+ * @param key - The API key for it, kept in this browser only, or blank for none
+ */
+export async function setVersionProxy(mode: ProxyMode, proxy: string, key: string): Promise<void> {
+  await game.settings.set(MODULE_ID, SETTINGS.versionProxyMode, mode);
   await game.settings.set(MODULE_ID, SETTINGS.versionProxy, proxy.trim());
   await game.settings.set(MODULE_ID, SETTINGS.versionProxyKey, key.trim());
 }

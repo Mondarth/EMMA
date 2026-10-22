@@ -21,6 +21,7 @@ declare module 'fvtt-types/configuration' {
     'mondarth-emma.grouped': boolean;
     'mondarth-emma.versionProxy': string;
     'mondarth-emma.versionProxyKey': string;
+    'mondarth-emma.versionProxyMode': string;
   }
 }
 

@@ -10,17 +10,24 @@ const SAVE = 'MONDARTH-EMMA.Settings.VersionProxy.Save';
 const URL_FIELD = 'MONDARTH-EMMA.Settings.VersionProxy.Url';
 const KEY_FIELD = 'MONDARTH-EMMA.Settings.VersionProxy.Key';
 const PROXY = 'https://proxy.test/?url={url}';
+const MODES = 'MONDARTH-EMMA.Settings.VersionProxy.Modes';
 
 /**
  * Install the Foundry mocks with EMMA's settings registered, then load a fresh copy of the menu's module, whose
  * window extends the mocked `ApplicationV2`.
  * @param options - Mock state
+ * @param build - The build loaded
+ * @param build.withDefault - Whether it has EMMA's own proxy, as a release build does
  * @returns The module and the installed mocks
  */
-async function loadMenu(options: FoundryMockOptions = {}) {
+async function loadMenu(options: FoundryMockOptions = {}, { withDefault = false } = {}) {
   const mocks = installFoundryMocks(options);
   registerSettings();
   vi.resetModules();
+  // A release build has EMMA's own proxy; test builds have none.
+  vi.doMock('@module/lib/default-proxy', () => ({
+    defaultProxy: () => (withDefault ? { url: 'https://default.test/?url={url}', key: 'default-k3y' } : null),
+  }));
   return { ...(await import('@module/app/version-proxy-config')), ...mocks };
 }
 
@@ -79,11 +86,12 @@ describe('VersionProxyConfig', () => {
     expect(key).toHaveAccessibleDescription('MONDARTH-EMMA.Settings.VersionProxy.KeyHint');
   });
 
-  test('saves the proxy and the key and closes', async () => {
+  test('saves the GM’s own proxy and its key and closes', async () => {
     const { VersionProxyConfig, game } = await loadMenu();
     const app = new VersionProxyConfig();
     await app.render({ force: true });
 
+    await userEvent.click(screen.getByRole('radio', { name: `${MODES}.Own` }));
     await retype(screen.getByLabelText(URL_FIELD), PROXY);
     await retype(screen.getByLabelText(KEY_FIELD), 'k3y');
     await userEvent.click(screen.getByRole('button', { name: SAVE }));
@@ -91,6 +99,7 @@ describe('VersionProxyConfig', () => {
     await vi.waitFor(() => {
       expect(app.rendered).toBe(false);
     });
+    expect(game.settings.get('mondarth-emma', 'versionProxyMode')).toBe('own');
     expect(game.settings.get('mondarth-emma', 'versionProxy')).toBe(PROXY);
     expect(game.settings.get('mondarth-emma', 'versionProxyKey')).toBe('k3y');
     expect(document.querySelector('.emma-proxy')).toBeNull();
@@ -100,6 +109,7 @@ describe('VersionProxyConfig', () => {
     const { VersionProxyConfig, game } = await loadMenu();
     const app = new VersionProxyConfig();
     await app.render({ force: true });
+    await userEvent.click(screen.getByRole('radio', { name: `${MODES}.Own` }));
     const url = screen.getByLabelText(URL_FIELD);
 
     await retype(url, 'https://proxy.test/');
@@ -110,9 +120,73 @@ describe('VersionProxyConfig', () => {
     await userEvent.type(url, '{Enter}');
     expect(game.settings.set).not.toHaveBeenCalled();
 
-    await retype(url, '');
+    await userEvent.click(screen.getByRole('radio', { name: `${MODES}.None` }));
     expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.getByRole('button', { name: SAVE })).toBeEnabled();
+  });
+
+  test('offers EMMA’s own proxy, chosen until the GM chooses another, in a build that has one', async () => {
+    const { VersionProxyConfig } = await loadMenu({}, { withDefault: true });
+    await new VersionProxyConfig().render({ force: true });
+
+    expect(screen.getByRole('radio', { name: `${MODES}.Default` })).toBeChecked();
+    // Its URL and key are never shown.
+    expect(screen.queryByLabelText(URL_FIELD)).toBeNull();
+    expect(document.body.textContent).not.toContain('default.test');
+  });
+
+  test('chooses no proxy in a build without EMMA’s, until the GM sets their own', async () => {
+    const { VersionProxyConfig } = await loadMenu();
+    await new VersionProxyConfig().render({ force: true });
+
+    expect(screen.queryByRole('radio', { name: `${MODES}.Default` })).toBeNull();
+    expect(screen.getByRole('radio', { name: `${MODES}.None` })).toBeChecked();
+  });
+
+  test('asks before choosing no proxy, saying what is lost, and keeps the choice if the GM thinks better of it', async () => {
+    const { VersionProxyConfig, foundry, game } = await loadMenu({}, { withDefault: true });
+    const app = new VersionProxyConfig();
+    await app.render({ force: true });
+    await userEvent.click(screen.getByRole('radio', { name: `${MODES}.None` }));
+
+    foundry.confirm.mockResolvedValueOnce(false);
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+    await vi.waitFor(() => {
+      expect(foundry.confirm).toHaveBeenCalledOnce();
+    });
+    expect(foundry.confirm.mock.calls[0]?.[0]).toMatchObject({
+      window: { title: 'MONDARTH-EMMA.Settings.VersionProxy.NoProxy.Title' },
+      content: expect.stringContaining('MONDARTH-EMMA.Settings.VersionProxy.NoProxy.Body') as unknown,
+      modal: true,
+      yes: { label: 'MONDARTH-EMMA.Settings.VersionProxy.NoProxy.Confirm', default: false },
+      no: { label: 'MONDARTH-EMMA.Settings.VersionProxy.NoProxy.Cancel', default: true },
+    });
+    expect(game.settings.set).not.toHaveBeenCalled();
+    expect(app.rendered).toBe(true);
+
+    foundry.confirm.mockResolvedValueOnce(true);
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+    await vi.waitFor(() => {
+      expect(app.rendered).toBe(false);
+    });
+    expect(game.settings.get('mondarth-emma', 'versionProxyMode')).toBe('none');
+  });
+
+  test('does not ask again when no proxy was chosen already', async () => {
+    const { VersionProxyConfig, foundry, game } = await loadMenu(
+      { settings: { 'mondarth-emma.versionProxyMode': 'none' } },
+      { withDefault: true },
+    );
+    const app = new VersionProxyConfig();
+    await app.render({ force: true });
+
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await vi.waitFor(() => {
+      expect(app.rendered).toBe(false);
+    });
+    expect(foundry.confirm).not.toHaveBeenCalled();
+    expect(game.settings.get('mondarth-emma', 'versionProxyMode')).toBe('none');
   });
 
   test('stays open and says so when saving fails', async () => {
@@ -148,6 +222,7 @@ describe('VersionProxyConfig', () => {
       const loaded = await loadMenu();
       const app = new loaded.VersionProxyConfig();
       await app.render({ force: true });
+      await userEvent.click(screen.getByRole('radio', { name: `${MODES}.Own` }));
       await retype(screen.getByLabelText(KEY_FIELD), 'k3y');
       return { app, ...loaded };
     }

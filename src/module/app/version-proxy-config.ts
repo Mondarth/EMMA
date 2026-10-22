@@ -4,9 +4,11 @@ import VersionProxyForm from '@component/VersionProxyForm.svelte';
 import type { DiscardClosingOptions, DiscardQuestion } from '@module/app/confirm-discard';
 import { confirmDiscard } from '@module/app/confirm-discard';
 import { MODULE_ID } from '@module/lib/constants';
+import { defaultProxy } from '@module/lib/default-proxy';
 import { localize } from '@module/lib/i18n';
 import { log } from '@module/lib/logger';
-import { SETTINGS, setVersionProxy } from '@module/settings';
+import type { ProxyMode } from '@module/settings';
+import { SETTINGS, getVersionProxyMode, setVersionProxy } from '@module/settings';
 import { VersionProxyDraft } from '@module/state/version-proxy.svelte';
 
 /** The key of the settings menu, without the module namespace. */
@@ -20,8 +22,25 @@ const DISCARD: DiscardQuestion = {
 };
 
 /**
- * The window in which a GM sets the CORS proxy hypothetical mode looks versions up through, and the API key sent to
- * it, opened from Game Settings. As with {@link EmmaApp}, its content is a Svelte component, the
+ * Ask before looking versions up through no proxy at all, saying what is lost. Keeping a proxy is the default.
+ * @returns `true` if the GM chose no proxy all the same
+ */
+async function confirmNoProxy(): Promise<boolean> {
+  const confirmed = await foundry.applications.api.DialogV2.confirm({
+    id: `${MODULE_ID}-no-proxy`,
+    window: { title: 'MONDARTH-EMMA.Settings.VersionProxy.NoProxy.Title' },
+    content: `<p>${localize('MONDARTH-EMMA.Settings.VersionProxy.NoProxy.Body')}</p>`,
+    modal: true,
+    yes: { label: 'MONDARTH-EMMA.Settings.VersionProxy.NoProxy.Confirm', icon: 'fa-solid fa-ban', default: false },
+    no: { label: 'MONDARTH-EMMA.Settings.VersionProxy.NoProxy.Cancel', icon: 'fa-solid fa-route', default: true },
+  });
+  return confirmed === true;
+}
+
+/**
+ * The window in which a GM chooses the CORS proxy hypothetical mode looks versions up through: EMMA's own, their own
+ * with the API key sent to it, or none, opened from Game Settings. EMMA's own is offered only by a build that has one,
+ * and its URL and key are never shown. As with {@link EmmaApp}, its content is a Svelte component, the
  * {@link VersionProxyForm}, mounted on first render and unmounted on close. Saving closes the window. Closing it with a
  * change not saved asks first, unless the caller passes `discard: true`.
  */
@@ -45,6 +64,9 @@ export class VersionProxyConfig extends foundry.applications.api.ApplicationV2 {
   /** Whether the user is being asked to confirm closing. */
   #confirming = false;
 
+  /** The choice set when the window opened, against which choosing no proxy is confirmed. */
+  #initialMode: ProxyMode = 'default';
+
   /**
    * Nothing to render: the Svelte component owns the content.
    * @returns Nothing
@@ -60,26 +82,38 @@ export class VersionProxyConfig extends foundry.applications.api.ApplicationV2 {
    */
   protected override _replaceHTML(_result: unknown, content: HTMLElement): void {
     if (this.#component !== null) return;
+    const hasDefault = defaultProxy() !== null;
+    const mode = getVersionProxyMode();
+    // A build without EMMA's own proxy looks up through none instead.
+    this.#initialMode = mode === 'default' && !hasDefault ? 'none' : mode;
     const draft = new VersionProxyDraft(
+      this.#initialMode,
       game.settings.get(MODULE_ID, SETTINGS.versionProxy),
       game.settings.get(MODULE_ID, SETTINGS.versionProxyKey),
     );
     this.#draft = draft;
     this.#component = mount(VersionProxyForm, {
       target: content,
-      props: { draft, onSave: (proxy: string, key: string) => this.#save(proxy, key) },
+      props: {
+        draft,
+        hasDefault,
+        onSave: (chosen: ProxyMode, proxy: string, key: string) => this.#save(chosen, proxy, key),
+      },
     });
   }
 
   /**
-   * Save the proxy and key and close, without asking, since nothing is left to discard. If saving fails, the user is
-   * told and the window stays open.
-   * @param proxy - The proxy URL template, or blank for none
-   * @param key - The API key, or blank for none
+   * Save the choice, and the GM's own proxy and key, and close, without asking, since nothing is left to discard.
+   * Choosing no proxy, where there was one, is confirmed first; if the GM thinks better of it, nothing is saved and the
+   * window stays open. If saving fails, the user is told and the window stays open.
+   * @param mode - The proxy chosen
+   * @param proxy - The GM's own proxy URL template, or blank for none
+   * @param key - The API key for it, or blank for none
    */
-  async #save(proxy: string, key: string): Promise<void> {
+  async #save(mode: ProxyMode, proxy: string, key: string): Promise<void> {
+    if (mode === 'none' && this.#initialMode !== 'none' && !(await confirmNoProxy())) return;
     try {
-      await setVersionProxy(proxy, key);
+      await setVersionProxy(mode, proxy, key);
     } catch (error) {
       log.error('Unable to save the version lookup proxy', error);
       ui.notifications?.error(localize('MONDARTH-EMMA.Errors.ProxyFailed'));

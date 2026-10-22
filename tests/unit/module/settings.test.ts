@@ -4,6 +4,7 @@ import {
   getDrawerFields,
   getVersionProxy,
   getVersionProxyKey,
+  getVersionProxyMode,
   getView,
   isAutoRecommended,
   isEmmaDisabled,
@@ -13,7 +14,9 @@ import {
   setGrouped,
   setVersionProxy,
   setView,
+  versionLookup,
 } from '@module/settings';
+import { obscure } from '@module/lib/obscure';
 import { drawerFields } from '@module/state/drawer-fields.svelte';
 import { installFoundryMocks } from '../mocks/foundry';
 
@@ -272,15 +275,109 @@ describe('getVersionProxyKey', () => {
   });
 });
 
+describe('getVersionProxyMode', () => {
+  test('registers a world setting, set in the GM-only menu, not yet chosen', () => {
+    const { game } = installFoundryMocks();
+
+    registerSettings();
+
+    expect(game.settings.register).toHaveBeenCalledWith('mondarth-emma', 'versionProxyMode', {
+      scope: 'world',
+      config: false,
+      type: String,
+      default: '',
+    });
+  });
+
+  test('is EMMA’s proxy until chosen, or the GM’s own where they set one before there was a choice', () => {
+    installFoundryMocks();
+    registerSettings();
+    expect(getVersionProxyMode()).toBe('default');
+
+    installFoundryMocks({ settings: { 'mondarth-emma.versionProxy': 'https://proxy.test/?url={url}' } });
+    registerSettings();
+    expect(getVersionProxyMode()).toBe('own');
+  });
+
+  test('is the choice made', () => {
+    for (const mode of ['default', 'own', 'none'] as const) {
+      installFoundryMocks({
+        settings: {
+          'mondarth-emma.versionProxyMode': mode,
+          'mondarth-emma.versionProxy': 'https://proxy.test/?url={url}',
+        },
+      });
+      registerSettings();
+      expect(getVersionProxyMode()).toBe(mode);
+    }
+  });
+});
+
+describe('versionLookup', () => {
+  /** The default proxy of a release build. */
+  const built = { url: obscure('https://default.test/?url={url}'), key: obscure('default-k3y') };
+
+  test('is EMMA’s proxy with its key, by default', () => {
+    installFoundryMocks();
+    registerSettings();
+
+    expect(versionLookup(built)).toEqual({ proxy: 'https://default.test/?url={url}', apiKey: 'default-k3y' });
+  });
+
+  test('is no proxy by default in a build without one', () => {
+    installFoundryMocks();
+    registerSettings();
+
+    expect(versionLookup(null)).toEqual({ proxy: null, apiKey: null });
+  });
+
+  test('is the GM’s own proxy with their own key, never EMMA’s key', () => {
+    installFoundryMocks({
+      settings: {
+        'mondarth-emma.versionProxyMode': 'own',
+        'mondarth-emma.versionProxy': 'https://own.test/?url={url}',
+      },
+    });
+    registerSettings();
+    expect(versionLookup(built)).toEqual({ proxy: 'https://own.test/?url={url}', apiKey: null });
+
+    installFoundryMocks({
+      settings: {
+        'mondarth-emma.versionProxyMode': 'own',
+        'mondarth-emma.versionProxy': 'https://own.test/?url={url}',
+        'mondarth-emma.versionProxyKey': 'own-k3y',
+      },
+    });
+    registerSettings();
+    expect(versionLookup(built)).toEqual({ proxy: 'https://own.test/?url={url}', apiKey: 'own-k3y' });
+  });
+
+  test('is no proxy when the GM chose none, or their own has nowhere to put the URL', () => {
+    installFoundryMocks({
+      settings: { 'mondarth-emma.versionProxyMode': 'none', 'mondarth-emma.versionProxyKey': 'k' },
+    });
+    registerSettings();
+    expect(versionLookup(built)).toEqual({ proxy: null, apiKey: null });
+
+    installFoundryMocks({
+      settings: { 'mondarth-emma.versionProxyMode': 'own', 'mondarth-emma.versionProxy': 'https://own.test/' },
+    });
+    registerSettings();
+    expect(versionLookup(built)).toEqual({ proxy: null, apiKey: null });
+  });
+});
+
 describe('setVersionProxy', () => {
-  test('saves the proxy and its key, trimmed', async () => {
+  test('saves the choice, and the GM’s own proxy and its key, trimmed', async () => {
     const { game } = installFoundryMocks();
     registerSettings();
 
-    await setVersionProxy(' https://proxy.test/?url={url} ', ' k3y ');
+    await setVersionProxy('own', ' https://proxy.test/?url={url} ', ' k3y ');
 
+    expect(game.settings.set).toHaveBeenCalledWith('mondarth-emma', 'versionProxyMode', 'own');
     expect(game.settings.set).toHaveBeenCalledWith('mondarth-emma', 'versionProxy', 'https://proxy.test/?url={url}');
     expect(game.settings.set).toHaveBeenCalledWith('mondarth-emma', 'versionProxyKey', 'k3y');
+    expect(getVersionProxyMode()).toBe('own');
     expect(getVersionProxy()).toBe('https://proxy.test/?url={url}');
     expect(getVersionProxyKey()).toBe('k3y');
   });
