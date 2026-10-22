@@ -989,6 +989,45 @@ test.describe('Hypothetical versions', () => {
     await expect(dialog).toHaveCount(0);
   });
 
+  test('a long report scrolls within its pane, keeping the report style in view', async ({ page }) => {
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+    await emma.getByRole('button', { name: 'Hypothetical mode', exact: true }).click();
+    const report = emma.getByRole('button', { name: 'Report', exact: true });
+    await expect(report).toBeEnabled();
+    await report.click();
+    const dialog = page.locator(`#${MODULE_ID}-report`);
+    const style = dialog.getByLabel('Report style');
+
+    // Too short a window for any report, as a long one is for a tall window.
+    await page.evaluate(
+      id => foundry.applications.instances.get(id)?.setPosition({ height: 200 }),
+      `${MODULE_ID}-report`,
+    );
+    for (const [option, name] of [
+      ['plan', /^Plan: /],
+      ['check', 'Check of the setup chosen'],
+    ] as const) {
+      await style.selectOption(option);
+      const pane = dialog.getByRole('region', { name }).first();
+      await expect(pane).toBeVisible();
+      expect(await pane.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
+
+      await pane.evaluate(element => {
+        element.scrollTop = element.scrollHeight;
+      });
+      expect(await pane.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+      // The pane scrolls, not the window: the controls stay where they are, inside it.
+      const [window, controls] = await Promise.all([dialog.boundingBox(), style.boundingBox()]);
+      expect(controls?.y).toBeGreaterThanOrEqual(window?.y ?? Infinity);
+      expect((controls?.y ?? Infinity) + (controls?.height ?? 0)).toBeLessThanOrEqual(
+        (window?.y ?? 0) + (window?.height ?? 0),
+      );
+    }
+
+    await clickClose(page, `#${MODULE_ID}-report`);
+  });
+
   test('the update’s best versions can be chosen, and every report then follows them', async ({ page }) => {
     const installed = await page.evaluate(id => game.modules.get(id)?.version ?? '', MODULE_ID);
     const library = 'https://github.com/emma-tests/emma-fixture-library/releases/download/v2.0.0/module.json';

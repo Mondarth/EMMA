@@ -124,7 +124,7 @@
   </div>
 
   {#if style === 'plan'}
-    <section aria-labelledby={`${uid}-plan`}>
+    <section class="emma-report-pane" aria-labelledby={`${uid}-plan`}>
       <h3 id={`${uid}-plan`}>{localize('MONDARTH-EMMA.Report.Plan.Heading')}</h3>
       <p class="emma-report-setup">{setupSummary(check.setup)}</p>
       {#if plan.length === 0}
@@ -144,7 +144,7 @@
       {/if}
     </section>
   {:else if style === 'check'}
-    <section aria-labelledby={`${uid}-check`}>
+    <section class="emma-report-pane" aria-labelledby={`${uid}-check`}>
       <h3 id={`${uid}-check`}>{localize('MONDARTH-EMMA.Report.Check.Heading')}</h3>
       <p class="emma-report-setup">{setupSummary(check.setup)}</p>
       <p class={['emma-report-verdict', check.valid ? 'valid' : 'invalid']}>
@@ -175,7 +175,7 @@
       {/if}
     </section>
   {:else}
-    <section aria-labelledby={`${uid}-solve`}>
+    <section class="emma-report-pane" aria-labelledby={`${uid}-solve`}>
       <h3 id={`${uid}-solve`}>{localize('MONDARTH-EMMA.Report.Solve.Heading')}</h3>
       <p class="emma-report-setup">{setupSummary(check.setup)}</p>
       {#if failed}
@@ -229,10 +229,13 @@
 </div>
 
 <style>
+  /* The report fills the window: the controls stay put, and the report shown scrolls beneath them. */
   .emma-report {
     display: flex;
+    flex: 1;
     flex-direction: column;
     gap: 0.75rem;
+    min-height: 0;
     font-family: var(--font-body);
   }
 
@@ -259,8 +262,15 @@
 
   .emma-report-controls {
     display: flex;
+    flex: none;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  .emma-report-pane {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
   }
 
   .emma-report-controls select {
