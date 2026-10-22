@@ -48,9 +48,9 @@ Hypothetical mode, for GMs:
     and system chosen, or why there is none. One click chooses those versions.
 - **Safe to explore**: saving is disabled while the mode is on. Reset, or leaving the mode, restores what was staged
   before you entered it.
-- **Looks further through a proxy**: versions are looked up on GitHub, GitLab and the URLs manifests declare. With a
-  CORS proxy set, which GMs can protect with an API key kept in their own browser, EMMA also reads Foundry's package
-  listing and its release notes.
+- **Looks further through a proxy**: versions are looked up on GitHub, GitLab and the URLs manifests declare, through
+  EMMA's own CORS proxy, which also reads Foundry's package listing and its release notes. GMs can choose a proxy of
+  their own instead, protected by an API key kept in their own browser, or none, at the cost of far fewer versions.
 
 For details refer to the [detailed documentation](https://mondarth.github.io/EMMA/). To work on the module, see
 [CONTRIBUTING.md](CONTRIBUTING.md).

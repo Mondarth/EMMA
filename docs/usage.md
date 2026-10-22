@@ -256,15 +256,14 @@ versions it chose.
 ### Where versions come from
 
 Browsers may not read Foundry's own package listing, its release notes, or the manifests attached to GitHub
-releases, because those sites send no CORS headers. Without a proxy, EMMA lists the versions released on GitHub and
-GitLab, but does not know which Foundry versions those releases support, so Foundry marks them **Compatibility
-unknown**; and as it cannot read Foundry's release notes, it offers no newer Foundry version. A note in the footer
-says so while the mode is on. A warning beside the System button names the packages whose versions could not all be
-looked up.
+releases, because those sites send no CORS headers, so EMMA looks versions up through a CORS proxy: its own, unless a
+GM chooses another (see [Settings](#settings)). Through a proxy, EMMA reads Foundry's package listing and release
+notes, so each version is judged on the Foundry versions it declares, and newer Foundry builds are offered.
 
-For a fuller picture, a GM can set a **Version lookup proxy** (see [Settings](#settings)): EMMA then reads Foundry's
-package listing and release notes through it, so each version is judged on the Foundry versions it declares, and
-newer Foundry builds are offered.
+Without a proxy, EMMA lists the versions released on GitHub and GitLab, but does not know which Foundry versions
+those releases support, so Foundry marks them **Compatibility unknown**; and as it cannot read Foundry's release
+notes, it offers no newer Foundry version. A note in the footer says so while the mode is on. A warning beside the System button names the packages whose versions could not all be
+looked up.
 
 ### Staging in hypothetical mode
 
@@ -314,16 +313,29 @@ Module details
 
 Version lookup proxy
 : A menu under **Game Settings** for GMs only (Foundry shows it only to users who may change configuration
-  settings). Its **Set proxy** button opens a window with two fields:
+  settings). Its **Set proxy** button opens a window to choose what hypothetical mode looks versions up through,
+  shared by the whole world:
 
-  - **Proxy URL**: the URL of a CORS proxy for hypothetical mode to look versions up through, with `{url}` where
-    the address to fetch goes, such as `https://proxy.example.com/?url={url}`. Shared by the whole world and blank by
-    default. Every request hypothetical mode makes is sent through it, so use only a proxy you trust. The window
-    will not save a URL without `{url}`.
-  - **API key**: sent to the proxy in an `X-API-Key` header, for a proxy that asks for one. Blank by default, and
-    never sent without a proxy. It is kept only in the browser it is entered in, as Foundry sends every world and
-    user setting to every user who joins, where any player could read it. Each GM enters it once on each browser
-    they use.
+  - **EMMA's proxy** (the default): a proxy run for EMMA, which fetches only package information (release lists,
+    release downloads, manifests and Foundry's package listing) and caches it, so lookups are quick and stay within
+    GitHub's limits. It sees your server's address and the packages it looks up. Its address and key are built into
+    EMMA and never shown. A world that set its own proxy before there was a choice keeps it.
+  - **My own proxy**: a CORS proxy you run or trust, with two fields:
+    - **Proxy URL**, with `{url}` where the address to fetch goes, such as `https://proxy.example.com/?url={url}`.
+      Every request hypothetical mode makes is sent through it, so use only a proxy you trust. The window will not
+      save it without `{url}`.
+    - **API key**, sent to the proxy in an `X-API-Key` header, for a proxy that asks for one. It is kept only in the
+      browser it is entered in, as Foundry sends every world and user setting to every user who joins, where any
+      player could read it. Each GM enters it once on each browser they use. EMMA's own key is never sent to your
+      proxy.
+  - **No proxy**: versions are looked up directly. Before saving, EMMA asks whether you are sure, as this greatly
+    reduces what hypothetical mode can do: it can read only GitHub's and GitLab's release lists and the manifests
+    installed modules came with, so it finds far fewer versions, offers no newer Foundry version, and judges many
+    versions without knowing which Foundry or system they suit. GitHub also allows only 60 lookups an hour from your
+    browser's address.
+
+  Every request through a proxy, EMMA's or your own, carries EMMA's version in an `X-EMMA-Version` header, so the
+  proxy's logs can tell which version asks for what. Requests without a proxy carry nothing extra.
 
   See [Where versions come from](#where-versions-come-from).
 
