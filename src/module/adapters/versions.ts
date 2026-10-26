@@ -419,6 +419,15 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
       }
       if (!cores) unreached.push(CORE_REF);
       releases = [...releases, ...(await installedMissing(refs, releases))];
+      // The catalogue answers each lookup with the whole closure, so with the system and the libraries found already:
+      // only what is new is kept, as a version found twice would be listed twice.
+      const held = new Set(catalogue.releases.map(releaseKey));
+      releases = releases.filter(release => {
+        const key = releaseKey(release);
+        if (held.has(key)) return false;
+        held.add(key);
+        return true;
+      });
       catalogue.releases.push(...releases);
       for (const release of releases.filter(({ package: { type } }) => type === 'module')) {
         versions.set(release.package.id, [...(versions.get(release.package.id) ?? []), release.version]);
@@ -461,6 +470,15 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
       return solveReport(reportUniverseOf(catalogue, setup), setup, messagesOf(catalogue), set.load.bind(set));
     },
   };
+}
+
+/**
+ * A release's package and version, as one key: the same release, whatever source gave it.
+ * @param release - The release
+ * @returns `<type>:<id>@<version>`, the version without a leading `v`
+ */
+function releaseKey(release: Release): string {
+  return `${packageKey(release.package)}@${unprefixed(release.version)}`;
 }
 
 /**
