@@ -25,6 +25,7 @@
       "Unreached": "Not every version could be looked up for: {packages}.",
       "UnreachedNoProxy": "Not every version could be looked up for: {packages}. Choose a version lookup proxy in EMMA's settings to look further.",
       "Core": "Foundry Virtual Tabletop",
+      "Unlisted": "Not on Foundry's package listing: its author has published it elsewhere, such as on GitLab, ahead of the listing, so Foundry's installer does not offer it.",
       "Fit": {
         "Verified": "The system and every active module are verified with this version.",
         "Unusable": "Will not work: {packages}.",
