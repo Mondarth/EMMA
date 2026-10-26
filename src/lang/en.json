@@ -57,6 +57,7 @@
         "NoManifest": "none for this version",
         "Empty": "No modules are active."
       },
+      "Ignored": "Hypothetical mode ignores {modules}, so this report leaves them out. They are taken as present for the modules that require them, but whether they suit this setup is not known: the report may be inaccurate.",
       "Check": {
         "Heading": "Check of the setup chosen",
         "Valid": "Every package can be used in this setup.",

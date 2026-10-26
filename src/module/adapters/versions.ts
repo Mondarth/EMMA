@@ -138,6 +138,14 @@ export interface VersionJudge {
    */
   reportSolve(active: Iterable<string>, choices: VersionChoices): Promise<SetupSolve>;
   /**
+   * The active modules the reports leave out, as hypothetical mode ignores them, so that a report can warn that it may
+   * be inaccurate.
+   * @param active - The IDs of the modules the setup has
+   * @param choices - The versions chosen, with the modules ignored
+   * @returns Their titles
+   */
+  reportIgnored(active: Iterable<string>, choices: VersionChoices): readonly string[];
+  /**
    * Plan the setup the choices make: each active module at the version chosen, with its manifest URL, those others
    * depend on first.
    * @param active - The IDs of the modules the setup has
@@ -486,10 +494,32 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
         ({ id }) => choices.ignored?.has(id) !== true,
       );
     },
-    reportSolve: (active, choices) => {
+    reportSolve: async (active, choices) => {
       const setup = setupOf(catalogue, active, choices);
-      return solveReport(reportUniverseOf(catalogue, setup), setup, messagesOf(catalogue), set.load.bind(set));
+      const solved = await solveReport(
+        reportUniverseOf(catalogue, setup),
+        setup,
+        messagesOf(catalogue),
+        set.load.bind(set),
+      );
+      // A module taken as present has one release, so cannot change; nothing of it is reported either way.
+      const { solution } = solved;
+      return solution.kind === 'found'
+        ? {
+            ...solved,
+            solution: {
+              ...solution,
+              changes: solution.changes.filter(
+                ({ package: { type, id } }) => type !== 'module' || choices.ignored?.has(id) !== true,
+              ),
+            },
+          }
+        : solved;
     },
+    reportIgnored: (active, choices) =>
+      [...active]
+        .filter(id => choices.ignored?.has(id) === true)
+        .map(id => catalogue.titles.get(packageKey({ type: 'module', id })) ?? id),
   };
 }
 
@@ -568,7 +598,13 @@ function reportUniverseOf(
   return {
     core: catalogue.cores.filter(({ version }) => atLeast(version, coreFloor)),
     releases: [
-      ...catalogue.releases.filter(release => atLeast(release.version, floors.get(packageKey(release.package)))),
+      ...catalogue.releases.filter(
+        release =>
+          // A module taken as present is only the release it stands for, even when it was looked up before being
+          // ignored: its own releases would be judged, and the solver could change it.
+          setup.assumed?.has(packageKey(release.package)) !== true &&
+          atLeast(release.version, floors.get(packageKey(release.package))),
+      ),
       // The modules taken as present, as the releases they stand for.
       ...assumedReleases(setup),
     ],

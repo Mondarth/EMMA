@@ -214,6 +214,7 @@ export class HypotheticalState {
     const active = [...this.#active()];
     const choices = this.#choicesMade();
     return {
+      ignored: judge.reportIgnored(active, choices),
       plan: judge.reportPlan(active, choices),
       check: judge.reportCheck(active, choices),
       solve: judge.reportSolve(active, choices),

@@ -36,16 +36,18 @@ const CHECK: SetupCheck = {
  * @param options.solve - The solve
  * @param options.check - The check
  * @param options.plan - The plan
+ * @param options.ignored - The titles of the modules hypothetical mode ignores; none by default
  * @returns The download handler; its `apply` is the function choosing the versions recommended
  */
 function renderReport({
   solve = new Promise<SetupSolve>(() => undefined),
   check = CHECK,
   plan = PLAN,
-}: { solve?: Promise<SetupSolve>; check?: SetupCheck; plan?: PlanEntry[] } = {}) {
+  ignored = [],
+}: { solve?: Promise<SetupSolve>; check?: SetupCheck; plan?: PlanEntry[]; ignored?: readonly string[] } = {}) {
   const onDownload = vi.fn();
   const apply = vi.fn();
-  render(SetupReport, { plan, check, solve, onDownload, apply });
+  render(SetupReport, { ignored, plan, check, solve, onDownload, apply });
   return Object.assign(onDownload, { apply });
 }
 
@@ -253,6 +255,7 @@ describe('SetupReport', () => {
   test('ignores a solve that finishes after it is gone', async () => {
     let finish = (_solved: SetupSolve): void => undefined;
     const { unmount } = render(SetupReport, {
+      ignored: [],
       plan: PLAN,
       check: CHECK,
       solve: new Promise<SetupSolve>(resolve => {
@@ -263,6 +266,7 @@ describe('SetupReport', () => {
     });
     let fail = (_error: Error): void => undefined;
     const failing = render(SetupReport, {
+      ignored: [],
       plan: PLAN,
       check: CHECK,
       solve: new Promise<SetupSolve>((_resolve, reject) => {
@@ -303,6 +307,7 @@ describe('SetupReport', () => {
 
     test('chooses the versions recommended, then reports on the setup they make in every style', async () => {
       const after: SetupReportData = {
+        ignored: [],
         plan: [{ id: 'lib', title: 'Lib', changes: true, manifest: 'https://example.test/lib/2.0.0' }],
         check: { ...CHECK, valid: true, modules: [{ ...CHECK.modules[0], version: '2.0.0' } as ReportedPackage] },
         solve: Promise.resolve({ solution: { kind: 'found', changes: [] }, unloaded: [] }),
@@ -333,7 +338,13 @@ describe('SetupReport', () => {
       const { apply } = renderReport({
         solve: Promise.resolve({ solution: { kind: 'found', changes: CHANGES }, unloaded: [] }),
       });
-      apply.mockReturnValue({ plan: PLAN, check: CHECK, solve: new Promise(() => undefined), apply: vi.fn() });
+      apply.mockReturnValue({
+        ignored: [],
+        plan: PLAN,
+        check: CHECK,
+        solve: new Promise(() => undefined),
+        apply: vi.fn(),
+      });
       await show('update');
 
       await userEvent.click(await screen.findByRole('button', { name: APPLY }));
@@ -357,6 +368,34 @@ describe('SetupReport', () => {
         expect(screen.getByRole('button', { name: DOWNLOAD })).toBeEnabled();
       });
       expect(screen.queryByRole('button', { name: APPLY })).toBeNull();
+    });
+  });
+
+  describe('with modules hypothetical mode ignores', () => {
+    const WARNING = 'MONDARTH-EMMA.Report.Ignored {"modules":"Coven’s Automation Toolkit"}';
+
+    test('warns in every style that it leaves them out, and may be inaccurate', async () => {
+      renderReport({ ignored: ['Coven’s Automation Toolkit'] });
+
+      expect(screen.getByRole('note')).toHaveTextContent(WARNING);
+      await show('check');
+      expect(screen.getByRole('note')).toHaveTextContent(WARNING);
+      await show('update');
+      expect(screen.getByRole('note')).toHaveTextContent(WARNING);
+    });
+
+    test('puts the warning first in the text downloaded', async () => {
+      const onDownload = renderReport({ ignored: ['Coven’s Automation Toolkit'] });
+
+      await userEvent.click(screen.getByRole('button', { name: DOWNLOAD }));
+
+      expect(onDownload.mock.lastCall?.[0]).toMatch(new RegExp(`^${WARNING.replace(/[{}()]/g, '\\$&')}\n\n`));
+    });
+
+    test('warns of nothing when none is ignored', () => {
+      renderReport();
+
+      expect(screen.queryByRole('note')).toBeNull();
     });
   });
 });

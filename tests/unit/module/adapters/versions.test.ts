@@ -929,6 +929,32 @@ describe('createVersionJudge with EMMA’s catalogue', () => {
     });
   });
 
+  // Regression: a module looked up before it was ignored kept its own releases in the reports' universe, which the
+  // check found before the release standing for it: the check called the setup unusable, and the update changed it.
+  test('reports a module ignored after it was looked up as left out, judging none of its own releases', async () => {
+    const unusable = { ...held('synth', '0.0.1'), compatibility: { minimum: '99' } };
+    const newer = { ...held('synth', '0.0.2'), compatibility: { minimum: '99' } };
+    const { judge } = await lookUpWithCatalogue(
+      { modules: { dice: onGithub('owner/dice', { version: '1.0.0' }), synth: { active: true, version: '0.0.1' } } },
+      [universe([held('dice', '1.0.0'), unusable, newer])],
+    );
+    const active = ['dice', 'synth'];
+    expect(judge.reportCheck(active, { modules: new Map() }).valid).toBe(false);
+
+    const choices = { modules: new Map<string, string>(), ignored: new Set(['synth']) };
+    const check = judge.reportCheck(active, choices);
+    expect(check.valid).toBe(true);
+    expect(check.modules.map(reported => reported.id)).toEqual(['dice']);
+    const solved = await judge.reportSolve(active, choices);
+    expect(
+      solved.solution.kind === 'found' ? solved.solution.changes.map(change => change.package.id) : [],
+    ).not.toContain('synth');
+    expect(judge.reportIgnored(active, choices)).toEqual(['synth']);
+    expect(judge.reportIgnored(active, { modules: new Map() })).toEqual([]);
+    // One it knows no title of is named by its ID.
+    expect(judge.reportIgnored(['ghost'], { modules: new Map(), ignored: new Set(['ghost']) })).toEqual(['ghost']);
+  });
+
   test('still offers the installed version when the catalogue does not list it', async () => {
     const { judge } = await lookUpWithCatalogue(
       { modules: { dice: onGithub('owner/dice', { version: '1.0.1-dev' }) } },

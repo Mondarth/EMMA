@@ -30,7 +30,7 @@ async function loadReport() {
 function report(
   solve: Promise<SetupSolve> = Promise.resolve({ solution: { kind: 'found', changes: [] }, unloaded: [] }),
 ) {
-  return { plan: [], check: CHECK, solve, apply: vi.fn() };
+  return { ignored: [], plan: [], check: CHECK, solve, apply: vi.fn() };
 }
 
 describe('SetupReportApp', () => {

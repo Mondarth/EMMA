@@ -107,6 +107,9 @@ export function fakeJudge(
     reportSolve: vi.fn((_active: Iterable<string>, _choices: VersionChoices): Promise<SetupSolve> =>
       Promise.resolve({ solution: { kind: 'found', changes: [] }, unloaded: [] }),
     ),
+    reportIgnored: vi.fn((active: Iterable<string>, choices: VersionChoices): readonly string[] =>
+      [...active].filter(id => choices.ignored?.has(id) === true),
+    ),
   } satisfies VersionJudge;
 }
 

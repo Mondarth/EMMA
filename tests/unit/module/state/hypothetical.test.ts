@@ -354,6 +354,18 @@ describe('HypotheticalState', () => {
       expect(state.isIgnored('dice')).toBe(false);
     });
 
+    test('reports which modules the reports leave out', async () => {
+      const judge = fakeJudge({ dice: ['1.0.0'], synth: ['0.0.1'] });
+      const state = new HypotheticalState(
+        () => judge,
+        () => ['dice', 'synth'],
+        () => new SvelteSet(['synth']),
+      );
+      await state.load();
+
+      expect(state.report()?.ignored).toEqual(['synth']);
+    });
+
     test('ignores nothing unless told', async () => {
       const judge = fakeJudge({ dice: ['1.0.0'] });
       const state = new HypotheticalState(
