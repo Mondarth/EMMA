@@ -105,6 +105,9 @@ jobs:
           # Without them, the release has no default proxy.
           EMMA_DEFAULT_PROXY_URL: ${{ vars.EMMA_DEFAULT_PROXY_URL }}
           EMMA_DEFAULT_PROXY_KEY: ${{ secrets.EMMA_DEFAULT_PROXY_KEY }}
+          # The default package catalogue, likewise; without them, the release has none.
+          EMMA_DEFAULT_CATALOGUE_URL: ${{ vars.EMMA_DEFAULT_CATALOGUE_URL }}
+          EMMA_DEFAULT_CATALOGUE_KEY: ${{ secrets.EMMA_DEFAULT_CATALOGUE_KEY }}
           GIT_AUTHOR_NAME: ${{ steps.identity.outputs.name }}
           GIT_AUTHOR_EMAIL: ${{ steps.identity.outputs.email }}
           GIT_COMMITTER_NAME: ${{ steps.identity.outputs.name }}

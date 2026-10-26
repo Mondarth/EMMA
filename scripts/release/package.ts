@@ -71,17 +71,20 @@ function stampDocs(version: string): void {
 
 /**
  * Build the bundle from a clean `dist/` so nothing stale ends up in the package, and refuse to package a build that
- * holds the default proxy's key in plain text: it is only ever to be built in obscured.
+ * holds the default proxy's or catalogue's key in plain text: they are only ever to be built in obscured.
  */
 function build(): void {
   fs.rmSync(DIST, { recursive: true, force: true });
   execFileSync('pnpm', ['build'], { cwd: ROOT, stdio: 'inherit' });
-  const key = process.env['EMMA_DEFAULT_PROXY_KEY'];
-  const leaks = key ? filesHolding(DIST, key) : [];
-  if (leaks.length > 0) {
-    throw new Error(
-      `The default proxy's key is in plain text in: ${leaks.map(file => path.relative(ROOT, file)).join(', ')}`,
-    );
+  for (const [name, variable] of [
+    ["The default proxy's key", 'EMMA_DEFAULT_PROXY_KEY'],
+    ["The default catalogue's key", 'EMMA_DEFAULT_CATALOGUE_KEY'],
+  ] as const) {
+    const key = process.env[variable];
+    const leaks = key ? filesHolding(DIST, key) : [];
+    if (leaks.length > 0) {
+      throw new Error(`${name} is in plain text in: ${leaks.map(file => path.relative(ROOT, file)).join(', ')}`);
+    }
   }
 }
 
