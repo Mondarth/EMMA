@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
@@ -432,6 +432,44 @@ describe('Toolbar', () => {
         expect(
           screen.getByRole('button', { name: 'MONDARTH-EMMA.Versions.Choose {"module":"D&D 5e","version":"5.2.0"}' }),
         ).toHaveTextContent('MONDARTH-EMMA.Toolbar.System {"id":"dnd5e","version":"5.2.0"}');
+      });
+
+      /**
+       * The versions a picker's list offers, read from the list its button opens.
+       * @param button - The picker's button
+       * @returns Each option's version
+       */
+      function offered(button: HTMLElement): string[] {
+        const list = document.getElementById(button.getAttribute('aria-controls') ?? '');
+        if (list === null) throw new Error('The button opens no list');
+        return within(list)
+          .queryAllByRole('option', { hidden: true })
+          .map(option => option.textContent.trim().split(' ')[0] ?? '');
+      }
+
+      // Once a newer version is chosen, its list must offer the one in use, to go back to, and leave out the one chosen.
+      test('lists the version in use once another is chosen, and leaves out the one chosen', async () => {
+        await renderWith({ platforms: { core: ['14.368', '14.370'], system: ['5.1.0', '5.2.0', '6.0.0'] } });
+        const chooseSystem = (version: string) =>
+          screen.getByRole('button', {
+            name: `MONDARTH-EMMA.Versions.Choose {"module":"D&D 5e","version":"${version}"}`,
+          });
+        const chooseCore = (version: string) =>
+          screen.getByRole('button', {
+            name: `MONDARTH-EMMA.Versions.Choose {"module":"MONDARTH-EMMA.Versions.Core","version":"${version}"}`,
+          });
+
+        await userEvent.click(chooseSystem('5.1.0'));
+        expect(offered(chooseSystem('5.1.0'))).toEqual(['6.0.0', '5.2.0']);
+        await userEvent.click(screen.getByRole('option', { name: /6\.0\.0/ }));
+        await userEvent.click(chooseSystem('6.0.0'));
+        expect(offered(chooseSystem('6.0.0'))).toEqual(['5.2.0', '5.1.0']);
+        await userEvent.keyboard('{Escape}');
+
+        await userEvent.click(chooseCore('14.368'));
+        await userEvent.click(screen.getByRole('option', { name: /14\.370/ }));
+        await userEvent.click(chooseCore('14.370'));
+        expect(offered(chooseCore('14.370'))).toEqual(['14.368']);
       });
     });
   });

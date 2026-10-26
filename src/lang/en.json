@@ -240,7 +240,7 @@
         "Choice": "Look versions up through",
         "Modes": {
           "Default": "EMMA's proxy",
-          "DefaultHint": "Recommended. A proxy run for EMMA, which only fetches package information: release lists, manifests and Foundry's package listing. It sees this server's address and the packages it looks up.",
+          "DefaultHint": "Recommended. EMMA's package catalogue, which keeps every version of the packages asked for, then a proxy run for EMMA for anything the catalogue does not have yet. Both deal only in package information: release lists, manifests and Foundry's package listing. They see this server's address and the packages it looks up.",
           "Own": "My own proxy",
           "OwnHint": "A CORS proxy you run or trust, with its API key if it asks for one.",
           "None": "No proxy",

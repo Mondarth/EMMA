@@ -92,6 +92,6 @@
     "not IE 11"
   ],
   "dependencies": {
-    "@mondarth/fvtt-resolver": "0.6.0"
+    "@mondarth/fvtt-resolver": "0.7.0"
   }
 }
