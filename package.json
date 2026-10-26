@@ -57,7 +57,7 @@
     "@tsconfig/svelte": "^5.0.8",
     "@types/node": "^26.2.0",
     "@typescript/native": "npm:typescript@^7.0.2",
-    "@vitest/coverage-v8": "^5.0.4",
+    "@vitest/coverage-v8": "^5.0.5",
     "autoprefixer": "^10.5.4",
     "commitizen": "4.3.2",
     "commitlint-plugin-tense": "^1.0.12",
@@ -84,7 +84,7 @@
     "unplugin-dts": "^1.0.3",
     "vite": "^8.3.4",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^5.0.4",
+    "vitest": "^5.0.5",
     "zod": "^4.6.5"
   },
   "browserslist": [
