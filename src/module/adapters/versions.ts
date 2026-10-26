@@ -464,15 +464,6 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
 }
 
 /**
- * The releases found, as the resolver reads them.
- * @param catalogue - The releases found
- * @returns The universe
- */
-function universeOf(catalogue: VersionCatalogue): { core: readonly CoreRelease[]; releases: readonly Release[] } {
-  return { core: catalogue.cores, releases: catalogue.releases };
-}
-
-/**
  * A version without a leading `v` before its first digit, as the resolver counts `v1.1.4` and `1.1.4` as one version.
  * @param version - The version
  * @returns The version without the `v`
@@ -633,14 +624,41 @@ function withModule(setup: Setup, id: string, version: string): Setup {
   };
 }
 
+/** Each package's releases found, by package key, with how many releases there were when they were indexed. */
+const releaseIndexes = new WeakMap<
+  readonly Release[],
+  { readonly count: number; readonly byKey: Map<string, Release[]> }
+>();
+
 /**
- * Check every package of a setup at once.
+ * The releases found, by package key: indexed once, and again only when a lookup has found more.
+ * @param releases - The releases found
+ * @returns Each package's releases, in the order found
+ */
+function releasesByKey(releases: readonly Release[]): ReadonlyMap<string, readonly Release[]> {
+  const indexed = releaseIndexes.get(releases);
+  if (indexed?.count === releases.length) return indexed.byKey;
+  const byKey = Map.groupBy(releases, release => packageKey(release.package));
+  releaseIndexes.set(releases, { count: releases.length, byKey });
+  return byKey;
+}
+
+/**
+ * Check every package of a setup at once, in a universe of what the check reads: the release of each package in the
+ * setup at its chosen version, the first found as the check itself would find it, and every core build. With
+ * Foundry's version order, the default, the other releases cannot change the answer, and in the catalogue's universe,
+ * with every version of everything the setup needs, they would make each check slow.
  * @param catalogue - The releases found
  * @param setup - The setup
  * @returns What checking found of the system and each module whose release is known
  */
 function checkSetup(catalogue: VersionCatalogue, setup: SetupSpec): readonly ReleaseCheck[] {
-  return check(universeOf(catalogue), setup).releases;
+  const byKey = releasesByKey(catalogue.releases);
+  const releases = [setup.system, ...(setup.modules ?? [])].flatMap(({ package: key, version }) => {
+    const release = byKey.get(key)?.find(candidate => sameVersion(candidate.version, version));
+    return release === undefined ? [] : [release];
+  });
+  return check({ core: catalogue.cores, releases }, setup).releases;
 }
 
 /**

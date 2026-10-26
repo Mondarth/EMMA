@@ -1,3 +1,4 @@
+import type * as Resolver from '@mondarth/fvtt-resolver';
 import { memoryCache } from '@mondarth/fvtt-resolver/sources';
 import { describe, expect, test, vi } from 'vitest';
 
@@ -5,6 +6,19 @@ import type { SetupSolve } from '@module/adapters/report';
 import { createVersionJudge } from '@module/adapters/versions';
 import type { FoundryMockOptions, ModuleMockData } from '../../mocks/foundry';
 import { installFoundryMocks } from '../../mocks/foundry';
+
+// Each universe a check is given, recorded: a judgement must give only what the check reads.
+const checked = vi.hoisted(() => ({ universes: [] as { releases: readonly unknown[] }[] }));
+vi.mock('@mondarth/fvtt-resolver', async importOriginal => {
+  const actual = await importOriginal<typeof Resolver>();
+  return {
+    ...actual,
+    check: (...args: Parameters<typeof actual.check>) => {
+      checked.universes.push(args[0]);
+      return actual.check(...args);
+    },
+  };
+});
 
 const INDEX = 'https://r2.foundryvtt.com/package-api-public/index-latest.json';
 const DETAILS = 'https://r2.foundryvtt.com/package-api-public/detail/{id}.json';
@@ -787,6 +801,22 @@ describe('createVersionJudge with EMMA’s catalogue', () => {
     ]);
 
     expect(judge.unreached).toEqual([]);
+  });
+
+  // Regression: each judgement checked the whole universe, which with the catalogue holds every version of
+  // everything the setup needs, so the drop-downs paused for seconds while each option was judged.
+  test('judges each version with only the releases the setup chooses', async () => {
+    const versions = ['1.0.0', '1.1.0', '1.2.0', '2.0.0', '2.1.0'];
+    const { judge } = await lookUpWithCatalogue(
+      { modules: { dice: onGithub('owner/dice', { version: '1.0.0' }), lib: { active: true, version: '3.0.0' } } },
+      [universe([...versions.map(v => held('dice', v)), ...['2.0.0', '3.0.0'].map(v => held('lib', v))])],
+    );
+
+    checked.universes.length = 0;
+    const options = judge.judgeVersions(['dice', 'lib'], { modules: new Map() }, 'dice');
+    expect(options.map(option => option.version)).toEqual(['2.1.0', '2.0.0', '1.2.0', '1.1.0', '1.0.0']);
+    // For each, the system's release, one of dice and one of lib: never dice's other versions, nor lib's.
+    expect(checked.universes.map(given => given.releases.length)).toEqual([3, 3, 3, 3, 3]);
   });
 
   test('still offers the installed version when the catalogue does not list it', async () => {
