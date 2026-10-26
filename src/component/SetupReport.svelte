@@ -7,6 +7,7 @@
     REPORT_STYLES,
     changeText,
     checkText,
+    ignoredWarning,
     planTables,
     planText,
     updateText,
@@ -16,6 +17,8 @@
   import VersionBadge from './VersionBadge.svelte';
 
   interface Props {
+    /** The titles of the active modules hypothetical mode ignores, which the report leaves out and warns of. */
+    ignored: readonly string[];
     /** The active modules in the order to install them. */
     plan: readonly PlanEntry[];
     /** What checking the setup chosen found. */
@@ -28,12 +31,20 @@
     apply: SetupReportData['apply'];
   }
 
-  const { plan: firstPlan, check: firstCheck, solve: firstSolve, apply: firstApply, onDownload }: Props = $props();
+  const {
+    ignored: firstIgnored,
+    plan: firstPlan,
+    check: firstCheck,
+    solve: firstSolve,
+    apply: firstApply,
+    onDownload,
+  }: Props = $props();
 
   // The report shown: the one given, then the one on the setup each choice of recommended versions makes. The window
   // is mounted afresh for each report, so the one given is only read once.
   // svelte-ignore state_referenced_locally
   let report: SetupReportData = $state.raw({
+    ignored: firstIgnored,
     plan: firstPlan,
     check: firstCheck,
     solve: firstSolve,
@@ -66,16 +77,22 @@
     };
   });
 
-  /** The report shown, as text; `null` while the setup is still being resolved, or could not be. */
+  /** The warning every style gives when hypothetical mode ignores some of the setup's modules. */
+  const warning = $derived(ignoredWarning(report.ignored));
+
+  /** The report shown, as text, after the warning if there is one; `null` while the setup is still being resolved. */
   const text = $derived.by((): string | null => {
-    switch (style) {
-      case 'plan':
-        return planText(check.setup, plan);
-      case 'check':
-        return checkText(check);
-      default:
-        return solved === null ? null : updateText(check.setup, solved);
-    }
+    const body = (() => {
+      switch (style) {
+        case 'plan':
+          return planText(check.setup, plan);
+        case 'check':
+          return checkText(check);
+        default:
+          return solved === null ? null : updateText(check.setup, solved);
+      }
+    })();
+    return body === null || warning === null ? body : `${warning}\n\n${body}`;
   });
 
   const downloadLabel = $derived(localize('MONDARTH-EMMA.Report.Download'));
@@ -122,6 +139,13 @@
         onDownload(text as string, style);
       }}></button>
   </div>
+
+  {#if warning !== null}
+    <p class="emma-report-warning" role="note">
+      <i class="fa-solid fa-triangle-exclamation" inert></i>
+      {warning}
+    </p>
+  {/if}
 
   {#if style === 'plan'}
     <section class="emma-report-pane" aria-labelledby={`${uid}-plan`}>
@@ -229,6 +253,18 @@
 </div>
 
 <style>
+  /* Every style warns of the modules it leaves out, above the report, in Foundry's warning colours. */
+  .emma-report-warning {
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
+    margin: 0;
+    padding: 0.375rem 0.5rem;
+    border: 1px solid var(--color-level-warning-border);
+    border-radius: 4px;
+    background: var(--color-level-warning-bg);
+  }
+
   /* The report fills the window: the controls stay put, and the report shown scrolls beneath them. */
   .emma-report {
     display: flex;

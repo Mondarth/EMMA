@@ -90,6 +90,8 @@ export interface ChangedPackage {
  * the update recommends gives the report on the setup they make.
  */
 export interface SetupReportData {
+  /** The titles of the active modules hypothetical mode ignores, which every style leaves out and warns of. */
+  readonly ignored: readonly string[];
   readonly plan: readonly PlanEntry[];
   readonly check: SetupCheck;
   readonly solve: Promise<SetupSolve>;

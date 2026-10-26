@@ -6,6 +6,7 @@ import SplitView from '@component/SplitView.svelte';
 import { installFoundryMocks } from '../mocks/foundry';
 import { createModules, ENTRIES } from './fixtures';
 import { DrawerFields } from '@module/state/drawer-fields.svelte';
+import { loadedVersions } from '../mocks/versions';
 
 const INACTIVE = 'MONDARTH-EMMA.Split.Inactive';
 const ACTIVE = 'MONDARTH-EMMA.Split.Active';
@@ -119,5 +120,38 @@ describe('SplitView', () => {
     unmount();
 
     expect(container).toBeEmptyDOMElement();
+  });
+
+  describe('with a module hypothetical mode ignores', () => {
+    test('greys it out, saying why, and names every row by its module for the context menu', async () => {
+      const { state } = await loadedVersions(
+        { 'lib-wrapper': ['1.13.2'], dice: ['4.0.0'] },
+        undefined,
+        undefined,
+        new Set(['lib-wrapper']),
+      );
+      const { container } = render(SplitView, {
+        fields: new DrawerFields(),
+        modules: createModules(),
+        canManage: true,
+        versions: state,
+      });
+
+      const ignored = container.querySelector('[data-module-id="lib-wrapper"]');
+      expect(ignored).toHaveClass('ignored');
+      expect(container.querySelector('[data-tooltip="MONDARTH-EMMA.Ignore.Tooltip"]')).not.toBeNull();
+      expect(container.querySelector('[data-module-id="dice"]')).not.toHaveClass('ignored');
+    });
+
+    test('shows it as usual while hypothetical mode is off', () => {
+      const { container } = render(SplitView, {
+        fields: new DrawerFields(),
+        modules: createModules(),
+        canManage: true,
+      });
+
+      expect(container.querySelector('[data-module-id="lib-wrapper"]')).not.toHaveClass('ignored');
+      expect(container.querySelector('.ignored')).toBeNull();
+    });
   });
 });

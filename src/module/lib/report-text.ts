@@ -16,6 +16,15 @@ export type ReportStyle = (typeof REPORT_STYLES)[number];
 type ReportedSetup = SetupCheck['setup'];
 
 /**
+ * The warning a report gives when hypothetical mode ignores some of the setup's modules, which it leaves out.
+ * @param ignored - The titles of the modules ignored
+ * @returns The warning, or `null` when none is ignored
+ */
+export function ignoredWarning(ignored: readonly string[]): string | null {
+  return ignored.length === 0 ? null : format('MONDARTH-EMMA.Report.Ignored', { modules: formatList(ignored) });
+}
+
+/**
  * The setup a report is on, in a sentence.
  * @param setup - The setup
  * @returns The sentence

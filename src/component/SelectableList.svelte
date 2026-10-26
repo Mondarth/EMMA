@@ -163,6 +163,7 @@
     {@const conflicted = modules.conflicted.has(entry.id)}
     <!-- On the active side, a recommended module grouped under a selected module may still be inactive: its checkbox
          confirms it, activating it. -->
+    {@const ignored = versions?.isIgnored(entry.id) === true}
     {@const confirmable = side === 'active' && relation === 'recommended'}
     <!-- Rows are chosen with the keyboard through the treegrid, which holds focus and points at the keyboard's row with
          aria-activedescendant; a focusable row would take focus from it when clicked. -->
@@ -176,15 +177,17 @@
           changed: entry.id in modules.changes,
           locked: locked !== undefined,
           conflicted,
+          ignored,
         },
       ]}
+      data-module-id={entry.id}
       style:--emma-depth={depth}
       role="row"
       aria-level={depth + 1}
       aria-expanded={expanded}
       aria-selected={modules.isSelected(side, entry.id)}
       aria-disabled={locked === undefined ? undefined : 'true'}
-      data-tooltip={locked}
+      data-tooltip={locked ?? (ignored ? localize('MONDARTH-EMMA.Ignore.Tooltip') : undefined)}
       aria-labelledby={`${optionId(key)}-title`}
       onclick={event => {
         onClick(event, row);
@@ -271,6 +274,11 @@
     cursor: pointer;
     user-select: none;
     border-left: 3px solid transparent;
+  }
+
+  /* A module hypothetical mode ignores is greyed out while the mode is on; its tooltip says why. */
+  .emma-option.ignored {
+    opacity: 0.5;
   }
 
   /* A module an active module requires cannot be selected, so cannot be deactivated; its tooltip says why. */

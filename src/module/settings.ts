@@ -4,6 +4,7 @@ import type { DefaultCatalogue } from '@module/lib/default-catalogue';
 import { defaultProxy } from '@module/lib/default-proxy';
 import type { DrawerField } from '@module/state/drawer-fields.svelte';
 import { DEFAULT_DRAWER_FIELDS, DRAWER_FIELDS, drawerFields, isDrawerField } from '@module/state/drawer-fields.svelte';
+import { setIgnoredModules } from '@module/state/hypothetical-ignored.svelte';
 
 /** Keys of the settings EMMA registers, without the module namespace. */
 export const SETTINGS = {
@@ -23,6 +24,8 @@ export const SETTINGS = {
   versionProxyKey: 'versionProxyKey',
   /** Which proxy hypothetical mode looks versions up through: EMMA's, the GM's own, or none. */
   versionProxyMode: 'versionProxyMode',
+  /** The IDs of the modules hypothetical mode ignores, shared by the world's GMs. */
+  hypotheticalIgnored: 'hypotheticalIgnored',
 } as const;
 
 /** Which proxy hypothetical mode looks versions up through: EMMA's own (the default), the GM's own, or none. */
@@ -98,6 +101,17 @@ export function registerSettings(): void {
     config: false,
     type: String,
     default: '',
+  });
+
+  game.settings.register(MODULE_ID, SETTINGS.hypotheticalIgnored, {
+    scope: 'world',
+    config: false,
+    type: Array,
+    default: [],
+    // Every GM's open window follows the change, wherever it was made.
+    onChange: value => {
+      setIgnoredModules(toModuleIds(value));
+    },
   });
 
   game.settings.register(MODULE_ID, SETTINGS.drawerFields, {
@@ -275,4 +289,33 @@ export async function setVersionProxy(mode: ProxyMode, proxy: string, key: strin
   await game.settings.set(MODULE_ID, SETTINGS.versionProxyMode, mode);
   await game.settings.set(MODULE_ID, SETTINGS.versionProxy, proxy.trim());
   await game.settings.set(MODULE_ID, SETTINGS.versionProxyKey, key.trim());
+}
+
+/**
+ * The module IDs a setting holds, leaving out anything else.
+ * @param value - The setting's value
+ * @returns The IDs
+ */
+function toModuleIds(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string' && id !== '') : [];
+}
+
+/**
+ * The modules hypothetical mode ignores.
+ * @returns Their IDs
+ */
+export function getHypotheticallyIgnored(): string[] {
+  return toModuleIds(game.settings.get(MODULE_ID, SETTINGS.hypotheticalIgnored));
+}
+
+/**
+ * Have hypothetical mode ignore a module, or stop ignoring it.
+ * @param id - The module ID
+ * @param ignored - `true` to ignore it
+ */
+export async function setHypotheticallyIgnored(id: string, ignored: boolean): Promise<void> {
+  const ids = new Set(getHypotheticallyIgnored());
+  if (ignored) ids.add(id);
+  else ids.delete(id);
+  await game.settings.set(MODULE_ID, SETTINGS.hypotheticalIgnored, [...ids].sort());
 }

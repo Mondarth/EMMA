@@ -494,4 +494,84 @@ describe('openEmma', () => {
     expect(second.rendered).toBe(true);
     expect(second.bringToFront).not.toHaveBeenCalled();
   });
+
+  describe('the context menu of each module', () => {
+    type Entry = foundry.applications.ux.ContextMenu.Entry<HTMLElement>;
+
+    /**
+     * Render EMMA, and give the context menu it attached to its rows, and a row to open it on.
+     * @param options - Mock state
+     * @returns The menu's container, selector, entries and options, with the mocks and the row
+     */
+    async function menu(options: FoundryMockOptions = {}) {
+      const loaded = await loadApp(options);
+      const app = new loaded.EmmaApp();
+      await app.render({ force: true });
+      const { ContextMenu } = loaded.foundry.applications.ux;
+      const [container, selector, entries = [], settings] = ContextMenu.mock.calls[0] ?? [];
+      const row = document.createElement('li');
+      row.dataset['moduleId'] = 'dice';
+      return { ...loaded, app, ContextMenu, container, selector, entries, settings, row };
+    }
+
+    /**
+     * Whether an entry shows on a row.
+     * @param entry - The entry
+     * @param row - The row
+     * @returns `true` if it shows
+     */
+    const shows = (entry: Entry | undefined, row: HTMLElement) =>
+      typeof entry?.visible === 'function' ? entry.visible(row) : entry?.visible;
+
+    test('opens on any module row, in the window, with Foundry’s menu', async () => {
+      const { app, container, selector, settings } = await menu();
+
+      expect(container).toBe(app.element.querySelector('section'));
+      expect(selector).toBe('[data-module-id]');
+      expect(settings).toMatchObject({ jQuery: false });
+    });
+
+    test('offers to have hypothetical mode ignore a module, saving it for the world', async () => {
+      const { entries, row, game } = await menu();
+      const [ignore, include] = entries;
+
+      expect(ignore?.label).toBe('MONDARTH-EMMA.Ignore.Add');
+      expect(shows(ignore, row)).toBe(true);
+      expect(shows(include, row)).toBe(false);
+      void ignore?.onClick?.(new PointerEvent('click'), row);
+      await vi.waitFor(() => {
+        expect(game.settings.get('mondarth-emma', 'hypotheticalIgnored')).toEqual(['dice']);
+      });
+    });
+
+    test('offers to stop ignoring a module once it is ignored', async () => {
+      const { entries, row, game } = await menu({ settings: { 'mondarth-emma.hypotheticalIgnored': ['dice'] } });
+      const [ignore, include] = entries;
+
+      expect(shows(ignore, row)).toBe(false);
+      expect(shows(include, row)).toBe(true);
+      expect(include?.label).toBe('MONDARTH-EMMA.Ignore.Remove');
+      void include?.onClick?.(new PointerEvent('click'), row);
+      await vi.waitFor(() => {
+        expect(game.settings.get('mondarth-emma', 'hypotheticalIgnored')).toEqual([]);
+      });
+    });
+
+    test('says so when the change cannot be saved', async () => {
+      const { entries, row, game, ui } = await menu();
+      vi.spyOn(game.settings, 'set').mockRejectedValueOnce(new Error('offline'));
+
+      void entries[0]?.onClick?.(new PointerEvent('click'), row);
+
+      await vi.waitFor(() => {
+        expect(ui.notifications.error).toHaveBeenCalledWith('MONDARTH-EMMA.Errors.IgnoreFailed');
+      });
+    });
+
+    test('is not given to a player, who has no hypothetical mode', async () => {
+      const { ContextMenu } = await menu({ isGM: false });
+
+      expect(ContextMenu).not.toHaveBeenCalled();
+    });
+  });
 });

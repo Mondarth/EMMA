@@ -290,6 +290,21 @@ Hypothetical mode is for trying setups out, so nothing in it is saved:
 
 Hypothetical mode is not remembered: it is off each time EMMA opens. Players are not offered it.
 
+### Modules hypothetical mode ignores
+
+Very rarely a module has no manifest EMMA can read, such as one made by hand rather than installed from a release.
+Hypothetical mode can never look its versions up, so it would always find it a problem. Rather than deactivate it to
+try a setup and activate it again afterwards, have hypothetical mode ignore it: right-click its row, in either view, and
+choose **No hypotheticals**.
+
+While the mode is on, an ignored module is greyed out, and its tooltip says why. Hypothetical mode never looks it up or
+judges it, and leaves it out of the reports, but takes it as present at its installed version, so the modules that
+require it are satisfied. Every report names the modules it leaves out, and warns that it may be inaccurate: whether
+they suit the setup is not known. It can still be activated and deactivated as usual. To have the mode consider it again,
+right-click its row and choose **Add to hypotheticals**.
+
+The modules ignored are shared by the world's GMs, and kept until a GM adds them back. Players are not offered the menu.
+
 ## Saving
 
 Changes you make in either view are staged, not applied: the footer counts them, and modules you have changed are
