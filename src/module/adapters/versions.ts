@@ -22,9 +22,10 @@ import type {
   Release,
   SetupSpec,
 } from '@mondarth/fvtt-resolver';
-import { check, isNewerVersion, isUnavailable, packageKey } from '@mondarth/fvtt-resolver';
+import { check, isNewerVersion, isUnavailable, packageKey, sameVersion } from '@mondarth/fvtt-resolver';
 import type { Cache as SourceCache, LocalManifest, ReleaseSource } from '@mondarth/fvtt-resolver/sources';
 import {
+  catalogueSource,
   foundryCoreReleases,
   foundryIndexSource,
   githubSource,
@@ -59,6 +60,8 @@ export interface VersionOption {
   readonly version: string;
   /** The badge, or `null` if Foundry gives none. */
   readonly badge: VersionBadge | null;
+  /** A version not on Foundry's package listing, such as one its author has published on GitLab ahead of it. */
+  readonly unlisted?: true;
 }
 
 /**
@@ -135,6 +138,14 @@ export interface VersionJudge {
    */
   reportSolve(active: Iterable<string>, choices: VersionChoices): Promise<SetupSolve>;
   /**
+   * The active modules the reports leave out, as hypothetical mode ignores them, so that a report can warn that it may
+   * be inaccurate.
+   * @param active - The IDs of the modules the setup has
+   * @param choices - The versions chosen, with the modules ignored
+   * @returns Their titles
+   */
+  reportIgnored(active: Iterable<string>, choices: VersionChoices): readonly string[];
+  /**
    * Plan the setup the choices make: each active module at the version chosen, with its manifest URL, those others
    * depend on first.
    * @param active - The IDs of the modules the setup has
@@ -160,8 +171,11 @@ interface VersionCatalogue {
   readonly titles: ReadonlyMap<string, string>;
 }
 
-/** A setup to check, always with its modules. */
-type Setup = SetupSpec & { readonly modules: readonly PackageVersion[] };
+/**
+ * A setup to check, always with its modules, and the package keys of those taken as present without being judged (see
+ * {@link VersionChoices.ignored}).
+ */
+type Setup = SetupSpec & { readonly modules: readonly PackageVersion[]; readonly assumed?: ReadonlySet<string> };
 
 /** The versions chosen; anything not given is at the version in use. */
 export interface VersionChoices {
@@ -171,6 +185,11 @@ export interface VersionChoices {
   readonly system?: string | undefined;
   /** The versions chosen for modules, keyed by module ID. */
   readonly modules: ReadonlyMap<string, string>;
+  /**
+   * Modules hypothetical mode ignores, by ID, such as one with no manifest a source can read: taken as present at their
+   * installed versions, so what requires them is satisfied, but never looked up, judged or reported.
+   */
+  readonly ignored?: ReadonlySet<string> | undefined;
 }
 
 /** The most requests one lookup makes, to stay within GitHub's limit of 60 an hour without a proxy. */
@@ -192,6 +211,11 @@ export interface FindOptions {
    * or `null` for none. Never sent without a proxy: GitHub's API refuses a request with a header it does not know.
    */
   readonly clientVersion?: string | null;
+  /**
+   * EMMA's package catalogue, with its key, or `null` for none. Asked first, directly, as it sends CORS headers: it
+   * gives the packages it holds with every release loaded, and the proxy, or the direct sources, find the rest.
+   */
+  readonly catalogue?: { readonly url: string; readonly key: string } | null;
   /** Fetches; the browser's by default. */
   readonly fetch?: typeof globalThis.fetch;
   /** Where fetched data is kept; for the session by default. */
@@ -276,7 +300,13 @@ function readCore(): CoreRelease {
  * @returns The judge, with nothing looked up yet
  */
 export function createVersionJudge(options: FindOptions): VersionJudge {
-  const { proxy, apiKey = null, clientVersion = null, cache = sessionCache } = options;
+  const {
+    proxy,
+    apiKey = null,
+    clientVersion = null,
+    catalogue: lookupCatalogue = null,
+    cache = sessionCache,
+  } = options;
   const send = options.fetch ?? globalThis.fetch.bind(globalThis);
   const http = httpClient({
     fetch:
@@ -304,9 +334,10 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
       ...installed.map(pkg => ({ key: packageKey({ type: 'module', id: pkg.id }), manifest: pkg.manifest })),
     ].flatMap(({ key, manifest }) => (typeof manifest === 'string' && manifest !== '' ? [[key, [manifest]]] : [])),
   );
+  const local = localSource(manifests);
   const sources: ReleaseSource[] = [
     // The installed releases come first, as they are loaded with everything their manifests declare.
-    localSource(manifests),
+    local,
     // Only reachable through a proxy: Foundry's listing sends no CORS headers.
     ...(proxy === null ? [] : [foundryIndexSource(http)]),
     githubSource(http),
@@ -314,7 +345,41 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
     manifestUrlSource(http),
   ];
   // No core releases are given, so no version is left out for needing a newer core: it is shown, and judged so.
-  const set = sourceSet({ sources, http, core: [], manifests: declared });
+  const set = sourceSet({
+    sources,
+    http,
+    core: [],
+    manifests: declared,
+    ...(lookupCatalogue !== null && {
+      catalogue: catalogueSource({
+        ...lookupCatalogue,
+        fetch: send,
+        ...(clientVersion !== null && { client: `EMMA/${clientVersion}` }),
+      }),
+    }),
+  });
+
+  /**
+   * The installed release of each package looked up that no source gave, from its installed manifest: the catalogue,
+   * asked first, gives a package it holds without the local source, and so without a version only installed here.
+   * @param refs - The packages looked up
+   * @param found - The releases found for them
+   * @returns The installed releases missing from what was found
+   */
+  async function installedMissing(refs: readonly ResolverRef[], found: readonly Release[]): Promise<Release[]> {
+    const missing = await Promise.all(
+      refs.map(async ref => {
+        const version = ref.type === 'system' ? system.version : catalogue.installed.get(ref.id);
+        const given = found.some(
+          release => packageKey(release.package) === packageKey(ref) && sameVersion(release.version, version ?? ''),
+        );
+        if (given) return [];
+        const read = await local.releases(ref);
+        return read.ok ? read.value : [];
+      }),
+    );
+    return missing.flat();
+  }
 
   const systemKey = packageKey({ type: 'system', id: system.id });
   const catalogue = {
@@ -371,14 +436,27 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
         throw error;
       }
       if (!cores) unreached.push(CORE_REF);
+      releases = [...releases, ...(await installedMissing(refs, releases))];
+      // The catalogue answers each lookup with the whole closure, so with the system and the libraries found already:
+      // only what is new is kept, as a version found twice would be listed twice.
+      const held = new Set(catalogue.releases.map(releaseKey));
+      releases = releases.filter(release => {
+        const key = releaseKey(release);
+        if (held.has(key)) return false;
+        held.add(key);
+        return true;
+      });
       catalogue.releases.push(...releases);
       for (const release of releases.filter(({ package: { type } }) => type === 'module')) {
         versions.set(release.package.id, [...(versions.get(release.package.id) ?? []), release.version]);
       }
+      // Only a package that could not be listed is unreached: one old release whose manifest cannot be read is not,
+      // and the catalogue, which loads every release, meets such releases in most packages with a long history.
       const failed = new Set(
         set
           .gaps()
           .slice(known)
+          .filter(gap => gap.version === undefined)
           .map(gap => gap.package),
       );
       unreached.push(...refs.filter(ref => failed.has(packageKey(ref))));
@@ -387,38 +465,71 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
     platformVersions: part => platformVersions(catalogue, part),
     judgeChoices: (active, choices) => judgeChoices(catalogue, setupOf(catalogue, active, choices)),
     judgeVersions: (active, choices, id) =>
-      judgeVersions(catalogue, setupOf(catalogue, active, choices), choosable(catalogue, versions, id), id),
+      choices.ignored?.has(id) === true
+        ? []
+        : judgeVersions(catalogue, setupOf(catalogue, active, choices), choosable(catalogue, versions, id), id),
     judgePlatform: (active, choices, part) =>
       platformVersions(catalogue, part).map(version =>
-        fitOf(catalogue, setupOf(catalogue, active, { ...choices, [part]: version }), version),
+        withListing(
+          fitOf(catalogue, setupOf(catalogue, active, { ...choices, [part]: version }), version),
+          // Foundry's builds all come from its release notes; only the system's versions can be unlisted.
+          part === 'system' && isUnlisted(catalogue, catalogue.base.system.package, version),
+        ),
       ),
     reportCheck: (active, choices) => {
       const setup = setupOf(catalogue, active, choices);
-      return checkReport(
+      const report = checkReport(
         reportUniverseOf(catalogue, setup),
         setup,
         messagesOf(catalogue),
         (checked, all) => optionOf(checked, all).badge,
       );
+      // A module taken as present is in the setup checked, so that what requires it is satisfied, but not reported.
+      const reported = report.modules.filter(({ id }) => choices.ignored?.has(id) !== true);
+      return { ...report, setup: { ...report.setup, modules: reported.length }, modules: reported };
     },
     reportPlan: (active, choices) => {
       const setup = setupOf(catalogue, active, choices);
-      return planReport(reportUniverseOf(catalogue, setup), setup, messagesOf(catalogue), catalogue.installed);
+      return planReport(reportUniverseOf(catalogue, setup), setup, messagesOf(catalogue), catalogue.installed).filter(
+        ({ id }) => choices.ignored?.has(id) !== true,
+      );
     },
-    reportSolve: (active, choices) => {
+    reportSolve: async (active, choices) => {
       const setup = setupOf(catalogue, active, choices);
-      return solveReport(reportUniverseOf(catalogue, setup), setup, messagesOf(catalogue), set.load.bind(set));
+      const solved = await solveReport(
+        reportUniverseOf(catalogue, setup),
+        setup,
+        messagesOf(catalogue),
+        set.load.bind(set),
+      );
+      // A module taken as present has one release, so cannot change; nothing of it is reported either way.
+      const { solution } = solved;
+      return solution.kind === 'found'
+        ? {
+            ...solved,
+            solution: {
+              ...solution,
+              changes: solution.changes.filter(
+                ({ package: { type, id } }) => type !== 'module' || choices.ignored?.has(id) !== true,
+              ),
+            },
+          }
+        : solved;
     },
+    reportIgnored: (active, choices) =>
+      [...active]
+        .filter(id => choices.ignored?.has(id) === true)
+        .map(id => catalogue.titles.get(packageKey({ type: 'module', id })) ?? id),
   };
 }
 
 /**
- * The releases found, as the resolver reads them.
- * @param catalogue - The releases found
- * @returns The universe
+ * A release's package and version, as one key: the same release, whatever source gave it.
+ * @param release - The release
+ * @returns `<type>:<id>@<version>`, the version without a leading `v`
  */
-function universeOf(catalogue: VersionCatalogue): { core: readonly CoreRelease[]; releases: readonly Release[] } {
-  return { core: catalogue.cores, releases: catalogue.releases };
+function releaseKey(release: Release): string {
+  return `${packageKey(release.package)}@${unprefixed(release.version)}`;
 }
 
 /**
@@ -486,7 +597,17 @@ function reportUniverseOf(
   const atLeast = (version: string, floor: string | undefined) => floor === undefined || !newer(floor, version);
   return {
     core: catalogue.cores.filter(({ version }) => atLeast(version, coreFloor)),
-    releases: catalogue.releases.filter(release => atLeast(release.version, floors.get(packageKey(release.package)))),
+    releases: [
+      ...catalogue.releases.filter(
+        release =>
+          // A module taken as present is only the release it stands for, even when it was looked up before being
+          // ignored: its own releases would be judged, and the solver could change it.
+          setup.assumed?.has(packageKey(release.package)) !== true &&
+          atLeast(release.version, floors.get(packageKey(release.package))),
+      ),
+      // The modules taken as present, as the releases they stand for.
+      ...assumedReleases(setup),
+    ],
   };
 }
 
@@ -554,17 +675,62 @@ function choosable(
  * @returns The version of each installed module of the setup, keyed by module ID
  */
 function setupOf(catalogue: VersionCatalogue, active: Iterable<string>, choices: VersionChoices): Setup {
+  const ignored = choices.ignored ?? new Set<string>();
   const modules = [...active].flatMap(id => {
     const installed = catalogue.installed.get(id);
-    const version = choices.modules.get(id) ?? installed;
+    // An ignored module stays at its installed version: nothing is known of its others.
+    const version = ignored.has(id) ? installed : (choices.modules.get(id) ?? installed);
     return version === undefined ? [] : [{ package: packageKey({ type: 'module', id }), version }];
   });
+  const assumed = new Set([...ignored].map(id => packageKey({ type: 'module', id })));
   const { core, system } = catalogue.base;
   return {
     core: choices.core ?? core,
     system: { package: system.package, version: choices.system ?? system.version },
     modules,
+    ...(assumed.size > 0 && { assumed }),
   };
+}
+
+/**
+ * The release a module taken as present stands for: at its version, with no compatibility, so that it suits every core
+ * and what requires it is satisfied, and with no relationships, so that it asks nothing of the setup.
+ * @param key - The module's package key
+ * @param version - Its version in the setup
+ * @returns The release
+ */
+function assumedRelease(key: string, version: string): Release {
+  const id = key.slice('module:'.length);
+  return {
+    package: { type: 'module', id },
+    version,
+    compatibility: {},
+    relationships: { requires: [], systems: [], conflicts: [], recommends: [] },
+    protected: false,
+    origin: `modules/${id}/module.json`,
+    detail: 'loaded',
+  };
+}
+
+/**
+ * The releases a setup's modules taken as present stand for.
+ * @param setup - The setup
+ * @returns One release for each
+ */
+function assumedReleases(setup: Setup): Release[] {
+  return setup.modules
+    .filter(({ package: key }) => setup.assumed?.has(key) === true)
+    .map(({ package: key, version }) => assumedRelease(key, version));
+}
+
+/**
+ * What checking found, without the modules taken as present, which are never judged.
+ * @param checks - What checking found
+ * @param setup - The setup checked
+ * @returns The checks of the other packages
+ */
+function judgedOf(checks: readonly ReleaseCheck[], setup: Setup): ReleaseCheck[] {
+  return checks.filter(({ release }) => setup.assumed?.has(packageKey(release.package)) !== true);
 }
 
 /**
@@ -582,14 +748,42 @@ function withModule(setup: Setup, id: string, version: string): Setup {
   };
 }
 
+/** Each package's releases found, by package key, with how many releases there were when they were indexed. */
+const releaseIndexes = new WeakMap<
+  readonly Release[],
+  { readonly count: number; readonly byKey: Map<string, Release[]> }
+>();
+
 /**
- * Check every package of a setup at once.
+ * The releases found, by package key: indexed once, and again only when a lookup has found more.
+ * @param releases - The releases found
+ * @returns Each package's releases, in the order found
+ */
+function releasesByKey(releases: readonly Release[]): ReadonlyMap<string, readonly Release[]> {
+  const indexed = releaseIndexes.get(releases);
+  if (indexed?.count === releases.length) return indexed.byKey;
+  const byKey = Map.groupBy(releases, release => packageKey(release.package));
+  releaseIndexes.set(releases, { count: releases.length, byKey });
+  return byKey;
+}
+
+/**
+ * Check every package of a setup at once, in a universe of what the check reads: the release of each package in the
+ * setup at its chosen version, the first found as the check itself would find it, and every core build. With
+ * Foundry's version order, the default, the other releases cannot change the answer, and in the catalogue's universe,
+ * with every version of everything the setup needs, they would make each check slow.
  * @param catalogue - The releases found
  * @param setup - The setup
  * @returns What checking found of the system and each module whose release is known
  */
-function checkSetup(catalogue: VersionCatalogue, setup: SetupSpec): readonly ReleaseCheck[] {
-  return check(universeOf(catalogue), setup).releases;
+function checkSetup(catalogue: VersionCatalogue, setup: Setup): readonly ReleaseCheck[] {
+  const byKey = releasesByKey(catalogue.releases);
+  const releases = [setup.system, ...setup.modules].flatMap(({ package: key, version }) => {
+    if (setup.assumed?.has(key) === true) return [assumedRelease(key, version)];
+    const release = byKey.get(key)?.find(candidate => sameVersion(candidate.version, version));
+    return release === undefined ? [] : [release];
+  });
+  return check({ core: catalogue.cores, releases }, setup).releases;
 }
 
 /**
@@ -622,6 +816,46 @@ function packagesOf(setup: readonly ReleaseCheck[]): foundry.packages.ClientPack
   return {
     modules: collected<foundry.packages.Module>('module'),
     systems: collected<foundry.packages.System>('system'),
+  };
+}
+
+/**
+ * Whether a package's version is not on Foundry's package listing.
+ * @param catalogue - The releases found
+ * @param key - The package
+ * @param version - Its version
+ * @returns `true` for a release marked unlisted
+ */
+function isUnlisted(catalogue: VersionCatalogue, key: string, version: string): boolean {
+  return (
+    releasesByKey(catalogue.releases)
+      .get(key)
+      ?.find(release => sameVersion(release.version, version))?.unlisted === true
+  );
+}
+
+/**
+ * A version, marked when it is not on Foundry's package listing, with a word on it in its badge's tooltip and text.
+ * Foundry's users cannot install it from the listing, so a GM should choose it knowingly.
+ * @param option - The version, with its badge
+ * @param unlisted - Whether it is not on the listing
+ * @returns The version, marked if it is not
+ */
+function withListing(option: VersionOption, unlisted: boolean): VersionOption {
+  if (!unlisted) return option;
+  const note = localize('MONDARTH-EMMA.Versions.Unlisted');
+  const { badge } = option;
+  return {
+    ...option,
+    unlisted: true,
+    badge:
+      badge === null
+        ? null
+        : {
+            ...badge,
+            tooltip: `${badge.tooltip}<br>${foundry.utils.escapeHTML(note)}`,
+            text: `${badge.text} ${note}`,
+          },
   };
 }
 
@@ -659,7 +893,7 @@ function optionOf(checked: ReleaseCheck, setup: readonly ReleaseCheck[]): Versio
     release.package.type === 'system'
       ? foundry.packages.System.getVersionBadge(code, data as foundry.packages.System.ManifestData, packages)
       : foundry.packages.Module.getVersionBadge(code, data, packages);
-  return { version: release.version, badge: toBadge(badge) };
+  return withListing({ version: release.version, badge: toBadge(badge) }, release.unlisted === true);
 }
 
 /** How badly each colour of badge fits, worst last; a package with no badge fits. */
@@ -673,9 +907,9 @@ const MISFIT: readonly VersionBadge['type'][] = ['success', 'neutral', 'warning'
  * @param version - The version the badge is for
  * @returns The version, with the setup's badge
  */
-function fitOf(catalogue: VersionCatalogue, setup: SetupSpec, version: string): VersionOption {
+function fitOf(catalogue: VersionCatalogue, setup: Setup, version: string): VersionOption {
   const checks = checkSetup(catalogue, setup);
-  const judged = checks.map(checked => ({
+  const judged = judgedOf(checks, setup).map(checked => ({
     title: catalogue.titles.get(packageKey(checked.release.package)) ?? checked.release.package.id,
     badge: optionOf(checked, checks).badge,
   }));
@@ -713,9 +947,9 @@ function fitOf(catalogue: VersionCatalogue, setup: SetupSpec, version: string): 
  * @param setup - The setup
  * @returns The version and its badge, keyed by module ID; none for a module whose release is not known
  */
-function judgeChoices(catalogue: VersionCatalogue, setup: SetupSpec): Map<string, VersionOption> {
+function judgeChoices(catalogue: VersionCatalogue, setup: Setup): Map<string, VersionOption> {
   const checks = checkSetup(catalogue, setup);
-  return new Map(modulesOf(checks).map(found => [found.release.package.id, optionOf(found, checks)]));
+  return new Map(modulesOf(judgedOf(checks, setup)).map(found => [found.release.package.id, optionOf(found, checks)]));
 }
 
 /**

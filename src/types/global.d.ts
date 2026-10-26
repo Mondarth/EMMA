@@ -22,6 +22,7 @@ declare module 'fvtt-types/configuration' {
     'mondarth-emma.versionProxy': string;
     'mondarth-emma.versionProxyKey': string;
     'mondarth-emma.versionProxyMode': string;
+    'mondarth-emma.hypotheticalIgnored': string[];
   }
 }
 
@@ -31,6 +32,11 @@ declare global {
    * Vite's `define` from `scripts/build/default-proxy.ts`; read only through `defaultProxy()`.
    */
   const __EMMA_DEFAULT_PROXY__: { readonly url: Obscured; readonly key: Obscured } | null;
+  /**
+   * The default package catalogue a release is built with, obscured, or `null` for a build without one. Set by Vite's
+   * `define` from `scripts/build/default-catalogue.ts`; read only through `defaultCatalogue()`.
+   */
+  const __EMMA_DEFAULT_CATALOGUE__: { readonly url: Obscured; readonly key: Obscured } | null;
 }
 
 export {};

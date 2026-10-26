@@ -1,22 +1,34 @@
 <script lang="ts">
   import type { VersionBadge } from '@module/adapters/modules';
+  import { localize } from '@module/lib/i18n';
 
   interface Props {
     /** The module's version. */
     version: string;
     /** Its compatibility badge, or `null` to show the version alone. */
     badge: VersionBadge | null;
+    /** Whether the version is not on Foundry's package listing; the badge's tooltip and text say so already. */
+    unlisted?: boolean;
   }
 
-  const { version, badge }: Props = $props();
+  const { version, badge, unlisted = false }: Props = $props();
 </script>
 
+<!-- A version not on Foundry's package listing carries a flask, as work not yet released there. -->
+{#snippet unlistedMark()}
+  {#if unlisted}<i class="fa-solid fa-flask fa-fw emma-unlisted" inert></i>{/if}
+{/snippet}
+
 {#if badge === null}
-  <span class="emma-version">{version}</span>
+  <span class="emma-version" data-tooltip={unlisted ? localize('MONDARTH-EMMA.Versions.Unlisted') : undefined}
+    >{version}{@render unlistedMark()}{#if unlisted}<span class="emma-badge-text"
+        >{localize('MONDARTH-EMMA.Versions.Unlisted')}</span
+      >{/if}</span>
 {:else}
   <span class={['emma-version', 'emma-badge', badge.type]} data-tooltip-html={badge.tooltip}>
     <i class={[badge.icon, 'fa-fw']} inert></i>
     {version}
+    {@render unlistedMark()}
     <span class="emma-badge-text">{badge.text}</span>
   </span>
 {/if}

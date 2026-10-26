@@ -1,7 +1,10 @@
 import { MODULE_ID } from '@module/lib/constants';
+import { defaultCatalogue } from '@module/lib/default-catalogue';
+import type { DefaultCatalogue } from '@module/lib/default-catalogue';
 import { defaultProxy } from '@module/lib/default-proxy';
 import type { DrawerField } from '@module/state/drawer-fields.svelte';
 import { DEFAULT_DRAWER_FIELDS, DRAWER_FIELDS, drawerFields, isDrawerField } from '@module/state/drawer-fields.svelte';
+import { setIgnoredModules } from '@module/state/hypothetical-ignored.svelte';
 
 /** Keys of the settings EMMA registers, without the module namespace. */
 export const SETTINGS = {
@@ -21,6 +24,8 @@ export const SETTINGS = {
   versionProxyKey: 'versionProxyKey',
   /** Which proxy hypothetical mode looks versions up through: EMMA's, the GM's own, or none. */
   versionProxyMode: 'versionProxyMode',
+  /** The IDs of the modules hypothetical mode ignores, shared by the world's GMs. */
+  hypotheticalIgnored: 'hypotheticalIgnored',
 } as const;
 
 /** Which proxy hypothetical mode looks versions up through: EMMA's own (the default), the GM's own, or none. */
@@ -96,6 +101,17 @@ export function registerSettings(): void {
     config: false,
     type: String,
     default: '',
+  });
+
+  game.settings.register(MODULE_ID, SETTINGS.hypotheticalIgnored, {
+    scope: 'world',
+    config: false,
+    type: Array,
+    default: [],
+    // Every GM's open window follows the change, wherever it was made.
+    onChange: value => {
+      setIgnoredModules(toModuleIds(value));
+    },
   });
 
   game.settings.register(MODULE_ID, SETTINGS.drawerFields, {
@@ -222,32 +238,44 @@ export function getVersionProxyMode(): ProxyMode {
   return game.settings.get(MODULE_ID, SETTINGS.versionProxy).trim() === '' ? 'default' : 'own';
 }
 
-/** The proxy versions are looked up through, and the API key to send it. */
+/** Where versions are looked up: the catalogue asked first, if any, and the proxy, with the API key to send it. */
 export interface VersionLookup {
   /** The proxy's URL template, or `null` to look up directly. */
   readonly proxy: string | null;
   /** The key to send the proxy, or `null` for none. */
   readonly apiKey: string | null;
+  /** EMMA's package catalogue, with its own key, asked before the proxy; `null` for none. */
+  readonly catalogue: DefaultCatalogue | null;
 }
 
 /**
- * The proxy versions are looked up through, with its key: EMMA's proxy with EMMA's key, the GM's own with theirs, or
- * none. EMMA's key only ever goes with EMMA's proxy, so a proxy a GM sets never receives it.
+ * Where versions are looked up: EMMA's catalogue first and then EMMA's proxy, each with EMMA's key for it; the GM's
+ * own proxy with their key; or none. EMMA's keys only ever go to EMMA's services, so a proxy a GM sets never receives
+ * them, and a GM who chose their own proxy, or none, is never sent to EMMA's catalogue.
  * @param built - EMMA's proxy as this build has it; this build's own unless given
- * @returns The proxy and key, or nulls to look up directly
+ * @param builtCatalogue - EMMA's catalogue as this build has it; this build's own unless given
+ * @returns The catalogue, proxy and key, or nulls to look up directly
  */
-export function versionLookup(built: Parameters<typeof defaultProxy>[0] = __EMMA_DEFAULT_PROXY__): VersionLookup {
+export function versionLookup(
+  built: Parameters<typeof defaultProxy>[0] = __EMMA_DEFAULT_PROXY__,
+  builtCatalogue: Parameters<typeof defaultCatalogue>[0] = __EMMA_DEFAULT_CATALOGUE__,
+): VersionLookup {
   switch (getVersionProxyMode()) {
     case 'default': {
       const proxy = defaultProxy(built);
-      return proxy === null ? { proxy: null, apiKey: null } : { proxy: proxy.url, apiKey: proxy.key };
+      const catalogue = defaultCatalogue(builtCatalogue);
+      return proxy === null
+        ? { proxy: null, apiKey: null, catalogue }
+        : { proxy: proxy.url, apiKey: proxy.key, catalogue };
     }
     case 'own': {
       const proxy = getVersionProxy();
-      return proxy === null ? { proxy: null, apiKey: null } : { proxy, apiKey: getVersionProxyKey() };
+      return proxy === null
+        ? { proxy: null, apiKey: null, catalogue: null }
+        : { proxy, apiKey: getVersionProxyKey(), catalogue: null };
     }
     default:
-      return { proxy: null, apiKey: null };
+      return { proxy: null, apiKey: null, catalogue: null };
   }
 }
 
@@ -261,4 +289,33 @@ export async function setVersionProxy(mode: ProxyMode, proxy: string, key: strin
   await game.settings.set(MODULE_ID, SETTINGS.versionProxyMode, mode);
   await game.settings.set(MODULE_ID, SETTINGS.versionProxy, proxy.trim());
   await game.settings.set(MODULE_ID, SETTINGS.versionProxyKey, key.trim());
+}
+
+/**
+ * The module IDs a setting holds, leaving out anything else.
+ * @param value - The setting's value
+ * @returns The IDs
+ */
+function toModuleIds(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string' && id !== '') : [];
+}
+
+/**
+ * The modules hypothetical mode ignores.
+ * @returns Their IDs
+ */
+export function getHypotheticallyIgnored(): string[] {
+  return toModuleIds(game.settings.get(MODULE_ID, SETTINGS.hypotheticalIgnored));
+}
+
+/**
+ * Have hypothetical mode ignore a module, or stop ignoring it.
+ * @param id - The module ID
+ * @param ignored - `true` to ignore it
+ */
+export async function setHypotheticallyIgnored(id: string, ignored: boolean): Promise<void> {
+  const ids = new Set(getHypotheticallyIgnored());
+  if (ignored) ids.add(id);
+  else ids.delete(id);
+  await game.settings.set(MODULE_ID, SETTINGS.hypotheticalIgnored, [...ids].sort());
 }

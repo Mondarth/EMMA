@@ -47,9 +47,10 @@ Under *Settings → Secrets and variables → Actions → Secrets*:
 | `FOUNDRY_ADMIN_KEY`     | E2E     | Any password; the tests use it to administer the test server                      |
 | `CODECOV_TOKEN`         | Dev CI  | Optional. Uploads coverage to [Codecov](https://about.codecov.io) (step 8)        |
 | `EMMA_DEFAULT_PROXY_KEY` | Release | Optional. The API key of the default version lookup proxy (see {doc}`default-proxy`) |
+| `EMMA_DEFAULT_CATALOGUE_KEY` | Release | Optional. The API key of the default package catalogue (see {doc}`default-proxy`) |
 
-And under *Variables*, `EMMA_DEFAULT_PROXY_URL`, the default proxy's URL template. Without both, a release has no
-default proxy.
+And under *Variables*, `EMMA_DEFAULT_PROXY_URL`, the default proxy's URL template, and `EMMA_DEFAULT_CATALOGUE_URL`,
+the default catalogue's URL. Without both of a pair, a release has no default proxy, or no default catalogue.
 
 Pull requests from forks cannot read secrets, so the end-to-end tests are skipped for them.
 

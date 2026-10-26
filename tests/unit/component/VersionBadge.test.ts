@@ -1,8 +1,9 @@
 import { render, screen } from '@testing-library/svelte';
-import { describe, expect, test } from 'vitest';
+import { beforeEach, describe, expect, test } from 'vitest';
 
 import VersionBadge from '@component/VersionBadge.svelte';
 import type { VersionBadge as Badge } from '@module/adapters/modules';
+import { installFoundryMocks } from '../mocks/foundry';
 
 const WARNING: Badge = {
   type: 'warning',
@@ -12,6 +13,10 @@ const WARNING: Badge = {
 };
 
 describe('VersionBadge', () => {
+  beforeEach(() => {
+    installFoundryMocks();
+  });
+
   test('shows the version in a badge coloured by its compatibility', () => {
     const { container } = render(VersionBadge, { version: '2.0.0', badge: WARNING });
 
@@ -33,5 +38,25 @@ describe('VersionBadge', () => {
 
     expect(container.querySelector('.emma-badge')).toBeNull();
     expect(screen.getByText('2.0.0')).toHaveClass('emma-version');
+  });
+
+  test('marks a version not on Foundry’s package listing', () => {
+    const { container } = render(VersionBadge, { version: '2.0.0', badge: WARNING, unlisted: true });
+
+    expect(container.querySelector('.emma-badge .emma-unlisted')).not.toBeNull();
+  });
+
+  test('marks one with no badge too, saying why in its own tooltip', () => {
+    const { container } = render(VersionBadge, { version: '2.0.0', badge: null, unlisted: true });
+
+    const version = screen.getByText('2.0.0');
+    expect(version).toHaveAttribute('data-tooltip', 'MONDARTH-EMMA.Versions.Unlisted');
+    expect(container.querySelector('.emma-unlisted')).not.toBeNull();
+  });
+
+  test('marks nothing for a listed version', () => {
+    const { container } = render(VersionBadge, { version: '2.0.0', badge: WARNING });
+
+    expect(container.querySelector('.emma-unlisted')).toBeNull();
   });
 });

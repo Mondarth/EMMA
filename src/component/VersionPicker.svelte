@@ -129,7 +129,7 @@
     else show(event.currentTarget);
   }}>
   {#if children === undefined}
-    <VersionBadge version={chosen.version} badge={chosen.badge} />
+    <VersionBadge version={chosen.version} badge={chosen.badge} unlisted={chosen.unlisted === true} />
   {:else}
     {@render children()}
   {/if}
@@ -169,7 +169,7 @@
         onpointermove={() => {
           active = index;
         }}>
-        <VersionBadge version={option.version} badge={option.badge} />
+        <VersionBadge version={option.version} badge={option.badge} unlisted={option.unlisted === true} />
       </li>
     {/each}
   </ul>

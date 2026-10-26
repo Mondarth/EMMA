@@ -107,6 +107,9 @@ export function fakeJudge(
     reportSolve: vi.fn((_active: Iterable<string>, _choices: VersionChoices): Promise<SetupSolve> =>
       Promise.resolve({ solution: { kind: 'found', changes: [] }, unloaded: [] }),
     ),
+    reportIgnored: vi.fn((active: Iterable<string>, choices: VersionChoices): readonly string[] =>
+      [...active].filter(id => choices.ignored?.has(id) === true),
+    ),
   } satisfies VersionJudge;
 }
 
@@ -115,17 +118,20 @@ export function fakeJudge(
  * @param versions - Each module's versions, the installed one first
  * @param options - As for {@link fakeJudge}
  * @param active - The modules staged active; by default, every module given
+ * @param ignored - The modules hypothetical mode ignores; none by default
  * @returns The state, loaded, and the judge behind it
  */
 export async function loadedVersions(
   versions: Readonly<Record<string, readonly string[]>>,
   options?: Parameters<typeof fakeJudge>[1],
   active: readonly string[] = Object.keys(versions),
+  ignored: ReadonlySet<string> = new Set(),
 ) {
   const judge = fakeJudge(versions, options);
   const state = new HypotheticalState(
     () => judge,
     () => active,
+    () => ignored,
   );
   await state.load();
   return { state, judge };

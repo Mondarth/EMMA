@@ -32,7 +32,7 @@
       versions.choose(entry.id, version);
     }} />
 {:else if chosen !== undefined}
-  <VersionBadge version={chosen.version} badge={chosen.badge} />
+  <VersionBadge version={chosen.version} badge={chosen.badge} unlisted={chosen.unlisted === true} />
 {:else}
   <VersionBadge version={entry.version} badge={entry.badge} />
 {/if}

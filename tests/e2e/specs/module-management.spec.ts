@@ -779,6 +779,46 @@ test.describe('Hypothetical mode', () => {
     expect(await savedActive(page, LIBRARY.id)).toBe(false);
   });
 
+  test('a module is left out of it from its context menu, and brought back', async ({ page }) => {
+    /**
+     * The modules hypothetical mode ignores, as the world's setting holds them.
+     * @returns Their IDs
+     */
+    const ignoredSetting = () => page.evaluate(() => game.settings.get('mondarth-emma', 'hypotheticalIgnored'));
+    await page.evaluate(() => game.settings.set('mondarth-emma', 'hypotheticalIgnored', []));
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+    const row = emma.locator(`[data-module-id="${LIBRARY.id}"]`);
+    const menu = page.locator('#context-menu');
+    /**
+     * Choose an entry of the row's context menu, as a person does: once the menu has opened, which Foundry animates,
+     * and only once it has gone.
+     * @param entry - The entry's text
+     */
+    async function choose(entry: string): Promise<void> {
+      await row.click({ button: 'right' });
+      // Foundry clears the height it animates once the menu is open.
+      await expect(menu).not.toHaveAttribute('style', /(^|[ ;])height:/);
+      await menu.getByText(entry).click();
+      await expect(menu).toHaveCount(0);
+    }
+
+    await row.click({ button: 'right' });
+    await expect(menu.getByText('No hypotheticals')).toBeVisible();
+    await expect(menu.getByText('Add to hypotheticals')).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
+
+    await choose('No hypotheticals');
+    await expect.poll(ignoredSetting).toEqual([LIBRARY.id]);
+    await emma.getByRole('button', { name: 'Hypothetical mode', exact: true }).click();
+    await expect(row).toHaveClass(/\bignored\b/);
+
+    await choose('Add to hypotheticals');
+    await expect.poll(ignoredSetting).toEqual([]);
+    await expect(row).not.toHaveClass(/\bignored\b/);
+  });
+
   test('closing EMMA in it asks only when changes were staged before it', async ({ page }) => {
     await deactivateFixtures(page);
     await (await moduleManagementButton(page)).click();

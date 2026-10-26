@@ -1,8 +1,12 @@
-# The default proxy
+# The default proxy and catalogue
 
 EMMA looks up versions through a CORS proxy. A GM can set their own; without one, a release uses a default proxy, built
 in. That proxy is a [Foundry VTT Package CORS Proxy](https://github.com/ulenarofmondarth/fvtt-package-corsproxy) that
 asks for an API key.
+
+With the default proxy, a release asks a default package catalogue first: the
+[Foundry VTT package catalogue](https://github.com/Mondarth/fvtt-package-catalogue), which also asks for an API key.
+It is built in the same way as the proxy, from its own pair of values; see [The catalogue](#the-catalogue).
 
 ## What protects it
 
@@ -54,3 +58,25 @@ Give each release a new key, and keep the proxy accepting the keys of the releas
 
 If a key is abused, remove it from `API_KEYS` at once and release with a new one. GMs on the release that used it lose
 the default proxy until they update.
+
+## The catalogue
+
+The catalogue keeps every release of the packages it is asked for, loaded from their manifests, with everything they
+require and run in, and gives a whole universe in one `POST /api/v1/universe`. EMMA asks it through
+`@mondarth/fvtt-resolver`'s `catalogueSource`, given to `sourceSet` as its `catalogue`: the packages it holds come from
+it alone, and the proxy finds the rest, or everything when the catalogue cannot be reached.
+
+- **Only with the default proxy.** `versionLookup()` (`src/module/settings.ts`) gives the catalogue in the `default`
+  mode only: a GM who chose their own proxy, or none, never contacts it, and its key goes only to it.
+- **Directly, not through the proxy.** The catalogue sends CORS headers, so the browser asks it itself, with its key in
+  `X-API-Key` and `EMMA/<version>` in `X-Catalogue-Client`.
+- **Built in the same way as the proxy:** `EMMA_DEFAULT_CATALOGUE_URL` (a repository variable, the catalogue's
+  `https` URL) and `EMMA_DEFAULT_CATALOGUE_KEY` (a secret) become `__EMMA_DEFAULT_CATALOGUE__`, obscured, through
+  `scripts/build/default-catalogue.ts`, and EMMA reveals them with `defaultCatalogue()`
+  (`src/module/lib/default-catalogue.ts`). The build stops for half a pair, or a URL that is not `https`, and the
+  release refuses a bundle that holds the key in plain text.
+- **What protects it** is what protects the proxy: the key only says which client is asking, the data is public, and
+  the catalogue serves nothing else.
+- **Rotating its key** is as for the proxy's: the catalogue's `API_KEYS` is a list too, so add the new key there,
+  set `EMMA_DEFAULT_CATALOGUE_KEY`, release, and remove the old key once its release is rarely seen. The catalogue's
+  logs give each request's `X-Catalogue-Client`.

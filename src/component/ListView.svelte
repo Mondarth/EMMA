@@ -92,10 +92,17 @@
       {@const expanded = modules.isExpanded(entry.id)}
       {@const conflicted = modules.conflicted.has(entry.id)}
       {@const locked = lockedTooltip(modules, entry)}
+      {@const ignored = versions?.isIgnored(entry.id) === true}
       <li
-        class={['emma-module', { changed: entry.id in modules.changes, conflicted, locked: locked !== undefined }]}
-        style:--emma-depth={depth}>
-        <div class="emma-module-row" data-tooltip={locked}>
+        class={[
+          'emma-module',
+          { changed: entry.id in modules.changes, conflicted, locked: locked !== undefined, ignored },
+        ]}
+        style:--emma-depth={depth}
+        data-module-id={entry.id}>
+        <div
+          class="emma-module-row"
+          data-tooltip={locked ?? (ignored ? localize('MONDARTH-EMMA.Ignore.Tooltip') : undefined)}>
           <label>
             {#if relation !== null}
               {@const label = localize(`MONDARTH-EMMA.Relation.${relation}`)}
@@ -202,6 +209,11 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     color: var(--color-text-emphatic);
+  }
+
+  /* A module hypothetical mode ignores is greyed out while the mode is on; its row's tooltip says why. */
+  .emma-module.ignored .emma-module-row {
+    opacity: 0.5;
   }
 
   /* A module an active module requires cannot be unchecked; its row's tooltip says why. */

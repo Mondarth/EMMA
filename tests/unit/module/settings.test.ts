@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import {
   getDrawerFields,
+  getHypotheticallyIgnored,
   getVersionProxy,
   getVersionProxyKey,
   getVersionProxyMode,
@@ -12,12 +13,14 @@ import {
   registerSettings,
   setDrawerFields,
   setGrouped,
+  setHypotheticallyIgnored,
   setVersionProxy,
   setView,
   versionLookup,
 } from '@module/settings';
 import { obscure } from '@module/lib/obscure';
 import { drawerFields } from '@module/state/drawer-fields.svelte';
+import { ignoredModules } from '@module/state/hypothetical-ignored.svelte';
 import { installFoundryMocks } from '../mocks/foundry';
 
 describe('registerSettings', () => {
@@ -314,21 +317,26 @@ describe('getVersionProxyMode', () => {
 });
 
 describe('versionLookup', () => {
-  /** The default proxy of a release build. */
+  /** The default proxy and catalogue of a release build. */
   const built = { url: obscure('https://default.test/?url={url}'), key: obscure('default-k3y') };
+  const catalogue = { url: obscure('https://catalogue.test/'), key: obscure('catalogue-k3y') };
 
   test('is EMMA’s proxy with its key, by default', () => {
     installFoundryMocks();
     registerSettings();
 
-    expect(versionLookup(built)).toEqual({ proxy: 'https://default.test/?url={url}', apiKey: 'default-k3y' });
+    expect(versionLookup(built)).toEqual({
+      proxy: 'https://default.test/?url={url}',
+      apiKey: 'default-k3y',
+      catalogue: null,
+    });
   });
 
   test('is no proxy by default in a build without one', () => {
     installFoundryMocks();
     registerSettings();
 
-    expect(versionLookup(null)).toEqual({ proxy: null, apiKey: null });
+    expect(versionLookup(null)).toEqual({ proxy: null, apiKey: null, catalogue: null });
   });
 
   test('is the GM’s own proxy with their own key, never EMMA’s key', () => {
@@ -339,7 +347,7 @@ describe('versionLookup', () => {
       },
     });
     registerSettings();
-    expect(versionLookup(built)).toEqual({ proxy: 'https://own.test/?url={url}', apiKey: null });
+    expect(versionLookup(built)).toEqual({ proxy: 'https://own.test/?url={url}', apiKey: null, catalogue: null });
 
     installFoundryMocks({
       settings: {
@@ -349,7 +357,7 @@ describe('versionLookup', () => {
       },
     });
     registerSettings();
-    expect(versionLookup(built)).toEqual({ proxy: 'https://own.test/?url={url}', apiKey: 'own-k3y' });
+    expect(versionLookup(built)).toEqual({ proxy: 'https://own.test/?url={url}', apiKey: 'own-k3y', catalogue: null });
   });
 
   test('is no proxy when the GM chose none, or their own has nowhere to put the URL', () => {
@@ -357,13 +365,35 @@ describe('versionLookup', () => {
       settings: { 'mondarth-emma.versionProxyMode': 'none', 'mondarth-emma.versionProxyKey': 'k' },
     });
     registerSettings();
-    expect(versionLookup(built)).toEqual({ proxy: null, apiKey: null });
+    expect(versionLookup(built)).toEqual({ proxy: null, apiKey: null, catalogue: null });
 
     installFoundryMocks({
       settings: { 'mondarth-emma.versionProxyMode': 'own', 'mondarth-emma.versionProxy': 'https://own.test/' },
     });
     registerSettings();
-    expect(versionLookup(built)).toEqual({ proxy: null, apiKey: null });
+    expect(versionLookup(built)).toEqual({ proxy: null, apiKey: null, catalogue: null });
+  });
+
+  test('asks EMMA’s catalogue first, with its own key, by default', () => {
+    installFoundryMocks();
+    registerSettings();
+
+    expect(versionLookup(built, catalogue)).toEqual({
+      proxy: 'https://default.test/?url={url}',
+      apiKey: 'default-k3y',
+      catalogue: { url: 'https://catalogue.test/', key: 'catalogue-k3y' },
+    });
+  });
+
+  test('never asks EMMA’s catalogue when the GM chose their own proxy, or none', () => {
+    for (const settings of [
+      { 'mondarth-emma.versionProxyMode': 'own', 'mondarth-emma.versionProxy': 'https://own.test/?url={url}' },
+      { 'mondarth-emma.versionProxyMode': 'none' },
+    ]) {
+      installFoundryMocks({ settings });
+      registerSettings();
+      expect(versionLookup(built, catalogue).catalogue).toBeNull();
+    }
   });
 });
 
@@ -380,5 +410,52 @@ describe('setVersionProxy', () => {
     expect(getVersionProxyMode()).toBe('own');
     expect(getVersionProxy()).toBe('https://proxy.test/?url={url}');
     expect(getVersionProxyKey()).toBe('k3y');
+  });
+});
+
+describe('the modules hypothetical mode ignores', () => {
+  test('are a hidden world setting, none by default', () => {
+    const { game } = installFoundryMocks();
+    registerSettings();
+
+    expect(game.settings.register).toHaveBeenCalledWith(
+      'mondarth-emma',
+      'hypotheticalIgnored',
+      expect.objectContaining({ scope: 'world', config: false, type: Array, default: [] }),
+    );
+    expect(getHypotheticallyIgnored()).toEqual([]);
+  });
+
+  test('are added and removed one at a time, kept in order', async () => {
+    installFoundryMocks();
+    registerSettings();
+
+    await setHypotheticallyIgnored('synth', true);
+    await setHypotheticallyIgnored('another', true);
+    await setHypotheticallyIgnored('synth', true);
+    expect(getHypotheticallyIgnored()).toEqual(['another', 'synth']);
+
+    await setHypotheticallyIgnored('synth', false);
+    expect(getHypotheticallyIgnored()).toEqual(['another']);
+  });
+
+  test('are followed by every open window, wherever they change', async () => {
+    installFoundryMocks();
+    registerSettings();
+
+    await setHypotheticallyIgnored('synth', true);
+    expect([...ignoredModules]).toEqual(['synth']);
+    await setHypotheticallyIgnored('synth', false);
+    expect([...ignoredModules]).toEqual([]);
+  });
+
+  test('leave out anything that is not a module ID', () => {
+    installFoundryMocks({ settings: { 'mondarth-emma.hypotheticalIgnored': ['synth', '', 7, null] } });
+    registerSettings();
+    expect(getHypotheticallyIgnored()).toEqual(['synth']);
+
+    installFoundryMocks({ settings: { 'mondarth-emma.hypotheticalIgnored': 'synth' } });
+    registerSettings();
+    expect(getHypotheticallyIgnored()).toEqual([]);
   });
 });

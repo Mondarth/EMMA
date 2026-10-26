@@ -383,6 +383,15 @@ export function createFoundryNamespaceMock() {
     applications: {
       api: { ApplicationV2: ApplicationV2Mock, DialogV2: { confirm } },
       settings: { SettingsConfig: { reloadConfirm } },
+      // Foundry's context menu, recorded: its container, selector, entries and options.
+      ux: {
+        ContextMenu: vi.fn(function ContextMenu(
+          _container: HTMLElement,
+          _selector: string,
+          _entries: foundry.applications.ux.ContextMenu.Entry<HTMLElement>[],
+          _options?: object,
+        ) {}),
+      },
       sidebar: {
         apps: {
           ModuleManagement: class {
