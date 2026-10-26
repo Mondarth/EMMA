@@ -423,10 +423,13 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
       for (const release of releases.filter(({ package: { type } }) => type === 'module')) {
         versions.set(release.package.id, [...(versions.get(release.package.id) ?? []), release.version]);
       }
+      // Only a package that could not be listed is unreached: one old release whose manifest cannot be read is not,
+      // and the catalogue, which loads every release, meets such releases in most packages with a long history.
       const failed = new Set(
         set
           .gaps()
           .slice(known)
+          .filter(gap => gap.version === undefined)
           .map(gap => gap.package),
       );
       unreached.push(...refs.filter(ref => failed.has(packageKey(ref))));

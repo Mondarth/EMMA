@@ -774,6 +774,21 @@ describe('createVersionJudge with EMMA’s catalogue', () => {
     expect(judge.unreached).toEqual(without.unreached);
   });
 
+  test('does not name a package unreached for an old release whose manifest could not be read', async () => {
+    const oldGap = {
+      source: 'manifest',
+      url: 'https://files.test/dice/0.1.0/module.json',
+      reason: 'invalid',
+      package: 'module:dice',
+      version: '0.1.0',
+    };
+    const { judge } = await lookUpWithCatalogue({ modules: { dice: onGithub('owner/dice', { version: '1.0.0' }) } }, [
+      universe([held('dice', '1.0.0')], { gaps: [oldGap] }),
+    ]);
+
+    expect(judge.unreached).toEqual([]);
+  });
+
   test('still offers the installed version when the catalogue does not list it', async () => {
     const { judge } = await lookUpWithCatalogue(
       { modules: { dice: onGithub('owner/dice', { version: '1.0.1-dev' }) } },

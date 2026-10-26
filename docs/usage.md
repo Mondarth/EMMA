@@ -268,8 +268,8 @@ through the proxy, as before.
 
 Without a proxy, EMMA lists the versions released on GitHub and GitLab, but does not know which Foundry versions
 those releases support, so Foundry marks them **Compatibility unknown**; and as it cannot read Foundry's release
-notes, it offers no newer Foundry version. A note in the footer says so while the mode is on. A warning beside the System button names the packages whose versions could not all be
-looked up.
+notes, it offers no newer Foundry version. A note in the footer says so while the mode is on. A warning beside the System button names the packages that could not be looked up. An old version
+whose manifest cannot be read is still listed, but does not raise the warning.
 
 ### Staging in hypothetical mode
 
