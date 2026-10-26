@@ -389,7 +389,8 @@ describe('SetupReport', () => {
 
       await userEvent.click(screen.getByRole('button', { name: DOWNLOAD }));
 
-      expect(onDownload.mock.lastCall?.[0]).toMatch(new RegExp(`^${WARNING.replace(/[{}()]/g, '\\$&')}\n\n`));
+      const text: unknown = onDownload.mock.lastCall?.[0];
+      expect(typeof text === 'string' && text.startsWith(`${WARNING}\n\n`)).toBe(true);
     });
 
     test('warns of nothing when none is ignored', () => {
