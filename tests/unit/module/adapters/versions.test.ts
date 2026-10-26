@@ -819,6 +819,45 @@ describe('createVersionJudge with EMMA’s catalogue', () => {
     expect(checked.universes.map(given => given.releases.length)).toEqual([3, 3, 3, 3, 3]);
   });
 
+  test('says which versions are not on Foundry’s package listing, as the catalogue marks them', async () => {
+    const ahead = { ...held('dice', '2.0.0'), unlisted: true };
+    const { judge } = await lookUpWithCatalogue({ modules: { dice: onGithub('owner/dice', { version: '1.0.0' }) } }, [
+      universe([held('dice', '1.0.0'), ahead]),
+    ]);
+
+    const [newest, installed] = judge.judgeVersions(['dice'], { modules: new Map() }, 'dice');
+    expect(newest).toMatchObject({ version: '2.0.0', unlisted: true });
+    expect(newest?.badge?.tooltip).toContain('MONDARTH-EMMA.Versions.Unlisted');
+    expect(newest?.badge?.text).toContain('MONDARTH-EMMA.Versions.Unlisted');
+    expect(installed).not.toHaveProperty('unlisted');
+    expect(installed?.badge?.tooltip).not.toContain('MONDARTH-EMMA.Versions.Unlisted');
+    // Chosen, it says so on the module's own badge too.
+    const chosen = judge.judgeChoices(['dice'], { modules: new Map([['dice', '2.0.0']]) }).get('dice');
+    expect(chosen).toMatchObject({ unlisted: true });
+  });
+
+  test('says so of a system version not on the listing, and never of a core build', async () => {
+    const system = (version: string, unlisted = false) => ({
+      ...held('dnd5e', version),
+      package: { type: 'system', id: 'dnd5e' },
+      ...(unlisted && { unlisted: true }),
+    });
+    const { judge } = await lookUpWithCatalogue(
+      {
+        modules: { dice: onGithub('owner/dice', { version: '1.0.0' }) },
+        system: { id: 'dnd5e', title: 'D&D 5e', version: '5.0.0' },
+      },
+      [universe([held('dice', '1.0.0'), system('5.0.0'), system('6.0.0', true)])],
+    );
+
+    const systems = judge.judgePlatform(['dice'], { modules: new Map() }, 'system');
+    expect(systems.map(option => [option.version, option.unlisted ?? false])).toEqual([
+      ['6.0.0', true],
+      ['5.0.0', false],
+    ]);
+    expect(judge.judgePlatform(['dice'], { modules: new Map() }, 'core').some(option => option.unlisted)).toBe(false);
+  });
+
   test('still offers the installed version when the catalogue does not list it', async () => {
     const { judge } = await lookUpWithCatalogue(
       { modules: { dice: onGithub('owner/dice', { version: '1.0.1-dev' }) } },

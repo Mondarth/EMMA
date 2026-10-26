@@ -266,6 +266,10 @@ One request gives them all, so lookups are much quicker. A package the catalogue
 time, and EMMA looks it up through the proxy meanwhile; if the catalogue cannot be reached, EMMA looks everything up
 through the proxy, as before.
 
+The catalogue also keeps versions an author has published ahead of Foundry's package listing, such as releases on
+GitLab not yet on the listing. EMMA offers them marked with a flask, and their tooltip says they are not on Foundry's
+package listing: Foundry's own installer does not offer them, so choose one knowingly.
+
 Without a proxy, EMMA lists the versions released on GitHub and GitLab, but does not know which Foundry versions
 those releases support, so Foundry marks them **Compatibility unknown**; and as it cannot read Foundry's release
 notes, it offers no newer Foundry version. A note in the footer says so while the mode is on. A warning beside the System button names the packages that could not be looked up. An old version

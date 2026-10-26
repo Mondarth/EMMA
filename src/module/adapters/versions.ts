@@ -60,6 +60,8 @@ export interface VersionOption {
   readonly version: string;
   /** The badge, or `null` if Foundry gives none. */
   readonly badge: VersionBadge | null;
+  /** A version not on Foundry's package listing, such as one its author has published on GitLab ahead of it. */
+  readonly unlisted?: true;
 }
 
 /**
@@ -441,7 +443,11 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
       judgeVersions(catalogue, setupOf(catalogue, active, choices), choosable(catalogue, versions, id), id),
     judgePlatform: (active, choices, part) =>
       platformVersions(catalogue, part).map(version =>
-        fitOf(catalogue, setupOf(catalogue, active, { ...choices, [part]: version }), version),
+        withListing(
+          fitOf(catalogue, setupOf(catalogue, active, { ...choices, [part]: version }), version),
+          // Foundry's builds all come from its release notes; only the system's versions can be unlisted.
+          part === 'system' && isUnlisted(catalogue, catalogue.base.system.package, version),
+        ),
       ),
     reportCheck: (active, choices) => {
       const setup = setupOf(catalogue, active, choices);
@@ -695,6 +701,46 @@ function packagesOf(setup: readonly ReleaseCheck[]): foundry.packages.ClientPack
 }
 
 /**
+ * Whether a package's version is not on Foundry's package listing.
+ * @param catalogue - The releases found
+ * @param key - The package
+ * @param version - Its version
+ * @returns `true` for a release marked unlisted
+ */
+function isUnlisted(catalogue: VersionCatalogue, key: string, version: string): boolean {
+  return (
+    releasesByKey(catalogue.releases)
+      .get(key)
+      ?.find(release => sameVersion(release.version, version))?.unlisted === true
+  );
+}
+
+/**
+ * A version, marked when it is not on Foundry's package listing, with a word on it in its badge's tooltip and text.
+ * Foundry's users cannot install it from the listing, so a GM should choose it knowingly.
+ * @param option - The version, with its badge
+ * @param unlisted - Whether it is not on the listing
+ * @returns The version, marked if it is not
+ */
+function withListing(option: VersionOption, unlisted: boolean): VersionOption {
+  if (!unlisted) return option;
+  const note = localize('MONDARTH-EMMA.Versions.Unlisted');
+  const { badge } = option;
+  return {
+    ...option,
+    unlisted: true,
+    badge:
+      badge === null
+        ? null
+        : {
+            ...badge,
+            tooltip: `${badge.tooltip}<br>${foundry.utils.escapeHTML(note)}`,
+            text: `${badge.text} ${note}`,
+          },
+  };
+}
+
+/**
  * A package's version, with the badge Foundry gives its release with a verdict.
  * @param checked - What checking found of the release
  * @param setup - What checking found of every package in the same setup
@@ -728,7 +774,7 @@ function optionOf(checked: ReleaseCheck, setup: readonly ReleaseCheck[]): Versio
     release.package.type === 'system'
       ? foundry.packages.System.getVersionBadge(code, data as foundry.packages.System.ManifestData, packages)
       : foundry.packages.Module.getVersionBadge(code, data, packages);
-  return { version: release.version, badge: toBadge(badge) };
+  return withListing({ version: release.version, badge: toBadge(badge) }, release.unlisted === true);
 }
 
 /** How badly each colour of badge fits, worst last; a package with no badge fits. */
