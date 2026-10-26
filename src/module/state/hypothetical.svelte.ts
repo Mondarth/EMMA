@@ -5,6 +5,9 @@ import type { SetupChange, SetupReportData } from '@module/adapters/report';
 import type { PackageRef, PlatformPart, VersionChoices, VersionJudge, VersionOption } from '@module/adapters/versions';
 import { log } from '@module/lib/logger';
 
+/** No module ignored, for a state told of none. */
+const NONE_IGNORED: ReadonlySet<string> = new SvelteSet();
+
 /** How far looking up versions has got. */
 export type VersionStatus = 'idle' | 'loading' | 'ready' | 'failed';
 
@@ -20,6 +23,7 @@ export type VersionStatus = 'idle' | 'loading' | 'ready' | 'failed';
 export class HypotheticalState {
   readonly #createJudge: () => VersionJudge;
   readonly #active: () => Iterable<string>;
+  readonly #ignored: () => ReadonlySet<string>;
   #judge: VersionJudge | null = null;
   // The judge once a lookup has finished, in a new wrapper after each: the judge is not reactive, so what is read from
   // it is read again when the wrapper changes.
@@ -43,10 +47,16 @@ export class HypotheticalState {
   /**
    * @param createJudge - Sets up looking up versions; called on the first {@link HypotheticalState.load}
    * @param active - The IDs of the modules staged active, read reactively
+   * @param ignored - The IDs of the modules hypothetical mode ignores, read reactively; none by default
    */
-  constructor(createJudge: () => VersionJudge, active: () => Iterable<string>) {
+  constructor(
+    createJudge: () => VersionJudge,
+    active: () => Iterable<string>,
+    ignored: () => ReadonlySet<string> = () => NONE_IGNORED,
+  ) {
     this.#createJudge = createJudge;
     this.#active = active;
+    this.#ignored = ignored;
     this.#chosen = $derived(this.#looked?.judge.judgeChoices(this.#active(), this.#choicesMade()));
   }
 
@@ -55,7 +65,7 @@ export class HypotheticalState {
    * @returns The choices
    */
   #choicesMade(): VersionChoices {
-    return { core: this.#core, system: this.#system, modules: this.#choices };
+    return { core: this.#core, system: this.#system, modules: this.#choices, ignored: this.#ignored() };
   }
 
   /**
@@ -88,7 +98,9 @@ export class HypotheticalState {
    * @returns Once the lookup is done; it never rejects, a failure being kept as the status
    */
   load(): Promise<void> {
-    const ids = [...this.#active()];
+    // An ignored module is never looked up; read here, so the effect runs again when one stops being ignored.
+    const ignored = this.#ignored();
+    const ids = [...this.#active()].filter(id => !ignored.has(id));
     return untrack(() => {
       const needed = ids.filter(id => !this.#asked.has(id));
       if (this.#judge !== null && needed.length === 0) return this.#queue;
@@ -115,6 +127,15 @@ export class HypotheticalState {
       });
       return this.#queue;
     });
+  }
+
+  /**
+   * Whether hypothetical mode ignores a module, so shows it greyed out, and never looks it up or judges it.
+   * @param id - The module ID
+   * @returns `true` if it is ignored
+   */
+  isIgnored(id: string): boolean {
+    return this.#ignored().has(id);
   }
 
   /**

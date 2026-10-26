@@ -881,6 +881,54 @@ describe('createVersionJudge with EMMA’s catalogue', () => {
     ).toEqual(['6.0.0', '5.0.0']);
   });
 
+  describe('with a module hypothetical mode ignores', () => {
+    /**
+     * Look up dice, which requires synth, a module with no manifest the sources can read, which hypothetical mode is
+     * told to ignore.
+     * @returns The judge, the choices that ignore synth, and the modules active
+     */
+    async function withSynthetic() {
+      const dice = {
+        ...held('dice', '1.0.0'),
+        relationships: {
+          requires: [{ package: { type: 'module', id: 'synth' }, compatibility: {} }],
+          systems: [],
+          conflicts: [],
+          recommends: [],
+        },
+      };
+      const found = await lookUpWithCatalogue(
+        { modules: { dice: onGithub('owner/dice', { version: '1.0.0' }), synth: { active: true, version: '0.0.1' } } },
+        [universe([dice])],
+      );
+      const choices = { modules: new Map<string, string>(), ignored: new Set(['synth']) };
+      return { ...found, choices, active: ['dice', 'synth'] };
+    }
+
+    test('takes it as present, so what requires it is satisfied, and judges it not at all', async () => {
+      const { judge, choices, active } = await withSynthetic();
+
+      const judged = judge.judgeChoices(active, choices);
+      expect(judged.get('dice')?.badge?.tooltip).toBe(`availability ${String(VERIFIED)}`);
+      expect(judged.has('synth')).toBe(false);
+      expect(judge.judgeVersions(active, choices, 'synth')).toEqual([]);
+      // Taken as present, it leaves nothing unknown in the setup checked.
+      expect(judge.reportCheck(active, choices).valid).toBe(true);
+    });
+
+    test('leaves it out of the fit of each core or system version, and of the reports', async () => {
+      const { judge, choices, active } = await withSynthetic();
+
+      expect(judge.judgePlatform(active, choices, 'core').every(option => !option.badge?.text.includes('synth'))).toBe(
+        true,
+      );
+      const check = judge.reportCheck(active, choices);
+      expect(check.modules.map(reported => reported.id)).toEqual(['dice']);
+      expect(check.setup.modules).toBe(1);
+      expect(judge.reportPlan(active, choices).map(entry => entry.id)).not.toContain('synth');
+    });
+  });
+
   test('still offers the installed version when the catalogue does not list it', async () => {
     const { judge } = await lookUpWithCatalogue(
       { modules: { dice: onGithub('owner/dice', { version: '1.0.1-dev' }) } },

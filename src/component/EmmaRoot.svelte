@@ -5,6 +5,7 @@
   import type { DrawerFields } from '@module/state/drawer-fields.svelte';
   import type { View } from '@module/settings';
   import { HypotheticalState } from '@module/state/hypothetical.svelte';
+  import { ignoredModules } from '@module/state/hypothetical-ignored.svelte';
   import type { ModuleState } from '@module/state/module-state.svelte';
 
   import Footer from './Footer.svelte';
@@ -66,7 +67,11 @@
   const versions =
     createVersionJudge === undefined
       ? undefined
-      : new HypotheticalState(createVersionJudge, () => modules.active.map(({ id }) => id));
+      : new HypotheticalState(
+          createVersionJudge,
+          () => modules.active.map(({ id }) => id),
+          () => ignoredModules,
+        );
 
   // While the mode is on, look up each module as it is staged active; modules already looked up are not again.
   $effect(() => {

@@ -319,4 +319,51 @@ describe('HypotheticalState', () => {
 
     expect(state.unreached).toEqual([{ type: 'module', id: 'dice' }]);
   });
+
+  describe('with modules ignored', () => {
+    test('never looks an ignored module up, and does once it is no longer ignored', async () => {
+      const judge = fakeJudge({ dice: ['1.0.0'], synth: ['0.0.1'] });
+      const ignored = new SvelteSet(['synth']);
+      const state = new HypotheticalState(
+        () => judge,
+        () => ['dice', 'synth'],
+        () => ignored,
+      );
+
+      await state.load();
+      expect(judge.lookUp).toHaveBeenCalledExactlyOnceWith(['dice']);
+
+      ignored.delete('synth');
+      await state.load();
+      expect(judge.lookUp).toHaveBeenLastCalledWith(['synth']);
+    });
+
+    test('gives the judge the modules ignored with every choice, and says which they are', async () => {
+      const judge = fakeJudge({ dice: ['1.0.0'], synth: ['0.0.1'] });
+      const ignored = new SvelteSet(['synth']);
+      const state = new HypotheticalState(
+        () => judge,
+        () => ['dice', 'synth'],
+        () => ignored,
+      );
+      await state.load();
+
+      state.versionsOf('dice');
+      expect([...(judge.judgeVersions.mock.lastCall?.[1].ignored ?? [])]).toEqual(['synth']);
+      expect(state.isIgnored('synth')).toBe(true);
+      expect(state.isIgnored('dice')).toBe(false);
+    });
+
+    test('ignores nothing unless told', async () => {
+      const judge = fakeJudge({ dice: ['1.0.0'] });
+      const state = new HypotheticalState(
+        () => judge,
+        () => ['dice'],
+      );
+      await state.load();
+
+      expect(state.isIgnored('dice')).toBe(false);
+      flushSync();
+    });
+  });
 });

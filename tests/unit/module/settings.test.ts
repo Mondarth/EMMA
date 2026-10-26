@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import {
   getDrawerFields,
+  getHypotheticallyIgnored,
   getVersionProxy,
   getVersionProxyKey,
   getVersionProxyMode,
@@ -12,12 +13,14 @@ import {
   registerSettings,
   setDrawerFields,
   setGrouped,
+  setHypotheticallyIgnored,
   setVersionProxy,
   setView,
   versionLookup,
 } from '@module/settings';
 import { obscure } from '@module/lib/obscure';
 import { drawerFields } from '@module/state/drawer-fields.svelte';
+import { ignoredModules } from '@module/state/hypothetical-ignored.svelte';
 import { installFoundryMocks } from '../mocks/foundry';
 
 describe('registerSettings', () => {
@@ -407,5 +410,52 @@ describe('setVersionProxy', () => {
     expect(getVersionProxyMode()).toBe('own');
     expect(getVersionProxy()).toBe('https://proxy.test/?url={url}');
     expect(getVersionProxyKey()).toBe('k3y');
+  });
+});
+
+describe('the modules hypothetical mode ignores', () => {
+  test('are a hidden world setting, none by default', () => {
+    const { game } = installFoundryMocks();
+    registerSettings();
+
+    expect(game.settings.register).toHaveBeenCalledWith(
+      'mondarth-emma',
+      'hypotheticalIgnored',
+      expect.objectContaining({ scope: 'world', config: false, type: Array, default: [] }),
+    );
+    expect(getHypotheticallyIgnored()).toEqual([]);
+  });
+
+  test('are added and removed one at a time, kept in order', async () => {
+    installFoundryMocks();
+    registerSettings();
+
+    await setHypotheticallyIgnored('synth', true);
+    await setHypotheticallyIgnored('another', true);
+    await setHypotheticallyIgnored('synth', true);
+    expect(getHypotheticallyIgnored()).toEqual(['another', 'synth']);
+
+    await setHypotheticallyIgnored('synth', false);
+    expect(getHypotheticallyIgnored()).toEqual(['another']);
+  });
+
+  test('are followed by every open window, wherever they change', async () => {
+    installFoundryMocks();
+    registerSettings();
+
+    await setHypotheticallyIgnored('synth', true);
+    expect([...ignoredModules]).toEqual(['synth']);
+    await setHypotheticallyIgnored('synth', false);
+    expect([...ignoredModules]).toEqual([]);
+  });
+
+  test('leave out anything that is not a module ID', () => {
+    installFoundryMocks({ settings: { 'mondarth-emma.hypotheticalIgnored': ['synth', '', 7, null] } });
+    registerSettings();
+    expect(getHypotheticallyIgnored()).toEqual(['synth']);
+
+    installFoundryMocks({ settings: { 'mondarth-emma.hypotheticalIgnored': 'synth' } });
+    registerSettings();
+    expect(getHypotheticallyIgnored()).toEqual([]);
   });
 });

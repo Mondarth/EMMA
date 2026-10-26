@@ -278,11 +278,17 @@
         }
       }
     },
+    "Ignore": {
+      "Add": "No hypotheticals",
+      "Remove": "Add to hypotheticals",
+      "Tooltip": "Hypothetical mode ignores this module: it is never looked up or judged, and is taken as present for the modules that require it."
+    },
     "Errors": {
       "OpenFailed": "EMMA could not open, so Foundry's Module Management window has been opened instead. See the console for details.",
       "SaveFailed": "EMMA could not save which modules are active. See the console for details.",
       "FieldsFailed": "EMMA could not save which module details to show. See the console for details.",
-      "ProxyFailed": "EMMA could not save the version lookup proxy. See the console for details."
+      "ProxyFailed": "EMMA could not save the version lookup proxy. See the console for details.",
+      "IgnoreFailed": "EMMA could not save which modules hypothetical mode ignores. See the console for details."
     }
   }
 }

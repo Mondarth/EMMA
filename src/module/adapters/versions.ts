@@ -163,8 +163,11 @@ interface VersionCatalogue {
   readonly titles: ReadonlyMap<string, string>;
 }
 
-/** A setup to check, always with its modules. */
-type Setup = SetupSpec & { readonly modules: readonly PackageVersion[] };
+/**
+ * A setup to check, always with its modules, and the package keys of those taken as present without being judged (see
+ * {@link VersionChoices.ignored}).
+ */
+type Setup = SetupSpec & { readonly modules: readonly PackageVersion[]; readonly assumed?: ReadonlySet<string> };
 
 /** The versions chosen; anything not given is at the version in use. */
 export interface VersionChoices {
@@ -174,6 +177,11 @@ export interface VersionChoices {
   readonly system?: string | undefined;
   /** The versions chosen for modules, keyed by module ID. */
   readonly modules: ReadonlyMap<string, string>;
+  /**
+   * Modules hypothetical mode ignores, by ID, such as one with no manifest a source can read: taken as present at their
+   * installed versions, so what requires them is satisfied, but never looked up, judged or reported.
+   */
+  readonly ignored?: ReadonlySet<string> | undefined;
 }
 
 /** The most requests one lookup makes, to stay within GitHub's limit of 60 an hour without a proxy. */
@@ -449,7 +457,9 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
     platformVersions: part => platformVersions(catalogue, part),
     judgeChoices: (active, choices) => judgeChoices(catalogue, setupOf(catalogue, active, choices)),
     judgeVersions: (active, choices, id) =>
-      judgeVersions(catalogue, setupOf(catalogue, active, choices), choosable(catalogue, versions, id), id),
+      choices.ignored?.has(id) === true
+        ? []
+        : judgeVersions(catalogue, setupOf(catalogue, active, choices), choosable(catalogue, versions, id), id),
     judgePlatform: (active, choices, part) =>
       platformVersions(catalogue, part).map(version =>
         withListing(
@@ -460,16 +470,21 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
       ),
     reportCheck: (active, choices) => {
       const setup = setupOf(catalogue, active, choices);
-      return checkReport(
+      const report = checkReport(
         reportUniverseOf(catalogue, setup),
         setup,
         messagesOf(catalogue),
         (checked, all) => optionOf(checked, all).badge,
       );
+      // A module taken as present is in the setup checked, so that what requires it is satisfied, but not reported.
+      const reported = report.modules.filter(({ id }) => choices.ignored?.has(id) !== true);
+      return { ...report, setup: { ...report.setup, modules: reported.length }, modules: reported };
     },
     reportPlan: (active, choices) => {
       const setup = setupOf(catalogue, active, choices);
-      return planReport(reportUniverseOf(catalogue, setup), setup, messagesOf(catalogue), catalogue.installed);
+      return planReport(reportUniverseOf(catalogue, setup), setup, messagesOf(catalogue), catalogue.installed).filter(
+        ({ id }) => choices.ignored?.has(id) !== true,
+      );
     },
     reportSolve: (active, choices) => {
       const setup = setupOf(catalogue, active, choices);
@@ -552,7 +567,11 @@ function reportUniverseOf(
   const atLeast = (version: string, floor: string | undefined) => floor === undefined || !newer(floor, version);
   return {
     core: catalogue.cores.filter(({ version }) => atLeast(version, coreFloor)),
-    releases: catalogue.releases.filter(release => atLeast(release.version, floors.get(packageKey(release.package)))),
+    releases: [
+      ...catalogue.releases.filter(release => atLeast(release.version, floors.get(packageKey(release.package)))),
+      // The modules taken as present, as the releases they stand for.
+      ...assumedReleases(setup),
+    ],
   };
 }
 
@@ -620,17 +639,62 @@ function choosable(
  * @returns The version of each installed module of the setup, keyed by module ID
  */
 function setupOf(catalogue: VersionCatalogue, active: Iterable<string>, choices: VersionChoices): Setup {
+  const ignored = choices.ignored ?? new Set<string>();
   const modules = [...active].flatMap(id => {
     const installed = catalogue.installed.get(id);
-    const version = choices.modules.get(id) ?? installed;
+    // An ignored module stays at its installed version: nothing is known of its others.
+    const version = ignored.has(id) ? installed : (choices.modules.get(id) ?? installed);
     return version === undefined ? [] : [{ package: packageKey({ type: 'module', id }), version }];
   });
+  const assumed = new Set([...ignored].map(id => packageKey({ type: 'module', id })));
   const { core, system } = catalogue.base;
   return {
     core: choices.core ?? core,
     system: { package: system.package, version: choices.system ?? system.version },
     modules,
+    ...(assumed.size > 0 && { assumed }),
   };
+}
+
+/**
+ * The release a module taken as present stands for: at its version, with no compatibility, so that it suits every core
+ * and what requires it is satisfied, and with no relationships, so that it asks nothing of the setup.
+ * @param key - The module's package key
+ * @param version - Its version in the setup
+ * @returns The release
+ */
+function assumedRelease(key: string, version: string): Release {
+  const id = key.slice('module:'.length);
+  return {
+    package: { type: 'module', id },
+    version,
+    compatibility: {},
+    relationships: { requires: [], systems: [], conflicts: [], recommends: [] },
+    protected: false,
+    origin: `modules/${id}/module.json`,
+    detail: 'loaded',
+  };
+}
+
+/**
+ * The releases a setup's modules taken as present stand for.
+ * @param setup - The setup
+ * @returns One release for each
+ */
+function assumedReleases(setup: Setup): Release[] {
+  return setup.modules
+    .filter(({ package: key }) => setup.assumed?.has(key) === true)
+    .map(({ package: key, version }) => assumedRelease(key, version));
+}
+
+/**
+ * What checking found, without the modules taken as present, which are never judged.
+ * @param checks - What checking found
+ * @param setup - The setup checked
+ * @returns The checks of the other packages
+ */
+function judgedOf(checks: readonly ReleaseCheck[], setup: Setup): ReleaseCheck[] {
+  return checks.filter(({ release }) => setup.assumed?.has(packageKey(release.package)) !== true);
 }
 
 /**
@@ -676,9 +740,10 @@ function releasesByKey(releases: readonly Release[]): ReadonlyMap<string, readon
  * @param setup - The setup
  * @returns What checking found of the system and each module whose release is known
  */
-function checkSetup(catalogue: VersionCatalogue, setup: SetupSpec): readonly ReleaseCheck[] {
+function checkSetup(catalogue: VersionCatalogue, setup: Setup): readonly ReleaseCheck[] {
   const byKey = releasesByKey(catalogue.releases);
-  const releases = [setup.system, ...(setup.modules ?? [])].flatMap(({ package: key, version }) => {
+  const releases = [setup.system, ...setup.modules].flatMap(({ package: key, version }) => {
+    if (setup.assumed?.has(key) === true) return [assumedRelease(key, version)];
     const release = byKey.get(key)?.find(candidate => sameVersion(candidate.version, version));
     return release === undefined ? [] : [release];
   });
@@ -806,9 +871,9 @@ const MISFIT: readonly VersionBadge['type'][] = ['success', 'neutral', 'warning'
  * @param version - The version the badge is for
  * @returns The version, with the setup's badge
  */
-function fitOf(catalogue: VersionCatalogue, setup: SetupSpec, version: string): VersionOption {
+function fitOf(catalogue: VersionCatalogue, setup: Setup, version: string): VersionOption {
   const checks = checkSetup(catalogue, setup);
-  const judged = checks.map(checked => ({
+  const judged = judgedOf(checks, setup).map(checked => ({
     title: catalogue.titles.get(packageKey(checked.release.package)) ?? checked.release.package.id,
     badge: optionOf(checked, checks).badge,
   }));
@@ -846,9 +911,9 @@ function fitOf(catalogue: VersionCatalogue, setup: SetupSpec, version: string): 
  * @param setup - The setup
  * @returns The version and its badge, keyed by module ID; none for a module whose release is not known
  */
-function judgeChoices(catalogue: VersionCatalogue, setup: SetupSpec): Map<string, VersionOption> {
+function judgeChoices(catalogue: VersionCatalogue, setup: Setup): Map<string, VersionOption> {
   const checks = checkSetup(catalogue, setup);
-  return new Map(modulesOf(checks).map(found => [found.release.package.id, optionOf(found, checks)]));
+  return new Map(modulesOf(judgedOf(checks, setup)).map(found => [found.release.package.id, optionOf(found, checks)]));
 }
 
 /**
