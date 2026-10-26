@@ -1,3 +1,22 @@
+## [0.7.0](https://github.com/Mondarth/EMMA/compare/v0.6.0...v0.7.0) (2026-10-26)
+
+### Features
+
+* **build:** build an obscured default catalogue into releases ([b56c8a3](https://github.com/Mondarth/EMMA/commit/b56c8a3794d32f1a5b73dc3f05e2139b3f6bb0d7))
+* **settings:** ask EMMA's package catalogue first, before its proxy ([f3723ba](https://github.com/Mondarth/EMMA/commit/f3723bab728915a30de26b4c58b1f874f0e3b6df))
+* **ui:** let hypothetical mode ignore a module from its context menu ([bc629e0](https://github.com/Mondarth/EMMA/commit/bc629e030100ced47ddb23d637b551deaed01a22))
+* **ui:** mark versions not on Foundry's package listing ([39abc5a](https://github.com/Mondarth/EMMA/commit/39abc5aff90eadf67277ea9386c523c4baf84527))
+
+### Bug Fixes
+
+* **ui:** keep each version once, however many lookups find it ([6d5a58a](https://github.com/Mondarth/EMMA/commit/6d5a58a3887c2a358917c53969496530e42a2b87))
+* **ui:** leave ignored modules out of reports, and warn that they are ([2b19a4a](https://github.com/Mondarth/EMMA/commit/2b19a4aef5f19a63b9c814bdad2ac972a5ca02dd))
+* **ui:** name as unreached only packages that could not be listed ([6e747e0](https://github.com/Mondarth/EMMA/commit/6e747e038eb1a5c7f35fd4412022a193f2e5a99a))
+
+### Performance Improvements
+
+* **ui:** judge each version with only the releases of its setup ([9410584](https://github.com/Mondarth/EMMA/commit/94105844a5168b3ce06cb45713398c1ea6259cc1))
+
 ## [0.6.0](https://github.com/Mondarth/EMMA/compare/v0.5.0...v0.6.0) (2026-10-22)
 
 ### Features
