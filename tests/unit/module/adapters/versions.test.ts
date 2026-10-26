@@ -858,6 +858,29 @@ describe('createVersionJudge with EMMA’s catalogue', () => {
     expect(judge.judgePlatform(['dice'], { modules: new Map() }, 'core').some(option => option.unlisted)).toBe(false);
   });
 
+  // Regression: each lookup's answer is the whole closure, so a module activated later brought the system and the
+  // libraries shared again, and the versions listed twice broke the keyed lists: an item went missing (dnd5e 5.3.3,
+  // once a newer one was chosen), or a badge lost its tooltip.
+  test('lists each version once, however many lookups bring it', async () => {
+    const system = (version: string) => ({ ...held('dnd5e', version), package: { type: 'system', id: 'dnd5e' } });
+    const closure = universe([system('5.0.0'), system('6.0.0'), held('dice', '1.0.0'), held('dice', '1.1.0')]);
+    const { judge } = await lookUpWithCatalogue(
+      {
+        modules: { dice: onGithub('owner/dice', { version: '1.0.0' }), lib: { active: false, version: '1.0.0' } },
+        system: { id: 'dnd5e', title: 'D&D 5e', version: '5.0.0' },
+      },
+      [closure],
+    );
+    // Activated later, a module whose closure the catalogue answers with what was found already.
+    await judge.lookUp(['dice', 'lib']);
+
+    expect(judge.versionsOf('dice')).toEqual(['1.1.0', '1.0.0']);
+    expect(judge.platformVersions('system')).toEqual(['6.0.0', '5.0.0']);
+    expect(
+      judge.judgePlatform(['dice'], { system: '6.0.0', modules: new Map() }, 'system').map(o => o.version),
+    ).toEqual(['6.0.0', '5.0.0']);
+  });
+
   test('still offers the installed version when the catalogue does not list it', async () => {
     const { judge } = await lookUpWithCatalogue(
       { modules: { dice: onGithub('owner/dice', { version: '1.0.1-dev' }) } },
