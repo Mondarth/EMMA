@@ -22,9 +22,10 @@ import type {
   Release,
   SetupSpec,
 } from '@mondarth/fvtt-resolver';
-import { check, isNewerVersion, isUnavailable, packageKey } from '@mondarth/fvtt-resolver';
+import { check, isNewerVersion, isUnavailable, packageKey, sameVersion } from '@mondarth/fvtt-resolver';
 import type { Cache as SourceCache, LocalManifest, ReleaseSource } from '@mondarth/fvtt-resolver/sources';
 import {
+  catalogueSource,
   foundryCoreReleases,
   foundryIndexSource,
   githubSource,
@@ -192,6 +193,11 @@ export interface FindOptions {
    * or `null` for none. Never sent without a proxy: GitHub's API refuses a request with a header it does not know.
    */
   readonly clientVersion?: string | null;
+  /**
+   * EMMA's package catalogue, with its key, or `null` for none. Asked first, directly, as it sends CORS headers: it
+   * gives the packages it holds with every release loaded, and the proxy, or the direct sources, find the rest.
+   */
+  readonly catalogue?: { readonly url: string; readonly key: string } | null;
   /** Fetches; the browser's by default. */
   readonly fetch?: typeof globalThis.fetch;
   /** Where fetched data is kept; for the session by default. */
@@ -276,7 +282,13 @@ function readCore(): CoreRelease {
  * @returns The judge, with nothing looked up yet
  */
 export function createVersionJudge(options: FindOptions): VersionJudge {
-  const { proxy, apiKey = null, clientVersion = null, cache = sessionCache } = options;
+  const {
+    proxy,
+    apiKey = null,
+    clientVersion = null,
+    catalogue: lookupCatalogue = null,
+    cache = sessionCache,
+  } = options;
   const send = options.fetch ?? globalThis.fetch.bind(globalThis);
   const http = httpClient({
     fetch:
@@ -304,9 +316,10 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
       ...installed.map(pkg => ({ key: packageKey({ type: 'module', id: pkg.id }), manifest: pkg.manifest })),
     ].flatMap(({ key, manifest }) => (typeof manifest === 'string' && manifest !== '' ? [[key, [manifest]]] : [])),
   );
+  const local = localSource(manifests);
   const sources: ReleaseSource[] = [
     // The installed releases come first, as they are loaded with everything their manifests declare.
-    localSource(manifests),
+    local,
     // Only reachable through a proxy: Foundry's listing sends no CORS headers.
     ...(proxy === null ? [] : [foundryIndexSource(http)]),
     githubSource(http),
@@ -314,7 +327,41 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
     manifestUrlSource(http),
   ];
   // No core releases are given, so no version is left out for needing a newer core: it is shown, and judged so.
-  const set = sourceSet({ sources, http, core: [], manifests: declared });
+  const set = sourceSet({
+    sources,
+    http,
+    core: [],
+    manifests: declared,
+    ...(lookupCatalogue !== null && {
+      catalogue: catalogueSource({
+        ...lookupCatalogue,
+        fetch: send,
+        ...(clientVersion !== null && { client: `EMMA/${clientVersion}` }),
+      }),
+    }),
+  });
+
+  /**
+   * The installed release of each package looked up that no source gave, from its installed manifest: the catalogue,
+   * asked first, gives a package it holds without the local source, and so without a version only installed here.
+   * @param refs - The packages looked up
+   * @param found - The releases found for them
+   * @returns The installed releases missing from what was found
+   */
+  async function installedMissing(refs: readonly ResolverRef[], found: readonly Release[]): Promise<Release[]> {
+    const missing = await Promise.all(
+      refs.map(async ref => {
+        const version = ref.type === 'system' ? system.version : catalogue.installed.get(ref.id);
+        const given = found.some(
+          release => packageKey(release.package) === packageKey(ref) && sameVersion(release.version, version ?? ''),
+        );
+        if (given) return [];
+        const read = await local.releases(ref);
+        return read.ok ? read.value : [];
+      }),
+    );
+    return missing.flat();
+  }
 
   const systemKey = packageKey({ type: 'system', id: system.id });
   const catalogue = {
@@ -371,6 +418,7 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
         throw error;
       }
       if (!cores) unreached.push(CORE_REF);
+      releases = [...releases, ...(await installedMissing(refs, releases))];
       catalogue.releases.push(...releases);
       for (const release of releases.filter(({ package: { type } }) => type === 'module')) {
         versions.set(release.package.id, [...(versions.get(release.package.id) ?? []), release.version]);

@@ -657,3 +657,129 @@ describe('the reports', () => {
     expect(said(solved)).toContain('1.0.0');
   });
 });
+
+describe('createVersionJudge with EMMA’s catalogue', () => {
+  const CATALOGUE = { url: 'https://catalogue.test/', key: 'cat-k3y' };
+  const UNIVERSE = 'https://catalogue.test/api/v1/universe';
+  const proxied = (routes: [string, unknown][]): [string, unknown][] =>
+    routes.map(([url, body]) => [PROXY.replace('{url}', encodeURIComponent(url)), body]);
+  // Foundry's builds, read through the proxy whether or not the catalogue answers.
+  const notes = proxied([releaseNotes([['14.368', 'stable']])]);
+
+  /**
+   * A release as the catalogue gives it, loaded.
+   * @param id - The module
+   * @param version - Its version
+   * @returns The release
+   */
+  function held(id: string, version: string) {
+    return {
+      package: { type: 'module', id },
+      version,
+      compatibility: { minimum: '14', verified: '14' },
+      relationships: { requires: [], systems: [], conflicts: [], recommends: [] },
+      protected: false,
+      origin: `https://files.test/${id}/${version}/module.json`,
+      detail: 'loaded',
+    };
+  }
+
+  /**
+   * The catalogue's answer to a universe request.
+   * @param releases - The releases it holds
+   * @param more - What else it says
+   * @param more.pending - The packages it does not hold yet
+   * @param more.gaps - The gaps of its own crawls
+   * @returns The URL it answers at, and the answer
+   */
+  function universe(releases: unknown[], more: { pending?: unknown[]; gaps?: unknown[] } = {}): [string, unknown] {
+    return [
+      UNIVERSE,
+      { universe: { core: [], releases }, gaps: more.gaps ?? [], pending: more.pending ?? [], asOf: null },
+    ];
+  }
+
+  /**
+   * Look the active modules up with EMMA's catalogue first, and EMMA's proxy behind it.
+   * @param options - The mock state
+   * @param routes - What each URL answers
+   * @returns The judge and the fetch it used
+   */
+  async function lookUpWithCatalogue(options: FoundryMockOptions, routes: [string, unknown][]) {
+    installFoundryMocks(options);
+    const send = fakeFetch([...routes, ...notes]);
+    const judge = createVersionJudge({
+      proxy: PROXY,
+      apiKey: 'proxy-k3y',
+      clientVersion: '0.7.0',
+      catalogue: CATALOGUE,
+      fetch: send,
+      cache: memoryCache(),
+    });
+    const active = Object.entries(options.modules ?? {}).flatMap(([id, data]) => (data.active === true ? [id] : []));
+    await judge.lookUp(active);
+    return { judge, send, asked: send.mock.calls.map(([url]) => urlOf(url)) };
+  }
+
+  test('takes every version of what the catalogue holds from it, in one request, asking the proxy nothing for it', async () => {
+    const { judge, asked } = await lookUpWithCatalogue(
+      { modules: { dice: onGithub('owner/dice', { version: '1.0.0' }) } },
+      [universe([held('dice', '1.0.0'), held('dice', '1.1.0'), held('dice', '2.0.0')])],
+    );
+
+    expect(judge.versionsOf('dice')).toEqual(['2.0.0', '1.1.0', '1.0.0']);
+    expect(asked.filter(url => url === UNIVERSE)).toHaveLength(1);
+    expect(asked.some(url => url.includes(encodeURIComponent('api.github.com')))).toBe(false);
+    expect(judge.unreached).toEqual([]);
+  });
+
+  test('asks the catalogue directly, with its own key and EMMA’s version, never the proxy’s key', async () => {
+    const { send } = await lookUpWithCatalogue({ modules: { dice: onGithub('owner/dice', { version: '1.0.0' }) } }, [
+      universe([held('dice', '1.0.0')]),
+    ]);
+
+    const [, init] = send.mock.calls.find(([url]) => urlOf(url) === UNIVERSE) ?? [];
+    const headers = new Headers(init?.headers);
+    expect(init?.method).toBe('POST');
+    expect(headers.get('X-API-Key')).toBe('cat-k3y');
+    expect(headers.get('X-Catalogue-Client')).toBe('EMMA/0.7.0');
+    expect(typeof init?.body).toBe('string');
+    const body = JSON.parse(init?.body as string) as { packages: unknown[] };
+    expect(body.packages).toContainEqual({ type: 'module', id: 'dice' });
+  });
+
+  test('looks up through the proxy what the catalogue does not hold yet', async () => {
+    const { judge, asked } = await lookUpWithCatalogue(
+      { modules: { dice: onGithub('owner/dice', { version: '1.0.0' }) } },
+      [
+        universe([], { pending: [{ type: 'module', id: 'dice' }] }),
+        ...proxied([githubReleases('owner/dice', ['1.0.0', '1.2.0'])]),
+      ],
+    );
+
+    expect(judge.versionsOf('dice')).toEqual(['1.2.0', '1.0.0']);
+    expect(asked).toContain(
+      PROXY.replace('{url}', encodeURIComponent('https://api.github.com/repos/owner/dice/releases?per_page=100')),
+    );
+  });
+
+  test('looks everything up through the proxy when the catalogue cannot be reached, as it would without one', async () => {
+    const modules = { dice: onGithub('owner/dice', { version: '1.0.0' }) };
+    const routes = proxied([githubReleases('owner/dice', ['1.0.0', '1.2.0'])]);
+    const { judge } = await lookUpWithCatalogue({ modules }, routes);
+    const { judge: without } = await lookUp({ modules }, [...routes, ...notes], PROXY);
+
+    expect(judge.versionsOf('dice')).toEqual(['1.2.0', '1.0.0']);
+    // The catalogue's own failure names no package: what is unreached is what the proxy alone leaves unreached.
+    expect(judge.unreached).toEqual(without.unreached);
+  });
+
+  test('still offers the installed version when the catalogue does not list it', async () => {
+    const { judge } = await lookUpWithCatalogue(
+      { modules: { dice: onGithub('owner/dice', { version: '1.0.1-dev' }) } },
+      [universe([held('dice', '1.0.0'), held('dice', '1.1.0')])],
+    );
+
+    expect(judge.versionsOf('dice')).toContain('1.0.1-dev');
+  });
+});
