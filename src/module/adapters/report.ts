@@ -304,6 +304,8 @@ const BEST_VERSIONS_POLICY: Partial<Policy> = {
  * @param setup - The setup chosen
  * @param messages - The wording
  * @param load - Loads releases known only from a listing, as the answer needs them
+ * @param kept - Modules to keep at their versions, as the core and system are: those taken as present, whose version
+ *   is the one release standing for them, which the update would otherwise leave out if it looked like a pre-release
  * @returns The best versions, as changes to the setup, or why there are none
  */
 export async function solveReport(
@@ -311,11 +313,12 @@ export async function solveReport(
   setup: ReportedSetup,
   messages: ExplanationMessages,
   load: (needs: readonly Release[]) => Promise<readonly Release[]>,
+  kept: readonly PackageVersion[] = [],
 ): Promise<SetupSolve> {
   const versions = versionsIn(setup);
   const requirements: Requirements = {
     require: setup.modules.map(({ package: key }) => ({ package: key })),
-    pins: [{ package: CORE, version: setup.core }, setup.system],
+    pins: [{ package: CORE, version: setup.core }, setup.system, ...kept],
   };
   const rounds = await resolveInRounds(universe, requirements, load, { policy: BEST_VERSIONS_POLICY });
   const { resolution } = rounds;
