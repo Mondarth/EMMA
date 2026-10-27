@@ -205,53 +205,57 @@ which may not. Choose a version to see it on the button; every module's badge is
 
 ### Reporting on the setup
 
-Just right of the **System** button, the report button (a clipboard) opens a report on the setup hypothetical mode
-shows: the Foundry version, the system and the modules staged active, at the versions chosen. It is enabled once the
-versions are looked up. Pick what the report shows under **Report style**:
+In the middle of the toolbar, three buttons each open a report on the setup hypothetical mode shows: the Foundry
+version, the system and the modules staged active, at the versions chosen. They are enabled once the versions are
+looked up. Each report opens in a window of its own, so any of them can be open beside the others; a button shows
+pressed while its report is open, and pressing it again closes the report:
 
-- **Plan** (shown first): the active modules in the order to install them, numbered, in three columns: each module's
-  ID, its name, and a manifest URL for the version chosen alone, such as a GitHub release's own `module.json`, so that
-  installing from it installs that version. A module's own manifest URL usually gives whatever version is newest, so
-  it is never shown; where no source gives a URL for the version, the plan says _none for this version_. The proxy
-  lets EMMA find more of them. The plan is in two lists, each under its title and numbered from 1: first the modules
-  to install (a version other than the one installed, or a module not installed), then those kept at the version
-  installed. In each, a module comes before the modules that depend on it: the modules are ordered by how deep the
-  tree of active modules depending on each one goes, deepest first, so the libraries others build on come first.
-- **Check**: whether every package can be used in the setup, then every active module with its badge, Foundry's
-  verdict and, in words, everything found about it: what keeps it from being used (a module it depends on at the wrong
-  version, a system it does not run in), what it prefers and is not given (a Foundry version or system version it is
-  not verified with), what it advises (a module it recommends that is not active), and whether it is not known, or
-  known only from a listing and so checked without its dependencies.
-- **Update**: the best versions of the active modules for the Foundry version and system chosen: the newest version of
-  each, from two versions before the one chosen up, that works with the others' and with that Foundry version and system. A
-  version that is only a compatibility risk (not verified for this Foundry, but not ruled out) is acceptable; one that
-  needs another Foundry version, does not support the system version, or declares no compatibility at all is not, nor
-  is a pre-release. It lists the versions to change, and modules an active module needs that it would add; or, when no
-  versions work together, explains why in numbered sentences. It may need the manifests of versions known only from a
-  listing, which it tries to fetch, so it can take a moment; versions whose manifests could not be loaded are named.
-  Without a proxy, versions known only from GitHub cannot be read, so are not taken.
+- **Plan** (a numbered list): the active modules in the order to install them, numbered, in three columns: each
+  module's ID, its name, and a manifest URL for the version chosen alone, such as a GitHub release's own
+  `module.json`, so that installing from it installs that version. A module's own manifest URL usually gives whatever
+  version is newest, so it is never shown; where no source gives a URL for the version, the plan says _none for this
+  version_. The proxy lets EMMA find more of them. The plan is in two lists, each under its title and numbered from 1:
+  first the modules to install (a version other than the one installed, or a module not installed), then those kept at
+  the version installed. In each, a module comes before the modules that depend on it: the modules are ordered by how
+  deep the tree of active modules depending on each one goes, deepest first, so the libraries others build on come
+  first.
+- **Check** (a clipboard with a tick): whether every package can be used in the setup, then every active module with
+  its badge, Foundry's verdict and, in words, everything found about it: what keeps it from being used (a module it
+  depends on at the wrong version, a system it does not run in), what it prefers and is not given (a Foundry version
+  or system version it is not verified with), what it advises (a module it recommends that is not active), and whether
+  it is not known, or known only from a listing and so checked without its dependencies.
+- **Update** (an arrow up in a circle): the best versions of the active modules for the Foundry version and system
+  chosen: the newest version of each, from two versions before the one chosen up, that works with the others' and with
+  that Foundry version and system. A version that is only a compatibility risk (not verified for this Foundry, but not
+  ruled out) is acceptable; one that needs another Foundry version, does not support the system version, or declares
+  no compatibility at all is not, nor is a pre-release. It lists the versions to change, and modules an active module
+  needs that it would add; or, when no versions work together, explains why in numbered sentences. It may need the
+  manifests of versions known only from a listing, which it tries to fetch, so it can take a moment; versions whose
+  manifests could not be loaded are named. Without a proxy, versions known only from GitHub cannot be read, so are not
+  taken.
 
-When the **Update** changes any version, a button (a wand) just left of the download button chooses the versions it
+When the **Update** changes any version, a button (a wand) just left of its download button chooses the versions it
 recommends in the hypothetical setup, as if you had picked each from its drop-down. Every other choice is left as it
 is, and nothing in the world changes. A module the update would add, which is not active, is given its version but not
-staged active. Every style of the report then reports on the setup with those versions, without closing the window:
-the **Update** is worked out again, and the plan and the check follow.
+staged active. Every report open then reports on the setup with those versions, without closing its window: the
+**Update** is worked out again, and the **Plan** and the **Check**, if open, follow. Only the **Update** works out the
+best versions, which may take requests, so opening the **Plan** or the **Check** alone makes none.
 
 The reports consider the version chosen of each package, the two versions before it and every newer one. That gives a
 hypothetical setup some room, while older versions, which few go back to and which are the ones most often missing,
 incomplete or gone, are left out. So the **Update** never recommends a version more than two before the one chosen,
 and its explanations do not name older versions. A module an active module needs, which is not active, counts from
-its installed version, if it is installed. Each report scrolls beneath
-**Report style**, which stays in view.
+its installed version, if it is installed. Each report scrolls beneath its buttons, which stay in view.
 
-The button beside **Report style** downloads the report shown as a plain text file (`emma-plan.txt`,
-`emma-check.txt` or `emma-update.txt`).
+The download button at the top of each report downloads it as a plain text file (`emma-plan.txt`, `emma-check.txt` or
+`emma-update.txt`).
 
-The report is made when it opens, from the setup as it is then. Changing a version, the Foundry version or the system,
+A report is made when it opens, from the setup as it is then. Changing a version, the Foundry version or the system,
 or staging a module active or inactive, while it is open does not change it: it still reports on the setup it was
-opened on. To report on the setup as it is now, click **Report** again, which replaces the open report with a new one.
-The one exception is the **Update**'s button that chooses the versions it recommends: the report then follows the
-versions it chose.
+opened on. To report on the setup as it is now, press its button twice, closing it and opening it afresh. The one
+exception is the **Update**'s button that chooses the versions it recommends: every report open then follows the
+versions it chose. Leaving hypothetical mode, or closing EMMA, closes every report, as the setup they report on goes
+with it.
 
 ### Where versions come from
 

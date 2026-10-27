@@ -5,6 +5,7 @@ import { joinAs, MODULE_ID, MODULE_TITLE, USERS } from '../support/foundry';
 
 const EMMA_TITLE = 'EMMA - module management';
 const EMMA_WINDOW = `#${MODULE_ID}-app`;
+const REPORTS = 'Reports on the setup chosen';
 
 /**
  * Open the Settings tab of the sidebar and return its Module Management button. The button is found by the markup
@@ -977,7 +978,7 @@ test.describe('Hypothetical versions', () => {
     await expect(picker).toHaveCount(0);
   });
 
-  test('the report button reports on the setup chosen in the style picked, and downloads it as text', async ({
+  test('the report buttons open each report in its own window, beside the others, and download it as text', async ({
     page,
   }) => {
     // GitHub lists the version installed too, so the plan has a manifest URL for that version alone.
@@ -990,86 +991,108 @@ test.describe('Hypothetical versions', () => {
     });
     await (await moduleManagementButton(page)).click();
     const emma = page.locator(EMMA_WINDOW);
-    const report = emma.getByRole('button', { name: 'Report', exact: true });
-    await expect(report).toHaveCount(0);
+    const reports = emma.getByRole('group', { name: REPORTS });
+    await expect(reports).toHaveCount(0);
 
     await emma.getByRole('button', { name: 'Hypothetical mode', exact: true }).click();
-    // An icon right of the System button, enabled once the versions are looked up.
-    await expect(report).toHaveText('');
-    await expect(report).toBeEnabled();
-    await report.click();
+    // Icons in the middle of the toolbar, enabled once the versions are looked up.
+    const plan = reports.getByRole('button', { name: 'Plan', exact: true });
+    const check = reports.getByRole('button', { name: 'Check', exact: true });
+    const update = reports.getByRole('button', { name: 'Update', exact: true });
+    await expect(plan).toHaveText('');
+    await expect(plan).toBeEnabled();
+    const [toolbar, group] = await Promise.all([emma.getByRole('toolbar').boundingBox(), reports.boundingBox()]);
+    expect(
+      Math.abs((group?.x ?? 0) + (group?.width ?? 0) / 2 - ((toolbar?.x ?? 0) + (toolbar?.width ?? 0) / 2)),
+    ).toBeLessThan(2);
 
-    const dialog = page.locator(`#${MODULE_ID}-report`);
-    await expect(dialog.getByRole('heading', { name: 'EMMA - setup report' })).toBeVisible();
-    const style = dialog.getByLabel('Report style');
-    await expect(style).toHaveValue('plan');
-    const plan = dialog.getByRole('region', { name: /^Plan: / });
-    await expect(plan.locator('pre')).toContainText(
+    await plan.click();
+    await check.click();
+    await update.click();
+
+    const planWindow = page.locator(`#${MODULE_ID}-report-plan`);
+    const checkWindow = page.locator(`#${MODULE_ID}-report-check`);
+    const updateWindow = page.locator(`#${MODULE_ID}-report-update`);
+    await expect(planWindow.getByRole('heading', { name: 'EMMA - plan' })).toBeVisible();
+    await expect(checkWindow.getByRole('heading', { name: 'EMMA - check' })).toBeVisible();
+    await expect(updateWindow.getByRole('heading', { name: 'EMMA - update' })).toBeVisible();
+    for (const button of [plan, check, update]) await expect(button).toHaveAttribute('aria-pressed', 'true');
+    // No report offers a choice of report.
+    await expect(page.getByLabel('Report style')).toHaveCount(0);
+
+    await expect(planWindow.getByRole('region', { name: /^Plan: / }).locator('pre')).toContainText(
       `mondarth-emma  EMMA - Enhanced Module Manager Application  https://github.com/Mondarth/EMMA/releases/download/v${installed}/module.json`,
     );
-
-    const download = page.waitForEvent('download');
-    await dialog.getByRole('button', { name: 'Download this report as text' }).click();
-    const saved = await download;
-    expect(saved.suggestedFilename()).toBe('emma-plan.txt');
-    expect(await readText(await saved.createReadStream())).toContain('mondarth-emma');
-
-    await style.selectOption('check');
-    await expect(dialog.getByRole('region', { name: 'Check of the setup chosen' })).toContainText(
+    await expect(checkWindow.getByRole('region', { name: 'Check of the setup chosen' })).toContainText(
       'Every package can be used in this setup.',
     );
-    await expect(plan).toHaveCount(0);
-
-    await style.selectOption('update');
     // EMMA 9.9.0's manifest cannot be read without a proxy, so it declares no compatibility and is not taken.
-    await expect(dialog.getByRole('region', { name: /^Best versions of the active modules/ })).toContainText(
+    await expect(updateWindow.getByRole('region', { name: /^Best versions of the active modules/ })).toContainText(
       'The best versions are found. Every active module is already at its best version.',
     );
 
-    await clickClose(page, `#${MODULE_ID}-report`);
-    await expect(dialog).toHaveCount(0);
+    for (const [shown, name, text] of [
+      [planWindow, 'emma-plan.txt', 'mondarth-emma'],
+      [checkWindow, 'emma-check.txt', 'Every package can be used in this setup.'],
+    ] as const) {
+      const download = page.waitForEvent('download');
+      await shown.getByRole('button', { name: 'Download this report as text' }).click();
+      const saved = await download;
+      expect(saved.suggestedFilename()).toBe(name);
+      expect(await readText(await saved.createReadStream())).toContain(text);
+    }
+
+    // Its button closes a report, and its window's own close button un-presses its button.
+    await plan.click();
+    await expect(planWindow).toHaveCount(0);
+    await expect(plan).toHaveAttribute('aria-pressed', 'false');
+    await clickClose(page, `#${MODULE_ID}-report-check`);
+    await expect(checkWindow).toHaveCount(0);
+    await expect(check).toHaveAttribute('aria-pressed', 'false');
+    await expect(updateWindow).toBeVisible();
+
+    // Leaving hypothetical mode closes the rest.
+    await emma.getByRole('button', { name: 'Hypothetical mode', exact: true }).click();
+    await expect(updateWindow).toHaveCount(0);
   });
 
-  test('a long report scrolls within its pane, keeping the report style in view', async ({ page }) => {
+  test('a long report scrolls within its pane, keeping its buttons in view', async ({ page }) => {
     await (await moduleManagementButton(page)).click();
     const emma = page.locator(EMMA_WINDOW);
     await emma.getByRole('button', { name: 'Hypothetical mode', exact: true }).click();
-    const report = emma.getByRole('button', { name: 'Report', exact: true });
-    await expect(report).toBeEnabled();
-    await report.click();
-    const dialog = page.locator(`#${MODULE_ID}-report`);
-    const style = dialog.getByLabel('Report style');
+    const reports = emma.getByRole('group', { name: REPORTS });
 
-    // Too short a window for any report, as a long one is for a tall window.
-    await page.evaluate(
-      id => foundry.applications.instances.get(id)?.setPosition({ height: 200 }),
-      `${MODULE_ID}-report`,
-    );
-    for (const [option, name] of [
-      ['plan', /^Plan: /],
-      ['check', 'Check of the setup chosen'],
+    for (const [style, button, name] of [
+      ['plan', 'Plan', /^Plan: /],
+      ['check', 'Check', 'Check of the setup chosen'],
     ] as const) {
-      await style.selectOption(option);
+      const toggle = reports.getByRole('button', { name: button, exact: true });
+      await expect(toggle).toBeEnabled();
+      await toggle.click();
+      const id = `${MODULE_ID}-report-${style}`;
+      const dialog = page.locator(`#${id}`);
       const pane = dialog.getByRole('region', { name }).first();
       await expect(pane).toBeVisible();
-      expect(await pane.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
+      // Too short a window for any report, as a long one is for a tall window.
+      await page.evaluate(shown => foundry.applications.instances.get(shown)?.setPosition({ height: 200 }), id);
+      await expect.poll(() => pane.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
 
       await pane.evaluate(element => {
         element.scrollTop = element.scrollHeight;
       });
       expect(await pane.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
-      // The pane scrolls, not the window: the controls stay where they are, inside it.
-      const [window, controls] = await Promise.all([dialog.boundingBox(), style.boundingBox()]);
+      // The pane scrolls, not the window: the buttons stay where they are, inside it.
+      const download = dialog.getByRole('button', { name: 'Download this report as text' });
+      const [window, controls] = await Promise.all([dialog.boundingBox(), download.boundingBox()]);
       expect(controls?.y).toBeGreaterThanOrEqual(window?.y ?? Infinity);
       expect((controls?.y ?? Infinity) + (controls?.height ?? 0)).toBeLessThanOrEqual(
         (window?.y ?? 0) + (window?.height ?? 0),
       );
+      await clickClose(page, `#${id}`);
     }
-
-    await clickClose(page, `#${MODULE_ID}-report`);
   });
 
-  test('the update’s best versions can be chosen, and every report then follows them', async ({ page }) => {
+  test('the update’s best versions can be chosen, and every report open then follows them', async ({ page }) => {
     const installed = await page.evaluate(id => game.modules.get(id)?.version ?? '', MODULE_ID);
     const library = 'https://github.com/emma-tests/emma-fixture-library/releases/download/v2.0.0/module.json';
     const emmaRelease = 'https://github.com/Mondarth/EMMA/releases/download/v9.9.0/module.json';
@@ -1103,16 +1126,17 @@ test.describe('Hypothetical versions', () => {
       const emma = page.locator(EMMA_WINDOW);
       await emma.getByRole('checkbox', { name: LIBRARY.title }).check();
       await emma.getByRole('button', { name: 'Hypothetical mode', exact: true }).click();
-      await expect(emma.getByRole('button', { name: 'Report', exact: true })).toBeEnabled();
-      await emma.getByRole('button', { name: 'Report', exact: true }).click();
-      const dialog = page.locator(`#${MODULE_ID}-report`);
-      const style = dialog.getByLabel('Report style');
-      await style.selectOption('update');
-      const update = dialog.getByRole('region', { name: /^Best versions of the active modules/ });
+      const reports = emma.getByRole('group', { name: REPORTS });
+      await expect(reports.getByRole('button', { name: 'Update', exact: true })).toBeEnabled();
+      for (const button of ['Plan', 'Check', 'Update']) {
+        await reports.getByRole('button', { name: button, exact: true }).click();
+      }
+      const updateWindow = page.locator(`#${MODULE_ID}-report-update`);
+      const update = updateWindow.getByRole('region', { name: /^Best versions of the active modules/ });
       await expect(update).toContainText(`${MODULE_TITLE}: ${installed} to 9.9.0`);
       await expect(update).toContainText(`${LIBRARY.title}: 1.0.0 to 2.0.0`);
 
-      await dialog.getByRole('button', { name: 'Choose these versions in the hypothetical setup' }).click();
+      await updateWindow.getByRole('button', { name: 'Choose these versions in the hypothetical setup' }).click();
 
       await expect(
         emma.getByRole('button', { name: `${MODULE_TITLE} version 9.9.0: choose another version` }),
@@ -1120,17 +1144,17 @@ test.describe('Hypothetical versions', () => {
       await expect(
         emma.getByRole('button', { name: `${LIBRARY.title} version 2.0.0: choose another version` }),
       ).toBeVisible();
-      // Every style reports on the setup with the versions chosen, without opening the report again.
+      // Every report open reports on the setup with the versions chosen, without opening it again.
       await expect(update).toContainText('Every active module is already at its best version.');
-      await expect(dialog.getByRole('button', { name: 'Choose these versions in the hypothetical setup' })).toHaveCount(
-        0,
-      );
-      await style.selectOption('plan');
-      const install = dialog.getByRole('region', { name: /^Install:/ });
+      await expect(
+        updateWindow.getByRole('button', { name: 'Choose these versions in the hypothetical setup' }),
+      ).toHaveCount(0);
+      const install = page.locator(`#${MODULE_ID}-report-plan`).getByRole('region', { name: /^Install:/ });
       await expect(install).toContainText(library);
       await expect(install).toContainText(emmaRelease);
-      await style.selectOption('check');
-      await expect(dialog.getByRole('region', { name: 'Check of the setup chosen' })).toContainText('9.9.0');
+      await expect(
+        page.locator(`#${MODULE_ID}-report-check`).getByRole('region', { name: 'Check of the setup chosen' }),
+      ).toContainText('9.9.0');
     } finally {
       await page.evaluate(async () => {
         await game.settings.set('mondarth-emma', 'versionProxy', '');

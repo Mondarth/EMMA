@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Platform } from '@module/adapters/platform';
-  import type { SetupReportData } from '@module/app/setup-report';
+  import type { ReportStyle, SetupReports } from '@module/app/setup-report';
   import type { VersionJudge } from '@module/adapters/versions';
   import type { DrawerFields } from '@module/state/drawer-fields.svelte';
   import type { View } from '@module/settings';
@@ -34,8 +34,8 @@
     platform?: Platform | undefined;
     /** Sets up looking up module versions for hypothetical mode; given to GMs with the platform. */
     createVersionJudge?: (() => VersionJudge) | undefined;
-    /** Shows a report on the setup chosen in hypothetical mode. */
-    onReport?: ((report: SetupReportData) => void) | undefined;
+    /** The windows of the reports on the setup chosen in hypothetical mode; given to GMs with the platform. */
+    reports?: SetupReports | undefined;
   }
 
   const {
@@ -49,7 +49,7 @@
     onGroupedChange,
     platform,
     createVersionJudge,
-    onReport,
+    reports,
   }: Props = $props();
 
   // The window is mounted afresh each time it opens, so the initial view and grouping are only read once.
@@ -106,11 +106,19 @@
       else {
         modules.leaveHypothetical();
         versions?.clearChoices();
+        // They report on a hypothetical setup that has gone, and their buttons go with the mode.
+        reports?.closeAll();
       }
     }}
-    onReport={() => {
+    reportsOpen={reports?.open}
+    onReport={(style: ReportStyle) => {
+      if (reports === undefined) return;
+      if (reports.open.has(style)) {
+        reports.close(style);
+        return;
+      }
       const report = versions?.report();
-      if (report !== null && report !== undefined) onReport?.(report);
+      if (report !== null && report !== undefined) reports.show(style, report);
     }} />
 
   <div class="emma-pane">

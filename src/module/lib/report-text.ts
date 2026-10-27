@@ -6,11 +6,18 @@ import type { PlanEntry, SetupCheck, SetupSolve } from '@module/adapters/report'
 
 import { format, formatList, localize } from './i18n';
 
-/** The reports the report window offers, the first shown first. */
+/** The reports, each in its own window, in the order the toolbar offers them. */
 export const REPORT_STYLES = ['plan', 'check', 'update'] as const;
 
-/** One of the reports the report window offers. */
+/** One of the reports. */
 export type ReportStyle = (typeof REPORT_STYLES)[number];
+
+/** Each report's Font Awesome icon, on its toolbar button and its window. */
+export const REPORT_ICONS: Readonly<Record<ReportStyle, string>> = {
+  plan: 'fa-list-ol',
+  check: 'fa-clipboard-check',
+  update: 'fa-circle-arrow-up',
+};
 
 /** The setup a report is on, as {@link SetupCheck} gives it. */
 type ReportedSetup = SetupCheck['setup'];

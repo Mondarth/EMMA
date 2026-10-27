@@ -86,15 +86,19 @@ export interface ChangedPackage {
 }
 
 /**
- * A report on a hypothetical setup: its plan and check, and its best versions once worked out. Choosing the versions
- * the update recommends gives the report on the setup they make.
+ * A report on a hypothetical setup: its plan and check, and its best versions, worked out when first asked for.
+ * Choosing the versions the update recommends gives the report on the setup they make.
  */
 export interface SetupReportData {
-  /** The titles of the active modules hypothetical mode ignores, which every style leaves out and warns of. */
+  /** The titles of the active modules hypothetical mode ignores, which every report leaves out and warns of. */
   readonly ignored: readonly string[];
   readonly plan: readonly PlanEntry[];
   readonly check: SetupCheck;
-  readonly solve: Promise<SetupSolve>;
+  /**
+   * Work out the best versions, which may take requests; only the update needs them.
+   * @returns The same solve each time it is called
+   */
+  readonly solve: () => Promise<SetupSolve>;
   /**
    * Choose the versions an update recommends in the hypothetical setup reported on.
    * @returns The report on the setup they make

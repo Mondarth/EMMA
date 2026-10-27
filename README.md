@@ -40,7 +40,8 @@ Hypothetical mode, for GMs:
   in the colour of the badge it would have. Newer Foundry builds and game system versions can be chosen the same way.
 - **Everything is judged together**: choosing a version, or staging a module, judges every module again in the setup
   you have made, with Foundry's own verdicts.
-- **Reports on the setup**, which can be downloaded as text:
+- **Reports on the setup**, each in its own window from the toolbar, open side by side if you like, and downloadable
+  as text:
   - **Plan**: the modules to install and those to keep, in the order to install them, each with a manifest URL for
     that version alone.
   - **Check**: every active module, with its verdict and, in words, everything that keeps it from working.

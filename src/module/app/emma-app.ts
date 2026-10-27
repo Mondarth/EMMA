@@ -4,8 +4,8 @@ import EmmaRoot from '@component/EmmaRoot.svelte';
 import { canManageModules, listInstalledModules, readActivation } from '@module/adapters/modules';
 import { isGM, readPlatform } from '@module/adapters/platform';
 import { createVersionJudge } from '@module/adapters/versions';
-import type { SetupReportData } from '@module/app/setup-report';
-import { closeSetupReport, showSetupReport } from '@module/app/setup-report';
+import type { ReportStyle, SetupReportData, SetupReports } from '@module/app/setup-report';
+import { closeSetupReport, closeSetupReports, openSetupReports, showSetupReport } from '@module/app/setup-report';
 import type { DiscardClosingOptions, DiscardQuestion } from '@module/app/confirm-discard';
 import { confirmDiscard } from '@module/app/confirm-discard';
 import { saveModules } from '@module/app/save';
@@ -33,6 +33,26 @@ const DISCARD: DiscardQuestion = {
   id: `${MODULE_ID}-discard`,
   title: 'MONDARTH-EMMA.Discard.Title',
   body: 'MONDARTH-EMMA.Discard.Body',
+};
+
+/** The reports' windows, which log what fails to open or close. */
+const REPORTS: SetupReports = {
+  open: openSetupReports,
+  show: (style: ReportStyle, report: SetupReportData) => {
+    showSetupReport(style, report).catch((error: unknown) => {
+      log.error('Unable to show the setup report', error);
+    });
+  },
+  close: (style: ReportStyle) => {
+    closeSetupReport(style).catch((error: unknown) => {
+      log.error('Unable to close the setup report', error);
+    });
+  },
+  closeAll: () => {
+    closeSetupReports().catch((error: unknown) => {
+      log.error('Unable to close the setup reports', error);
+    });
+  },
 };
 
 /**
@@ -109,11 +129,7 @@ export class EmmaApp extends foundry.applications.api.ApplicationV2 {
                 clientVersion: game.modules.get(MODULE_ID)?.version ?? null,
               })
           : undefined,
-        onReport: (report: SetupReportData) => {
-          showSetupReport(report).catch((error: unknown) => {
-            log.error('Unable to show the setup report', error);
-          });
-        },
+        reports: isGM() ? REPORTS : undefined,
         fields: drawerFields,
         onSave: () => saveModules(modules),
         onViewChange: (view: View) => {
@@ -164,8 +180,8 @@ export class EmmaApp extends foundry.applications.api.ApplicationV2 {
   ): Promise<void> {
     await super._onClose(options);
     this.#modules = null;
-    // The report's update would apply to a hypothetical setup that has gone.
-    await closeSetupReport();
+    // The reports' update would apply to a hypothetical setup that has gone.
+    await closeSetupReports();
     if (this.#component === null) return;
     void unmount(this.#component);
     this.#component = null;

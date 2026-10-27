@@ -33,16 +33,23 @@
       }
     },
     "Report": {
-      "Button": "Report",
-      "Tooltip": "Report on the setup chosen: a plan to install it, a check of it, or the best versions of its modules",
-      "Title": "EMMA - setup report",
-      "Setup": "Foundry Virtual Tabletop {core}, {system}. Active modules: {count}",
-      "Style": "Report style",
-      "Styles": {
+      "Group": "Reports on the setup chosen",
+      "Reports": {
         "plan": "Plan",
         "check": "Check",
         "update": "Update"
       },
+      "Tooltips": {
+        "plan": "Plan: the active modules in the order to install them",
+        "check": "Check: whether every package can be used in the setup chosen",
+        "update": "Update: the best versions of the active modules"
+      },
+      "Titles": {
+        "plan": "EMMA - plan",
+        "check": "EMMA - check",
+        "update": "EMMA - update"
+      },
+      "Setup": "Foundry Virtual Tabletop {core}, {system}. Active modules: {count}",
       "Download": "Download this report as text",
       "Apply": "Choose these versions in the hypothetical setup",
       "Plan": {
