@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
 
-import type { PlanEntry, SetupCheck, SetupSolve } from '@module/adapters/report';
+import type { PlanEntry, SetupCheck, SetupSolve, UnavailableModule } from '@module/adapters/report';
 import type { PackageRef, PlatformPart, VersionChoices, VersionJudge, VersionOption } from '@module/adapters/versions';
 import { HypotheticalState } from '@module/state/hypothetical.svelte';
 
@@ -110,6 +110,7 @@ export function fakeJudge(
     reportIgnored: vi.fn((active: Iterable<string>, choices: VersionChoices): readonly string[] =>
       [...active].filter(id => choices.ignored?.has(id) === true),
     ),
+    reportUnavailable: vi.fn((_active: Iterable<string>, _choices: VersionChoices): readonly UnavailableModule[] => []),
   } satisfies VersionJudge;
 }
 

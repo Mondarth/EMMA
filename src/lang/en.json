@@ -33,16 +33,23 @@
       }
     },
     "Report": {
-      "Button": "Report",
-      "Tooltip": "Report on the setup chosen: a plan to install it, a check of it, or the best versions of its modules",
-      "Title": "EMMA - setup report",
-      "Setup": "Foundry Virtual Tabletop {core}, {system}. Active modules: {count}",
-      "Style": "Report style",
-      "Styles": {
+      "Group": "Reports on the setup chosen",
+      "Reports": {
         "plan": "Plan",
         "check": "Check",
         "update": "Update"
       },
+      "Tooltips": {
+        "plan": "Plan: the active modules in the order to install them",
+        "check": "Check: whether every package can be used in the setup chosen",
+        "update": "Update: the best versions of the active modules"
+      },
+      "Titles": {
+        "plan": "EMMA - plan",
+        "check": "EMMA - check",
+        "update": "EMMA - update"
+      },
+      "Setup": "Foundry Virtual Tabletop {core}, {system}. Active modules: {count}",
       "Download": "Download this report as text",
       "Apply": "Choose these versions in the hypothetical setup",
       "Plan": {
@@ -56,6 +63,14 @@
         "Manifest": "Manifest URL",
         "NoManifest": "none for this version",
         "Empty": "No modules are active."
+      },
+      "Unavailable": {
+        "Heading": "Not available",
+        "Intro": "These active modules cannot be had, so this report leaves them out. Modules that require them will not find them.",
+        "Entry": "{title}: {reason}",
+        "EntryNote": "{title}: {reason} {note}",
+        "archived": "Archived. Foundry VTT no longer offers it.",
+        "gone": "Gone. Its files are no longer available."
       },
       "Ignored": "Hypothetical mode ignores {modules}, so this report leaves them out. They are taken as present for the modules that require them, but whether they suit this setup is not known: the report may be inaccurate.",
       "Check": {
@@ -207,6 +222,7 @@
       "Changes": "Changes staged: {count}",
       "ReadOnly": "Only a GM can change which modules are active.",
       "DisablesEmma": "Saving deactivates EMMA itself, so Foundry's own Module Management window will open from then on.",
+      "NativeBadges": "The badges show Foundry VTT's own checks, which judge the Foundry version alone, not the game system or the modules each requires: they may be inaccurate. Choose EMMA's checks under Badge checks in EMMA's settings.",
       "NoProxy": "No version lookup proxy is used, so Foundry's package listing and release notes can't be read: fewer module versions are found, and no newer Foundry version is offered. Choose a proxy in EMMA's settings to look further."
     },
     "Requirements": {
@@ -229,6 +245,16 @@
       "Disabled": {
         "Name": "Disable EMMA",
         "Hint": "Use Foundry's built-in Module Management window instead of EMMA. Takes effect immediately."
+      },
+      "OlderVersions": {
+        "Name": "Show older versions",
+        "Hint": "How many versions before the one installed hypothetical mode offers in each version drop-down, and its reports consider. Installing an older version into an existing world is risky, as its data may not go back, so none are shown by default; one or two are enough to try rolling back an update. Warning: each version shown is judged against every other, so showing many older versions can make hypothetical mode noticeably slower."
+      },
+      "BadgeChecks": {
+        "Name": "Badge checks",
+        "Hint": "Whose checks the version badges show outside hypothetical mode. EMMA's check each module against the game system and its version, and an active module against the modules it requires and conflicts with, as well as the Foundry version. Foundry's own check the Foundry version alone, as its Module Management does, so may show a module as verified that will not work with your system: they may be inaccurate. Hypothetical mode always uses EMMA's.",
+        "Emma": "EMMA's checks (recommended)",
+        "Foundry": "Foundry VTT's own checks (may be inaccurate)"
       },
       "AutoRecommended": {
         "Name": "Automatically activate/deactivate recommended modules",

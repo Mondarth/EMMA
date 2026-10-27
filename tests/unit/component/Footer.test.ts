@@ -160,6 +160,22 @@ describe('Footer', () => {
     });
   });
 
+  describe('with Foundry’s own checks for the badges', () => {
+    const NATIVE = 'MONDARTH-EMMA.Footer.NativeBadges';
+
+    test('warns that the badges may be inaccurate', () => {
+      render(Footer, { modules: createModules(), canManage: false, onSave: vi.fn(), nativeBadges: true });
+
+      expect(screen.getByRole('status')).toHaveTextContent(NATIVE);
+    });
+
+    test('says nothing of them otherwise', () => {
+      render(Footer, { modules: createModules(), canManage: false, onSave: vi.fn() });
+
+      expect(screen.getByRole('status')).not.toHaveTextContent(NATIVE);
+    });
+  });
+
   describe('hypothetical mode without a proxy', () => {
     const NO_PROXY = 'MONDARTH-EMMA.Footer.NoProxy';
 

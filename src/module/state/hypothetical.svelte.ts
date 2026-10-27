@@ -1,7 +1,7 @@
 import { untrack } from 'svelte';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
-import type { SetupChange, SetupReportData } from '@module/adapters/report';
+import type { SetupChange, SetupReportData, SetupSolve } from '@module/adapters/report';
 import type { PackageRef, PlatformPart, VersionChoices, VersionJudge, VersionOption } from '@module/adapters/versions';
 import { log } from '@module/lib/logger';
 
@@ -205,19 +205,27 @@ export class HypotheticalState {
 
   /**
    * Report on the setup chosen: a plan and a check of it, at once, and the best setup keeping the versions chosen,
-   * which may take requests to work out.
+   * which may take requests to work out, so is only worked out when asked for.
    * @returns The plan, the check and the solve, or `null` before versions are looked up
    */
   report(): SetupReportData | null {
     const judge = this.#looked?.judge;
     if (judge === undefined) return null;
     const active = [...this.#active()];
-    const choices = this.#choicesMade();
+    // As they are now: the solve is worked out later, if at all.
+    const made = this.#choicesMade();
+    const choices: VersionChoices = {
+      ...made,
+      modules: new SvelteMap(made.modules),
+      ignored: made.ignored && new SvelteSet(made.ignored),
+    };
+    let solving: Promise<SetupSolve> | undefined;
     return {
       ignored: judge.reportIgnored(active, choices),
+      unavailable: judge.reportUnavailable(active, choices),
       plan: judge.reportPlan(active, choices),
       check: judge.reportCheck(active, choices),
-      solve: judge.reportSolve(active, choices),
+      solve: () => (solving ??= judge.reportSolve(active, choices)),
       apply: changes => {
         this.apply(changes);
         // The report on the setup the versions chosen make; there is one, as there was one to apply.

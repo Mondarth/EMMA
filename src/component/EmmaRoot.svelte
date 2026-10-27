@@ -1,10 +1,11 @@
 <script lang="ts">
   import type { Platform } from '@module/adapters/platform';
-  import type { SetupReportData } from '@module/app/setup-report';
-  import type { VersionJudge } from '@module/adapters/versions';
+  import type { ReportStyle, SetupReports } from '@module/app/setup-report';
+  import type { InstalledJudge, VersionJudge } from '@module/adapters/versions';
   import type { DrawerFields } from '@module/state/drawer-fields.svelte';
   import type { View } from '@module/settings';
   import { HypotheticalState } from '@module/state/hypothetical.svelte';
+  import { badgeChecks } from '@module/state/badge-checks.svelte';
   import { ignoredModules } from '@module/state/hypothetical-ignored.svelte';
   import type { ModuleState } from '@module/state/module-state.svelte';
 
@@ -34,8 +35,10 @@
     platform?: Platform | undefined;
     /** Sets up looking up module versions for hypothetical mode; given to GMs with the platform. */
     createVersionJudge?: (() => VersionJudge) | undefined;
-    /** Shows a report on the setup chosen in hypothetical mode. */
-    onReport?: ((report: SetupReportData) => void) | undefined;
+    /** The windows of the reports on the setup chosen in hypothetical mode; given to GMs with the platform. */
+    reports?: SetupReports | undefined;
+    /** Judges the installed modules as EMMA's checks do, for the badges when the user chose them. */
+    judgeInstalled?: InstalledJudge | undefined;
   }
 
   const {
@@ -49,7 +52,8 @@
     onGroupedChange,
     platform,
     createVersionJudge,
-    onReport,
+    reports,
+    judgeInstalled,
   }: Props = $props();
 
   // The window is mounted afresh each time it opens, so the initial view and grouping are only read once.
@@ -80,6 +84,13 @@
 
   /** The versions offered while hypothetical mode is on. */
   const offered = $derived(hypothetical ? versions : undefined);
+
+  // EMMA's badges, judged again as modules are staged active or inactive; none with Foundry's own checks chosen.
+  const badges = $derived(
+    badgeChecks.value === 'emma' ? judgeInstalled?.(modules.active.map(({ id }) => id)) : undefined,
+  );
+  /** Whether the badges shown are Foundry's own, which may be inaccurate: outside hypothetical mode, by choice. */
+  const nativeBadges = $derived(!hypothetical && badgeChecks.value === 'foundry');
 </script>
 
 <div class="emma-root">
@@ -106,18 +117,26 @@
       else {
         modules.leaveHypothetical();
         versions?.clearChoices();
+        // They report on a hypothetical setup that has gone, and their buttons go with the mode.
+        reports?.closeAll();
       }
     }}
-    onReport={() => {
+    reportsOpen={reports?.open}
+    onReport={(style: ReportStyle) => {
+      if (reports === undefined) return;
+      if (reports.open.has(style)) {
+        reports.close(style);
+        return;
+      }
       const report = versions?.report();
-      if (report !== null && report !== undefined) onReport?.(report);
+      if (report !== null && report !== undefined) reports.show(style, report);
     }} />
 
   <div class="emma-pane">
     {#if view === 'list'}
-      <ListView {modules} {canManage} {fields} {grouped} versions={offered} />
+      <ListView {modules} {canManage} {fields} {grouped} versions={offered} {badges} />
     {:else}
-      <SplitView {modules} {canManage} {fields} versions={offered} />
+      <SplitView {modules} {canManage} {fields} versions={offered} {badges} />
     {/if}
   </div>
 
@@ -126,6 +145,7 @@
     {canManage}
     {onSave}
     unproxied={hypothetical && versions?.proxied === false}
+    {nativeBadges}
     hypothetical={hypothetical
       ? {
           canReset: modules.changedInHypothetical || versions?.hasChoices === true,

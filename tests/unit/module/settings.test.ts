@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'vitest';
 
 import {
+  getBadgeChecks,
   getDrawerFields,
   getHypotheticallyIgnored,
+  getOlderVersions,
   getVersionProxy,
   getVersionProxyKey,
   getVersionProxyMode,
@@ -10,6 +12,7 @@ import {
   isAutoRecommended,
   isEmmaDisabled,
   isGrouped,
+  registerGmSettings,
   registerSettings,
   setDrawerFields,
   setGrouped,
@@ -20,6 +23,7 @@ import {
 } from '@module/settings';
 import { obscure } from '@module/lib/obscure';
 import { drawerFields } from '@module/state/drawer-fields.svelte';
+import { badgeChecks, setBadgeChecks } from '@module/state/badge-checks.svelte';
 import { ignoredModules } from '@module/state/hypothetical-ignored.svelte';
 import { installFoundryMocks } from '../mocks/foundry';
 
@@ -69,11 +73,58 @@ describe('registerSettings', () => {
   });
 });
 
-describe('isAutoRecommended', () => {
-  test('registers the per-user setting in Game Settings, off by default', () => {
+describe('getOlderVersions', () => {
+  test('registers the per-user setting, a whole number from 0 to 20, none by default, in Game Settings for GMs', () => {
     const { game } = installFoundryMocks();
 
-    registerSettings();
+    registerGmSettings();
+
+    expect(game.settings.register).toHaveBeenCalledWith('mondarth-emma', 'olderVersions', {
+      name: 'MONDARTH-EMMA.Settings.OlderVersions.Name',
+      hint: 'MONDARTH-EMMA.Settings.OlderVersions.Hint',
+      scope: 'user',
+      config: true,
+      type: Number,
+      range: { min: 0, max: 20, step: 1 },
+      default: 0,
+    });
+    expect(getOlderVersions()).toBe(0);
+  });
+
+  test('is not offered to players, who have no hypothetical mode', () => {
+    const { game } = installFoundryMocks({ isGM: false });
+
+    registerGmSettings();
+
+    expect(game.settings.register).toHaveBeenCalledWith(
+      'mondarth-emma',
+      'olderVersions',
+      expect.objectContaining({ config: false }),
+    );
+  });
+
+  test('follows the setting, as a whole number within its range', async () => {
+    const { game } = installFoundryMocks();
+    registerGmSettings();
+
+    for (const [chosen, read] of [
+      [2, 2],
+      [2.7, 2],
+      [-3, 0],
+      [99, 20],
+      [Number.NaN, 0],
+    ] as const) {
+      await game.settings.set('mondarth-emma', 'olderVersions', chosen);
+      expect(getOlderVersions()).toBe(read);
+    }
+  });
+});
+
+describe('isAutoRecommended', () => {
+  test('registers the per-user setting in Game Settings for GMs, off by default', () => {
+    const { game } = installFoundryMocks();
+
+    registerGmSettings();
 
     expect(game.settings.register).toHaveBeenCalledWith('mondarth-emma', 'autoRecommended', {
       name: 'MONDARTH-EMMA.Settings.AutoRecommended.Name',
@@ -86,9 +137,29 @@ describe('isAutoRecommended', () => {
     expect(isAutoRecommended()).toBe(false);
   });
 
+  test('is not offered to players, who cannot change which modules are active', () => {
+    const { game } = installFoundryMocks({ isGM: false });
+
+    registerGmSettings();
+
+    expect(game.settings.register).toHaveBeenCalledWith(
+      'mondarth-emma',
+      'autoRecommended',
+      expect.objectContaining({ config: false }),
+    );
+  });
+
+  test('is not registered on init, before the user is known', () => {
+    const { game } = installFoundryMocks();
+
+    registerSettings();
+
+    expect(game.settings.register).not.toHaveBeenCalledWith('mondarth-emma', 'autoRecommended', expect.anything());
+  });
+
   test('follows the setting without a reload', async () => {
     const { game } = installFoundryMocks();
-    registerSettings();
+    registerGmSettings();
 
     await game.settings.set('mondarth-emma', 'autoRecommended', true);
 
@@ -111,6 +182,46 @@ describe('isEmmaDisabled', () => {
     await game.settings.set('mondarth-emma', 'disabled', true);
 
     expect(isEmmaDisabled()).toBe(true);
+  });
+});
+
+describe('getBadgeChecks', () => {
+  test('registers the per-user setting in Game Settings for every user, EMMA’s checks by default', () => {
+    const { game } = installFoundryMocks({ isGM: false });
+
+    registerSettings();
+
+    expect(game.settings.register).toHaveBeenCalledWith(
+      'mondarth-emma',
+      'badgeChecks',
+      expect.objectContaining({
+        name: 'MONDARTH-EMMA.Settings.BadgeChecks.Name',
+        hint: 'MONDARTH-EMMA.Settings.BadgeChecks.Hint',
+        scope: 'user',
+        config: true,
+        type: String,
+        choices: {
+          emma: 'MONDARTH-EMMA.Settings.BadgeChecks.Emma',
+          foundry: 'MONDARTH-EMMA.Settings.BadgeChecks.Foundry',
+        },
+        default: 'emma',
+      }),
+    );
+    expect(getBadgeChecks()).toBe('emma');
+  });
+
+  test('follows the setting, taking anything but Foundry’s as EMMA’s, and so does every open window', async () => {
+    const { game } = installFoundryMocks();
+    registerSettings();
+    setBadgeChecks('emma');
+
+    await game.settings.set('mondarth-emma', 'badgeChecks', 'foundry');
+    expect(getBadgeChecks()).toBe('foundry');
+    expect(badgeChecks.value).toBe('foundry');
+
+    await game.settings.set('mondarth-emma', 'badgeChecks', 'other');
+    expect(getBadgeChecks()).toBe('emma');
+    expect(badgeChecks.value).toBe('emma');
   });
 });
 

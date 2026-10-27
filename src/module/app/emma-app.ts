@@ -3,9 +3,9 @@ import { mount, unmount } from 'svelte';
 import EmmaRoot from '@component/EmmaRoot.svelte';
 import { canManageModules, listInstalledModules, readActivation } from '@module/adapters/modules';
 import { isGM, readPlatform } from '@module/adapters/platform';
-import { createVersionJudge } from '@module/adapters/versions';
-import type { SetupReportData } from '@module/app/setup-report';
-import { closeSetupReport, showSetupReport } from '@module/app/setup-report';
+import { createInstalledJudge, createVersionJudge } from '@module/adapters/versions';
+import type { ReportAnchor, ReportStyle, SetupReportData, SetupReports } from '@module/app/setup-report';
+import { closeSetupReport, closeSetupReports, openSetupReports, showSetupReport } from '@module/app/setup-report';
 import type { DiscardClosingOptions, DiscardQuestion } from '@module/app/confirm-discard';
 import { confirmDiscard } from '@module/app/confirm-discard';
 import { saveModules } from '@module/app/save';
@@ -13,9 +13,12 @@ import { MODULE_ID } from '@module/lib/constants';
 import { log } from '@module/lib/logger';
 import type { View } from '@module/settings';
 import { localize } from '@module/lib/i18n';
+import { setBadgeChecks } from '@module/state/badge-checks.svelte';
 import {
+  getBadgeChecks,
   getDrawerFields,
   getHypotheticallyIgnored,
+  getOlderVersions,
   getView,
   isAutoRecommended,
   isGrouped,
@@ -34,6 +37,32 @@ const DISCARD: DiscardQuestion = {
   title: 'MONDARTH-EMMA.Discard.Title',
   body: 'MONDARTH-EMMA.Discard.Body',
 };
+
+/**
+ * The reports' windows, which open clear of EMMA's window and log what fails to open or close.
+ * @param anchor - Where EMMA's window is, if it is open
+ * @returns The reports' windows
+ */
+function reportsFor(anchor: () => ReportAnchor | undefined): SetupReports {
+  return {
+    open: openSetupReports,
+    show: (style: ReportStyle, report: SetupReportData) => {
+      showSetupReport(style, report, anchor()).catch((error: unknown) => {
+        log.error('Unable to show the setup report', error);
+      });
+    },
+    close: (style: ReportStyle) => {
+      closeSetupReport(style).catch((error: unknown) => {
+        log.error('Unable to close the setup report', error);
+      });
+    },
+    closeAll: () => {
+      closeSetupReports().catch((error: unknown) => {
+        log.error('Unable to close the setup reports', error);
+      });
+    },
+  };
+}
 
 /**
  * The EMMA window: an `ApplicationV2` frame whose content is rendered entirely by the {@link EmmaRoot} Svelte
@@ -93,6 +122,7 @@ export class EmmaApp extends foundry.applications.api.ApplicationV2 {
     this.#modules = modules;
     drawerFields.set(getDrawerFields());
     setIgnoredModules(getHypotheticallyIgnored());
+    setBadgeChecks(getBadgeChecks());
     this.#component = mount(EmmaRoot, {
       target: content,
       props: {
@@ -107,13 +137,19 @@ export class EmmaApp extends foundry.applications.api.ApplicationV2 {
               createVersionJudge({
                 ...versionLookup(),
                 clientVersion: game.modules.get(MODULE_ID)?.version ?? null,
+                olderVersions: getOlderVersions,
               })
           : undefined,
-        onReport: (report: SetupReportData) => {
-          showSetupReport(report).catch((error: unknown) => {
-            log.error('Unable to show the setup report', error);
-          });
-        },
+        // Read afresh each time the window opens, as modules may have been installed since.
+        judgeInstalled: createInstalledJudge(),
+        reports: isGM()
+          ? reportsFor(() => {
+              const bar = content.querySelector('[role="toolbar"]');
+              return bar === null
+                ? undefined
+                : { window: this.element.getBoundingClientRect(), toolbar: bar.getBoundingClientRect() };
+            })
+          : undefined,
         fields: drawerFields,
         onSave: () => saveModules(modules),
         onViewChange: (view: View) => {
@@ -164,8 +200,8 @@ export class EmmaApp extends foundry.applications.api.ApplicationV2 {
   ): Promise<void> {
     await super._onClose(options);
     this.#modules = null;
-    // The report's update would apply to a hypothetical setup that has gone.
-    await closeSetupReport();
+    // The reports' update would apply to a hypothetical setup that has gone.
+    await closeSetupReports();
     if (this.#component === null) return;
     void unmount(this.#component);
     this.#component = null;

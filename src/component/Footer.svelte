@@ -13,6 +13,8 @@
     onSave: () => Promise<unknown>;
     /** Whether hypothetical mode is looking up versions without a proxy, so finds fewer. */
     unproxied?: boolean;
+    /** Whether the badges are Foundry's own checks, which may be inaccurate, as the user chose. */
+    nativeBadges?: boolean;
     /**
      * Hypothetical mode, while it is on: nothing can be saved, and Reset restores what was staged when it was entered,
      * through `reset`, enabled while `canReset`.
@@ -20,7 +22,7 @@
     hypothetical?: { readonly canReset: boolean; readonly reset: () => void } | undefined;
   }
 
-  const { modules, canManage, onSave, unproxied = false, hypothetical }: Props = $props();
+  const { modules, canManage, onSave, unproxied = false, nativeBadges = false, hypothetical }: Props = $props();
 
   let saving = $state(false);
 
@@ -71,6 +73,12 @@
       <p class="emma-unproxied">
         <i class="fa-solid fa-circle-info" inert></i>
         {localize('MONDARTH-EMMA.Footer.NoProxy')}
+      </p>
+    {/if}
+    {#if nativeBadges}
+      <p class="emma-native-badges">
+        <i class="fa-solid fa-triangle-exclamation" inert></i>
+        {localize('MONDARTH-EMMA.Footer.NativeBadges')}
       </p>
     {/if}
     {#if canManage && disablesEmma}

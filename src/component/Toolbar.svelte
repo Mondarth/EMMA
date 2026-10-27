@@ -2,6 +2,8 @@
   import type { Platform } from '@module/adapters/platform';
   import type { PackageRef, PlatformPart } from '@module/adapters/versions';
   import { format, formatList, localize } from '@module/lib/i18n';
+  import type { ReportStyle } from '@module/lib/report-text';
+  import { REPORT_ICONS, REPORT_STYLES } from '@module/lib/report-text';
   import type { HypotheticalState } from '@module/state/hypothetical.svelte';
   import type { View } from '@module/settings';
   import type { ModuleState } from '@module/state/module-state.svelte';
@@ -27,8 +29,10 @@
     onHypotheticalChange?: (hypothetical: boolean) => void;
     /** Hypothetical mode's versions, whose lookup the toolbar reports on while the mode is on. */
     versions?: HypotheticalState | undefined;
-    /** Called when the user asks for a report on the setup chosen in hypothetical mode. */
-    onReport?: () => void;
+    /** The reports on the setup chosen in hypothetical mode that are open, whose buttons show pressed. */
+    reportsOpen?: ReadonlySet<ReportStyle> | undefined;
+    /** Called when the user turns a report on the setup chosen in hypothetical mode on or off. */
+    onReport?: (style: ReportStyle) => void;
   }
 
   const {
@@ -41,6 +45,7 @@
     hypothetical = false,
     onHypotheticalChange,
     versions,
+    reportsOpen = new Set(),
     onReport,
   }: Props = $props();
 
@@ -141,16 +146,6 @@
             format('MONDARTH-EMMA.Toolbar.System', { id: platform.system.id, version: system }),
             format('MONDARTH-EMMA.Toolbar.SystemTooltip', { title: platform.system.title, version: system }),
           )}
-          <!-- Reports on the setup chosen, once its versions are looked up. -->
-          <button
-            type="button"
-            class="emma-toolbar-report icon fa-solid fa-clipboard-list"
-            aria-label={localize('MONDARTH-EMMA.Report.Button')}
-            data-tooltip={localize('MONDARTH-EMMA.Report.Tooltip')}
-            disabled={versions?.canReport !== true}
-            onclick={() => {
-              onReport?.();
-            }}></button>
           {#if lookup !== null}
             <i
               class={['emma-toolbar-lookup', 'fa-solid', lookup.icon, { failed: versions?.status === 'failed' }]}
@@ -162,48 +157,69 @@
       {/if}
     </div>
   {/if}
-  {#if view === 'list'}
-    <button
-      type="button"
-      class={['emma-toolbar-group', 'icon', 'fa-solid', 'fa-sitemap', { active: grouped }]}
-      aria-label={groupLabel}
-      aria-pressed={grouped}
-      data-tooltip={groupLabel}
-      onclick={() => {
-        onGroupedChange?.(!grouped);
-      }}></button>
+  {#if platform !== undefined && hypothetical}
+    <!-- Each report on the setup chosen, in a window of its own, once its versions are looked up. -->
+    <div class="emma-toolbar-reports" role="group" aria-label={localize('MONDARTH-EMMA.Report.Group')}>
+      {#each REPORT_STYLES as style (style)}
+        {@const pressed = reportsOpen.has(style)}
+        <button
+          type="button"
+          class={['icon', 'fa-solid', REPORT_ICONS[style], { active: pressed }]}
+          aria-label={localize(`MONDARTH-EMMA.Report.Reports.${style}`)}
+          aria-pressed={pressed}
+          data-tooltip={localize(`MONDARTH-EMMA.Report.Tooltips.${style}`)}
+          disabled={!pressed && versions?.canReport !== true}
+          onclick={() => {
+            onReport?.(style);
+          }}></button>
+      {/each}
+    </div>
   {/if}
-  <div class="emma-toolbar-views">
-    {#each VIEWS as option (option.view)}
-      {@const label = localize(option.label)}
-      {@const pressed = view === option.view}
+  <div class="emma-toolbar-end">
+    {#if view === 'list'}
       <button
         type="button"
-        class={['icon', 'fa-solid', option.icon, { active: pressed }]}
-        aria-label={label}
-        aria-pressed={pressed}
-        data-tooltip={label}
+        class={['emma-toolbar-group', 'icon', 'fa-solid', 'fa-sitemap', { active: grouped }]}
+        aria-label={groupLabel}
+        aria-pressed={grouped}
+        data-tooltip={groupLabel}
         onclick={() => {
-          onViewChange(option.view);
+          onGroupedChange?.(!grouped);
         }}></button>
-    {/each}
+    {/if}
+    <div class="emma-toolbar-views">
+      {#each VIEWS as option (option.view)}
+        {@const label = localize(option.label)}
+        {@const pressed = view === option.view}
+        <button
+          type="button"
+          class={['icon', 'fa-solid', option.icon, { active: pressed }]}
+          aria-label={label}
+          aria-pressed={pressed}
+          data-tooltip={label}
+          onclick={() => {
+            onViewChange(option.view);
+          }}></button>
+      {/each}
+    </div>
+    <button
+      type="button"
+      class={['emma-toolbar-expand', 'icon', 'fa-solid', modules.allExpanded ? 'fa-angles-down' : 'fa-angles-up']}
+      aria-label={expandLabel}
+      data-tooltip={expandLabel}
+      disabled={modules.entries.length === 0}
+      onclick={() => {
+        modules.setAllExpanded(!modules.allExpanded);
+      }}></button>
   </div>
-  <button
-    type="button"
-    class={['emma-toolbar-expand', 'icon', 'fa-solid', modules.allExpanded ? 'fa-angles-down' : 'fa-angles-up']}
-    aria-label={expandLabel}
-    data-tooltip={expandLabel}
-    disabled={modules.entries.length === 0}
-    onclick={() => {
-      modules.setAllExpanded(!modules.allExpanded);
-    }}></button>
 </div>
 
 <style>
+  /* Three parts: hypothetical mode at the start, its reports in the middle, and the list's arrangement at the end. */
   .emma-toolbar {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    justify-content: flex-end;
     gap: 0.5rem;
     padding-bottom: 0.5rem;
     border-bottom: 1px solid var(--color-border);
@@ -212,9 +228,25 @@
   /* Hypothetical mode sits at the far left, apart from the controls that arrange the list. */
   .emma-toolbar-hypothetical {
     display: flex;
+    grid-column: 1;
     align-items: center;
+    justify-self: start;
     gap: 0.25rem;
-    margin-inline-end: auto;
+  }
+
+  /* Centred, between the setup they report on and the list's arrangement. */
+  .emma-toolbar-reports {
+    display: flex;
+    grid-column: 2;
+    gap: 0.25rem;
+  }
+
+  .emma-toolbar-end {
+    display: flex;
+    grid-column: 3;
+    align-items: center;
+    justify-self: end;
+    gap: 0.5rem;
   }
 
   /* Slightly apart from the toggle, as they only appear while it is on. */
@@ -230,11 +262,6 @@
     width: auto;
     padding-inline: 0.5rem;
     white-space: nowrap;
-  }
-
-  /* A little apart from the Core and System buttons, as it reports on them rather than choosing a version. */
-  .emma-toolbar-report {
-    margin-inline-start: 0.5rem;
   }
 
   .emma-toolbar-lookup {

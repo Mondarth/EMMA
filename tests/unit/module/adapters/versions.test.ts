@@ -3,7 +3,8 @@ import { memoryCache } from '@mondarth/fvtt-resolver/sources';
 import { describe, expect, test, vi } from 'vitest';
 
 import type { SetupSolve } from '@module/adapters/report';
-import { createVersionJudge } from '@module/adapters/versions';
+import { AVAILABILITY } from '@mondarth/fvtt-resolver';
+import { createInstalledJudge, createVersionJudge } from '@module/adapters/versions';
 import type { FoundryMockOptions, ModuleMockData } from '../../mocks/foundry';
 import { installFoundryMocks } from '../../mocks/foundry';
 
@@ -108,38 +109,82 @@ function fakeFetch(routes: [string, unknown][]) {
  * @param options - The mock state
  * @param routes - The JSON to answer each URL with
  * @param proxy - The proxy URL template, if any
+ * @param olderVersions - How many versions before the one installed, or chosen, to offer and consider; none by default
  * @returns The versions found, with the fetch used and the Foundry mocks
  */
-async function lookUp(options: FoundryMockOptions, routes: [string, unknown][], proxy: string | null = null) {
+async function lookUp(
+  options: FoundryMockOptions,
+  routes: [string, unknown][],
+  proxy: string | null = null,
+  olderVersions?: () => number,
+) {
   const mocks = installFoundryMocks(options);
   const send = fakeFetch(routes);
-  const judge = createVersionJudge({ proxy, fetch: send, cache: memoryCache() });
+  const judge = createVersionJudge({
+    proxy,
+    fetch: send,
+    cache: memoryCache(),
+    ...(olderVersions !== undefined && { olderVersions }),
+  });
   const active = Object.entries(options.modules ?? {}).flatMap(([id, data]) => (data.active === true ? [id] : []));
   await judge.lookUp(active);
   return { judge, send, active, ...mocks };
 }
 
 describe('createVersionJudge without a proxy', () => {
-  test('offers the installed version, the two before it and the newer ones GitHub releases, newest first', async () => {
+  test('offers the installed version and the newer ones GitHub releases, newest first, and none older', async () => {
     const { judge } = await lookUp({ modules: { dice: onGithub('owner/dice', { version: '5.2.4' }) } }, [
       githubReleases('owner/dice', ['4.0.0', '5.0.0', '5.1.0', '5.3.0', '6.0.0']),
     ]);
 
+    expect(judge.versionsOf('dice')).toEqual(['6.0.0', '5.3.0', '5.2.4']);
+  });
+
+  test('offers as many versions before the installed one as the user chose', async () => {
+    const { judge } = await lookUp(
+      { modules: { dice: onGithub('owner/dice', { version: '5.2.4' }) } },
+      [githubReleases('owner/dice', ['4.0.0', '5.0.0', '5.1.0', '5.3.0', '6.0.0'])],
+      null,
+      () => 2,
+    );
+
     expect(judge.versionsOf('dice')).toEqual(['6.0.0', '5.3.0', '5.2.4', '5.1.0', '5.0.0']);
   });
 
+  test('follows a change to how many older versions the user chose, the next time it is asked', async () => {
+    let older = 0;
+    const { judge } = await lookUp(
+      { modules: { dice: onGithub('owner/dice', { version: '0.4.0' }) } },
+      [githubReleases('owner/dice', ['0.1.0', '0.2.0', '0.3.0', '0.4.0'])],
+      null,
+      () => older,
+    );
+    expect(judge.versionsOf('dice')).toEqual(['0.4.0']);
+
+    older = 1;
+    expect(judge.versionsOf('dice')).toEqual(['0.4.0', '0.3.0']);
+    older = 10;
+    expect(judge.versionsOf('dice')).toEqual(['0.4.0', '0.3.0', '0.2.0', '0.1.0']);
+  });
+
   test('offers the two versions before the installed one even when it is the newest', async () => {
-    const { judge } = await lookUp({ modules: { dice: onGithub('owner/dice', { version: '0.4.0' }) } }, [
-      githubReleases('owner/dice', ['0.1.0', '0.2.0', '0.3.0', '0.4.0']),
-    ]);
+    const { judge } = await lookUp(
+      { modules: { dice: onGithub('owner/dice', { version: '0.4.0' }) } },
+      [githubReleases('owner/dice', ['0.1.0', '0.2.0', '0.3.0', '0.4.0'])],
+      null,
+      () => 2,
+    );
 
     expect(judge.versionsOf('dice')).toEqual(['0.4.0', '0.3.0', '0.2.0']);
   });
 
   test('counts the versions before one written with a leading v, as the release tags write them without', async () => {
-    const { judge } = await lookUp({ modules: { dice: onGithub('owner/dice', { version: 'v0.4.0' }) } }, [
-      githubReleases('owner/dice', ['0.1.0', '0.2.0', '0.3.0', '0.5.0']),
-    ]);
+    const { judge } = await lookUp(
+      { modules: { dice: onGithub('owner/dice', { version: 'v0.4.0' }) } },
+      [githubReleases('owner/dice', ['0.1.0', '0.2.0', '0.3.0', '0.5.0'])],
+      null,
+      () => 2,
+    );
 
     expect(judge.versionsOf('dice')).toEqual(['0.5.0', 'v0.4.0', '0.3.0', '0.2.0']);
   });
@@ -631,8 +676,17 @@ describe('the reports', () => {
    */
   const said = (solved: SetupSolve) => JSON.stringify(solved);
 
-  test('consider the version chosen of each module, the two before it and newer ones, never older', async () => {
+  test('consider the version chosen of each module and newer ones, never older, by default', async () => {
     const { judge, active } = await lookUp({ modules: { dice } }, [releases]);
+
+    const solved = await judge.reportSolve(active, { modules: new Map([['dice', '4.0.0']]) });
+
+    expect(said(solved)).toContain('5.0.0');
+    for (const version of ['1.0.0', '2.0.0', '3.0.0']) expect(said(solved)).not.toContain(version);
+  });
+
+  test('consider the version chosen of each module, as many before it as the user chose, and newer ones', async () => {
+    const { judge, active } = await lookUp({ modules: { dice } }, [releases], null, () => 2);
 
     const solved = await judge.reportSolve(active, { modules: new Map([['dice', '4.0.0']]) });
 
@@ -641,7 +695,7 @@ describe('the reports', () => {
   });
 
   test('count from the version chosen, not the one installed', async () => {
-    const { judge, active } = await lookUp({ modules: { dice } }, [releases]);
+    const { judge, active } = await lookUp({ modules: { dice } }, [releases], null, () => 2);
 
     const solved = await judge.reportSolve(active, { modules: new Map([['dice', '5.0.0']]) });
 
@@ -653,9 +707,12 @@ describe('the reports', () => {
   test('count a version written with a leading v as the same version, so the range is still found', async () => {
     // socketlib's manifest gives `v1.1.4`, which Foundry reports as installed, where its release tags give `1.1.4`.
     const prefixed = onGithub('owner/dice', { version: 'v4.0.0', compatibility: { minimum: '15', verified: '15' } });
-    const { judge, active } = await lookUp({ modules: { dice: prefixed } }, [
-      githubReleases('owner/dice', ['1.0.0', '2.0.0', '3.0.0', '5.0.0']),
-    ]);
+    const { judge, active } = await lookUp(
+      { modules: { dice: prefixed } },
+      [githubReleases('owner/dice', ['1.0.0', '2.0.0', '3.0.0', '5.0.0'])],
+      null,
+      () => 2,
+    );
 
     const solved = await judge.reportSolve(active, { modules: new Map() });
 
@@ -664,7 +721,7 @@ describe('the reports', () => {
   });
 
   test('consider every older version when fewer than two are known', async () => {
-    const { judge, active } = await lookUp({ modules: { dice } }, [releases]);
+    const { judge, active } = await lookUp({ modules: { dice } }, [releases], null, () => 2);
 
     const solved = await judge.reportSolve(active, { modules: new Map([['dice', '2.0.0']]) });
 
@@ -704,12 +761,22 @@ describe('createVersionJudge with EMMA’s catalogue', () => {
    * @param more - What else it says
    * @param more.pending - The packages it does not hold yet
    * @param more.gaps - The gaps of its own crawls
+   * @param more.unavailable - The packages it says cannot be had
    * @returns The URL it answers at, and the answer
    */
-  function universe(releases: unknown[], more: { pending?: unknown[]; gaps?: unknown[] } = {}): [string, unknown] {
+  function universe(
+    releases: unknown[],
+    more: { pending?: unknown[]; gaps?: unknown[]; unavailable?: unknown[] } = {},
+  ): [string, unknown] {
     return [
       UNIVERSE,
-      { universe: { core: [], releases }, gaps: more.gaps ?? [], pending: more.pending ?? [], asOf: null },
+      {
+        universe: { core: [], releases },
+        gaps: more.gaps ?? [],
+        pending: more.pending ?? [],
+        ...(more.unavailable !== undefined && { unavailable: more.unavailable }),
+        asOf: null,
+      },
     ];
   }
 
@@ -745,6 +812,76 @@ describe('createVersionJudge with EMMA’s catalogue', () => {
     expect(asked.filter(url => url === UNIVERSE)).toHaveLength(1);
     expect(asked.some(url => url.includes(encodeURIComponent('api.github.com')))).toBe(false);
     expect(judge.unreached).toEqual([]);
+  });
+
+  describe('a module the catalogue says cannot be had', () => {
+    const NONE = { modules: new Map<string, string>() };
+    const modules = {
+      dice: onGithub('owner/dice', { version: '1.0.0' }),
+      babonus: onGithub('krbz999/babonus', { version: '12.5.8' }),
+      lost: onGithub('owner/lost', { version: '1.0.0' }),
+    };
+    const answer = universe([held('dice', '1.0.0')], {
+      unavailable: [
+        { package: { type: 'module', id: 'babonus' }, reason: 'archived' },
+        { package: { type: 'module', id: 'lost' }, reason: 'gone', note: 'Its repository was deleted.' },
+      ],
+    });
+
+    test('is looked up nowhere, not even in its own manifest, and has no versions', async () => {
+      const { judge, asked } = await lookUpWithCatalogue({ modules }, [answer]);
+
+      expect(judge.versionsOf('babonus')).toEqual([]);
+      expect(asked.some(url => url.includes('babonus'))).toBe(false);
+      expect(judge.judgeVersions(['dice', 'babonus'], NONE, 'babonus')).toEqual([]);
+      expect(judge.unreached).toEqual([]);
+    });
+
+    test('is named, with why, and left out of every report', async () => {
+      const { judge } = await lookUpWithCatalogue({ modules }, [answer]);
+      const active = ['dice', 'babonus', 'lost'];
+
+      expect(judge.reportUnavailable(active, NONE)).toEqual([
+        { title: expect.any(String) as string, reason: 'archived' },
+        { title: expect.any(String) as string, reason: 'gone', note: 'Its repository was deleted.' },
+      ]);
+      const check = judge.reportCheck(active, NONE);
+      expect(check.modules.map(({ id }) => id)).toEqual(['dice']);
+      expect(check.setup.modules).toBe(1);
+      expect(judge.reportPlan(active, NONE).map(({ id }) => id)).toEqual(['dice']);
+      expect([...judge.judgeChoices(active, NONE).keys()]).toEqual(['dice']);
+      const solved = await judge.reportSolve(active, NONE);
+      expect(solved.solution.kind).toBe('found');
+    });
+
+    test('is taken as present, not named, when hypothetical mode ignores it', async () => {
+      const { judge } = await lookUpWithCatalogue({ modules }, [answer]);
+      const choices = { ...NONE, ignored: new Set(['babonus']) };
+
+      expect(judge.reportUnavailable(['dice', 'babonus'], choices)).toEqual([]);
+      expect(judge.reportCheck(['dice', 'babonus'], choices).setup.modules).toBe(1);
+    });
+
+    test('is named by its ID when it is not installed, and only modules are, not a system', async () => {
+      const { judge } = await lookUpWithCatalogue({ modules }, [
+        universe([held('dice', '1.0.0')], {
+          unavailable: [
+            { package: { type: 'module', id: 'old-lib' }, reason: 'archived' },
+            { package: { type: 'system', id: 'old-system' }, reason: 'archived' },
+          ],
+        }),
+      ]);
+
+      expect(judge.reportUnavailable(['dice', 'old-lib', 'old-system'], NONE)).toEqual([
+        { title: 'old-lib', reason: 'archived' },
+      ]);
+    });
+
+    test('is not named when it is not active', async () => {
+      const { judge } = await lookUpWithCatalogue({ modules }, [answer]);
+
+      expect(judge.reportUnavailable(['dice'], NONE)).toEqual([]);
+    });
   });
 
   test('asks the catalogue directly, with its own key and EMMA’s version, never the proxy’s key', async () => {
@@ -885,21 +1022,22 @@ describe('createVersionJudge with EMMA’s catalogue', () => {
     /**
      * Look up dice, which requires synth, a module with no manifest the sources can read, which hypothetical mode is
      * told to ignore.
+     * @param versions - The versions of dice the catalogue holds; only the installed one by default
      * @returns The judge, the choices that ignore synth, and the modules active
      */
-    async function withSynthetic() {
-      const dice = {
-        ...held('dice', '1.0.0'),
+    async function withSynthetic(versions: readonly string[] = ['1.0.0']) {
+      const dice = (version: string) => ({
+        ...held('dice', version),
         relationships: {
           requires: [{ package: { type: 'module', id: 'synth' }, compatibility: {} }],
           systems: [],
           conflicts: [],
           recommends: [],
         },
-      };
+      });
       const found = await lookUpWithCatalogue(
         { modules: { dice: onGithub('owner/dice', { version: '1.0.0' }), synth: { active: true, version: '0.0.1' } } },
-        [universe([dice])],
+        [universe(versions.map(dice))],
       );
       const choices = { modules: new Map<string, string>(), ignored: new Set(['synth']) };
       return { ...found, choices, active: ['dice', 'synth'] };
@@ -916,6 +1054,21 @@ describe('createVersionJudge with EMMA’s catalogue', () => {
       expect(judge.reportCheck(active, choices).valid).toBe(true);
     });
 
+    // Regression: the release standing for it declared no compatibility, which the update's policy refuses, so with any
+    // module ignored the update found no setup at all.
+    test('lets the update find the best versions of the others, changing it not at all', async () => {
+      const { judge, choices, active } = await withSynthetic(['1.0.0', '1.1.0']);
+
+      const solved = await judge.reportSolve(active, choices);
+
+      expect(solved.solution).toEqual({
+        kind: 'found',
+        changes: [
+          { package: { type: 'module', id: 'dice' }, title: expect.any(String) as string, from: '1.0.0', to: '1.1.0' },
+        ],
+      });
+    });
+
     test('leaves it out of the fit of each core or system version, and of the reports', async () => {
       const { judge, choices, active } = await withSynthetic();
 
@@ -926,6 +1079,21 @@ describe('createVersionJudge with EMMA’s catalogue', () => {
       expect(check.modules.map(reported => reported.id)).toEqual(['dice']);
       expect(check.setup.modules).toBe(1);
       expect(judge.reportPlan(active, choices).map(entry => entry.id)).not.toContain('synth');
+    });
+  });
+
+  test('recommends the newest version of a module that works, as a change to the setup', async () => {
+    const { judge } = await lookUpWithCatalogue({ modules: { dice: onGithub('owner/dice', { version: '1.0.0' }) } }, [
+      universe([held('dice', '1.0.0'), held('dice', '1.1.0')]),
+    ]);
+
+    const solved = await judge.reportSolve(['dice'], { modules: new Map() });
+
+    expect(solved.solution).toEqual({
+      kind: 'found',
+      changes: [
+        { package: { type: 'module', id: 'dice' }, title: expect.any(String) as string, from: '1.0.0', to: '1.1.0' },
+      ],
     });
   });
 
@@ -962,5 +1130,59 @@ describe('createVersionJudge with EMMA’s catalogue', () => {
     );
 
     expect(judge.versionsOf('dice')).toContain('1.0.1-dev');
+  });
+});
+
+describe('createInstalledJudge', () => {
+  /** A module verified with the core in use, as the mocks' `14.368`. */
+  const verified = { compatibility: { minimum: '14', verified: '14' } };
+  /**
+   * The badge's tooltip the Foundry mock gives an availability.
+   * @param code - The availability
+   * @returns The tooltip
+   */
+  const tooltipOf = (code: number) => `availability ${String(code)}`;
+
+  test('judges an active module verified with the core and the system in use as verified, fetching nothing', () => {
+    installFoundryMocks({ modules: { dice: { ...verified, active: true, systems: ['dnd5e'] } } });
+    const send = vi.spyOn(globalThis, 'fetch');
+
+    const badges = createInstalledJudge()(['dice']);
+
+    expect(badges.get('dice')?.tooltip).toBe(tooltipOf(AVAILABILITY.VERIFIED));
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  // Regression: Foundry's own badge judges the core alone, so a module needing another system version was verified.
+  test('judges a module that does not support the version of the system in use as such, active or not', () => {
+    installFoundryMocks({
+      modules: {
+        coven: { ...verified, active: true, systems: [{ id: 'dnd5e', compatibility: { minimum: '6.0.0' } }] },
+        other: { ...verified, systems: [{ id: 'dnd5e', compatibility: { minimum: '6.0.0' } }] },
+      },
+    });
+
+    const badges = createInstalledJudge()(['coven']);
+
+    // As hypothetical mode judges it: the system is installed, but not a version the module supports.
+    expect(badges.get('coven')?.tooltip).toBe(tooltipOf(AVAILABILITY.UNVERIFIED_SYSTEM));
+    expect(badges.get('other')?.tooltip).toBe(tooltipOf(AVAILABILITY.UNVERIFIED_SYSTEM));
+  });
+
+  test('judges an active module missing what it requires as unusable, and the same module inactive by itself', () => {
+    installFoundryMocks({ modules: { dice: { ...verified, active: true, requires: ['lib'] }, lib: verified } });
+    const judge = createInstalledJudge();
+
+    expect(judge(['dice']).get('dice')?.tooltip).toBe(tooltipOf(AVAILABILITY.MISSING_DEPENDENCY));
+    expect(judge(['dice', 'lib']).get('dice')?.tooltip).toBe(tooltipOf(AVAILABILITY.VERIFIED));
+    // Inactive, what it requires does not matter yet.
+    expect(judge([]).get('dice')?.tooltip).toBe(tooltipOf(AVAILABILITY.VERIFIED));
+  });
+
+  test('gives no badge for a module whose manifest it cannot read, leaving Foundry’s', () => {
+    // An ID no package can have, so no release.
+    installFoundryMocks({ modules: { 'bad id': { ...verified, active: true } } });
+
+    expect(createInstalledJudge()(['bad id']).has('bad id')).toBe(false);
   });
 });

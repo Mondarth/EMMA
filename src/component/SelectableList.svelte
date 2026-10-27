@@ -3,6 +3,7 @@
   import { lockedTooltip } from '@module/lib/locked';
   import type { DrawerFields } from '@module/state/drawer-fields.svelte';
   import type { ModuleRow } from '@module/state/grouping';
+  import type { VersionBadge } from '@module/adapters/modules';
   import type { HypotheticalState } from '@module/state/hypothetical.svelte';
   import type { ModuleState, SelectMode, Side } from '@module/state/module-state.svelte';
 
@@ -23,9 +24,11 @@
     canManage: boolean;
     /** Hypothetical mode's versions while it is on, offering a choice of version for each active module. */
     versions?: HypotheticalState | undefined;
+    /** The badges EMMA's checks give the installed modules, when the user chose them; Foundry's own otherwise. */
+    badges?: ReadonlyMap<string, VersionBadge | null> | undefined;
   }
 
-  const { modules, side, labelledby, fields, canManage, versions }: Props = $props();
+  const { modules, side, labelledby, fields, canManage, versions, badges }: Props = $props();
 
   const uid = $props.id();
 
@@ -224,7 +227,7 @@
         <span id={`${optionId(key)}-title`} class="emma-option-title">{entry.title}</span>
       </div>
       <div class="emma-option-version" role="gridcell">
-        <ModuleVersion {entry} {versions} focusable={false} />
+        <ModuleVersion {entry} {versions} {badges} focusable={false} />
       </div>
       <div class="emma-option-toggle" role="gridcell">
         <DisclosureButton

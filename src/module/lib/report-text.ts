@@ -2,15 +2,52 @@
  * The setup report as plain text, for downloading, and for the plan's columns, which the report window shows as they
  * are written to the file.
  */
-import type { PlanEntry, SetupCheck, SetupSolve } from '@module/adapters/report';
+import type { PlanEntry, SetupCheck, SetupSolve, UnavailableModule } from '@module/adapters/report';
 
 import { format, formatList, localize } from './i18n';
 
-/** The reports the report window offers, the first shown first. */
+/** The reports, each in its own window, in the order the toolbar offers them. */
 export const REPORT_STYLES = ['plan', 'check', 'update'] as const;
 
-/** One of the reports the report window offers. */
+/** One of the reports. */
 export type ReportStyle = (typeof REPORT_STYLES)[number];
+
+/** Each report's Font Awesome icon, on its toolbar button and its window. */
+export const REPORT_ICONS: Readonly<Record<ReportStyle, string>> = {
+  plan: 'fa-list-ol',
+  check: 'fa-clipboard-check',
+  update: 'fa-circle-arrow-up',
+};
+
+/**
+ * An active module that cannot be had, in a sentence: its title and why.
+ * @param unavailable - The module
+ * @param unavailable.title - Its title
+ * @param unavailable.reason - Why it cannot be had
+ * @param unavailable.note - More of why, if the catalogue says
+ * @returns The sentence
+ */
+export function unavailableText({ title, reason, note }: UnavailableModule): string {
+  const why = localize(`MONDARTH-EMMA.Report.Unavailable.${reason}`);
+  return note === undefined
+    ? format('MONDARTH-EMMA.Report.Unavailable.Entry', { title, reason: why })
+    : format('MONDARTH-EMMA.Report.Unavailable.EntryNote', { title, reason: why, note });
+}
+
+/**
+ * The section every report ends with when active modules cannot be had, as plain text.
+ * @param unavailable - The modules
+ * @returns Its lines, after a blank one; none when every module can be had
+ */
+export function unavailableLines(unavailable: readonly UnavailableModule[]): string[] {
+  if (unavailable.length === 0) return [];
+  return [
+    '',
+    localize('MONDARTH-EMMA.Report.Unavailable.Heading'),
+    localize('MONDARTH-EMMA.Report.Unavailable.Intro'),
+    ...indented('- ', unavailable.map(unavailableText)),
+  ];
+}
 
 /** The setup a report is on, as {@link SetupCheck} gives it. */
 type ReportedSetup = SetupCheck['setup'];

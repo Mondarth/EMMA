@@ -3,6 +3,7 @@
   import { lockedTooltip } from '@module/lib/locked';
   import type { DrawerFields } from '@module/state/drawer-fields.svelte';
   import type { ModuleRow } from '@module/state/grouping';
+  import type { VersionBadge } from '@module/adapters/modules';
   import type { HypotheticalState } from '@module/state/hypothetical.svelte';
   import type { ModuleState } from '@module/state/module-state.svelte';
 
@@ -21,9 +22,11 @@
     grouped?: boolean;
     /** Hypothetical mode's versions while it is on, offering a choice of version for each active module. */
     versions?: HypotheticalState | undefined;
+    /** The badges EMMA's checks give the installed modules, when the user chose them; Foundry's own otherwise. */
+    badges?: ReadonlyMap<string, VersionBadge | null> | undefined;
   }
 
-  const { modules, canManage, fields, grouped = true, versions }: Props = $props();
+  const { modules, canManage, fields, grouped = true, versions, badges }: Props = $props();
 
   const rows: readonly ModuleRow[] = $derived(
     grouped ? modules.rows : modules.entries.map(entry => ({ key: entry.id, entry, depth: 0, relation: null })),
@@ -129,7 +132,7 @@
             {/if}
             <span class="emma-module-title">{entry.title}</span>
           </label>
-          <span class="emma-module-version"><ModuleVersion {entry} {versions} /></span>
+          <span class="emma-module-version"><ModuleVersion {entry} {versions} {badges} /></span>
           <DisclosureButton
             title={entry.title}
             {expanded}

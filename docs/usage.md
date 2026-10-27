@@ -46,8 +46,16 @@ Split view
   the buttons between the lists: **<** deactivates the modules selected on the active side, and **>** activates the
   modules selected on the inactive side. Moved modules stay selected, so the opposite button undoes a move.
 
-In both views each module's version is shown as Foundry's own Module Management shows it: in a badge coloured by
-how compatible the module is with your version of Foundry. Hover over the badge for the reason.
+In both views each module's version is shown in a badge, in Foundry's own colours and icons, coloured by how well the
+module suits your world. Hover over the badge for the reason.
+
+By default the badges show EMMA's checks, made from the installed modules alone, without fetching anything. Each
+module is checked against your Foundry version and against the game system and its version, and a module staged
+active is also checked against the modules it requires and conflicts with, among those staged active: staging a module
+active or inactive checks the others again. Foundry's own Module Management checks only the Foundry version, so it can
+show a module as verified that does not work with your game system. To see Foundry's own badges instead, choose
+**Foundry VTT's own checks** under **Badge checks** (see [Settings](#settings)); the footer then warns that they may
+be inaccurate. Hypothetical mode always judges as EMMA does.
 
 | Badge   | Meaning                                                                                       |
 | ------- | --------------------------------------------------------------------------------------------- |
@@ -170,8 +178,9 @@ System button while it looks.
 ### Choosing versions
 
 Once the versions are found, each module staged active that has other versions to choose has its version badge
-replaced by a drop-down, in the same colours. A module offers the version installed, the two versions before it, to
-give a hypothetical setup some room, and every newer one; anything older is left out. Click it, or **Tab** to it and
+replaced by a drop-down, in the same colours. A module offers the version installed and every newer one; older
+versions are left out, unless you choose to be shown some with the **Show older versions** setting (see
+[Settings](#settings)). Click it, or **Tab** to it and
 press **Enter**, to list those versions, newest first. The version shown on the badge is left out of the list, and
 once you have chosen another version, the installed one is listed too, to go back to. Each version has the badge
 Foundry would give it: green when verified for your Foundry version, red when it needs another Foundry version or a module it requires
@@ -205,53 +214,57 @@ which may not. Choose a version to see it on the button; every module's badge is
 
 ### Reporting on the setup
 
-Just right of the **System** button, the report button (a clipboard) opens a report on the setup hypothetical mode
-shows: the Foundry version, the system and the modules staged active, at the versions chosen. It is enabled once the
-versions are looked up. Pick what the report shows under **Report style**:
+In the middle of the toolbar, three buttons each open a report on the setup hypothetical mode shows: the Foundry
+version, the system and the modules staged active, at the versions chosen. They are enabled once the versions are
+looked up. Each report opens in a window of its own, so any of them can be open beside the others; a button shows
+pressed while its report is open, and pressing it again closes the report:
 
-- **Plan** (shown first): the active modules in the order to install them, numbered, in three columns: each module's
-  ID, its name, and a manifest URL for the version chosen alone, such as a GitHub release's own `module.json`, so that
-  installing from it installs that version. A module's own manifest URL usually gives whatever version is newest, so
-  it is never shown; where no source gives a URL for the version, the plan says _none for this version_. The proxy
-  lets EMMA find more of them. The plan is in two lists, each under its title and numbered from 1: first the modules
-  to install (a version other than the one installed, or a module not installed), then those kept at the version
-  installed. In each, a module comes before the modules that depend on it: the modules are ordered by how deep the
-  tree of active modules depending on each one goes, deepest first, so the libraries others build on come first.
-- **Check**: whether every package can be used in the setup, then every active module with its badge, Foundry's
-  verdict and, in words, everything found about it: what keeps it from being used (a module it depends on at the wrong
-  version, a system it does not run in), what it prefers and is not given (a Foundry version or system version it is
-  not verified with), what it advises (a module it recommends that is not active), and whether it is not known, or
-  known only from a listing and so checked without its dependencies.
-- **Update**: the best versions of the active modules for the Foundry version and system chosen: the newest version of
-  each, from two versions before the one chosen up, that works with the others' and with that Foundry version and system. A
-  version that is only a compatibility risk (not verified for this Foundry, but not ruled out) is acceptable; one that
-  needs another Foundry version, does not support the system version, or declares no compatibility at all is not, nor
-  is a pre-release. It lists the versions to change, and modules an active module needs that it would add; or, when no
-  versions work together, explains why in numbered sentences. It may need the manifests of versions known only from a
-  listing, which it tries to fetch, so it can take a moment; versions whose manifests could not be loaded are named.
-  Without a proxy, versions known only from GitHub cannot be read, so are not taken.
+- **Plan** (a numbered list): the active modules in the order to install them, numbered, in three columns: each
+  module's ID, its name, and a manifest URL for the version chosen alone, such as a GitHub release's own
+  `module.json`, so that installing from it installs that version. A module's own manifest URL usually gives whatever
+  version is newest, so it is never shown; where no source gives a URL for the version, the plan says _none for this
+  version_. The proxy lets EMMA find more of them. The plan is in two lists, each under its title and numbered from 1:
+  first the modules to install (a version other than the one installed, or a module not installed), then those kept at
+  the version installed. In each, a module comes before the modules that depend on it: the modules are ordered by how
+  deep the tree of active modules depending on each one goes, deepest first, so the libraries others build on come
+  first.
+- **Check** (a clipboard with a tick): whether every package can be used in the setup, then every active module with
+  its badge, Foundry's verdict and, in words, everything found about it: what keeps it from being used (a module it
+  depends on at the wrong version, a system it does not run in), what it prefers and is not given (a Foundry version
+  or system version it is not verified with), what it advises (a module it recommends that is not active), and whether
+  it is not known, or known only from a listing and so checked without its dependencies.
+- **Update** (an arrow up in a circle): the best versions of the active modules for the Foundry version and system
+  chosen: the newest version of each, from the one chosen up, that works with the others' and with
+  that Foundry version and system. A version that is only a compatibility risk (not verified for this Foundry, but not
+  ruled out) is acceptable; one that needs another Foundry version, does not support the system version, or declares
+  no compatibility at all is not, nor is a pre-release. It lists the versions to change, and modules an active module
+  needs that it would add; or, when no versions work together, explains why in numbered sentences. It may need the
+  manifests of versions known only from a listing, which it tries to fetch, so it can take a moment; versions whose
+  manifests could not be loaded are named. Without a proxy, versions known only from GitHub cannot be read, so are not
+  taken.
 
-When the **Update** changes any version, a button (a wand) just left of the download button chooses the versions it
+When the **Update** changes any version, a button (a wand) just left of its download button chooses the versions it
 recommends in the hypothetical setup, as if you had picked each from its drop-down. Every other choice is left as it
 is, and nothing in the world changes. A module the update would add, which is not active, is given its version but not
-staged active. Every style of the report then reports on the setup with those versions, without closing the window:
-the **Update** is worked out again, and the plan and the check follow.
+staged active. Every report open then reports on the setup with those versions, without closing its window: the
+**Update** is worked out again, and the **Plan** and the **Check**, if open, follow. Only the **Update** works out the
+best versions, which may take requests, so opening the **Plan** or the **Check** alone makes none.
 
-The reports consider the version chosen of each package, the two versions before it and every newer one. That gives a
-hypothetical setup some room, while older versions, which few go back to and which are the ones most often missing,
-incomplete or gone, are left out. So the **Update** never recommends a version more than two before the one chosen,
-and its explanations do not name older versions. A module an active module needs, which is not active, counts from
-its installed version, if it is installed. Each report scrolls beneath
-**Report style**, which stays in view.
+The reports consider the version chosen of each package and every newer one, and as many versions before it as
+**Show older versions** says: none by default, as installing an older version into an existing world is risky, its data
+not always going back, and the oldest versions are the ones most often missing, incomplete or gone. So by default the
+**Update** never recommends an older version than the one chosen, and its explanations do not name older versions. A module an active module needs, which is not active, counts from
+its installed version, if it is installed. Each report scrolls beneath its buttons, which stay in view.
 
-The button beside **Report style** downloads the report shown as a plain text file (`emma-plan.txt`,
-`emma-check.txt` or `emma-update.txt`).
+The download button at the top of each report downloads it as a plain text file (`emma-plan.txt`, `emma-check.txt` or
+`emma-update.txt`).
 
-The report is made when it opens, from the setup as it is then. Changing a version, the Foundry version or the system,
+A report is made when it opens, from the setup as it is then. Changing a version, the Foundry version or the system,
 or staging a module active or inactive, while it is open does not change it: it still reports on the setup it was
-opened on. To report on the setup as it is now, click **Report** again, which replaces the open report with a new one.
-The one exception is the **Update**'s button that chooses the versions it recommends: the report then follows the
-versions it chose.
+opened on. To report on the setup as it is now, press its button twice, closing it and opening it afresh. The one
+exception is the **Update**'s button that chooses the versions it recommends: every report open then follows the
+versions it chose. Leaving hypothetical mode, or closing EMMA, closes every report, as the setup they report on goes
+with it.
 
 ### Where versions come from
 
@@ -269,6 +282,13 @@ through the proxy, as before.
 The catalogue also keeps versions an author has published ahead of Foundry's package listing, such as releases on
 GitLab not yet on the listing. EMMA offers them marked with a flask, and their tooltip says they are not on Foundry's
 package listing: Foundry's own installer does not offer them, so choose one knowingly.
+
+The catalogue also knows which packages cannot be had: those whose Foundry listing is **archived**, which Foundry's
+Setup screen no longer offers (often because the author removed them), and those the catalogue's maintainers found
+**gone**, their files no longer available. Hypothetical mode never looks such a module up or judges it, and leaves it
+out of the setup it reports on, so a module that requires it shows that requirement as not met. Every report ends with
+a **Not available** section naming each active module that cannot be had, and why. A module hypothetical mode ignores
+(see [below](#modules-hypothetical-mode-ignores)) is taken as present instead, and not named there.
 
 Without a proxy, EMMA lists the versions released on GitHub and GitLab, but does not know which Foundry versions
 those releases support, so Foundry marks them **Compatibility unknown**; and as it cannot read Foundry's release
@@ -328,9 +348,26 @@ Disable EMMA
   Foundry's own Module Management window again. It takes effect immediately, without reloading.
 
 Automatically activate/deactivate recommended modules
-: A setting for each user, off by default. When on, activating a module, by checking it in the list view or moving
-  it to the active side of the split view, also activates the modules it recommends, and deactivating it deactivates
-  them again, as it does for required modules.
+: A setting for each GM, off by default; players are not offered it, as only GMs change which modules are active. When
+  on, activating a module, by checking it in the list view or moving it to the active side of the split view, also
+  activates the modules it recommends, and deactivating it deactivates them again, as it does for required modules.
+
+Badge checks
+: A setting for each user: whose checks the version badges show outside hypothetical mode. **EMMA's checks** (the
+  default) judge each module against the Foundry version and the game system and its version, and an active module
+  against what it requires and conflicts with; **Foundry VTT's own checks** judge the Foundry version alone, as
+  Foundry's Module Management does, so may be inaccurate, which the footer says while they are shown. A change shows at
+  once.
+
+Show older versions
+: A setting for each GM, under **Game Settings**: how many versions before the one installed hypothetical mode offers in
+  each version drop-down, and its reports consider, from 0 (the default) to 20. Older versions are rarely safe to
+  install into an existing world, but one or two let you try rolling an update back: say a module update brought a
+  change you dislike. Set this to 1, choose the version before in hypothetical mode and run the **Check**. If it finds
+  no problems, install that version from the manifest URL in the **Plan**, and restore the world from the backup you
+  made before updating. Each version shown is judged against every other, so showing many older versions can make
+  hypothetical mode noticeably slower. A change applies the next time versions are judged, such as when you next open
+  a drop-down or a report. Players are not offered it, as only GMs have hypothetical mode.
 
 Module details
 : A menu every user can open under **Game Settings**, choosing the details their drawers show for themselves. See

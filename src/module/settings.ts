@@ -4,6 +4,8 @@ import type { DefaultCatalogue } from '@module/lib/default-catalogue';
 import { defaultProxy } from '@module/lib/default-proxy';
 import type { DrawerField } from '@module/state/drawer-fields.svelte';
 import { DEFAULT_DRAWER_FIELDS, DRAWER_FIELDS, drawerFields, isDrawerField } from '@module/state/drawer-fields.svelte';
+import type { BadgeChecks } from '@module/state/badge-checks.svelte';
+import { setBadgeChecks } from '@module/state/badge-checks.svelte';
 import { setIgnoredModules } from '@module/state/hypothetical-ignored.svelte';
 
 /** Keys of the settings EMMA registers, without the module namespace. */
@@ -26,7 +28,14 @@ export const SETTINGS = {
   versionProxyMode: 'versionProxyMode',
   /** The IDs of the modules hypothetical mode ignores, shared by the world's GMs. */
   hypotheticalIgnored: 'hypotheticalIgnored',
+  /** Whose checks the badges outside hypothetical mode show: EMMA's, or Foundry's own. */
+  badgeChecks: 'badgeChecks',
+  /** How many versions before the one installed hypothetical mode offers, and its reports consider. */
+  olderVersions: 'olderVersions',
 } as const;
+
+/** The most older versions a GM may choose to be shown: more cost more to judge, for little more use. */
+export const MAX_OLDER_VERSIONS = 20;
 
 /** Which proxy hypothetical mode looks versions up through: EMMA's own (the default), the GM's own, or none. */
 export type ProxyMode = 'default' | 'own' | 'none';
@@ -63,13 +72,21 @@ export function registerSettings(): void {
     default: DEFAULT_VIEW,
   });
 
-  game.settings.register(MODULE_ID, SETTINGS.autoRecommended, {
-    name: 'MONDARTH-EMMA.Settings.AutoRecommended.Name',
-    hint: 'MONDARTH-EMMA.Settings.AutoRecommended.Hint',
+  game.settings.register(MODULE_ID, SETTINGS.badgeChecks, {
+    name: 'MONDARTH-EMMA.Settings.BadgeChecks.Name',
+    hint: 'MONDARTH-EMMA.Settings.BadgeChecks.Hint',
     scope: 'user',
     config: true,
-    type: Boolean,
-    default: false,
+    type: String,
+    choices: {
+      emma: 'MONDARTH-EMMA.Settings.BadgeChecks.Emma',
+      foundry: 'MONDARTH-EMMA.Settings.BadgeChecks.Foundry',
+    },
+    default: 'emma',
+    // An open window's badges follow the change.
+    onChange: value => {
+      setBadgeChecks(toBadgeChecks(value));
+    },
   });
 
   game.settings.register(MODULE_ID, SETTINGS.grouped, {
@@ -124,6 +141,59 @@ export function registerSettings(): void {
       drawerFields.set(toDrawerFields(value));
     },
   });
+}
+
+/**
+ * Register the settings only GMs are offered, as only they change which modules are active and use hypothetical
+ * mode. Call during `setup`: the user is not known before it, so a setting registered during `init` cannot be shown to
+ * GMs alone.
+ */
+export function registerGmSettings(): void {
+  game.settings.register(MODULE_ID, SETTINGS.autoRecommended, {
+    name: 'MONDARTH-EMMA.Settings.AutoRecommended.Name',
+    hint: 'MONDARTH-EMMA.Settings.AutoRecommended.Hint',
+    scope: 'user',
+    config: game.user?.isGM === true,
+    type: Boolean,
+    default: false,
+  });
+
+  game.settings.register(MODULE_ID, SETTINGS.olderVersions, {
+    name: 'MONDARTH-EMMA.Settings.OlderVersions.Name',
+    hint: 'MONDARTH-EMMA.Settings.OlderVersions.Hint',
+    scope: 'user',
+    config: game.user?.isGM === true,
+    type: Number,
+    range: { min: 0, max: MAX_OLDER_VERSIONS, step: 1 },
+    default: 0,
+  });
+}
+
+/**
+ * How many versions before the one installed hypothetical mode offers in each version drop-down, and its reports
+ * consider, as the current user chose. Read on every use, so a change takes effect the next time versions are judged.
+ * @returns A whole number from 0 to {@link MAX_OLDER_VERSIONS}; 0 if none was chosen
+ */
+export function getOlderVersions(): number {
+  const chosen = game.settings.get(MODULE_ID, SETTINGS.olderVersions);
+  return Number.isFinite(chosen) ? Math.min(Math.max(Math.trunc(chosen), 0), MAX_OLDER_VERSIONS) : 0;
+}
+
+/**
+ * Read a saved choice of checks, taking anything else as EMMA's, the default.
+ * @param value - The saved value
+ * @returns Whose checks
+ */
+function toBadgeChecks(value: unknown): BadgeChecks {
+  return value === 'foundry' ? 'foundry' : 'emma';
+}
+
+/**
+ * Whose checks the current user chose the badges outside hypothetical mode to show.
+ * @returns `emma`, unless they chose Foundry's own
+ */
+export function getBadgeChecks(): BadgeChecks {
+  return toBadgeChecks(game.settings.get(MODULE_ID, SETTINGS.badgeChecks));
 }
 
 /**
