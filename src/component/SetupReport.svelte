@@ -11,6 +11,8 @@
     planText,
     updateText,
     setupSummary,
+    unavailableLines,
+    unavailableText,
   } from '@module/lib/report-text';
 
   import VersionBadge from './VersionBadge.svelte';
@@ -80,7 +82,10 @@
           return solved === null ? null : updateText(check.setup, solved);
       }
     })();
-    return body === null || warning === null ? body : `${warning}\n\n${body}`;
+    if (body === null) return null;
+    // Every report ends naming the modules that cannot be had.
+    const whole = [body, ...unavailableLines(report.unavailable)].join('\n');
+    return warning === null ? whole : `${warning}\n\n${whole}`;
   });
 
   const downloadLabel = $derived(localize('MONDARTH-EMMA.Report.Download'));
@@ -90,6 +95,21 @@
 
   const applyLabel = $derived(localize('MONDARTH-EMMA.Report.Apply'));
 </script>
+
+<!-- The active modules that cannot be had, which every report leaves out, ending each. -->
+{#snippet notAvailable()}
+  {#if report.unavailable.length > 0}
+    <section class="emma-report-unavailable" aria-labelledby={`${uid}-unavailable`}>
+      <h4 id={`${uid}-unavailable`}>{localize('MONDARTH-EMMA.Report.Unavailable.Heading')}</h4>
+      <p>{localize('MONDARTH-EMMA.Report.Unavailable.Intro')}</p>
+      <ul>
+        {#each report.unavailable as unavailable (unavailable.title)}
+          <li>{unavailableText(unavailable)}</li>
+        {/each}
+      </ul>
+    </section>
+  {/if}
+{/snippet}
 
 <div class="emma-report">
   <div class="emma-report-controls">
@@ -141,6 +161,7 @@
           </section>
         {/each}
       {/if}
+      {@render notAvailable()}
     </section>
   {:else if style === 'check'}
     <section class="emma-report-pane" aria-labelledby={`${uid}-check`}>
@@ -172,6 +193,7 @@
           {/each}
         </ul>
       {/if}
+      {@render notAvailable()}
     </section>
   {:else}
     <section class="emma-report-pane" aria-labelledby={`${uid}-solve`}>
@@ -223,6 +245,7 @@
           <p>{format('MONDARTH-EMMA.Report.Solve.Unloaded', { packages: formatList(unloaded) })}</p>
         {/if}
       {/if}
+      {@render notAvailable()}
     </section>
   {/if}
 </div>

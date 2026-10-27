@@ -10,6 +10,7 @@ import type {
   SetupCheck,
   SetupReportData,
   SetupSolve,
+  UnavailableModule,
 } from '@module/adapters/report';
 import type { ReportStyle } from '@module/lib/report-text';
 import { installFoundryMocks } from '../mocks/foundry';
@@ -47,6 +48,7 @@ const SOLVED: SetupSolve = { solution: { kind: 'found', changes: [] }, unloaded:
  * @param options.check - The check
  * @param options.plan - The plan
  * @param options.ignored - The titles of the modules hypothetical mode ignores; none by default
+ * @param options.unavailable - The active modules that cannot be had; none by default
  * @returns The report, whose `solve` and `apply` are mocks
  */
 function reportOf({
@@ -54,9 +56,17 @@ function reportOf({
   check = CHECK,
   plan = PLAN,
   ignored = [],
-}: { solve?: Promise<SetupSolve>; check?: SetupCheck; plan?: PlanEntry[]; ignored?: readonly string[] } = {}) {
+  unavailable = [],
+}: {
+  solve?: Promise<SetupSolve>;
+  check?: SetupCheck;
+  plan?: PlanEntry[];
+  ignored?: readonly string[];
+  unavailable?: readonly UnavailableModule[];
+} = {}) {
   return {
     ignored,
+    unavailable,
     plan,
     check,
     solve: vi.fn((): Promise<SetupSolve> => solve),
@@ -429,6 +439,59 @@ describe('SetupReport', () => {
       renderReport('plan');
 
       expect(screen.queryByRole('note')).toBeNull();
+    });
+  });
+
+  describe('with active modules that cannot be had', () => {
+    const UNAVAILABLE: UnavailableModule[] = [
+      { title: 'Build-a-Bonus', reason: 'archived' },
+      { title: 'Lost Module', reason: 'gone', note: 'Its repository was deleted.' },
+    ];
+    const LINES = [
+      'MONDARTH-EMMA.Report.Unavailable.Entry {"title":"Build-a-Bonus","reason":"MONDARTH-EMMA.Report.Unavailable.archived"}',
+      'MONDARTH-EMMA.Report.Unavailable.EntryNote {"title":"Lost Module","reason":"MONDARTH-EMMA.Report.Unavailable.gone","note":"Its repository was deleted."}',
+    ];
+
+    test.each(['plan', 'check', 'update'] as const)('names them, and why, in a section of the %s', style => {
+      renderReport(style, { unavailable: UNAVAILABLE, solve: Promise.resolve(SOLVED) });
+
+      const section = screen.getByRole('region', { name: 'MONDARTH-EMMA.Report.Unavailable.Heading' });
+      expect(section).toHaveTextContent('MONDARTH-EMMA.Report.Unavailable.Intro');
+      expect([...section.querySelectorAll('li')].map(item => item.textContent)).toEqual(LINES);
+    });
+
+    test.each([
+      ['plan', 'Plan'],
+      ['check', 'Check'],
+      ['update', 'Solve'],
+    ] as const)('ends the %s with the section, in the pane that scrolls', async (style, heading) => {
+      renderReport(style, { unavailable: UNAVAILABLE, solve: Promise.resolve(SOLVED) });
+      await vi.waitFor(() => {
+        expect(screen.getByRole('button', { name: DOWNLOAD })).toBeEnabled();
+      });
+
+      const section = screen.getByRole('region', { name: 'MONDARTH-EMMA.Report.Unavailable.Heading' });
+      expect(region(heading).lastElementChild).toBe(section);
+    });
+
+    test('ends the text downloaded with them', async () => {
+      const { onDownload } = renderReport('check', { unavailable: UNAVAILABLE });
+
+      await userEvent.click(screen.getByRole('button', { name: DOWNLOAD }));
+
+      const text = String(onDownload.mock.lastCall?.[0]);
+      expect(text.split('\n').slice(-5)).toEqual([
+        '',
+        'MONDARTH-EMMA.Report.Unavailable.Heading',
+        'MONDARTH-EMMA.Report.Unavailable.Intro',
+        ...LINES.map(line => `- ${line}`),
+      ]);
+    });
+
+    test('has no such section when every module can be had', () => {
+      renderReport('plan');
+
+      expect(screen.queryByRole('region', { name: 'MONDARTH-EMMA.Report.Unavailable.Heading' })).toBeNull();
     });
   });
 });

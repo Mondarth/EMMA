@@ -704,12 +704,22 @@ describe('createVersionJudge with EMMA’s catalogue', () => {
    * @param more - What else it says
    * @param more.pending - The packages it does not hold yet
    * @param more.gaps - The gaps of its own crawls
+   * @param more.unavailable - The packages it says cannot be had
    * @returns The URL it answers at, and the answer
    */
-  function universe(releases: unknown[], more: { pending?: unknown[]; gaps?: unknown[] } = {}): [string, unknown] {
+  function universe(
+    releases: unknown[],
+    more: { pending?: unknown[]; gaps?: unknown[]; unavailable?: unknown[] } = {},
+  ): [string, unknown] {
     return [
       UNIVERSE,
-      { universe: { core: [], releases }, gaps: more.gaps ?? [], pending: more.pending ?? [], asOf: null },
+      {
+        universe: { core: [], releases },
+        gaps: more.gaps ?? [],
+        pending: more.pending ?? [],
+        ...(more.unavailable !== undefined && { unavailable: more.unavailable }),
+        asOf: null,
+      },
     ];
   }
 
@@ -745,6 +755,76 @@ describe('createVersionJudge with EMMA’s catalogue', () => {
     expect(asked.filter(url => url === UNIVERSE)).toHaveLength(1);
     expect(asked.some(url => url.includes(encodeURIComponent('api.github.com')))).toBe(false);
     expect(judge.unreached).toEqual([]);
+  });
+
+  describe('a module the catalogue says cannot be had', () => {
+    const NONE = { modules: new Map<string, string>() };
+    const modules = {
+      dice: onGithub('owner/dice', { version: '1.0.0' }),
+      babonus: onGithub('krbz999/babonus', { version: '12.5.8' }),
+      lost: onGithub('owner/lost', { version: '1.0.0' }),
+    };
+    const answer = universe([held('dice', '1.0.0')], {
+      unavailable: [
+        { package: { type: 'module', id: 'babonus' }, reason: 'archived' },
+        { package: { type: 'module', id: 'lost' }, reason: 'gone', note: 'Its repository was deleted.' },
+      ],
+    });
+
+    test('is looked up nowhere, not even in its own manifest, and has no versions', async () => {
+      const { judge, asked } = await lookUpWithCatalogue({ modules }, [answer]);
+
+      expect(judge.versionsOf('babonus')).toEqual([]);
+      expect(asked.some(url => url.includes('babonus'))).toBe(false);
+      expect(judge.judgeVersions(['dice', 'babonus'], NONE, 'babonus')).toEqual([]);
+      expect(judge.unreached).toEqual([]);
+    });
+
+    test('is named, with why, and left out of every report', async () => {
+      const { judge } = await lookUpWithCatalogue({ modules }, [answer]);
+      const active = ['dice', 'babonus', 'lost'];
+
+      expect(judge.reportUnavailable(active, NONE)).toEqual([
+        { title: expect.any(String) as string, reason: 'archived' },
+        { title: expect.any(String) as string, reason: 'gone', note: 'Its repository was deleted.' },
+      ]);
+      const check = judge.reportCheck(active, NONE);
+      expect(check.modules.map(({ id }) => id)).toEqual(['dice']);
+      expect(check.setup.modules).toBe(1);
+      expect(judge.reportPlan(active, NONE).map(({ id }) => id)).toEqual(['dice']);
+      expect([...judge.judgeChoices(active, NONE).keys()]).toEqual(['dice']);
+      const solved = await judge.reportSolve(active, NONE);
+      expect(solved.solution.kind).toBe('found');
+    });
+
+    test('is taken as present, not named, when hypothetical mode ignores it', async () => {
+      const { judge } = await lookUpWithCatalogue({ modules }, [answer]);
+      const choices = { ...NONE, ignored: new Set(['babonus']) };
+
+      expect(judge.reportUnavailable(['dice', 'babonus'], choices)).toEqual([]);
+      expect(judge.reportCheck(['dice', 'babonus'], choices).setup.modules).toBe(1);
+    });
+
+    test('is named by its ID when it is not installed, and only modules are, not a system', async () => {
+      const { judge } = await lookUpWithCatalogue({ modules }, [
+        universe([held('dice', '1.0.0')], {
+          unavailable: [
+            { package: { type: 'module', id: 'old-lib' }, reason: 'archived' },
+            { package: { type: 'system', id: 'old-system' }, reason: 'archived' },
+          ],
+        }),
+      ]);
+
+      expect(judge.reportUnavailable(['dice', 'old-lib', 'old-system'], NONE)).toEqual([
+        { title: 'old-lib', reason: 'archived' },
+      ]);
+    });
+
+    test('is not named when it is not active', async () => {
+      const { judge } = await lookUpWithCatalogue({ modules }, [answer]);
+
+      expect(judge.reportUnavailable(['dice'], NONE)).toEqual([]);
+    });
   });
 
   test('asks the catalogue directly, with its own key and EMMA’s version, never the proxy’s key', async () => {

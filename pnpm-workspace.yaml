@@ -8,3 +8,5 @@ allowBuilds:
 minimumReleaseAgeExclude:
   # The resolver is the maintainer's own package, released and adopted the same day.
   - "@mondarth/fvtt-resolver"
+  # The catalogue's contract, which the resolver depends on, is the maintainer's own too.
+  - "@mondarth/fvtt-package-catalogue-contract"

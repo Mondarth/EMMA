@@ -386,6 +386,19 @@ describe('HypotheticalState', () => {
       expect(state.report()?.ignored).toEqual(['synth']);
     });
 
+    test('reports which active modules cannot be had, as the judge says', async () => {
+      const judge = fakeJudge({ dice: ['1.0.0'], babonus: ['12.5.8'] });
+      judge.reportUnavailable.mockReturnValue([{ title: 'Build-a-Bonus', reason: 'archived' }]);
+      const state = new HypotheticalState(
+        () => judge,
+        () => ['dice', 'babonus'],
+      );
+      await state.load();
+
+      expect(state.report()?.unavailable).toEqual([{ title: 'Build-a-Bonus', reason: 'archived' }]);
+      expect(judge.reportUnavailable.mock.lastCall?.[0]).toEqual(['dice', 'babonus']);
+    });
+
     test('ignores nothing unless told', async () => {
       const judge = fakeJudge({ dice: ['1.0.0'] });
       const state = new HypotheticalState(
