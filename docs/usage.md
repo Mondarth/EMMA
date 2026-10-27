@@ -319,7 +319,7 @@ choose **No hypotheticals**.
 
 While the mode is on, an ignored module is greyed out, and its tooltip says why. Hypothetical mode never looks it up or
 judges it, and leaves it out of the reports, but takes it as present at its installed version, so the modules that
-require it are satisfied. Every report names the modules it leaves out, and warns that it may be inaccurate: whether
+require it are satisfied, whatever version of it they ask for. Every report names the modules it leaves out, and warns that it may be inaccurate: whether
 they suit the setup is not known. It can still be activated and deactivated as usual. To have the mode consider it again,
 right-click its row and choose **Add to hypotheticals**.
 
