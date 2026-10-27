@@ -1,6 +1,7 @@
 <script lang="ts">
   import { format, localize } from '@module/lib/i18n';
   import type { DrawerFields } from '@module/state/drawer-fields.svelte';
+  import type { VersionBadge } from '@module/adapters/modules';
   import type { HypotheticalState } from '@module/state/hypothetical.svelte';
   import type { ModuleState, Side } from '@module/state/module-state.svelte';
 
@@ -16,9 +17,11 @@
     fields: DrawerFields;
     /** Hypothetical mode's versions while it is on, offering a choice of version for each active module. */
     versions?: HypotheticalState | undefined;
+    /** The badges EMMA's checks give the installed modules, when the user chose them; Foundry's own otherwise. */
+    badges?: ReadonlyMap<string, VersionBadge | null> | undefined;
   }
 
-  const { modules, canManage, fields, versions }: Props = $props();
+  const { modules, canManage, fields, versions, badges }: Props = $props();
 
   const uid = $props.id();
 
@@ -35,7 +38,7 @@
       {localize(TEXT[side].heading)}
       <span class="emma-split-count">{format('MONDARTH-EMMA.Count', { count: String(modules[side].length) })}</span>
     </h3>
-    <SelectableList {modules} {side} labelledby={headingId} {fields} {canManage} {versions} />
+    <SelectableList {modules} {side} labelledby={headingId} {fields} {canManage} {versions} {badges} />
     {#if modules[side].length === 0}
       <p class="emma-split-empty">{localize(TEXT[side].empty)}</p>
     {/if}

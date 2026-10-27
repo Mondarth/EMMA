@@ -3,7 +3,8 @@ import { memoryCache } from '@mondarth/fvtt-resolver/sources';
 import { describe, expect, test, vi } from 'vitest';
 
 import type { SetupSolve } from '@module/adapters/report';
-import { createVersionJudge } from '@module/adapters/versions';
+import { AVAILABILITY } from '@mondarth/fvtt-resolver';
+import { createInstalledJudge, createVersionJudge } from '@module/adapters/versions';
 import type { FoundryMockOptions, ModuleMockData } from '../../mocks/foundry';
 import { installFoundryMocks } from '../../mocks/foundry';
 
@@ -1129,5 +1130,59 @@ describe('createVersionJudge with EMMA’s catalogue', () => {
     );
 
     expect(judge.versionsOf('dice')).toContain('1.0.1-dev');
+  });
+});
+
+describe('createInstalledJudge', () => {
+  /** A module verified with the core in use, as the mocks' `14.368`. */
+  const verified = { compatibility: { minimum: '14', verified: '14' } };
+  /**
+   * The badge's tooltip the Foundry mock gives an availability.
+   * @param code - The availability
+   * @returns The tooltip
+   */
+  const tooltipOf = (code: number) => `availability ${String(code)}`;
+
+  test('judges an active module verified with the core and the system in use as verified, fetching nothing', () => {
+    installFoundryMocks({ modules: { dice: { ...verified, active: true, systems: ['dnd5e'] } } });
+    const send = vi.spyOn(globalThis, 'fetch');
+
+    const badges = createInstalledJudge()(['dice']);
+
+    expect(badges.get('dice')?.tooltip).toBe(tooltipOf(AVAILABILITY.VERIFIED));
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  // Regression: Foundry's own badge judges the core alone, so a module needing another system version was verified.
+  test('judges a module that does not support the version of the system in use as such, active or not', () => {
+    installFoundryMocks({
+      modules: {
+        coven: { ...verified, active: true, systems: [{ id: 'dnd5e', compatibility: { minimum: '6.0.0' } }] },
+        other: { ...verified, systems: [{ id: 'dnd5e', compatibility: { minimum: '6.0.0' } }] },
+      },
+    });
+
+    const badges = createInstalledJudge()(['coven']);
+
+    // As hypothetical mode judges it: the system is installed, but not a version the module supports.
+    expect(badges.get('coven')?.tooltip).toBe(tooltipOf(AVAILABILITY.UNVERIFIED_SYSTEM));
+    expect(badges.get('other')?.tooltip).toBe(tooltipOf(AVAILABILITY.UNVERIFIED_SYSTEM));
+  });
+
+  test('judges an active module missing what it requires as unusable, and the same module inactive by itself', () => {
+    installFoundryMocks({ modules: { dice: { ...verified, active: true, requires: ['lib'] }, lib: verified } });
+    const judge = createInstalledJudge();
+
+    expect(judge(['dice']).get('dice')?.tooltip).toBe(tooltipOf(AVAILABILITY.MISSING_DEPENDENCY));
+    expect(judge(['dice', 'lib']).get('dice')?.tooltip).toBe(tooltipOf(AVAILABILITY.VERIFIED));
+    // Inactive, what it requires does not matter yet.
+    expect(judge([]).get('dice')?.tooltip).toBe(tooltipOf(AVAILABILITY.VERIFIED));
+  });
+
+  test('gives no badge for a module whose manifest it cannot read, leaving Foundry’s', () => {
+    // An ID no package can have, so no release.
+    installFoundryMocks({ modules: { 'bad id': { ...verified, active: true } } });
+
+    expect(createInstalledJudge()(['bad id']).has('bad id')).toBe(false);
   });
 });

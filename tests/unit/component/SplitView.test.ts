@@ -122,6 +122,21 @@ describe('SplitView', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  test('shows the badges EMMA’s checks give, in either list', () => {
+    const unusable = { type: 'error' as const, icon: 'fa-solid fa-xmark', tooltip: 'EMMA: unusable', text: 'Unusable' };
+    render(SplitView, {
+      fields: new DrawerFields(),
+      modules: createModules(),
+      canManage: true,
+      badges: new Map([
+        ['emma', unusable],
+        ['dice', unusable],
+      ]),
+    });
+
+    expect(document.querySelectorAll('.emma-badge.error')).toHaveLength(2);
+  });
+
   describe('with a module hypothetical mode ignores', () => {
     test('greys it out, saying why, and names every row by its module for the context menu', async () => {
       const { state } = await loadedVersions(

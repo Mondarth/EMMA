@@ -564,6 +564,53 @@ test.describe('Related modules in the list view', () => {
   });
 });
 
+test.describe('Badge checks', () => {
+  test.beforeEach(async ({ page }) => {
+    await joinAs(page, USERS.gm);
+    await setDisabled(page, false);
+    await setView(page, 'list');
+    await deactivateFixtures(page);
+  });
+
+  test.afterEach(async ({ page }) => {
+    await page.evaluate(async () => {
+      await game.settings.set('mondarth-emma', 'badgeChecks', 'emma');
+    });
+    await closeEmma(page);
+  });
+
+  test('EMMA’s badges find a module that needs another system version, active or not; Foundry’s own do not, and say so', async ({
+    page,
+  }) => {
+    // The rival, as if its manifest needed a version of the game system no world has. Only in this page: the next
+    // test's login reloads it.
+    await page.evaluate(id => {
+      game.modules.get(id)?.updateSource({
+        relationships: { systems: [{ id: game.system.id, type: 'system', compatibility: { minimum: '999' } }] },
+      });
+    }, RIVAL.id);
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+    const rival = emma.getByRole('listitem').filter({ has: page.getByRole('checkbox', { name: RIVAL.title }) });
+    const badge = rival.locator('.emma-module-version .emma-badge').first();
+    const warning = emma.getByText(/may be inaccurate/);
+
+    // Inactive, and staged active.
+    await expect(badge).toHaveClass(/warning/);
+    await emma.getByRole('checkbox', { name: RIVAL.title }).check();
+    await expect(badge).toHaveClass(/warning/);
+    await expect(warning).toHaveCount(0);
+
+    await page.evaluate(async () => {
+      await game.settings.set('mondarth-emma', 'badgeChecks', 'foundry');
+    });
+
+    // Foundry's own check the Foundry version alone, which the rival is verified for.
+    await expect(badge).toHaveClass(/success/);
+    await expect(warning).toBeVisible();
+  });
+});
+
 test.describe('List view controls', () => {
   test.beforeEach(async ({ page }) => {
     await joinAs(page, USERS.gm);

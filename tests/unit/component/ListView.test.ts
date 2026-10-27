@@ -493,6 +493,49 @@ describe('ListView', () => {
     });
   });
 
+  describe('EMMA’s badges', () => {
+    const UNUSABLE = { type: 'error' as const, icon: 'fa-solid fa-xmark', tooltip: 'EMMA: unusable', text: 'Unusable' };
+    const badgeOf = (title: string) =>
+      screen.getByText(title, { selector: '.emma-module-title' }).closest('li')?.querySelector('.emma-badge');
+
+    test('shows the badge EMMA’s checks give a module in place of Foundry’s, and Foundry’s for one they do not', () => {
+      render(ListView, {
+        modules: createModules(),
+        canManage: true,
+        fields: new DrawerFields(),
+        badges: new Map([['emma', UNUSABLE]]),
+      });
+
+      expect(badgeOf('EMMA')).toHaveClass('error');
+      // Foundry gives the fixtures no badge.
+      expect(badgeOf('libWrapper')).toBeNull();
+    });
+
+    test('shows no badge for a module EMMA’s checks give none', () => {
+      render(ListView, {
+        modules: createModules(),
+        canManage: true,
+        fields: new DrawerFields(),
+        badges: new Map([['emma', null]]),
+      });
+
+      expect(badgeOf('EMMA')).toBeNull();
+    });
+
+    test('gives way to hypothetical mode’s judgement of the version chosen', async () => {
+      const { state } = await loadedVersions({ emma: ['0.1.0'] });
+      render(ListView, {
+        modules: createModules(),
+        canManage: true,
+        fields: new DrawerFields(),
+        versions: state,
+        badges: new Map([['emma', UNUSABLE]]),
+      });
+
+      expect(badgeOf('EMMA')).toHaveClass('success');
+    });
+  });
+
   describe('with a module hypothetical mode ignores', () => {
     test('greys it out, saying why, and names every row by its module for the context menu', async () => {
       const { state } = await loadedVersions(

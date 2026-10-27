@@ -48,6 +48,29 @@ describe('EmmaApp', () => {
     expect(app.element.querySelector('section .emma-root')).toBeInTheDocument();
   });
 
+  test('shows the badges EMMA’s checks give, judged from the installed manifests', async () => {
+    const { EmmaApp } = await loadApp({
+      modules: {
+        ...MODULES,
+        // Needs a newer system than the mocks' 5.1.0, which Foundry's own badge would not say.
+        dice: { title: 'Dice So Nice!', active: true, systems: [{ id: 'dnd5e', compatibility: { minimum: '6.0.0' } }] },
+      },
+    });
+
+    await new EmmaApp().render({ force: true });
+
+    const row = screen.getByText('Dice So Nice!', { selector: '.emma-module-title' }).closest('li');
+    expect(row?.querySelector('.emma-badge')).toHaveClass('warning');
+  });
+
+  test('shows Foundry’s own badges, warning they may be inaccurate, when the user chose them', async () => {
+    const { EmmaApp } = await loadApp({ settings: { 'mondarth-emma.badgeChecks': 'foundry' } });
+
+    await new EmmaApp().render({ force: true });
+
+    expect(screen.getByRole('contentinfo')).toHaveTextContent('MONDARTH-EMMA.Footer.NativeBadges');
+  });
+
   test('keeps the same component across re-renders', async () => {
     const { EmmaApp } = await loadApp();
     const app = new EmmaApp();
