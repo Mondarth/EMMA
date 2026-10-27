@@ -110,8 +110,8 @@ importers:
   .:
     dependencies:
       '@mondarth/fvtt-resolver':
-        specifier: 0.7.0
-        version: 0.7.0
+        specifier: 0.8.0
+        version: 0.8.0
     devDependencies:
       '@commitlint/cli':
         specifier: 21.2.4
@@ -571,12 +571,12 @@ packages:
   '@massifrg/prosemirror-tables-sections@0.6.3':
     resolution: {integrity: sha512-DTYZuYrisLpxu7YzYpIJ0gEx2dSAXQ/Zg+Up505VUbsD1+8kFKYzIoKiX+gAk87OTrdCi0VQOg1NREV9MXMN0Q==}
 
-  '@mondarth/fvtt-package-catalogue-contract@0.2.0':
-    resolution: {integrity: sha512-9IQHQ0DZ9jHy/iQIySoy3cZRe+XyNtK5MiBbeFkYxDMlGHSF5rcSdO4y4OZwyEpKl1bVVPslDbBgwfdjTgBdLg==}
+  '@mondarth/fvtt-package-catalogue-contract@0.3.0':
+    resolution: {integrity: sha512-scwRUBIuysOwWQGh+eytqQ1Eo0nvRMgcaxDnAs9AdAq0og4u25kMayVnl+6JWioiwV9W58G/y3fIGfdK34O5Sg==}
     engines: {node: '>=24'}
 
-  '@mondarth/fvtt-resolver@0.7.0':
-    resolution: {integrity: sha512-BFYe9PaS55aEp07gVuqDETzyoN4+C+pideSw+CscfQx0gweNmdzEBpeObO5/Z1cBAB+lGEsmWOKNvCTiJ745pg==}
+  '@mondarth/fvtt-resolver@0.8.0':
+    resolution: {integrity: sha512-ISdt4Yc2bBASSBA3VG0swnze4xaYcjDoQ1OhdItsHL87knz9inWqhQ3Lfe2SGDYuvbQ5Gklypcv+IFv6DGCUpw==}
     engines: {node: '>=24'}
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
@@ -4759,13 +4759,13 @@ snapshots:
       prosemirror-transform: 1.12.2
       prosemirror-view: 1.42.6
 
-  '@mondarth/fvtt-package-catalogue-contract@0.2.0':
+  '@mondarth/fvtt-package-catalogue-contract@0.3.0':
     dependencies:
       zod: 4.6.7
 
-  '@mondarth/fvtt-resolver@0.7.0':
+  '@mondarth/fvtt-resolver@0.8.0':
     dependencies:
-      '@mondarth/fvtt-package-catalogue-contract': 0.2.0
+      '@mondarth/fvtt-package-catalogue-contract': 0.3.0
       zod: 4.6.7
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
