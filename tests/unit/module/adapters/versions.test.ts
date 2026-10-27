@@ -1133,6 +1133,64 @@ describe('createVersionJudge with EMMA’s catalogue', () => {
       );
     });
 
+    // Regression: an ignored module that is installed but not staged active, which a module requires, as midi-qol
+    // pulls in a synthetic module, had nothing standing for it, and its own releases were left out: the update found
+    // no version of it at all.
+    test('stands for it when it is installed but not active, and another requires it', async () => {
+      const dice = {
+        ...held('dice', '1.0.0'),
+        relationships: {
+          requires: [{ package: { type: 'module', id: 'synth' }, compatibility: { minimum: '0.2.0' } }],
+          systems: [],
+          conflicts: [],
+          recommends: [],
+        },
+      };
+      const found = await lookUpWithCatalogue(
+        { modules: { dice: onGithub('owner/dice', { version: '1.0.0' }), synth: { version: '0.0.1' } } },
+        [universe([dice, { ...held('synth', '0.0.1'), compatibility: { minimum: '99' } }])],
+      );
+      const choices = { modules: new Map<string, string>(), ignored: new Set(['synth']) };
+
+      const solved = await found.judge.reportSolve(['dice'], choices);
+
+      expect(solved.solution).toEqual({ kind: 'found', changes: [] });
+      const check = found.judge.reportCheck(['dice'], choices);
+      expect(check.valid).toBe(true);
+      expect(check.modules.map(({ id }) => id)).toEqual(['dice']);
+      expect(check.setup.modules).toBe(1);
+      expect(found.judge.reportPlan(['dice'], choices).map(({ id }) => id)).toEqual(['dice']);
+      expect([...found.judge.judgeChoices(['dice'], choices).keys()]).toEqual(['dice']);
+    });
+
+    // Regression: the update leaves out versions that look like pre-releases, as a hand-made synthetic module's may,
+    // so the release standing for one such was left out too: the update found no version of it.
+    test('stands for it whatever its version looks like, as the update would leave a pre-release out', async () => {
+      const dice = {
+        ...held('dice', '1.0.0'),
+        relationships: {
+          requires: [{ package: { type: 'module', id: 'synth' }, compatibility: {} }],
+          systems: [],
+          conflicts: [],
+          recommends: [],
+        },
+      };
+      const found = await lookUpWithCatalogue(
+        {
+          modules: {
+            dice: onGithub('owner/dice', { version: '1.0.0' }),
+            synth: { active: true, version: '1.0.0-dev' },
+          },
+        },
+        [universe([dice])],
+      );
+      const choices = { modules: new Map<string, string>(), ignored: new Set(['synth']) };
+
+      const solved = await found.judge.reportSolve(['dice', 'synth'], choices);
+
+      expect(solved.solution).toEqual({ kind: 'found', changes: [] });
+    });
+
     test('lets the update find the best versions of the others, changing it not at all', async () => {
       const { judge, choices, active } = await withSynthetic(['1.0.0', '1.1.0']);
 

@@ -622,6 +622,7 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
         messagesOf(catalogue),
         // What loading finds, as the modules taken as present leave it, as the universe is.
         async needs => withAssumed(await set.load(needs), setup),
+        setup.modules.filter(({ package: key }) => setup.assumed?.has(key) === true),
       );
       // A module taken as present has one release, so cannot change; nothing of it is reported either way.
       const { solution } = solved;
@@ -806,7 +807,10 @@ function choosable(
  */
 function setupOf(catalogue: VersionCatalogue, active: Iterable<string>, choices: VersionChoices): Setup {
   const ignored = choices.ignored ?? new Set<string>();
-  const modules = [...active].flatMap(id => {
+  // An ignored module is taken as present whether it is staged active or not, so that one another requires, as
+  // midi-qol pulls in a synthetic module, is there for it: it is never judged or reported either way.
+  const present = new Set([...active, ...[...ignored].filter(id => catalogue.installed.has(id))]);
+  const modules = [...present].flatMap(id => {
     // A module that cannot be had is left out of the setup, unless hypothetical mode ignores it, taking it as present.
     if (catalogue.unavailable.has(id) && !ignored.has(id)) return [];
     const installed = catalogue.installed.get(id);
