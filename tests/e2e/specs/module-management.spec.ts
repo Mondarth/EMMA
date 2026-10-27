@@ -1251,6 +1251,16 @@ test.describe('Version lookup proxy', () => {
     await closeEmma(page);
   });
 
+  test('only a GM is offered Automatically activate/deactivate recommended modules', async ({ page }) => {
+    const auto = /^Automatically activate\/deactivate recommended modules$/;
+    await joinAs(page, USERS.gm);
+    await setDisabled(page, false);
+    await expect((await openEmmaSettings(page)).getByRole('checkbox', { name: auto })).not.toBeChecked();
+
+    await joinAs(page, USERS.player);
+    await expect((await openEmmaSettings(page)).getByRole('checkbox', { name: auto })).toHaveCount(0);
+  });
+
   test('a GM sets their own proxy and its key, and hypothetical mode sends the key and EMMA’s version to it', async ({
     page,
   }) => {

@@ -63,15 +63,6 @@ export function registerSettings(): void {
     default: DEFAULT_VIEW,
   });
 
-  game.settings.register(MODULE_ID, SETTINGS.autoRecommended, {
-    name: 'MONDARTH-EMMA.Settings.AutoRecommended.Name',
-    hint: 'MONDARTH-EMMA.Settings.AutoRecommended.Hint',
-    scope: 'user',
-    config: true,
-    type: Boolean,
-    default: false,
-  });
-
   game.settings.register(MODULE_ID, SETTINGS.grouped, {
     scope: 'user',
     config: false,
@@ -123,6 +114,21 @@ export function registerSettings(): void {
     onChange: value => {
       drawerFields.set(toDrawerFields(value));
     },
+  });
+}
+
+/**
+ * Register the settings only GMs are offered, as only they change which modules are active. Call during `setup`: the
+ * user is not known before it, so a setting registered during `init` cannot be shown to GMs alone.
+ */
+export function registerGmSettings(): void {
+  game.settings.register(MODULE_ID, SETTINGS.autoRecommended, {
+    name: 'MONDARTH-EMMA.Settings.AutoRecommended.Name',
+    hint: 'MONDARTH-EMMA.Settings.AutoRecommended.Hint',
+    scope: 'user',
+    config: game.user?.isGM === true,
+    type: Boolean,
+    default: false,
   });
 }
 
