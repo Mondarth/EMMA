@@ -85,6 +85,15 @@ export interface ChangedPackage {
   readonly id: string;
 }
 
+/** An active module that cannot be had, which every report leaves out, and why. */
+export interface UnavailableModule {
+  readonly title: string;
+  /** `archived`: Foundry VTT's listing of it is archived, so it is no longer offered. `gone`: its files are gone. */
+  readonly reason: 'archived' | 'gone';
+  /** More of why, in words, as the catalogue's maintainers wrote it. */
+  readonly note?: string;
+}
+
 /**
  * A report on a hypothetical setup: its plan and check, and its best versions, worked out when first asked for.
  * Choosing the versions the update recommends gives the report on the setup they make.
@@ -92,6 +101,8 @@ export interface ChangedPackage {
 export interface SetupReportData {
   /** The titles of the active modules hypothetical mode ignores, which every report leaves out and warns of. */
   readonly ignored: readonly string[];
+  /** The active modules that cannot be had, which every report leaves out and names, with why. */
+  readonly unavailable: readonly UnavailableModule[];
   readonly plan: readonly PlanEntry[];
   readonly check: SetupCheck;
   /**

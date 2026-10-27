@@ -222,6 +222,7 @@ export class HypotheticalState {
     let solving: Promise<SetupSolve> | undefined;
     return {
       ignored: judge.reportIgnored(active, choices),
+      unavailable: judge.reportUnavailable(active, choices),
       plan: judge.reportPlan(active, choices),
       check: judge.reportCheck(active, choices),
       solve: () => (solving ??= judge.reportSolve(active, choices)),

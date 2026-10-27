@@ -43,7 +43,7 @@ import { format, formatList, localize } from '@module/lib/i18n';
 import { explanationMessages } from './explanation';
 import type { VersionBadge } from './modules';
 import { toBadge } from './modules';
-import type { PlanEntry, SetupCheck, SetupSolve } from './report';
+import type { PlanEntry, SetupCheck, SetupSolve, UnavailableModule } from './report';
 import { checkReport, planReport, solveReport } from './report';
 
 /** A package, by type and ID; Foundry itself is the package of type `core`, with the ID `core`. */
@@ -146,6 +146,14 @@ export interface VersionJudge {
    */
   reportIgnored(active: Iterable<string>, choices: VersionChoices): readonly string[];
   /**
+   * The active modules that cannot be had, as the catalogue says: archived on Foundry VTT, or gone. Nothing of them is
+   * resolved or judged, so the reports leave them out and name them. A module hypothetical mode ignores is not one.
+   * @param active - The IDs of the modules the setup has
+   * @param choices - The versions chosen, with the modules ignored
+   * @returns Each, with its title and why
+   */
+  reportUnavailable(active: Iterable<string>, choices: VersionChoices): readonly UnavailableModule[];
+  /**
    * Plan the setup the choices make: each active module at the version chosen, with its manifest URL, those others
    * depend on first.
    * @param active - The IDs of the modules the setup has
@@ -169,6 +177,8 @@ interface VersionCatalogue {
   readonly core: CoreRelease;
   /** The titles of the system and the installed modules, keyed by package key, to name them in tooltips. */
   readonly titles: ReadonlyMap<string, string>;
+  /** The modules that cannot be had, and why, keyed by module ID: nothing of them is resolved or judged. */
+  readonly unavailable: ReadonlyMap<string, Omit<UnavailableModule, 'title'>>;
 }
 
 /**
@@ -392,6 +402,7 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
       [systemKey, system.title],
       ...installed.map(pkg => [packageKey({ type: 'module', id: pkg.id }), pkg.title] as const),
     ]),
+    unavailable: new Map<string, Omit<UnavailableModule, 'title'>>(),
   };
   // Only versions with a release, which every version found has, and the installed one does unless its manifest
   // could not be read; such a module is left at its installed version, unjudged.
@@ -436,7 +447,12 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
         throw error;
       }
       if (!cores) unreached.push(CORE_REF);
-      releases = [...releases, ...(await installedMissing(refs, releases))];
+      for (const { package: ref, reason, note } of set.unavailable()) {
+        if (ref.type === 'module') catalogue.unavailable.set(ref.id, { reason, ...(note !== undefined && { note }) });
+      }
+      // A module that cannot be had is not stood in for by its installed manifest: it is not resolved at all.
+      const available = refs.filter(ref => ref.type !== 'module' || !catalogue.unavailable.has(ref.id));
+      releases = [...releases, ...(await installedMissing(available, releases))];
       // The catalogue answers each lookup with the whole closure, so with the system and the libraries found already:
       // only what is new is kept, as a version found twice would be listed twice.
       const held = new Set(catalogue.releases.map(releaseKey));
@@ -465,7 +481,7 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
     platformVersions: part => platformVersions(catalogue, part),
     judgeChoices: (active, choices) => judgeChoices(catalogue, setupOf(catalogue, active, choices)),
     judgeVersions: (active, choices, id) =>
-      choices.ignored?.has(id) === true
+      choices.ignored?.has(id) === true || catalogue.unavailable.has(id)
         ? []
         : judgeVersions(catalogue, setupOf(catalogue, active, choices), choosable(catalogue, versions, id), id),
     judgePlatform: (active, choices, part) =>
@@ -520,6 +536,13 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
       [...active]
         .filter(id => choices.ignored?.has(id) === true)
         .map(id => catalogue.titles.get(packageKey({ type: 'module', id })) ?? id),
+    reportUnavailable: (active, choices) =>
+      [...active].flatMap(id => {
+        const unavailable = catalogue.unavailable.get(id);
+        return unavailable === undefined || choices.ignored?.has(id) === true
+          ? []
+          : [{ title: catalogue.titles.get(packageKey({ type: 'module', id })) ?? id, ...unavailable }];
+      }),
   };
 }
 
@@ -677,6 +700,8 @@ function choosable(
 function setupOf(catalogue: VersionCatalogue, active: Iterable<string>, choices: VersionChoices): Setup {
   const ignored = choices.ignored ?? new Set<string>();
   const modules = [...active].flatMap(id => {
+    // A module that cannot be had is left out of the setup, unless hypothetical mode ignores it, taking it as present.
+    if (catalogue.unavailable.has(id) && !ignored.has(id)) return [];
     const installed = catalogue.installed.get(id);
     // An ignored module stays at its installed version: nothing is known of its others.
     const version = ignored.has(id) ? installed : (choices.modules.get(id) ?? installed);

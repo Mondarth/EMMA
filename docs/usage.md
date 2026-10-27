@@ -274,6 +274,13 @@ The catalogue also keeps versions an author has published ahead of Foundry's pac
 GitLab not yet on the listing. EMMA offers them marked with a flask, and their tooltip says they are not on Foundry's
 package listing: Foundry's own installer does not offer them, so choose one knowingly.
 
+The catalogue also knows which packages cannot be had: those whose Foundry listing is **archived**, which Foundry's
+Setup screen no longer offers (often because the author removed them), and those the catalogue's maintainers found
+**gone**, their files no longer available. Hypothetical mode never looks such a module up or judges it, and leaves it
+out of the setup it reports on, so a module that requires it shows that requirement as not met. Every report ends with
+a **Not available** section naming each active module that cannot be had, and why. A module hypothetical mode ignores
+(see [below](#modules-hypothetical-mode-ignores)) is taken as present instead, and not named there.
+
 Without a proxy, EMMA lists the versions released on GitHub and GitLab, but does not know which Foundry versions
 those releases support, so Foundry marks them **Compatibility unknown**; and as it cannot read Foundry's release
 notes, it offers no newer Foundry version. A note in the footer says so while the mode is on. A warning beside the System button names the packages that could not be looked up. An old version

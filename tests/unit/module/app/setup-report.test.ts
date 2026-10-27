@@ -30,6 +30,7 @@ async function loadReport() {
 function report(modules = 1) {
   return {
     ignored: [],
+    unavailable: [],
     plan: [],
     check: { ...CHECK, setup: { ...CHECK.setup, modules } },
     solve: (): Promise<SetupSolve> => Promise.resolve({ solution: { kind: 'found', changes: [] }, unloaded: [] }),
