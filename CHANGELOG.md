@@ -1,3 +1,9 @@
+## [0.8.1](https://github.com/Mondarth/EMMA/compare/v0.8.0...v0.8.1) (2026-10-27)
+
+### Bug Fixes
+
+* **ui:** let others require any version of an ignored module ([d7bd58f](https://github.com/Mondarth/EMMA/commit/d7bd58f5c4437b41ad2521a3d71e74e6006c7d3c))
+
 ## [0.8.0](https://github.com/Mondarth/EMMA/compare/v0.7.0...v0.8.0) (2026-10-27)
 
 ### Features
