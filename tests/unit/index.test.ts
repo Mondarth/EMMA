@@ -55,6 +55,7 @@ describe('module entry point', () => {
     hooks.run('setup');
 
     expect(game.settings.register).toHaveBeenCalledWith('mondarth-emma', 'autoRecommended', expect.any(Object));
+    expect(game.settings.register).toHaveBeenCalledWith('mondarth-emma', 'olderVersions', expect.any(Object));
   });
 
   test('only initializes once', async () => {

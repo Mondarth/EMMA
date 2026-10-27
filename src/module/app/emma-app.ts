@@ -16,6 +16,7 @@ import { localize } from '@module/lib/i18n';
 import {
   getDrawerFields,
   getHypotheticallyIgnored,
+  getOlderVersions,
   getView,
   isAutoRecommended,
   isGrouped,
@@ -133,6 +134,7 @@ export class EmmaApp extends foundry.applications.api.ApplicationV2 {
               createVersionJudge({
                 ...versionLookup(),
                 clientVersion: game.modules.get(MODULE_ID)?.version ?? null,
+                olderVersions: getOlderVersions,
               })
           : undefined,
         reports: isGM()

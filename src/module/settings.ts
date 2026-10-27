@@ -26,7 +26,12 @@ export const SETTINGS = {
   versionProxyMode: 'versionProxyMode',
   /** The IDs of the modules hypothetical mode ignores, shared by the world's GMs. */
   hypotheticalIgnored: 'hypotheticalIgnored',
+  /** How many versions before the one installed hypothetical mode offers, and its reports consider. */
+  olderVersions: 'olderVersions',
 } as const;
+
+/** The most older versions a GM may choose to be shown: more cost more to judge, for little more use. */
+export const MAX_OLDER_VERSIONS = 20;
 
 /** Which proxy hypothetical mode looks versions up through: EMMA's own (the default), the GM's own, or none. */
 export type ProxyMode = 'default' | 'own' | 'none';
@@ -118,8 +123,9 @@ export function registerSettings(): void {
 }
 
 /**
- * Register the settings only GMs are offered, as only they change which modules are active. Call during `setup`: the
- * user is not known before it, so a setting registered during `init` cannot be shown to GMs alone.
+ * Register the settings only GMs are offered, as only they change which modules are active and use hypothetical
+ * mode. Call during `setup`: the user is not known before it, so a setting registered during `init` cannot be shown to
+ * GMs alone.
  */
 export function registerGmSettings(): void {
   game.settings.register(MODULE_ID, SETTINGS.autoRecommended, {
@@ -130,6 +136,26 @@ export function registerGmSettings(): void {
     type: Boolean,
     default: false,
   });
+
+  game.settings.register(MODULE_ID, SETTINGS.olderVersions, {
+    name: 'MONDARTH-EMMA.Settings.OlderVersions.Name',
+    hint: 'MONDARTH-EMMA.Settings.OlderVersions.Hint',
+    scope: 'user',
+    config: game.user?.isGM === true,
+    type: Number,
+    range: { min: 0, max: MAX_OLDER_VERSIONS, step: 1 },
+    default: 0,
+  });
+}
+
+/**
+ * How many versions before the one installed hypothetical mode offers in each version drop-down, and its reports
+ * consider, as the current user chose. Read on every use, so a change takes effect the next time versions are judged.
+ * @returns A whole number from 0 to {@link MAX_OLDER_VERSIONS}; 0 if none was chosen
+ */
+export function getOlderVersions(): number {
+  const chosen = game.settings.get(MODULE_ID, SETTINGS.olderVersions);
+  return Number.isFinite(chosen) ? Math.min(Math.max(Math.trunc(chosen), 0), MAX_OLDER_VERSIONS) : 0;
 }
 
 /**

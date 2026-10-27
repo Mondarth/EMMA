@@ -951,7 +951,7 @@ test.describe('Hypothetical versions', () => {
     await expect(picker('9.8.0')).toHaveCount(0);
   });
 
-  test('a module staged active is looked up, offering its newer versions and the two before; staged inactive, it is not', async ({
+  test('a module staged active is looked up, offering its newer versions and the older ones asked for; staged inactive, it is not', async ({
     page,
   }) => {
     await (await moduleManagementButton(page)).click();
@@ -967,12 +967,25 @@ test.describe('Hypothetical versions', () => {
 
     await library.check();
 
+    const options = page.getByRole('listbox', { name: `Versions of ${LIBRARY.title}` }).getByRole('option');
+    // No older version by default: installing one into an existing world is risky.
     await picker.click();
-    await expect(page.getByRole('listbox', { name: `Versions of ${LIBRARY.title}` }).getByRole('option')).toHaveText([
-      /^\s*2\.0\.0/,
-      /^\s*0\.9\.0/,
-    ]);
+    await expect(options).toHaveText([/^\s*2\.0\.0/]);
     await page.keyboard.press('Escape');
+
+    try {
+      // Show older versions: the one before is offered the next time the versions are listed.
+      await page.evaluate(async () => {
+        await game.settings.set('mondarth-emma', 'olderVersions', 1);
+      });
+      await picker.click();
+      await expect(options).toHaveText([/^\s*2\.0\.0/, /^\s*0\.9\.0/]);
+      await page.keyboard.press('Escape');
+    } finally {
+      await page.evaluate(async () => {
+        await game.settings.set('mondarth-emma', 'olderVersions', 0);
+      });
+    }
 
     await library.uncheck();
     await expect(picker).toHaveCount(0);
@@ -1259,6 +1272,31 @@ test.describe('Version lookup proxy', () => {
 
     await joinAs(page, USERS.player);
     await expect((await openEmmaSettings(page)).getByRole('checkbox', { name: auto })).toHaveCount(0);
+  });
+
+  test('a GM is offered Show older versions under Game Settings, none by default, warned it may slow things', async ({
+    page,
+  }) => {
+    await joinAs(page, USERS.gm);
+    await setDisabled(page, false);
+
+    const settings = await openEmmaSettings(page);
+    // Foundry's range picker gives its slider and number field no name of their own: they are found by their row's.
+    const older = settings.locator('.form-group').filter({ hasText: 'Show older versions' });
+    await expect(older.getByRole('slider')).toHaveValue('0');
+    await expect(older.getByRole('spinbutton')).toHaveValue('0');
+    await expect(
+      settings.getByText(/showing many older versions can make hypothetical mode noticeably slower/),
+    ).toBeVisible();
+  });
+
+  test('a player is not offered Show older versions, having no hypothetical mode', async ({ page }) => {
+    await joinAs(page, USERS.player);
+
+    const settings = await openEmmaSettings(page);
+    // EMMA's section is there, with the menu every user has.
+    await expect(settings.getByRole('button', { name: 'Choose details' })).toBeVisible();
+    await expect(settings.getByText('Show older versions')).toHaveCount(0);
   });
 
   test('a GM sets their own proxy and its key, and hypothetical mode sends the key and EMMA’s version to it', async ({
