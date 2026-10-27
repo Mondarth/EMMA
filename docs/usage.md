@@ -339,9 +339,9 @@ Disable EMMA
   Foundry's own Module Management window again. It takes effect immediately, without reloading.
 
 Automatically activate/deactivate recommended modules
-: A setting for each user, off by default. When on, activating a module, by checking it in the list view or moving
-  it to the active side of the split view, also activates the modules it recommends, and deactivating it deactivates
-  them again, as it does for required modules.
+: A setting for each GM, off by default; players are not offered it, as only GMs change which modules are active. When
+  on, activating a module, by checking it in the list view or moving it to the active side of the split view, also
+  activates the modules it recommends, and deactivating it deactivates them again, as it does for required modules.
 
 Module details
 : A menu every user can open under **Game Settings**, choosing the details their drawers show for themselves. See

@@ -10,6 +10,7 @@ import {
   isAutoRecommended,
   isEmmaDisabled,
   isGrouped,
+  registerGmSettings,
   registerSettings,
   setDrawerFields,
   setGrouped,
@@ -70,10 +71,10 @@ describe('registerSettings', () => {
 });
 
 describe('isAutoRecommended', () => {
-  test('registers the per-user setting in Game Settings, off by default', () => {
+  test('registers the per-user setting in Game Settings for GMs, off by default', () => {
     const { game } = installFoundryMocks();
 
-    registerSettings();
+    registerGmSettings();
 
     expect(game.settings.register).toHaveBeenCalledWith('mondarth-emma', 'autoRecommended', {
       name: 'MONDARTH-EMMA.Settings.AutoRecommended.Name',
@@ -86,9 +87,29 @@ describe('isAutoRecommended', () => {
     expect(isAutoRecommended()).toBe(false);
   });
 
+  test('is not offered to players, who cannot change which modules are active', () => {
+    const { game } = installFoundryMocks({ isGM: false });
+
+    registerGmSettings();
+
+    expect(game.settings.register).toHaveBeenCalledWith(
+      'mondarth-emma',
+      'autoRecommended',
+      expect.objectContaining({ config: false }),
+    );
+  });
+
+  test('is not registered on init, before the user is known', () => {
+    const { game } = installFoundryMocks();
+
+    registerSettings();
+
+    expect(game.settings.register).not.toHaveBeenCalledWith('mondarth-emma', 'autoRecommended', expect.anything());
+  });
+
   test('follows the setting without a reload', async () => {
     const { game } = installFoundryMocks();
-    registerSettings();
+    registerGmSettings();
 
     await game.settings.set('mondarth-emma', 'autoRecommended', true);
 

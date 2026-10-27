@@ -23,7 +23,9 @@ describe('module entry point', () => {
   test('does nothing until Foundry fires init', async () => {
     const { hooks, game } = await loadModule();
 
-    expect(hooks.once).toHaveBeenCalledExactlyOnceWith('init', expect.any(Function));
+    expect(hooks.once).toHaveBeenCalledTimes(2);
+    expect(hooks.once).toHaveBeenCalledWith('init', expect.any(Function));
+    expect(hooks.once).toHaveBeenCalledWith('setup', expect.any(Function));
     expect(console.info).not.toHaveBeenCalled();
     expect(game.settings.register).not.toHaveBeenCalled();
   });
@@ -45,6 +47,14 @@ describe('module entry point', () => {
     expect(game.settings.registerMenu).toHaveBeenCalledWith('mondarth-emma', 'drawerFieldsMenu', expect.any(Object));
     expect(game.settings.registerMenu).toHaveBeenCalledWith('mondarth-emma', 'versionProxyMenu', expect.any(Object));
     expect(hooks.on).toHaveBeenCalledWith('renderSettings', expect.any(Function));
+  });
+
+  test('registers the settings only GMs are offered on setup, once the user is known', async () => {
+    const { hooks, game } = await loadModule();
+
+    hooks.run('setup');
+
+    expect(game.settings.register).toHaveBeenCalledWith('mondarth-emma', 'autoRecommended', expect.any(Object));
   });
 
   test('only initializes once', async () => {
