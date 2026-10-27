@@ -620,7 +620,8 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
         reportUniverseOf(catalogue, setup),
         setup,
         messagesOf(catalogue),
-        set.load.bind(set),
+        // What loading finds, as the modules taken as present leave it, as the universe is.
+        async needs => withAssumed(await set.load(needs), setup),
       );
       // A module taken as present has one release, so cannot change; nothing of it is reported either way.
       const { solution } = solved;
@@ -728,12 +729,11 @@ function reportUniverseOf(
   return {
     core: catalogue.cores.filter(({ version }) => atLeast(version, coreFloor)),
     releases: [
-      ...catalogue.releases.filter(
-        release =>
-          // A module taken as present is only the release it stands for, even when it was looked up before being
-          // ignored: its own releases would be judged, and the solver could change it.
-          setup.assumed?.has(packageKey(release.package)) !== true &&
-          atLeast(release.version, floors.get(packageKey(release.package))),
+      // A module taken as present is only the release it stands for, even when it was looked up before being ignored:
+      // its own releases would be judged, and the solver could change it.
+      ...withAssumed(
+        catalogue.releases.filter(release => atLeast(release.version, floors.get(packageKey(release.package)))),
+        setup,
       ),
       // The modules taken as present, as the releases they stand for.
       ...assumedReleases(setup),
@@ -858,6 +858,32 @@ function assumedReleases(setup: Setup): Release[] {
 }
 
 /**
+ * A setup's releases as the modules taken as present leave them: a release of such a module is only the one standing
+ * for it, and any version of it another release requires is the one present, as it is taken to be whatever is needed.
+ * A dependency a module such as midi-qol pulls in, which hypothetical mode ignores, would otherwise make every release
+ * requiring a newer version of it unusable.
+ * @param releases - The releases
+ * @param setup - The setup, with the modules taken as present
+ * @returns The releases, without those of the modules taken as present, and asking any version of them
+ */
+function withAssumed(releases: readonly Release[], setup: Setup): Release[] {
+  const { assumed } = setup;
+  if (assumed === undefined || assumed.size === 0) return [...releases];
+  const satisfied = (relationship: Relationship): Relationship =>
+    assumed.has(packageKey(relationship.package)) ? { ...relationship, compatibility: {} } : relationship;
+  return releases
+    .filter(release => !assumed.has(packageKey(release.package)))
+    .map(release =>
+      release.relationships.requires.some(({ package: ref }) => assumed.has(packageKey(ref)))
+        ? {
+            ...release,
+            relationships: { ...release.relationships, requires: release.relationships.requires.map(satisfied) },
+          }
+        : release,
+    );
+}
+
+/**
  * What checking found, without the modules taken as present, which are never judged.
  * @param checks - What checking found
  * @param setup - The setup checked
@@ -913,11 +939,12 @@ function releasesByKey(releases: readonly Release[]): ReadonlyMap<string, readon
 function checkSetup(catalogue: VersionCatalogue, setup: Setup): readonly ReleaseCheck[] {
   const byKey = releasesByKey(catalogue.releases);
   const releases = [setup.system, ...setup.modules].flatMap(({ package: key, version }) => {
-    if (setup.assumed?.has(key) === true) return [assumedRelease(key, version, setup.core)];
+    if (setup.assumed?.has(key) === true) return [];
     const release = byKey.get(key)?.find(candidate => sameVersion(candidate.version, version));
     return release === undefined ? [] : [release];
   });
-  return check({ core: catalogue.cores, releases }, setup).releases;
+  return check({ core: catalogue.cores, releases: [...withAssumed(releases, setup), ...assumedReleases(setup)] }, setup)
+    .releases;
 }
 
 /**
