@@ -1,10 +1,9 @@
 <script lang="ts">
-  import type { PlanEntry, SetupCheck, SetupReportData, SetupSolve } from '@module/adapters/report';
+  import type { SetupChange, SetupReportData, SetupSolve } from '@module/adapters/report';
   import { format, formatList, localize } from '@module/lib/i18n';
   import { log } from '@module/lib/logger';
   import type { ReportStyle } from '@module/lib/report-text';
   import {
-    REPORT_STYLES,
     changeText,
     checkText,
     ignoredWarning,
@@ -17,53 +16,42 @@
   import VersionBadge from './VersionBadge.svelte';
 
   interface Props {
-    /** The titles of the active modules hypothetical mode ignores, which the report leaves out and warns of. */
-    ignored: readonly string[];
-    /** The active modules in the order to install them. */
-    plan: readonly PlanEntry[];
-    /** What checking the setup chosen found. */
-    check: SetupCheck;
-    /** The best setup keeping the versions chosen, once worked out. */
-    solve: Promise<SetupSolve>;
+    /** Which report this is. */
+    style: ReportStyle;
+    /** The report to show first. */
+    report: SetupReportData;
+    /** Given, once, the function that shows another report in this one's place. */
+    follow?: (show: (report: SetupReportData) => void) => void;
     /** Saves the report shown, as text. */
     onDownload: (text: string, style: ReportStyle) => void;
-    /** Chooses the versions the update recommends, in the hypothetical setup reported on, giving the report after. */
-    apply: SetupReportData['apply'];
+    /** Chooses the versions the update recommends, in the hypothetical setup reported on. */
+    onApply: (changes: readonly SetupChange[]) => void;
   }
 
-  const {
-    ignored: firstIgnored,
-    plan: firstPlan,
-    check: firstCheck,
-    solve: firstSolve,
-    apply: firstApply,
-    onDownload,
-  }: Props = $props();
+  const { style, report: first, follow, onDownload, onApply }: Props = $props();
 
-  // The report shown: the one given, then the one on the setup each choice of recommended versions makes. The window
-  // is mounted afresh for each report, so the one given is only read once.
+  // The report shown: the one given, then each one `follow`'s function is given, such as the one on the setup choosing
+  // the versions an update recommends makes. The window is mounted afresh for each report, so these are read once.
   // svelte-ignore state_referenced_locally
-  let report: SetupReportData = $state.raw({
-    ignored: firstIgnored,
-    plan: firstPlan,
-    check: firstCheck,
-    solve: firstSolve,
-    apply: firstApply,
-  });
+  let report: SetupReportData = $state.raw(first);
   const { plan, check } = $derived(report);
+  // svelte-ignore state_referenced_locally
+  follow?.((next: SetupReportData) => {
+    report = next;
+  });
 
   const uid = $props.id();
 
-  let style = $state<ReportStyle>('plan');
   let solved = $state<SetupSolve | null>(null);
   let failed = $state(false);
 
-  // Follows the report's solve, a new one with each report.
+  // The update follows the report's solve, a new one with each report; the others need none, so ask for none.
   $effect(() => {
+    if (style !== 'update') return;
     let live = true;
     solved = null;
     failed = false;
-    report.solve.then(
+    report.solve().then(
       result => {
         if (live) solved = result;
       },
@@ -77,7 +65,7 @@
     };
   });
 
-  /** The warning every style gives when hypothetical mode ignores some of the setup's modules. */
+  /** The warning every report gives when hypothetical mode ignores some of the setup's modules. */
   const warning = $derived(ignoredWarning(report.ignored));
 
   /** The report shown, as text, after the warning if there is one; `null` while the setup is still being resolved. */
@@ -105,18 +93,6 @@
 
 <div class="emma-report">
   <div class="emma-report-controls">
-    <label for={`${uid}-style`}>{localize('MONDARTH-EMMA.Report.Style')}</label>
-    <!-- Only it changes the style, so it shows the style without being told: the first, the plan, to start. -->
-    <select
-      id={`${uid}-style`}
-      onchange={(event: Event & { currentTarget: HTMLSelectElement }) => {
-        // The options are the styles.
-        style = event.currentTarget.value as ReportStyle;
-      }}>
-      {#each REPORT_STYLES as option (option)}
-        <option value={option}>{localize(`MONDARTH-EMMA.Report.Styles.${option}`)}</option>
-      {/each}
-    </select>
     {#if style === 'update' && changes.length > 0}
       <button
         type="button"
@@ -124,8 +100,7 @@
         aria-label={applyLabel}
         data-tooltip={applyLabel}
         onclick={() => {
-          // Every style then reports on the setup with the versions chosen.
-          report = report.apply(changes);
+          onApply(changes);
         }}></button>
     {/if}
     <button
@@ -253,7 +228,7 @@
 </div>
 
 <style>
-  /* Every style warns of the modules it leaves out, above the report, in Foundry's warning colours. */
+  /* Every report warns of the modules it leaves out, above the report, in Foundry's warning colours. */
   .emma-report-warning {
     display: flex;
     gap: 0.5rem;
@@ -265,7 +240,7 @@
     background: var(--color-level-warning-bg);
   }
 
-  /* The report fills the window: the controls stay put, and the report shown scrolls beneath them. */
+  /* The report fills the window: its buttons stay put, and the report scrolls beneath them. */
   .emma-report {
     display: flex;
     flex: 1;
@@ -296,10 +271,12 @@
     font-weight: bold;
   }
 
+  /* Its buttons act on the report, so sit at the end, as a window's own controls do. */
   .emma-report-controls {
     display: flex;
     flex: none;
     align-items: center;
+    justify-content: flex-end;
     gap: 0.5rem;
   }
 
@@ -307,10 +284,6 @@
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-  }
-
-  .emma-report-controls select {
-    flex: 0 1 12rem;
   }
 
   .emma-report-controls button {

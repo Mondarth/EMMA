@@ -188,65 +188,142 @@ describe('EmmaApp', () => {
     expect(new Headers(send.mock.calls[0]?.[1]?.headers).get('X-EMMA-Version')).toBe('0.6.0');
   });
 
-  test('opens a report on the setup chosen in hypothetical mode', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))),
-    );
-    const { EmmaApp } = await loadApp();
-    await new EmmaApp().render({ force: true });
-    await userEvent.click(screen.getByRole('button', { name: 'MONDARTH-EMMA.Toolbar.Hypothetical' }));
-    const report = screen.getByRole('button', { name: 'MONDARTH-EMMA.Report.Button' });
-    await vi.waitFor(() => {
-      expect(report).toBeEnabled();
+  describe('reports', () => {
+    const PLAN = 'MONDARTH-EMMA.Report.Reports.plan';
+    const CHECK = 'MONDARTH-EMMA.Report.Reports.check';
+
+    /**
+     * Open EMMA in hypothetical mode, once its reports can be opened.
+     * @returns The window, and the mocks it was loaded with
+     */
+    async function inHypothetical() {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))),
+      );
+      const loaded = await loadApp();
+      const app = new loaded.EmmaApp();
+      await app.render({ force: true });
+      await userEvent.click(screen.getByRole('button', { name: 'MONDARTH-EMMA.Toolbar.Hypothetical' }));
+      await vi.waitFor(() => {
+        expect(screen.getByRole('button', { name: PLAN })).toBeEnabled();
+      });
+      return { ...loaded, app };
+    }
+
+    test('opens each report on the setup chosen in its own window, beside the others', async () => {
+      await inHypothetical();
+
+      await userEvent.click(screen.getByRole('button', { name: PLAN }));
+      await userEvent.click(screen.getByRole('button', { name: CHECK }));
+
+      expect(await screen.findByRole('region', { name: 'MONDARTH-EMMA.Report.Plan.Heading' })).toBeInTheDocument();
+      expect(await screen.findByRole('region', { name: 'MONDARTH-EMMA.Report.Check.Heading' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: PLAN })).toHaveAttribute('aria-pressed', 'true');
     });
 
-    await userEvent.click(report);
+    test('closes a report when its button is pressed again', async () => {
+      await inHypothetical();
+      await userEvent.click(screen.getByRole('button', { name: PLAN }));
+      await screen.findByRole('region', { name: 'MONDARTH-EMMA.Report.Plan.Heading' });
 
-    expect(await screen.findByRole('region', { name: 'MONDARTH-EMMA.Report.Plan.Heading' })).toBeInTheDocument();
-  });
+      await userEvent.click(screen.getByRole('button', { name: PLAN }));
 
-  test('closes the report on its hypothetical setup when it closes', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))),
-    );
-    const { EmmaApp } = await loadApp();
-    const app = new EmmaApp();
-    await app.render({ force: true });
-    await userEvent.click(screen.getByRole('button', { name: 'MONDARTH-EMMA.Toolbar.Hypothetical' }));
-    const report = screen.getByRole('button', { name: 'MONDARTH-EMMA.Report.Button' });
-    await vi.waitFor(() => {
-      expect(report).toBeEnabled();
+      await vi.waitFor(() => {
+        expect(document.querySelector('.emma-report')).toBeNull();
+      });
+      expect(screen.getByRole('button', { name: PLAN })).toHaveAttribute('aria-pressed', 'false');
     });
-    await userEvent.click(report);
-    await screen.findByRole('region', { name: 'MONDARTH-EMMA.Report.Plan.Heading' });
 
-    await app.close();
+    test('closes the reports on its hypothetical setup when hypothetical mode is left', async () => {
+      await inHypothetical();
+      await userEvent.click(screen.getByRole('button', { name: PLAN }));
+      await userEvent.click(screen.getByRole('button', { name: CHECK }));
+      await screen.findByRole('region', { name: 'MONDARTH-EMMA.Report.Check.Heading' });
 
-    expect(document.querySelector('.emma-report')).toBeNull();
-  });
+      await userEvent.click(screen.getByRole('button', { name: 'MONDARTH-EMMA.Toolbar.Hypothetical' }));
 
-  test('logs a report window that fails to open', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))),
-    );
-    const { EmmaApp, foundry } = await loadApp();
-    const failure = new Error('no window');
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    await new EmmaApp().render({ force: true });
-    await userEvent.click(screen.getByRole('button', { name: 'MONDARTH-EMMA.Toolbar.Hypothetical' }));
-    const report = screen.getByRole('button', { name: 'MONDARTH-EMMA.Report.Button' });
-    await vi.waitFor(() => {
-      expect(report).toBeEnabled();
+      await vi.waitFor(() => {
+        expect(document.querySelector('.emma-report')).toBeNull();
+      });
     });
-    vi.spyOn(foundry.applications.api.ApplicationV2.prototype, 'render').mockRejectedValueOnce(failure);
 
-    await userEvent.click(report);
+    test('closes the reports on its hypothetical setup when it closes', async () => {
+      const { app } = await inHypothetical();
+      await userEvent.click(screen.getByRole('button', { name: PLAN }));
+      await screen.findByRole('region', { name: 'MONDARTH-EMMA.Report.Plan.Heading' });
 
-    await vi.waitFor(() => {
-      expect(console.error).toHaveBeenCalledWith('mondarth-emma |', 'Unable to show the setup report', failure);
+      await app.close();
+
+      expect(document.querySelector('.emma-report')).toBeNull();
+    });
+
+    test('opens a report just below its toolbar when there is no room beside its window', async () => {
+      await inHypothetical();
+      // The module EMMA loaded, after the mocks.
+      const { SetupReportApp } = await import('@module/app/setup-report');
+      // EMMA's window fills the width of the screen.
+      const frame = screen.getByRole('toolbar').closest('#mondarth-emma-app');
+      if (frame === null) throw new Error('EMMA’s window is not open');
+      vi.spyOn(frame, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, window.innerWidth, 700));
+      vi.spyOn(screen.getByRole('toolbar'), 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 10, 1024, 30));
+      const render = vi.spyOn(SetupReportApp.prototype, 'render');
+
+      await userEvent.click(screen.getByRole('button', { name: PLAN }));
+
+      await vi.waitFor(() => {
+        expect(render).toHaveBeenCalled();
+      });
+      const [opened] = render.mock.contexts as InstanceType<typeof SetupReportApp>[];
+      expect((opened?.options as { position?: { top: number } }).position?.top).toBe(48);
+    });
+
+    test('opens a report in the middle of the screen when its toolbar cannot be found', async () => {
+      await inHypothetical();
+      // The module EMMA loaded, after the mocks.
+      const { SetupReportApp } = await import('@module/app/setup-report');
+      screen.getByRole('toolbar').removeAttribute('role');
+      const render = vi.spyOn(SetupReportApp.prototype, 'render');
+
+      await userEvent.click(screen.getByRole('button', { name: PLAN }));
+
+      await vi.waitFor(() => {
+        expect(render).toHaveBeenCalled();
+      });
+      const [opened] = render.mock.contexts as InstanceType<typeof SetupReportApp>[];
+      expect((opened?.options as { position?: { left: number } }).position?.left).toBe((window.innerWidth - 560) / 2);
+    });
+
+    test('logs a report window that fails to open', async () => {
+      const { foundry } = await inHypothetical();
+      const failure = new Error('no window');
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      vi.spyOn(foundry.applications.api.ApplicationV2.prototype, 'render').mockRejectedValueOnce(failure);
+
+      await userEvent.click(screen.getByRole('button', { name: PLAN }));
+
+      await vi.waitFor(() => {
+        expect(console.error).toHaveBeenCalledWith('mondarth-emma |', 'Unable to show the setup report', failure);
+      });
+    });
+
+    test('logs report windows that fail to close', async () => {
+      const { foundry } = await inHypothetical();
+      await userEvent.click(screen.getByRole('button', { name: PLAN }));
+      await screen.findByRole('region', { name: 'MONDARTH-EMMA.Report.Plan.Heading' });
+      const failure = new Error('stuck');
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const close = vi.spyOn(foundry.applications.api.ApplicationV2.prototype, 'close');
+
+      close.mockRejectedValueOnce(failure);
+      await userEvent.click(screen.getByRole('button', { name: PLAN }));
+      close.mockRejectedValueOnce(failure);
+      await userEvent.click(screen.getByRole('button', { name: 'MONDARTH-EMMA.Toolbar.Hypothetical' }));
+
+      await vi.waitFor(() => {
+        expect(console.error).toHaveBeenCalledWith('mondarth-emma |', 'Unable to close the setup report', failure);
+        expect(console.error).toHaveBeenCalledWith('mondarth-emma |', 'Unable to close the setup reports', failure);
+      });
     });
   });
 

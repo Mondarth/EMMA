@@ -241,9 +241,29 @@ describe('HypotheticalState', () => {
     const report = state.report();
 
     expect(report?.check.setup.modules).toBe(1);
-    await expect(report?.solve).resolves.toEqual({ solution: { kind: 'found', changes: [] }, unloaded: [] });
     expect(judge.reportCheck.mock.lastCall?.[0]).toEqual(['dice']);
+    // The solve is only worked out when asked for, and then once.
+    expect(judge.reportSolve).not.toHaveBeenCalled();
+    await expect(report?.solve()).resolves.toEqual({ solution: { kind: 'found', changes: [] }, unloaded: [] });
+    expect(report?.solve()).toBe(report?.solve());
+    expect(judge.reportSolve).toHaveBeenCalledOnce();
     expect(judge.reportSolve.mock.lastCall?.[1]).toMatchObject({ system: '5.2.0' });
+    expect([...(judge.reportSolve.mock.lastCall?.[1].modules ?? [])]).toEqual([['dice', '2.0.0']]);
+  });
+
+  test('works out the solve on the versions chosen when it reported, not those chosen since', async () => {
+    const judge = fakeJudge({ dice: ['1.0.0', '2.0.0'] });
+    const state = new HypotheticalState(
+      () => judge,
+      () => ['dice'],
+    );
+    await state.load();
+    state.choose('dice', '2.0.0');
+    const report = state.report();
+
+    state.choose('dice', '1.0.0');
+    await report?.solve();
+
     expect([...(judge.reportSolve.mock.lastCall?.[1].modules ?? [])]).toEqual([['dice', '2.0.0']]);
   });
 

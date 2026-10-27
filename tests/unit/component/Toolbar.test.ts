@@ -67,7 +67,9 @@ describe('Toolbar', () => {
       render(Toolbar, { modules: createModules(), view: 'list', onViewChange: vi.fn() });
 
       const button = screen.getByRole('button', { name: EXPAND });
-      expect(screen.getByRole('toolbar').lastElementChild).toBe(button);
+      const end = screen.getByRole('toolbar').lastElementChild;
+      expect(end).toHaveClass('emma-toolbar-end');
+      expect(end?.lastElementChild).toBe(button);
       expect(button).toHaveClass('icon', 'fa-solid', 'fa-angles-up');
       expect(button).toHaveAttribute('data-tooltip', EXPAND);
     });
@@ -316,11 +318,12 @@ describe('Toolbar', () => {
       });
     });
 
-    describe('report', () => {
-      const REPORT = 'MONDARTH-EMMA.Report.Button';
+    describe('reports', () => {
+      const PLAN = 'MONDARTH-EMMA.Report.Reports.plan';
+      const CHECK = 'MONDARTH-EMMA.Report.Reports.check';
+      const UPDATE = 'MONDARTH-EMMA.Report.Reports.update';
 
-      test('sits right of the System button, enabled once versions are looked up, and asks for a report', async () => {
-        const onReport = vi.fn();
+      test('are a group of toggles in the middle of the toolbar: plan, check and update', async () => {
         const { state } = await loadedVersions({});
         render(Toolbar, {
           modules: createModules(),
@@ -329,28 +332,65 @@ describe('Toolbar', () => {
           hypothetical: true,
           versions: state,
           onViewChange: vi.fn(),
-          onReport,
         });
 
-        const report = screen.getByRole('button', { name: REPORT });
-        const buttons = screen.getAllByRole('button');
-        expect(buttons.indexOf(report)).toBe(buttons.indexOf(screen.getByRole('button', { name: SYSTEM })) + 1);
-        expect(report).toHaveClass('emma-toolbar-report');
-        expect(report).toHaveAttribute('data-tooltip', 'MONDARTH-EMMA.Report.Tooltip');
-        await userEvent.click(report);
-
-        expect(onReport).toHaveBeenCalledOnce();
+        const group = screen.getByRole('group', { name: 'MONDARTH-EMMA.Report.Group' });
+        expect(group).toHaveClass('emma-toolbar-reports');
+        expect(group.previousElementSibling).toHaveClass('emma-toolbar-hypothetical');
+        expect(group.nextElementSibling).toHaveClass('emma-toolbar-end');
+        const buttons = within(group).getAllByRole('button');
+        expect(buttons.map(button => button.getAttribute('aria-label'))).toEqual([PLAN, CHECK, UPDATE]);
+        expect(buttons.map(button => button.getAttribute('data-tooltip'))).toEqual([
+          'MONDARTH-EMMA.Report.Tooltips.plan',
+          'MONDARTH-EMMA.Report.Tooltips.check',
+          'MONDARTH-EMMA.Report.Tooltips.update',
+        ]);
+        expect(
+          buttons.map(button => [...button.classList].find(name => name.startsWith('fa-') && name !== 'fa-solid')),
+        ).toEqual(['fa-list-ol', 'fa-clipboard-check', 'fa-circle-arrow-up']);
+        expect(buttons.every(button => button.getAttribute('aria-pressed') === 'false')).toBe(true);
       });
 
-      test('is disabled before versions are looked up, and harmless without a handler', async () => {
+      test('are offered only in hypothetical mode', () => {
+        render(Toolbar, { modules: createModules(), view: 'list', platform, onViewChange: vi.fn() });
+
+        expect(screen.queryByRole('group', { name: 'MONDARTH-EMMA.Report.Group' })).toBeNull();
+      });
+
+      test('show pressed those open, and ask for each to be turned on or off', async () => {
+        const onReport = vi.fn();
+        const { state } = await loadedVersions({});
         render(Toolbar, {
           modules: createModules(),
           view: 'list',
           platform,
           hypothetical: true,
+          versions: state,
+          reportsOpen: new Set(['check'] as const),
+          onViewChange: vi.fn(),
+          onReport,
+        });
+
+        expect(screen.getByRole('button', { name: CHECK })).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getByRole('button', { name: CHECK })).toHaveClass('active');
+        expect(screen.getByRole('button', { name: PLAN })).toHaveAttribute('aria-pressed', 'false');
+        await userEvent.click(screen.getByRole('button', { name: PLAN }));
+        await userEvent.click(screen.getByRole('button', { name: CHECK }));
+
+        expect(onReport.mock.calls).toEqual([['plan'], ['check']]);
+      });
+
+      test('are disabled before versions are looked up, except to close one open, and harmless without a handler', async () => {
+        render(Toolbar, {
+          modules: createModules(),
+          view: 'list',
+          platform,
+          hypothetical: true,
+          reportsOpen: new Set(['update'] as const),
           onViewChange: vi.fn(),
         });
-        expect(screen.getByRole('button', { name: REPORT })).toBeDisabled();
+        expect(screen.getByRole('button', { name: PLAN })).toBeDisabled();
+        expect(screen.getByRole('button', { name: UPDATE })).toBeEnabled();
 
         document.body.replaceChildren();
         const { state } = await loadedVersions({});
@@ -362,8 +402,8 @@ describe('Toolbar', () => {
           versions: state,
           onViewChange: vi.fn(),
         });
-        await userEvent.click(screen.getByRole('button', { name: REPORT }));
-        expect(screen.getByRole('button', { name: REPORT })).toBeEnabled();
+        await userEvent.click(screen.getByRole('button', { name: PLAN }));
+        expect(screen.getByRole('button', { name: PLAN })).toBeEnabled();
       });
     });
 
