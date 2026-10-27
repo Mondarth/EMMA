@@ -1,3 +1,18 @@
+## [0.8.0](https://github.com/Mondarth/EMMA/compare/v0.7.0...v0.8.0) (2026-10-27)
+
+### Features
+
+* **ui:** leave unavailable modules out, naming them in every report ([934b780](https://github.com/Mondarth/EMMA/commit/934b780cc57a5936b8046fb83389e4325f595a55))
+* **ui:** let GMs choose how many older versions to show ([4e9aa3c](https://github.com/Mondarth/EMMA/commit/4e9aa3c32b6e2f8e9b0b87ae3b5daf872c1f6c92)), closes [#38](https://github.com/Mondarth/EMMA/issues/38)
+* **ui:** offer only GMs the choice to activate what a module recommends ([14f798d](https://github.com/Mondarth/EMMA/commit/14f798d15a50fe0c9ba18c70dab8aa3f14a8e62d))
+* **ui:** open each setup report in its own window from toolbar toggles ([a003eff](https://github.com/Mondarth/EMMA/commit/a003eff3aaf8a742e45c9077d9924c539db56900))
+
+### Bug Fixes
+
+* **ui:** give each badge EMMA's verdict, or Foundry's if a user picks it ([0819ec1](https://github.com/Mondarth/EMMA/commit/0819ec11dd6374fb3693376621f642961a4dc3cb))
+* **ui:** let the update find the best versions with a module ignored ([deaa0c2](https://github.com/Mondarth/EMMA/commit/deaa0c2eccecbc66fd026444692375ed885bf87d))
+* **ui:** open report windows clear of EMMA's toolbar ([5b060c0](https://github.com/Mondarth/EMMA/commit/5b060c04c449bc662e3f6c7b80a47db221e30d5c))
+
 ## [0.7.0](https://github.com/Mondarth/EMMA/compare/v0.6.0...v0.7.0) (2026-10-26)
 
 ### Features
