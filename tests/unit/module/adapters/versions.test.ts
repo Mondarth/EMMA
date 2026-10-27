@@ -108,38 +108,82 @@ function fakeFetch(routes: [string, unknown][]) {
  * @param options - The mock state
  * @param routes - The JSON to answer each URL with
  * @param proxy - The proxy URL template, if any
+ * @param olderVersions - How many versions before the one installed, or chosen, to offer and consider; none by default
  * @returns The versions found, with the fetch used and the Foundry mocks
  */
-async function lookUp(options: FoundryMockOptions, routes: [string, unknown][], proxy: string | null = null) {
+async function lookUp(
+  options: FoundryMockOptions,
+  routes: [string, unknown][],
+  proxy: string | null = null,
+  olderVersions?: () => number,
+) {
   const mocks = installFoundryMocks(options);
   const send = fakeFetch(routes);
-  const judge = createVersionJudge({ proxy, fetch: send, cache: memoryCache() });
+  const judge = createVersionJudge({
+    proxy,
+    fetch: send,
+    cache: memoryCache(),
+    ...(olderVersions !== undefined && { olderVersions }),
+  });
   const active = Object.entries(options.modules ?? {}).flatMap(([id, data]) => (data.active === true ? [id] : []));
   await judge.lookUp(active);
   return { judge, send, active, ...mocks };
 }
 
 describe('createVersionJudge without a proxy', () => {
-  test('offers the installed version, the two before it and the newer ones GitHub releases, newest first', async () => {
+  test('offers the installed version and the newer ones GitHub releases, newest first, and none older', async () => {
     const { judge } = await lookUp({ modules: { dice: onGithub('owner/dice', { version: '5.2.4' }) } }, [
       githubReleases('owner/dice', ['4.0.0', '5.0.0', '5.1.0', '5.3.0', '6.0.0']),
     ]);
 
+    expect(judge.versionsOf('dice')).toEqual(['6.0.0', '5.3.0', '5.2.4']);
+  });
+
+  test('offers as many versions before the installed one as the user chose', async () => {
+    const { judge } = await lookUp(
+      { modules: { dice: onGithub('owner/dice', { version: '5.2.4' }) } },
+      [githubReleases('owner/dice', ['4.0.0', '5.0.0', '5.1.0', '5.3.0', '6.0.0'])],
+      null,
+      () => 2,
+    );
+
     expect(judge.versionsOf('dice')).toEqual(['6.0.0', '5.3.0', '5.2.4', '5.1.0', '5.0.0']);
   });
 
+  test('follows a change to how many older versions the user chose, the next time it is asked', async () => {
+    let older = 0;
+    const { judge } = await lookUp(
+      { modules: { dice: onGithub('owner/dice', { version: '0.4.0' }) } },
+      [githubReleases('owner/dice', ['0.1.0', '0.2.0', '0.3.0', '0.4.0'])],
+      null,
+      () => older,
+    );
+    expect(judge.versionsOf('dice')).toEqual(['0.4.0']);
+
+    older = 1;
+    expect(judge.versionsOf('dice')).toEqual(['0.4.0', '0.3.0']);
+    older = 10;
+    expect(judge.versionsOf('dice')).toEqual(['0.4.0', '0.3.0', '0.2.0', '0.1.0']);
+  });
+
   test('offers the two versions before the installed one even when it is the newest', async () => {
-    const { judge } = await lookUp({ modules: { dice: onGithub('owner/dice', { version: '0.4.0' }) } }, [
-      githubReleases('owner/dice', ['0.1.0', '0.2.0', '0.3.0', '0.4.0']),
-    ]);
+    const { judge } = await lookUp(
+      { modules: { dice: onGithub('owner/dice', { version: '0.4.0' }) } },
+      [githubReleases('owner/dice', ['0.1.0', '0.2.0', '0.3.0', '0.4.0'])],
+      null,
+      () => 2,
+    );
 
     expect(judge.versionsOf('dice')).toEqual(['0.4.0', '0.3.0', '0.2.0']);
   });
 
   test('counts the versions before one written with a leading v, as the release tags write them without', async () => {
-    const { judge } = await lookUp({ modules: { dice: onGithub('owner/dice', { version: 'v0.4.0' }) } }, [
-      githubReleases('owner/dice', ['0.1.0', '0.2.0', '0.3.0', '0.5.0']),
-    ]);
+    const { judge } = await lookUp(
+      { modules: { dice: onGithub('owner/dice', { version: 'v0.4.0' }) } },
+      [githubReleases('owner/dice', ['0.1.0', '0.2.0', '0.3.0', '0.5.0'])],
+      null,
+      () => 2,
+    );
 
     expect(judge.versionsOf('dice')).toEqual(['0.5.0', 'v0.4.0', '0.3.0', '0.2.0']);
   });
@@ -631,8 +675,17 @@ describe('the reports', () => {
    */
   const said = (solved: SetupSolve) => JSON.stringify(solved);
 
-  test('consider the version chosen of each module, the two before it and newer ones, never older', async () => {
+  test('consider the version chosen of each module and newer ones, never older, by default', async () => {
     const { judge, active } = await lookUp({ modules: { dice } }, [releases]);
+
+    const solved = await judge.reportSolve(active, { modules: new Map([['dice', '4.0.0']]) });
+
+    expect(said(solved)).toContain('5.0.0');
+    for (const version of ['1.0.0', '2.0.0', '3.0.0']) expect(said(solved)).not.toContain(version);
+  });
+
+  test('consider the version chosen of each module, as many before it as the user chose, and newer ones', async () => {
+    const { judge, active } = await lookUp({ modules: { dice } }, [releases], null, () => 2);
 
     const solved = await judge.reportSolve(active, { modules: new Map([['dice', '4.0.0']]) });
 
@@ -641,7 +694,7 @@ describe('the reports', () => {
   });
 
   test('count from the version chosen, not the one installed', async () => {
-    const { judge, active } = await lookUp({ modules: { dice } }, [releases]);
+    const { judge, active } = await lookUp({ modules: { dice } }, [releases], null, () => 2);
 
     const solved = await judge.reportSolve(active, { modules: new Map([['dice', '5.0.0']]) });
 
@@ -653,9 +706,12 @@ describe('the reports', () => {
   test('count a version written with a leading v as the same version, so the range is still found', async () => {
     // socketlib's manifest gives `v1.1.4`, which Foundry reports as installed, where its release tags give `1.1.4`.
     const prefixed = onGithub('owner/dice', { version: 'v4.0.0', compatibility: { minimum: '15', verified: '15' } });
-    const { judge, active } = await lookUp({ modules: { dice: prefixed } }, [
-      githubReleases('owner/dice', ['1.0.0', '2.0.0', '3.0.0', '5.0.0']),
-    ]);
+    const { judge, active } = await lookUp(
+      { modules: { dice: prefixed } },
+      [githubReleases('owner/dice', ['1.0.0', '2.0.0', '3.0.0', '5.0.0'])],
+      null,
+      () => 2,
+    );
 
     const solved = await judge.reportSolve(active, { modules: new Map() });
 
@@ -664,7 +720,7 @@ describe('the reports', () => {
   });
 
   test('consider every older version when fewer than two are known', async () => {
-    const { judge, active } = await lookUp({ modules: { dice } }, [releases]);
+    const { judge, active } = await lookUp({ modules: { dice } }, [releases], null, () => 2);
 
     const solved = await judge.reportSolve(active, { modules: new Map([['dice', '2.0.0']]) });
 
@@ -1022,6 +1078,21 @@ describe('createVersionJudge with EMMA’s catalogue', () => {
       expect(check.modules.map(reported => reported.id)).toEqual(['dice']);
       expect(check.setup.modules).toBe(1);
       expect(judge.reportPlan(active, choices).map(entry => entry.id)).not.toContain('synth');
+    });
+  });
+
+  test('recommends the newest version of a module that works, as a change to the setup', async () => {
+    const { judge } = await lookUpWithCatalogue({ modules: { dice: onGithub('owner/dice', { version: '1.0.0' }) } }, [
+      universe([held('dice', '1.0.0'), held('dice', '1.1.0')]),
+    ]);
+
+    const solved = await judge.reportSolve(['dice'], { modules: new Map() });
+
+    expect(solved.solution).toEqual({
+      kind: 'found',
+      changes: [
+        { package: { type: 'module', id: 'dice' }, title: expect.any(String) as string, from: '1.0.0', to: '1.1.0' },
+      ],
     });
   });
 

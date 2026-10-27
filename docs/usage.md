@@ -170,8 +170,9 @@ System button while it looks.
 ### Choosing versions
 
 Once the versions are found, each module staged active that has other versions to choose has its version badge
-replaced by a drop-down, in the same colours. A module offers the version installed, the two versions before it, to
-give a hypothetical setup some room, and every newer one; anything older is left out. Click it, or **Tab** to it and
+replaced by a drop-down, in the same colours. A module offers the version installed and every newer one; older
+versions are left out, unless you choose to be shown some with the **Show older versions** setting (see
+[Settings](#settings)). Click it, or **Tab** to it and
 press **Enter**, to list those versions, newest first. The version shown on the badge is left out of the list, and
 once you have chosen another version, the installed one is listed too, to go back to. Each version has the badge
 Foundry would give it: green when verified for your Foundry version, red when it needs another Foundry version or a module it requires
@@ -225,7 +226,7 @@ pressed while its report is open, and pressing it again closes the report:
   or system version it is not verified with), what it advises (a module it recommends that is not active), and whether
   it is not known, or known only from a listing and so checked without its dependencies.
 - **Update** (an arrow up in a circle): the best versions of the active modules for the Foundry version and system
-  chosen: the newest version of each, from two versions before the one chosen up, that works with the others' and with
+  chosen: the newest version of each, from the one chosen up, that works with the others' and with
   that Foundry version and system. A version that is only a compatibility risk (not verified for this Foundry, but not
   ruled out) is acceptable; one that needs another Foundry version, does not support the system version, or declares
   no compatibility at all is not, nor is a pre-release. It lists the versions to change, and modules an active module
@@ -241,10 +242,10 @@ staged active. Every report open then reports on the setup with those versions, 
 **Update** is worked out again, and the **Plan** and the **Check**, if open, follow. Only the **Update** works out the
 best versions, which may take requests, so opening the **Plan** or the **Check** alone makes none.
 
-The reports consider the version chosen of each package, the two versions before it and every newer one. That gives a
-hypothetical setup some room, while older versions, which few go back to and which are the ones most often missing,
-incomplete or gone, are left out. So the **Update** never recommends a version more than two before the one chosen,
-and its explanations do not name older versions. A module an active module needs, which is not active, counts from
+The reports consider the version chosen of each package and every newer one, and as many versions before it as
+**Show older versions** says: none by default, as installing an older version into an existing world is risky, its data
+not always going back, and the oldest versions are the ones most often missing, incomplete or gone. So by default the
+**Update** never recommends an older version than the one chosen, and its explanations do not name older versions. A module an active module needs, which is not active, counts from
 its installed version, if it is installed. Each report scrolls beneath its buttons, which stay in view.
 
 The download button at the top of each report downloads it as a plain text file (`emma-plan.txt`, `emma-check.txt` or
@@ -342,6 +343,16 @@ Automatically activate/deactivate recommended modules
 : A setting for each GM, off by default; players are not offered it, as only GMs change which modules are active. When
   on, activating a module, by checking it in the list view or moving it to the active side of the split view, also
   activates the modules it recommends, and deactivating it deactivates them again, as it does for required modules.
+
+Show older versions
+: A setting for each GM, under **Game Settings**: how many versions before the one installed hypothetical mode offers in
+  each version drop-down, and its reports consider, from 0 (the default) to 20. Older versions are rarely safe to
+  install into an existing world, but one or two let you try rolling an update back: say a module update brought a
+  change you dislike. Set this to 1, choose the version before in hypothetical mode and run the **Check**. If it finds
+  no problems, install that version from the manifest URL in the **Plan**, and restore the world from the backup you
+  made before updating. Each version shown is judged against every other, so showing many older versions can make
+  hypothetical mode noticeably slower. A change applies the next time versions are judged, such as when you next open
+  a drop-down or a report. Players are not offered it, as only GMs have hypothetical mode.
 
 Module details
 : A menu every user can open under **Game Settings**, choosing the details their drawers show for themselves. See

@@ -84,7 +84,8 @@ export interface VersionJudge {
    */
   lookUp(ids: Iterable<string>): Promise<void>;
   /**
-   * The versions of a module that may be chosen: the installed one, the two before it and every newer one found.
+   * The versions of a module that may be chosen: the installed one, as many before it as the user chose to be shown, and
+   * every newer one found.
    * @param id - The module ID
    * @returns The versions, newest first; none for a module not looked up
    */
@@ -179,6 +180,8 @@ interface VersionCatalogue {
   readonly titles: ReadonlyMap<string, string>;
   /** The modules that cannot be had, and why, keyed by module ID: nothing of them is resolved or judged. */
   readonly unavailable: ReadonlyMap<string, Omit<UnavailableModule, 'title'>>;
+  /** How many versions before the one installed, or chosen, are offered and considered, as the user chose. */
+  readonly olderVersions: () => number;
 }
 
 /**
@@ -230,6 +233,11 @@ export interface FindOptions {
   readonly fetch?: typeof globalThis.fetch;
   /** Where fetched data is kept; for the session by default. */
   readonly cache?: SourceCache;
+  /**
+   * How many versions before the one installed, or chosen, are offered and considered: read on every judgement, so a
+   * change is followed. None by default.
+   */
+  readonly olderVersions?: () => number;
 }
 
 /**
@@ -316,6 +324,7 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
     clientVersion = null,
     catalogue: lookupCatalogue = null,
     cache = sessionCache,
+    olderVersions = () => 0,
   } = options;
   const send = options.fetch ?? globalThis.fetch.bind(globalThis);
   const http = httpClient({
@@ -403,6 +412,7 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
       ...installed.map(pkg => [packageKey({ type: 'module', id: pkg.id }), pkg.title] as const),
     ]),
     unavailable: new Map<string, Omit<UnavailableModule, 'title'>>(),
+    olderVersions,
   };
   // Only versions with a release, which every version found has, and the installed one does unless its manifest
   // could not be read; such a module is left at its installed version, unjudged.
@@ -564,9 +574,6 @@ function unprefixed(version: string): string {
   return version.replace(/^[vV](?=\d)/, '');
 }
 
-/** How many versions before the one chosen a report still considers, to give a hypothetical setup some room. */
-const VERSIONS_BEFORE = 2;
-
 /**
  * Whether Foundry counts one version as newer than another, a leading `v` aside.
  * @param a - A version
@@ -578,22 +585,24 @@ function newer(a: string, b: string): boolean {
 }
 
 /**
- * The oldest version a report considers of a package: two versions before the one chosen, or the oldest known if
- * fewer are older.
+ * The oldest version offered or considered of a package: so many versions before the one chosen, or the oldest known
+ * if fewer are older; the one chosen if none are wanted.
  * @param chosen - The version chosen
  * @param known - Every version known of the package
- * @returns The oldest version to consider
+ * @param before - How many older versions are wanted
+ * @returns The oldest version to offer or consider
  */
-function floorOf(chosen: string, known: readonly string[]): string {
+function floorOf(chosen: string, known: readonly string[], before: number): string {
   const older = newestFirst(known.map(unprefixed).filter(version => newer(chosen, version)));
-  return older[Math.min(VERSIONS_BEFORE, older.length) - 1] ?? chosen;
+  return older[Math.min(before, older.length) - 1] ?? chosen;
 }
 
 /**
- * The releases a report considers: of the core, the system and each module, the version the setup has, the two
- * before it and every newer one. Few go back further, and the oldest releases are the ones most often missing,
- * incomplete or gone, which only filled the reports with versions that could not be judged. A module the setup does
- * not have counts from its installed version, if it is installed.
+ * The releases a report considers: of the core, the system and each module, the version the setup has, as many before
+ * it as the user chose to be shown (none by default), and every newer one. Older versions are risky to install into an
+ * existing world, and the oldest releases are the ones most often missing, incomplete or gone, which only filled the
+ * reports with versions that could not be judged. A module the setup does not have counts from its installed version,
+ * if it is installed.
  * @param catalogue - The releases found
  * @param setup - The setup reported on
  * @returns The universe, without the older releases
@@ -612,10 +621,14 @@ function reportUniverseOf(
     const key = packageKey(release.package);
     known.set(key, [...(known.get(key) ?? []), release.version]);
   }
-  const floors = new Map([...chosen].map(([key, version]) => [key, floorOf(version, known.get(key) ?? [])] as const));
+  const before = catalogue.olderVersions();
+  const floors = new Map(
+    [...chosen].map(([key, version]) => [key, floorOf(version, known.get(key) ?? [], before)] as const),
+  );
   const coreFloor = floorOf(
     setup.core,
     catalogue.cores.map(({ version }) => version),
+    before,
   );
   const atLeast = (version: string, floor: string | undefined) => floor === undefined || !newer(floor, version);
   return {
@@ -672,8 +685,8 @@ function platformVersions(catalogue: VersionCatalogue, part: PlatformPart): stri
 }
 
 /**
- * The versions of a module that may be chosen: the installed one, the two before it, which leave a hypothetical setup
- * some room, and every newer one.
+ * The versions of a module that may be chosen: the installed one, as many before it as the user chose to be shown
+ * (none by default), and every newer one.
  * @param catalogue - The releases found
  * @param versions - Every version found of each module, keyed by module ID
  * @param id - The module ID
@@ -686,7 +699,7 @@ function choosable(
 ): string[] {
   const found = versions.get(id) ?? [];
   const installed = catalogue.installed.get(id);
-  const floor = installed === undefined ? undefined : floorOf(installed, found);
+  const floor = installed === undefined ? undefined : floorOf(installed, found, catalogue.olderVersions());
   return newestFirst(found.filter(version => floor === undefined || !newer(floor, version)));
 }
 

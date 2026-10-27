@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import {
   getDrawerFields,
   getHypotheticallyIgnored,
+  getOlderVersions,
   getVersionProxy,
   getVersionProxyKey,
   getVersionProxyMode,
@@ -67,6 +68,53 @@ describe('registerSettings', () => {
         default: ['description', 'authors', 'languages'],
       }),
     );
+  });
+});
+
+describe('getOlderVersions', () => {
+  test('registers the per-user setting, a whole number from 0 to 20, none by default, in Game Settings for GMs', () => {
+    const { game } = installFoundryMocks();
+
+    registerGmSettings();
+
+    expect(game.settings.register).toHaveBeenCalledWith('mondarth-emma', 'olderVersions', {
+      name: 'MONDARTH-EMMA.Settings.OlderVersions.Name',
+      hint: 'MONDARTH-EMMA.Settings.OlderVersions.Hint',
+      scope: 'user',
+      config: true,
+      type: Number,
+      range: { min: 0, max: 20, step: 1 },
+      default: 0,
+    });
+    expect(getOlderVersions()).toBe(0);
+  });
+
+  test('is not offered to players, who have no hypothetical mode', () => {
+    const { game } = installFoundryMocks({ isGM: false });
+
+    registerGmSettings();
+
+    expect(game.settings.register).toHaveBeenCalledWith(
+      'mondarth-emma',
+      'olderVersions',
+      expect.objectContaining({ config: false }),
+    );
+  });
+
+  test('follows the setting, as a whole number within its range', async () => {
+    const { game } = installFoundryMocks();
+    registerGmSettings();
+
+    for (const [chosen, read] of [
+      [2, 2],
+      [2.7, 2],
+      [-3, 0],
+      [99, 20],
+      [Number.NaN, 0],
+    ] as const) {
+      await game.settings.set('mondarth-emma', 'olderVersions', chosen);
+      expect(getOlderVersions()).toBe(read);
+    }
   });
 });
 
