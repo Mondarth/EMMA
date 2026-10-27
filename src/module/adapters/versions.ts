@@ -718,18 +718,20 @@ function setupOf(catalogue: VersionCatalogue, active: Iterable<string>, choices:
 }
 
 /**
- * The release a module taken as present stands for: at its version, with no compatibility, so that it suits every core
- * and what requires it is satisfied, and with no relationships, so that it asks nothing of the setup.
+ * The release a module taken as present stands for: at its version, verified with the setup's core, so that it suits
+ * it and what requires it is satisfied, and with no relationships, so that it asks nothing of the setup. It declares
+ * that compatibility rather than none, as the update's policy refuses a release that declares none.
  * @param key - The module's package key
  * @param version - Its version in the setup
+ * @param core - The setup's core version
  * @returns The release
  */
-function assumedRelease(key: string, version: string): Release {
+function assumedRelease(key: string, version: string, core: string): Release {
   const id = key.slice('module:'.length);
   return {
     package: { type: 'module', id },
     version,
-    compatibility: {},
+    compatibility: { minimum: core, verified: core },
     relationships: { requires: [], systems: [], conflicts: [], recommends: [] },
     protected: false,
     origin: `modules/${id}/module.json`,
@@ -745,7 +747,7 @@ function assumedRelease(key: string, version: string): Release {
 function assumedReleases(setup: Setup): Release[] {
   return setup.modules
     .filter(({ package: key }) => setup.assumed?.has(key) === true)
-    .map(({ package: key, version }) => assumedRelease(key, version));
+    .map(({ package: key, version }) => assumedRelease(key, version, setup.core));
 }
 
 /**
@@ -804,7 +806,7 @@ function releasesByKey(releases: readonly Release[]): ReadonlyMap<string, readon
 function checkSetup(catalogue: VersionCatalogue, setup: Setup): readonly ReleaseCheck[] {
   const byKey = releasesByKey(catalogue.releases);
   const releases = [setup.system, ...setup.modules].flatMap(({ package: key, version }) => {
-    if (setup.assumed?.has(key) === true) return [assumedRelease(key, version)];
+    if (setup.assumed?.has(key) === true) return [assumedRelease(key, version, setup.core)];
     const release = byKey.get(key)?.find(candidate => sameVersion(candidate.version, version));
     return release === undefined ? [] : [release];
   });

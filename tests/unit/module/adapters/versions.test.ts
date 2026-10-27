@@ -965,21 +965,22 @@ describe('createVersionJudge with EMMA’s catalogue', () => {
     /**
      * Look up dice, which requires synth, a module with no manifest the sources can read, which hypothetical mode is
      * told to ignore.
+     * @param versions - The versions of dice the catalogue holds; only the installed one by default
      * @returns The judge, the choices that ignore synth, and the modules active
      */
-    async function withSynthetic() {
-      const dice = {
-        ...held('dice', '1.0.0'),
+    async function withSynthetic(versions: readonly string[] = ['1.0.0']) {
+      const dice = (version: string) => ({
+        ...held('dice', version),
         relationships: {
           requires: [{ package: { type: 'module', id: 'synth' }, compatibility: {} }],
           systems: [],
           conflicts: [],
           recommends: [],
         },
-      };
+      });
       const found = await lookUpWithCatalogue(
         { modules: { dice: onGithub('owner/dice', { version: '1.0.0' }), synth: { active: true, version: '0.0.1' } } },
-        [universe([dice])],
+        [universe(versions.map(dice))],
       );
       const choices = { modules: new Map<string, string>(), ignored: new Set(['synth']) };
       return { ...found, choices, active: ['dice', 'synth'] };
@@ -994,6 +995,21 @@ describe('createVersionJudge with EMMA’s catalogue', () => {
       expect(judge.judgeVersions(active, choices, 'synth')).toEqual([]);
       // Taken as present, it leaves nothing unknown in the setup checked.
       expect(judge.reportCheck(active, choices).valid).toBe(true);
+    });
+
+    // Regression: the release standing for it declared no compatibility, which the update's policy refuses, so with any
+    // module ignored the update found no setup at all.
+    test('lets the update find the best versions of the others, changing it not at all', async () => {
+      const { judge, choices, active } = await withSynthetic(['1.0.0', '1.1.0']);
+
+      const solved = await judge.reportSolve(active, choices);
+
+      expect(solved.solution).toEqual({
+        kind: 'found',
+        changes: [
+          { package: { type: 'module', id: 'dice' }, title: expect.any(String) as string, from: '1.0.0', to: '1.1.0' },
+        ],
+      });
     });
 
     test('leaves it out of the fit of each core or system version, and of the reports', async () => {
