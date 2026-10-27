@@ -1031,10 +1031,14 @@ test.describe('Hypothetical versions', () => {
       'The best versions are found. Every active module is already at its best version.',
     );
 
-    for (const [shown, name, text] of [
-      [planWindow, 'emma-plan.txt', 'mondarth-emma'],
-      [checkWindow, 'emma-check.txt', 'Every package can be used in this setup.'],
+    for (const [style, shown, name, text] of [
+      ['plan', planWindow, 'emma-plan.txt', 'mondarth-emma'],
+      ['check', checkWindow, 'emma-check.txt', 'Every package can be used in this setup.'],
     ] as const) {
+      // The windows opened after it overlap it, as cascaded windows do: bring it to the front first.
+      await page.evaluate(id => {
+        foundry.applications.instances.get(id)?.bringToFront();
+      }, `${MODULE_ID}-report-${style}`);
       const download = page.waitForEvent('download');
       await shown.getByRole('button', { name: 'Download this report as text' }).click();
       const saved = await download;
@@ -1046,6 +1050,10 @@ test.describe('Hypothetical versions', () => {
     await plan.click();
     await expect(planWindow).toHaveCount(0);
     await expect(plan).toHaveAttribute('aria-pressed', 'false');
+    // Clicking EMMA brought it to the front, over the report.
+    await page.evaluate(id => {
+      foundry.applications.instances.get(id)?.bringToFront();
+    }, `${MODULE_ID}-report-check`);
     await clickClose(page, `#${MODULE_ID}-report-check`);
     await expect(checkWindow).toHaveCount(0);
     await expect(check).toHaveAttribute('aria-pressed', 'false');

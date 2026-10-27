@@ -4,7 +4,7 @@ import EmmaRoot from '@component/EmmaRoot.svelte';
 import { canManageModules, listInstalledModules, readActivation } from '@module/adapters/modules';
 import { isGM, readPlatform } from '@module/adapters/platform';
 import { createVersionJudge } from '@module/adapters/versions';
-import type { ReportStyle, SetupReportData, SetupReports } from '@module/app/setup-report';
+import type { ReportAnchor, ReportStyle, SetupReportData, SetupReports } from '@module/app/setup-report';
 import { closeSetupReport, closeSetupReports, openSetupReports, showSetupReport } from '@module/app/setup-report';
 import type { DiscardClosingOptions, DiscardQuestion } from '@module/app/confirm-discard';
 import { confirmDiscard } from '@module/app/confirm-discard';
@@ -35,25 +35,31 @@ const DISCARD: DiscardQuestion = {
   body: 'MONDARTH-EMMA.Discard.Body',
 };
 
-/** The reports' windows, which log what fails to open or close. */
-const REPORTS: SetupReports = {
-  open: openSetupReports,
-  show: (style: ReportStyle, report: SetupReportData) => {
-    showSetupReport(style, report).catch((error: unknown) => {
-      log.error('Unable to show the setup report', error);
-    });
-  },
-  close: (style: ReportStyle) => {
-    closeSetupReport(style).catch((error: unknown) => {
-      log.error('Unable to close the setup report', error);
-    });
-  },
-  closeAll: () => {
-    closeSetupReports().catch((error: unknown) => {
-      log.error('Unable to close the setup reports', error);
-    });
-  },
-};
+/**
+ * The reports' windows, which open clear of EMMA's window and log what fails to open or close.
+ * @param anchor - Where EMMA's window is, if it is open
+ * @returns The reports' windows
+ */
+function reportsFor(anchor: () => ReportAnchor | undefined): SetupReports {
+  return {
+    open: openSetupReports,
+    show: (style: ReportStyle, report: SetupReportData) => {
+      showSetupReport(style, report, anchor()).catch((error: unknown) => {
+        log.error('Unable to show the setup report', error);
+      });
+    },
+    close: (style: ReportStyle) => {
+      closeSetupReport(style).catch((error: unknown) => {
+        log.error('Unable to close the setup report', error);
+      });
+    },
+    closeAll: () => {
+      closeSetupReports().catch((error: unknown) => {
+        log.error('Unable to close the setup reports', error);
+      });
+    },
+  };
+}
 
 /**
  * The EMMA window: an `ApplicationV2` frame whose content is rendered entirely by the {@link EmmaRoot} Svelte
@@ -129,7 +135,14 @@ export class EmmaApp extends foundry.applications.api.ApplicationV2 {
                 clientVersion: game.modules.get(MODULE_ID)?.version ?? null,
               })
           : undefined,
-        reports: isGM() ? REPORTS : undefined,
+        reports: isGM()
+          ? reportsFor(() => {
+              const bar = content.querySelector('[role="toolbar"]');
+              return bar === null
+                ? undefined
+                : { window: this.element.getBoundingClientRect(), toolbar: bar.getBoundingClientRect() };
+            })
+          : undefined,
         fields: drawerFields,
         onSave: () => saveModules(modules),
         onViewChange: (view: View) => {

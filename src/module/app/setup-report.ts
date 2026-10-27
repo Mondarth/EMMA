@@ -13,6 +13,14 @@ export type { SetupReportData } from '@module/adapters/report';
 /** One of the reports, each shown in its own window. */
 export type { ReportStyle } from '@module/lib/report-text';
 
+/** Where EMMA's window and its toolbar are on screen, which a report's window opens clear of. */
+export interface ReportAnchor {
+  /** EMMA's window. */
+  readonly window: DOMRect;
+  /** Its toolbar, whose report buttons stay in reach. */
+  readonly toolbar: DOMRect;
+}
+
 /** The reports' windows, as EMMA's window opens and closes them; each can be open beside the others. */
 export interface SetupReports {
   /** The reports open, read reactively. */
@@ -37,6 +45,41 @@ const SIZE = { width: 560, height: 600 };
 
 /** How far each report's window opens from the one before it, so that those open together do not hide each other. */
 const CASCADE = 32;
+
+/** The space between EMMA's window and a report's. */
+const GAP = 8;
+
+/**
+ * Where a report's window opens, each a little further along than the one before it. Beside EMMA's window, where there
+ * is room for every report there; otherwise just below its toolbar, so the report buttons stay in reach. Without EMMA's
+ * window, in the middle of the screen.
+ * @param style - Which report
+ * @param anchor - Where EMMA's window is
+ * @returns The window's position
+ */
+export function reportPosition(
+  style: ReportStyle,
+  anchor?: ReportAnchor,
+): { left: number; top: number; width: number; height: number } {
+  const offset = REPORT_STYLES.indexOf(style) * CASCADE;
+  const furthest = (REPORT_STYLES.length - 1) * CASCADE;
+  let left = (window.innerWidth - SIZE.width) / 2;
+  let top = (window.innerHeight - SIZE.height) / 2;
+  if (anchor !== undefined) {
+    const beside = anchor.window.right + GAP;
+    if (beside + furthest + SIZE.width <= window.innerWidth) {
+      left = beside;
+      top = anchor.window.top;
+    } else {
+      left = anchor.window.left + GAP;
+      top = anchor.toolbar.bottom + GAP;
+    }
+  }
+  left = Math.max(0, left + offset);
+  top = Math.max(0, top + offset);
+  // As tall as it can be, up to its size, without going off the bottom of the screen.
+  return { left, top, width: SIZE.width, height: Math.min(SIZE.height, Math.max(200, window.innerHeight - top)) };
+}
 
 /**
  * A window showing one report on the setup chosen in hypothetical mode, opened from EMMA's toolbar. As with
@@ -63,13 +106,14 @@ export class SetupReportApp extends foundry.applications.api.ApplicationV2 {
    * @param style - Which report it shows
    * @param report - What it reports
    * @param options - Options for the window
+   * @param anchor - Where EMMA's window is, which it opens clear of
    */
   constructor(
     style: ReportStyle,
     report: SetupReportData,
     options: ConstructorParameters<typeof foundry.applications.api.ApplicationV2>[0] = {},
+    anchor?: ReportAnchor,
   ) {
-    const offset = REPORT_STYLES.indexOf(style) * CASCADE;
     super({
       id: `${MODULE_ID}-report-${style}`,
       window: {
@@ -77,11 +121,7 @@ export class SetupReportApp extends foundry.applications.api.ApplicationV2 {
         icon: `fa-solid ${REPORT_ICONS[style]}`,
         resizable: true,
       },
-      position: {
-        ...SIZE,
-        left: Math.max(0, (window.innerWidth - SIZE.width) / 2 + offset),
-        top: Math.max(0, (window.innerHeight - SIZE.height) / 2 + offset),
-      },
+      position: reportPosition(style, anchor),
       ...options,
     });
     this.#style = style;
@@ -172,11 +212,16 @@ function forget(style: ReportStyle, app: SetupReportApp): void {
  * Show a report, in place of the same report if it is open; the others stay open.
  * @param style - Which report
  * @param report - What it reports
+ * @param anchor - Where EMMA's window is, which the report opens clear of
  * @returns Once the window is rendered
  */
-export async function showSetupReport(style: ReportStyle, report: SetupReportData): Promise<void> {
+export async function showSetupReport(
+  style: ReportStyle,
+  report: SetupReportData,
+  anchor?: ReportAnchor,
+): Promise<void> {
   await shown.get(style)?.close();
-  const app = new SetupReportApp(style, report);
+  const app = new SetupReportApp(style, report, {}, anchor);
   shown.set(style, app);
   opened.add(style);
   try {

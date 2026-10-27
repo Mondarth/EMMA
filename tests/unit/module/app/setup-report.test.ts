@@ -105,6 +105,49 @@ describe('SetupReportApp', () => {
   });
 });
 
+describe('reportPosition', () => {
+  /**
+   * Where EMMA's window and toolbar are.
+   * @param left - The window's left edge
+   * @param width - The window's width
+   * @returns The anchor
+   */
+  function anchor(left: number, width: number) {
+    return {
+      window: new DOMRect(left, 50, width, 700),
+      toolbar: new DOMRect(left, 80, width, 40),
+    };
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal('innerWidth', 1920);
+    vi.stubGlobal('innerHeight', 1080);
+  });
+
+  test('opens beside EMMA’s window when every report fits there, each a little further along', async () => {
+    const { reportPosition } = await loadReport();
+
+    expect(reportPosition('plan', anchor(100, 800))).toEqual({ left: 908, top: 50, width: 560, height: 600 });
+    expect(reportPosition('update', anchor(100, 800))).toEqual({ left: 972, top: 114, width: 560, height: 600 });
+  });
+
+  test('opens just below EMMA’s toolbar when there is no room beside it, as tall as fits on the screen', async () => {
+    const { reportPosition } = await loadReport();
+    vi.stubGlobal('innerHeight', 600);
+
+    expect(reportPosition('check', anchor(400, 1200))).toEqual({ left: 440, top: 160, width: 560, height: 440 });
+  });
+
+  test('opens in the middle of the screen without EMMA’s window, never off its top or left', async () => {
+    const { reportPosition } = await loadReport();
+
+    expect(reportPosition('plan')).toEqual({ left: 680, top: 240, width: 560, height: 600 });
+    vi.stubGlobal('innerWidth', 400);
+    vi.stubGlobal('innerHeight', 300);
+    expect(reportPosition('plan')).toEqual({ left: 0, top: 0, width: 560, height: 300 });
+  });
+});
+
 describe('downloading', () => {
   beforeEach(() => {
     document.body.replaceChildren();

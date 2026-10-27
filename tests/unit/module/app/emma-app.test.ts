@@ -258,6 +258,42 @@ describe('EmmaApp', () => {
       expect(document.querySelector('.emma-report')).toBeNull();
     });
 
+    test('opens a report just below its toolbar when there is no room beside its window', async () => {
+      await inHypothetical();
+      // The module EMMA loaded, after the mocks.
+      const { SetupReportApp } = await import('@module/app/setup-report');
+      // EMMA's window fills the width of the screen.
+      const frame = screen.getByRole('toolbar').closest('#mondarth-emma-app');
+      if (frame === null) throw new Error('EMMA’s window is not open');
+      vi.spyOn(frame, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, window.innerWidth, 700));
+      vi.spyOn(screen.getByRole('toolbar'), 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 10, 1024, 30));
+      const render = vi.spyOn(SetupReportApp.prototype, 'render');
+
+      await userEvent.click(screen.getByRole('button', { name: PLAN }));
+
+      await vi.waitFor(() => {
+        expect(render).toHaveBeenCalled();
+      });
+      const [opened] = render.mock.contexts as InstanceType<typeof SetupReportApp>[];
+      expect((opened?.options as { position?: { top: number } }).position?.top).toBe(48);
+    });
+
+    test('opens a report in the middle of the screen when its toolbar cannot be found', async () => {
+      await inHypothetical();
+      // The module EMMA loaded, after the mocks.
+      const { SetupReportApp } = await import('@module/app/setup-report');
+      screen.getByRole('toolbar').removeAttribute('role');
+      const render = vi.spyOn(SetupReportApp.prototype, 'render');
+
+      await userEvent.click(screen.getByRole('button', { name: PLAN }));
+
+      await vi.waitFor(() => {
+        expect(render).toHaveBeenCalled();
+      });
+      const [opened] = render.mock.contexts as InstanceType<typeof SetupReportApp>[];
+      expect((opened?.options as { position?: { left: number } }).position?.left).toBe((window.innerWidth - 560) / 2);
+    });
+
     test('logs a report window that fails to open', async () => {
       const { foundry } = await inHypothetical();
       const failure = new Error('no window');
