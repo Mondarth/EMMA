@@ -1056,6 +1056,83 @@ describe('createVersionJudge with EMMA’s catalogue', () => {
 
     // Regression: the release standing for it declared no compatibility, which the update's policy refuses, so with any
     // module ignored the update found no setup at all.
+    // Regression: loading a newer dice's manifest while solving listed synth from the manifest its requirement
+    // declares, adding synth's own releases to the update's universe beside the one standing for it: the newest, which
+    // needs a core no one has, was chosen, so no setup was found.
+    test('keeps out of the update the releases of it that loading another module finds', async () => {
+      const SYNTH = 'https://files.test/synth/module.json';
+      const DICE = 'https://files.test/dice/1.1.0/module.json';
+      const needsSynth = {
+        requires: [{ package: { type: 'module', id: 'synth' }, compatibility: {}, manifest: SYNTH }],
+        systems: [],
+        conflicts: [],
+        recommends: [],
+      };
+      const newer = {
+        ...held('dice', '1.1.0'),
+        detail: 'listed',
+        manifest: DICE,
+        relationships: { requires: [], systems: [], conflicts: [], recommends: [] },
+      };
+      const found = await lookUpWithCatalogue(
+        // Hypothetical mode never looks an ignored module up, so only dice is.
+        { modules: { dice: onGithub('owner/dice', { version: '1.0.0' }), synth: { version: '0.0.1' } } },
+        [
+          universe([{ ...held('dice', '1.0.0'), relationships: needsSynth }, newer]),
+          ...proxied([
+            [
+              DICE,
+              {
+                id: 'dice',
+                version: '1.1.0',
+                compatibility: { minimum: '14', verified: '14' },
+                relationships: { requires: [{ id: 'synth', type: 'module', manifest: SYNTH }] },
+              },
+            ],
+            [SYNTH, { id: 'synth', version: '0.0.2', compatibility: { minimum: '99', verified: '99' } }],
+          ]),
+        ],
+      );
+      const choices = { modules: new Map<string, string>(), ignored: new Set(['synth']) };
+
+      const solved = await found.judge.reportSolve(['dice', 'synth'], choices);
+
+      expect(solved.solution).toEqual({
+        kind: 'found',
+        changes: [
+          { package: { type: 'module', id: 'dice' }, title: expect.any(String) as string, from: '1.0.0', to: '1.1.0' },
+        ],
+      });
+    });
+
+    // Regression: a module requiring a newer version of it than the one installed, which the release standing for it
+    // has, could not be satisfied: the update found no setup, saying no version of it would do.
+    test('satisfies whatever version of it the others require, as it is taken as present', async () => {
+      const dice = {
+        ...held('dice', '1.0.0'),
+        relationships: {
+          requires: [{ package: { type: 'module', id: 'synth' }, compatibility: { minimum: '0.2.0' } }],
+          systems: [],
+          conflicts: [],
+          recommends: [],
+        },
+      };
+      const found = await lookUpWithCatalogue(
+        { modules: { dice: onGithub('owner/dice', { version: '1.0.0' }), synth: { version: '0.0.1' } } },
+        [universe([dice])],
+      );
+      const active = ['dice', 'synth'];
+      const choices = { modules: new Map<string, string>(), ignored: new Set(['synth']) };
+
+      const solved = await found.judge.reportSolve(active, choices);
+
+      expect(solved.solution).toEqual({ kind: 'found', changes: [] });
+      expect(found.judge.reportCheck(active, choices).valid).toBe(true);
+      expect(found.judge.judgeChoices(active, choices).get('dice')?.badge?.tooltip).toBe(
+        `availability ${String(VERIFIED)}`,
+      );
+    });
+
     test('lets the update find the best versions of the others, changing it not at all', async () => {
       const { judge, choices, active } = await withSynthetic(['1.0.0', '1.1.0']);
 
