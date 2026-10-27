@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import {
+  getBadgeChecks,
   getDrawerFields,
   getHypotheticallyIgnored,
   getOlderVersions,
@@ -22,6 +23,7 @@ import {
 } from '@module/settings';
 import { obscure } from '@module/lib/obscure';
 import { drawerFields } from '@module/state/drawer-fields.svelte';
+import { badgeChecks, setBadgeChecks } from '@module/state/badge-checks.svelte';
 import { ignoredModules } from '@module/state/hypothetical-ignored.svelte';
 import { installFoundryMocks } from '../mocks/foundry';
 
@@ -180,6 +182,46 @@ describe('isEmmaDisabled', () => {
     await game.settings.set('mondarth-emma', 'disabled', true);
 
     expect(isEmmaDisabled()).toBe(true);
+  });
+});
+
+describe('getBadgeChecks', () => {
+  test('registers the per-user setting in Game Settings for every user, EMMA’s checks by default', () => {
+    const { game } = installFoundryMocks({ isGM: false });
+
+    registerSettings();
+
+    expect(game.settings.register).toHaveBeenCalledWith(
+      'mondarth-emma',
+      'badgeChecks',
+      expect.objectContaining({
+        name: 'MONDARTH-EMMA.Settings.BadgeChecks.Name',
+        hint: 'MONDARTH-EMMA.Settings.BadgeChecks.Hint',
+        scope: 'user',
+        config: true,
+        type: String,
+        choices: {
+          emma: 'MONDARTH-EMMA.Settings.BadgeChecks.Emma',
+          foundry: 'MONDARTH-EMMA.Settings.BadgeChecks.Foundry',
+        },
+        default: 'emma',
+      }),
+    );
+    expect(getBadgeChecks()).toBe('emma');
+  });
+
+  test('follows the setting, taking anything but Foundry’s as EMMA’s, and so does every open window', async () => {
+    const { game } = installFoundryMocks();
+    registerSettings();
+    setBadgeChecks('emma');
+
+    await game.settings.set('mondarth-emma', 'badgeChecks', 'foundry');
+    expect(getBadgeChecks()).toBe('foundry');
+    expect(badgeChecks.value).toBe('foundry');
+
+    await game.settings.set('mondarth-emma', 'badgeChecks', 'other');
+    expect(getBadgeChecks()).toBe('emma');
+    expect(badgeChecks.value).toBe('emma');
   });
 });
 

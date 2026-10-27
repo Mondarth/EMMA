@@ -3,7 +3,7 @@ import { mount, unmount } from 'svelte';
 import EmmaRoot from '@component/EmmaRoot.svelte';
 import { canManageModules, listInstalledModules, readActivation } from '@module/adapters/modules';
 import { isGM, readPlatform } from '@module/adapters/platform';
-import { createVersionJudge } from '@module/adapters/versions';
+import { createInstalledJudge, createVersionJudge } from '@module/adapters/versions';
 import type { ReportAnchor, ReportStyle, SetupReportData, SetupReports } from '@module/app/setup-report';
 import { closeSetupReport, closeSetupReports, openSetupReports, showSetupReport } from '@module/app/setup-report';
 import type { DiscardClosingOptions, DiscardQuestion } from '@module/app/confirm-discard';
@@ -13,7 +13,9 @@ import { MODULE_ID } from '@module/lib/constants';
 import { log } from '@module/lib/logger';
 import type { View } from '@module/settings';
 import { localize } from '@module/lib/i18n';
+import { setBadgeChecks } from '@module/state/badge-checks.svelte';
 import {
+  getBadgeChecks,
   getDrawerFields,
   getHypotheticallyIgnored,
   getOlderVersions,
@@ -120,6 +122,7 @@ export class EmmaApp extends foundry.applications.api.ApplicationV2 {
     this.#modules = modules;
     drawerFields.set(getDrawerFields());
     setIgnoredModules(getHypotheticallyIgnored());
+    setBadgeChecks(getBadgeChecks());
     this.#component = mount(EmmaRoot, {
       target: content,
       props: {
@@ -137,6 +140,8 @@ export class EmmaApp extends foundry.applications.api.ApplicationV2 {
                 olderVersions: getOlderVersions,
               })
           : undefined,
+        // Read afresh each time the window opens, as modules may have been installed since.
+        judgeInstalled: createInstalledJudge(),
         reports: isGM()
           ? reportsFor(() => {
               const bar = content.querySelector('[role="toolbar"]');

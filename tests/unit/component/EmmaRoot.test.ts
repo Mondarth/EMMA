@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
+import { tick } from 'svelte';
 import { SvelteSet } from 'svelte/reactivity';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
@@ -9,6 +10,8 @@ import { installFoundryMocks } from '../mocks/foundry';
 import { createModules } from './fixtures';
 import { fakeJudge } from '../mocks/versions';
 import { DrawerFields } from '@module/state/drawer-fields.svelte';
+import { setBadgeChecks } from '@module/state/badge-checks.svelte';
+import type { VersionBadge } from '@module/adapters/modules';
 
 const onSave = () => Promise.resolve();
 const LIST = 'MONDARTH-EMMA.Toolbar.List';
@@ -116,6 +119,70 @@ describe('EmmaRoot', () => {
     await userEvent.click(screen.getByRole('button', { name: SPLIT }));
 
     expect(screen.getByRole('button', { name: SPLIT })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  describe('badges', () => {
+    const NATIVE = 'MONDARTH-EMMA.Footer.NativeBadges';
+    const unusable: VersionBadge = { type: 'error', icon: 'fa-solid fa-xmark', tooltip: 'Unusable', text: 'Unusable' };
+
+    /**
+     * Render EMMA with an installed judge that calls every module staged active unusable.
+     * @returns The judge
+     */
+    function renderJudged() {
+      const judgeInstalled = vi.fn(
+        (active: Iterable<string>) => new Map<string, VersionBadge | null>([...active].map(id => [id, unusable])),
+      );
+      render(EmmaRoot, {
+        fields: new DrawerFields(),
+        modules: createModules(),
+        initialView: 'list',
+        initialGrouped: true,
+        canManage: true,
+        onSave,
+        platform: { core: '14.368', system: { id: 'dnd5e', title: 'D&D 5e', version: '5.1.0' } },
+        createVersionJudge: () => fakeJudge({}),
+        judgeInstalled,
+      });
+      return judgeInstalled;
+    }
+
+    const badgeOf = (title: string) =>
+      screen.getByText(title, { selector: '.emma-module-title' }).closest('li')?.querySelector('.emma-badge');
+
+    beforeEach(() => {
+      setBadgeChecks('emma');
+    });
+
+    test('are EMMA’s, judged again as modules are staged active or inactive', async () => {
+      const judgeInstalled = renderJudged();
+      expect(judgeInstalled).toHaveBeenLastCalledWith(['lib-wrapper']);
+      expect(badgeOf('libWrapper')).toHaveClass('error');
+
+      await userEvent.click(screen.getByRole('checkbox', { name: 'EMMA' }));
+
+      expect(judgeInstalled).toHaveBeenLastCalledWith(['emma', 'lib-wrapper']);
+      expect(badgeOf('EMMA')).toHaveClass('error');
+      expect(screen.getByRole('contentinfo')).not.toHaveTextContent(NATIVE);
+    });
+
+    test('are Foundry’s own when the user chose them, with a warning they may be inaccurate, outside hypothetical mode', async () => {
+      const judgeInstalled = renderJudged();
+
+      setBadgeChecks('foundry');
+      await tick();
+
+      // Foundry gives the fixtures no badge.
+      expect(badgeOf('libWrapper')).toBeNull();
+      expect(screen.getByRole('contentinfo')).toHaveTextContent(NATIVE);
+      // Hypothetical mode is always judged as EMMA does.
+      await userEvent.click(screen.getByRole('button', { name: HYPOTHETICAL }));
+      expect(screen.getByRole('contentinfo')).not.toHaveTextContent(NATIVE);
+      judgeInstalled.mockClear();
+      setBadgeChecks('emma');
+      await tick();
+      expect(judgeInstalled).toHaveBeenCalled();
+    });
   });
 
   test('keeps staged changes across view switches', async () => {

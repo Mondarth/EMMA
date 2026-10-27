@@ -46,8 +46,16 @@ Split view
   the buttons between the lists: **<** deactivates the modules selected on the active side, and **>** activates the
   modules selected on the inactive side. Moved modules stay selected, so the opposite button undoes a move.
 
-In both views each module's version is shown as Foundry's own Module Management shows it: in a badge coloured by
-how compatible the module is with your version of Foundry. Hover over the badge for the reason.
+In both views each module's version is shown in a badge, in Foundry's own colours and icons, coloured by how well the
+module suits your world. Hover over the badge for the reason.
+
+By default the badges show EMMA's checks, made from the installed modules alone, without fetching anything. Each
+module is checked against your Foundry version and against the game system and its version, and a module staged
+active is also checked against the modules it requires and conflicts with, among those staged active: staging a module
+active or inactive checks the others again. Foundry's own Module Management checks only the Foundry version, so it can
+show a module as verified that does not work with your game system. To see Foundry's own badges instead, choose
+**Foundry VTT's own checks** under **Badge checks** (see [Settings](#settings)); the footer then warns that they may
+be inaccurate. Hypothetical mode always judges as EMMA does.
 
 | Badge   | Meaning                                                                                       |
 | ------- | --------------------------------------------------------------------------------------------- |
@@ -343,6 +351,13 @@ Automatically activate/deactivate recommended modules
 : A setting for each GM, off by default; players are not offered it, as only GMs change which modules are active. When
   on, activating a module, by checking it in the list view or moving it to the active side of the split view, also
   activates the modules it recommends, and deactivating it deactivates them again, as it does for required modules.
+
+Badge checks
+: A setting for each user: whose checks the version badges show outside hypothetical mode. **EMMA's checks** (the
+  default) judge each module against the Foundry version and the game system and its version, and an active module
+  against what it requires and conflicts with; **Foundry VTT's own checks** judge the Foundry version alone, as
+  Foundry's Module Management does, so may be inaccurate, which the footer says while they are shown. A change shows at
+  once.
 
 Show older versions
 : A setting for each GM, under **Game Settings**: how many versions before the one installed hypothetical mode offers in

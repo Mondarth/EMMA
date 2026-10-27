@@ -22,7 +22,14 @@ import type {
   Release,
   SetupSpec,
 } from '@mondarth/fvtt-resolver';
-import { check, isNewerVersion, isUnavailable, packageKey, sameVersion } from '@mondarth/fvtt-resolver';
+import {
+  check,
+  isNewerVersion,
+  isUnavailable,
+  normaliseManifest,
+  packageKey,
+  sameVersion,
+} from '@mondarth/fvtt-resolver';
 import type { Cache as SourceCache, LocalManifest, ReleaseSource } from '@mondarth/fvtt-resolver/sources';
 import {
   catalogueSource,
@@ -313,6 +320,100 @@ function readCore(): CoreRelease {
 }
 
 /**
+ * The manifests of the system in use and every installed module, as Foundry read them.
+ * @returns The manifests
+ */
+function installedManifests(): LocalManifest[] {
+  const system = game.system;
+  return [
+    { json: system.toObject(), origin: `systems/${system.id}/system.json`, type: 'system' },
+    ...Array.from(game.modules.values(), pkg => ({
+      json: pkg.toObject(),
+      origin: `modules/${pkg.id}/module.json`,
+      type: 'module' as const,
+    })),
+  ];
+}
+
+/**
+ * The badges EMMA gives the installed modules, judged from their installed manifests alone: nothing is fetched.
+ * @param active - The IDs of the modules staged active
+ * @returns Each module's badge, keyed by module ID; none for a module whose manifest could not be read
+ */
+export type InstalledJudge = (active: Iterable<string>) => ReadonlyMap<string, VersionBadge | null>;
+
+/**
+ * Set up judging the installed modules as EMMA does, which Foundry's own badges do not: what a module requires and
+ * conflicts with, and the systems and system versions it runs in, as well as the core versions it supports. A module
+ * staged active is judged in the setup of the modules staged active, the core and the system in use. One inactive is
+ * judged against the core and the system alone, as what it requires and conflicts with matters only once it is
+ * active; judging each in a setup of its own would cost a check for every module installed.
+ * @returns The judge
+ */
+export function createInstalledJudge(): InstalledJudge {
+  const core = readCore();
+  const releases = localReleases(installedManifests());
+  const systemKey = packageKey({ type: 'system', id: game.system.id });
+  const systemVersion = game.system.version;
+  const modules = new Map(
+    releases.flatMap(release => (release.package.type === 'module' ? [[release.package.id, release] as const] : [])),
+  );
+  const systems = releases.filter(release => release.package.type === 'system');
+
+  /**
+   * What checking found of some modules, with the system in use.
+   * @param judged - The releases of the modules
+   * @returns What checking found of each
+   */
+  function checked(judged: readonly Release[]): readonly ReleaseCheck[] {
+    const setup: SetupSpec = {
+      core: core.version,
+      system: { package: systemKey, version: systemVersion },
+      modules: judged.map(release => ({ package: packageKey(release.package), version: release.version })),
+    };
+    return check({ core: [core], releases: [...systems, ...judged] }, setup).releases;
+  }
+
+  return active => {
+    const on = new Set(active);
+    const badges = new Map<string, VersionBadge | null>();
+    const judge = (checks: readonly ReleaseCheck[]) => {
+      for (const found of checks) {
+        if (found.release.package.type === 'module')
+          badges.set(found.release.package.id, optionOf(found, checks).badge);
+      }
+    };
+    // The modules staged active, together: one they require that is not among them is missing.
+    const activeReleases = [...modules.values()].filter(({ package: { id } }) => on.has(id));
+    judge(checked(activeReleases));
+    // The inactive modules, asking nothing of each other.
+    judge(
+      checked(
+        [...modules.values()]
+          .filter(({ package: { id } }) => !on.has(id))
+          .map(release => ({
+            ...release,
+            relationships: { ...release.relationships, requires: [], conflicts: [] },
+          })),
+      ),
+    );
+    return badges;
+  };
+}
+
+/**
+ * The releases installed manifests give; a manifest that cannot be read gives none.
+ * @param manifests - The manifests
+ * @returns The releases
+ */
+function localReleases(manifests: readonly LocalManifest[]): Release[] {
+  return manifests.flatMap(manifest => {
+    const read = normaliseManifest(manifest.json, { origin: manifest.origin, type: manifest.type });
+    return read.ok ? [read.release] : [];
+  });
+}
+
+/**
  * Set up looking up versions. Nothing is fetched until {@link VersionJudge.lookUp} is called.
  * @param options - How to fetch
  * @returns The judge, with nothing looked up yet
@@ -339,14 +440,7 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
   const system = game.system;
   const installed = Array.from(game.modules.values());
 
-  const manifests: LocalManifest[] = [
-    { json: system.toObject(), origin: `systems/${system.id}/system.json`, type: 'system' },
-    ...installed.map(pkg => ({
-      json: pkg.toObject(),
-      origin: `modules/${pkg.id}/module.json`,
-      type: 'module' as const,
-    })),
-  ];
+  const manifests = installedManifests();
   const declared = Object.fromEntries(
     [
       { key: packageKey({ type: 'system', id: system.id }), manifest: system.manifest },
