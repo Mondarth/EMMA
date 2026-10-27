@@ -193,7 +193,7 @@ importers:
         version: 3.23.1(eslint@10.12.0(jiti@2.6.1)(supports-color@7.2.0))(svelte@5.57.2(@typescript-eslint/types@8.71.1))
       fvtt-types:
         specifier: github:League-of-Foundry-Developers/foundry-vtt-types#main
-        version: '@league-of-foundry-developers/foundry-vtt-types@https://codeload.github.com/League-of-Foundry-Developers/foundry-vtt-types/tar.gz/27bf7b9bac68a74a5346c7ca44432917d9f41bdb(b2939dc1d5a5e5597ee14ae72e5a6b17)'
+        version: '@league-of-foundry-developers/foundry-vtt-types@https://codeload.github.com/League-of-Foundry-Developers/foundry-vtt-types/tar.gz/e613e06e85f6fcded8a9621ad23337f20d0bff70(b2939dc1d5a5e5597ee14ae72e5a6b17)'
       globals:
         specifier: ^16.5.0
         version: 16.5.0
@@ -475,6 +475,9 @@ packages:
     resolution: {integrity: sha512-IkO+/KEUvwbVpiURZg+P7zF74z5Jxe0UgJxVni+RtoHQ6IZieXaO02kmadomap/q+l6bc/jdPGGqTjhuZnuz1Q==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
 
+  '@foundry-vtt-types/animejs@4.3.6':
+    resolution: {integrity: sha512-zCLxbkcGx0D12zymFKjLeLnuLvX7r/s7ug+XwclhJwXiMsZUNtyYDIdURhK/8uZTWww+yhdlhrk+uHh+ZH3XUA==}
+
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
     engines: {node: '>=18.18.0'}
@@ -529,9 +532,9 @@ packages:
   '@keyv/serialize@1.1.1':
     resolution: {integrity: sha512-dXn3FZhPv0US+7dtJsIi2R+c7qWYiReoEh5zUntWCf4oSpMNib8FDhSoed6m3QyZdx5hK7iLFkYk3rNxwt8vTA==}
 
-  '@league-of-foundry-developers/foundry-vtt-types@https://codeload.github.com/League-of-Foundry-Developers/foundry-vtt-types/tar.gz/27bf7b9bac68a74a5346c7ca44432917d9f41bdb':
-    resolution: {gitHosted: true, integrity: sha512-PTnQdaMueo8lyWu7KsqbMdkqgSOptsHXpx/Ux/OkwO7MZQL2HkwTy45OO1meAk8msPjB4oL5HJ+2V0ycoTovYA==, tarball: https://codeload.github.com/League-of-Foundry-Developers/foundry-vtt-types/tar.gz/27bf7b9bac68a74a5346c7ca44432917d9f41bdb}
-    version: 14.366.0
+  '@league-of-foundry-developers/foundry-vtt-types@https://codeload.github.com/League-of-Foundry-Developers/foundry-vtt-types/tar.gz/e613e06e85f6fcded8a9621ad23337f20d0bff70':
+    resolution: {gitHosted: true, integrity: sha512-tWCVBHZ2RaaQyzMfbs2b2sdMtHcLbTxUaDXUZFQwVNwnK+EE+zguytjw+K4s1mrs2Tz0xUFcFByvJpY9teecng==, tarball: https://codeload.github.com/League-of-Foundry-Developers/foundry-vtt-types/tar.gz/e613e06e85f6fcded8a9621ad23337f20d0bff70}
+    version: 14.369.0
     peerDependencies:
       '@typescript/native-preview': '*'
       typescript: '>=5.9'
@@ -1627,9 +1630,6 @@ packages:
 
   ajv@8.20.0:
     resolution: {integrity: sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA==}
-
-  animejs@4.3.6:
-    resolution: {integrity: sha512-rzZ4bDc8JAtyx6hYwxj7s5M/yWfnM5qqY4hZDnhy1cWFvMb6H5/necHS2sbCY3WQTDbRLuZL10dPXSxSCFOr/w==}
 
   ansi-escapes@4.3.2:
     resolution: {integrity: sha512-gKXj5ALrKWQLsYG9jlTRmR/xKluxHV+Z9QEwNIgCfM1/uwPMCuzVVnh5mwTd+OuBZcwSIMbqssNWRm1lE51QaQ==}
@@ -4604,6 +4604,8 @@ snapshots:
       '@eslint/core': 1.2.1
       levn: 0.4.1
 
+  '@foundry-vtt-types/animejs@4.3.6': {}
+
   '@humanfs/core@0.19.2':
     dependencies:
       '@humanfs/types': 0.15.0
@@ -4654,7 +4656,7 @@ snapshots:
 
   '@keyv/serialize@1.1.1': {}
 
-  '@league-of-foundry-developers/foundry-vtt-types@https://codeload.github.com/League-of-Foundry-Developers/foundry-vtt-types/tar.gz/27bf7b9bac68a74a5346c7ca44432917d9f41bdb(b2939dc1d5a5e5597ee14ae72e5a6b17)':
+  '@league-of-foundry-developers/foundry-vtt-types@https://codeload.github.com/League-of-Foundry-Developers/foundry-vtt-types/tar.gz/e613e06e85f6fcded8a9621ad23337f20d0bff70(b2939dc1d5a5e5597ee14ae72e5a6b17)':
     dependencies:
       '@codemirror/lang-html': 6.4.12
       '@codemirror/lang-javascript': 6.2.5
@@ -4668,7 +4670,7 @@ snapshots:
       '@types/showdown': 2.0.6
       '@types/simple-peer': 9.11.9
       '@types/youtube': 0.0.50
-      animejs: 4.3.6
+      animejs: '@foundry-vtt-types/animejs@4.3.6'
       codemirror: 6.0.2
       handlebars: 4.7.10
       handlebars-intl: 1.1.2
@@ -5690,8 +5692,6 @@ snapshots:
       fast-uri: 3.1.8
       json-schema-traverse: 1.0.0
       require-from-string: 2.0.2
-
-  animejs@4.3.6: {}
 
   ansi-escapes@4.3.2:
     dependencies:
