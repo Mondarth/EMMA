@@ -18,6 +18,7 @@ export default defineConfig(
       '**/tests/e2e/.data/',
       '**/tests/e2e/test-results/',
       '**/tests/e2e/playwright-report/',
+      '**/tests/browser/test-results/',
     ],
   },
   js.configs.recommended,
@@ -28,7 +29,16 @@ export default defineConfig(
     languageOptions: {
       globals: globals.node,
       parserOptions: {
-        project: ['./packages/*/tsconfig.test.json', './packages/*/tsconfig.node.json'],
+        project: [
+          './packages/module/tsconfig.test.json',
+          './packages/module/tsconfig.node.json',
+          './packages/core/tsconfig.json',
+          './packages/core/tsconfig.node.json',
+          './packages/setup/tsconfig.json',
+          './packages/setup/tsconfig.node.json',
+          './packages/extension/tsconfig.json',
+          './packages/extension/tsconfig.node.json',
+        ],
         tsconfigRootDir: import.meta.dirname,
         extraFileExtensions: ['.svelte'],
       },
@@ -49,9 +59,14 @@ export default defineConfig(
     },
   },
   {
-    // Module source runs in the Foundry client, where jQuery is still a global.
-    files: ['packages/module/src/**'],
+    // The module and the setup screen's code run in the Foundry client, where jQuery is still a global.
+    files: ['packages/module/src/**', 'packages/setup/src/**'],
     languageOptions: { globals: { ...globals.browser, ...globals.jquery } },
+  },
+  {
+    // The browser extension runs in the browser, with its extension API.
+    files: ['packages/extension/src/**'],
+    languageOptions: { globals: { ...globals.browser, ...globals.webextensions } },
   },
   {
     files: ['**/*.svelte', '**/*.svelte.ts'],

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
-import type { WorldRecordContent } from '@module/lib/world-record';
-import { recordHolds, stampRecord, WORLD_RECORD_SCHEMA } from '@module/lib/world-record';
+import type { WorldRecordContent } from '../src/world-record';
+import { parseWorldRecord, recordHolds, stampRecord, WORLD_RECORD_SCHEMA } from '../src/world-record';
 
 const CONTENT: WorldRecordContent = {
   schema: WORLD_RECORD_SCHEMA,
@@ -48,5 +48,32 @@ describe('recordHolds', () => {
 
   test.each([undefined, null, 'text', 42, [CONTENT]])('does not hold %j, which is no record', saved => {
     expect(recordHolds(saved, CONTENT)).toBe(false);
+  });
+});
+
+describe('parseWorldRecord', () => {
+  const RECORD = stampRecord(CONTENT, new Date('2026-10-28T12:00:00Z'));
+
+  test('reads a record, keeping only what the format gives', () => {
+    expect(parseWorldRecord({ ...RECORD, extra: true, world: { ...RECORD.world, extra: 1 } })).toEqual(RECORD);
+  });
+
+  test.each([
+    ['another schema', { schema: 2 }],
+    ['no EMMA version', { emma: 1 }],
+    ['no core version', { core: null }],
+    ['no time', { updated: undefined }],
+    ['no world', { world: 'my-world' }],
+    ['a world without a title', { world: { id: 'my-world' } }],
+    ['a system without a version', { system: { id: 'dnd5e', title: 'D&D 5e' } }],
+    ['no system', { system: [] }],
+    ['modules that are not a list', { modules: {} }],
+    ['a module without an ID', { modules: [{ title: 'Library', version: '1.0.0' }] }],
+  ])('refuses a record with %s', (_label, change) => {
+    expect(parseWorldRecord({ ...RECORD, ...change })).toBeUndefined();
+  });
+
+  test.each([undefined, null, 'text', [RECORD]])('refuses %j', value => {
+    expect(parseWorldRecord(value)).toBeUndefined();
   });
 });

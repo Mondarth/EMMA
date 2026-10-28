@@ -1,0 +1,33 @@
+{
+  "name": { "message": "EMMA for Foundry VTT (alpha)" },
+  "description": {
+    "message": "Brings EMMA, the Enhanced Module Manager Application, to Foundry VTT's setup screen, on the servers you choose."
+  },
+  "popupTitle": { "message": "EMMA for Foundry VTT" },
+  "alpha": { "message": "Alpha: for testing only." },
+  "notAServer": {
+    "message": "EMMA runs on a Foundry VTT server's setup screen. Open one, then click this button again."
+  },
+  "server": { "message": "Server: $1" },
+  "notSetup": { "message": "This is not the server's setup screen. EMMA opens on its setup screen (…/setup)." },
+  "consent": {
+    "message": "EMMA can add its window to this server's setup screen. To do it each time, it needs your permission to read and change this server's pages. Nothing is sent anywhere else."
+  },
+  "activate": { "message": "Activate on this server" },
+  "once": { "message": "Open EMMA just this once" },
+  "refused": { "message": "Permission was not given, so EMMA was not activated." },
+  "activated": { "message": "EMMA is active on this server." },
+  "auto": { "message": "Open EMMA by itself on this server's setup screen" },
+  "openNow": { "message": "Open EMMA now" },
+  "forget": { "message": "Forget this server" },
+  "manage": { "message": "Manage servers" },
+  "optionsTitle": { "message": "EMMA for Foundry VTT: servers" },
+  "optionsIntro": {
+    "message": "The Foundry VTT servers EMMA is active on. Forgetting a server gives up the permission to run on it."
+  },
+  "noSites": {
+    "message": "EMMA is not active on any server. Open a server's setup screen and click EMMA's button to activate it."
+  },
+  "autoFor": { "message": "Open EMMA by itself on $1" },
+  "forgetSite": { "message": "Forget $1" }
+}

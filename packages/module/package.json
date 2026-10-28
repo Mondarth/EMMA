@@ -20,6 +20,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@mondarth/emma-core": "workspace:*",
     "@mondarth/fvtt-resolver": "0.8.0"
   }
 }

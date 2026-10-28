@@ -11,7 +11,7 @@ coverage:
 flags:
   unit:
     paths:
-      - packages/module/src/
+      - packages/
     carryforward: true
 
 comment:

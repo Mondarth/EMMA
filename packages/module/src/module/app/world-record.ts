@@ -12,7 +12,7 @@ import {
 } from '@module/adapters/world-record';
 import { beforeLeavingWorld } from '@module/foundry/session-exit';
 import { log } from '@module/lib/logger';
-import { recordHolds, stampRecord } from '@module/lib/world-record';
+import { recordHolds, stampRecord } from '@mondarth/emma-core/world-record';
 
 /** What checking the record did. */
 export type WorldRecordOutcome = 'written' | 'current' | 'skipped' | 'failed';

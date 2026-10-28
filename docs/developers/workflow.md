@@ -57,6 +57,7 @@ does.
 | Dev CI (`dev.yml`)                       | pushes to `dev`, pull requests, the release workflow       | The quality gate                                              |
 | E2E (`e2e.yml`)                          | pull requests to `main`, by hand                           | Playwright against a real Foundry VTT server                  |
 | Release (`release.yml`)                  | pushes to `main`, by hand                                  | Dev CI, then semantic-release, the docs and the `dev` update  |
+| Extension release (`extension-release.yml`) | by hand, on `main`                                      | Publishes an alpha of the browser extension as a pre-release  |
 | Build and Deploy Docs                    | pushes to `main` that change `docs/`, the release workflow | Builds the Sphinx site and deploys it to GitHub Pages         |
 | CodeQL (`codeql.yml`)                    | pushes and pull requests to `dev` and `main`, weekly       | Code scanning of the TypeScript and of the workflows|
 | Dependency review                        | pull requests                                              | Fails pull requests that add vulnerable dependencies          |
@@ -73,7 +74,7 @@ every release. Its jobs run in parallel:
 | Lint            | ESLint with no warnings allowed, and Prettier for the remaining file types                  |
 | Svelte check    | `svelte-check`, once the project has a component                                            |
 | Unit tests      | the tests with the coverage thresholds; uploads the coverage to Codecov                     |
-| Build           | builds the bundle and keeps it, with `module.json`, as an artifact                          |
+| Build           | builds every package, keeping the module, with `module.json`, and the extension as artifacts; lints the Firefox extension with `web-ext lint` and loads the Chromium extension into Chromium |
 | Docs            | builds the documentation in Docker and keeps it as an artifact                              |
 | CI passed       | succeeds only if every job above passed or was skipped: the rulesets' required check        |
 
@@ -127,6 +128,24 @@ of the repository, so that the latest release is still the module's when they lo
 
 The workflow can also be started by hand on `main` (*Actions → Release → Run workflow*). It then releases only if
 there are releasable commits.
+
+### Extension release
+
+The browser extension is released by hand, apart from the module, while it is an alpha:
+
+1. Raise `version` in `packages/extension/package.json` (three numbers, as browsers require), and merge the change to
+   `main` with a release of the module.
+2. Start *Actions → Extension release → Run workflow* on `main`.
+
+The workflow builds every package, checks the Firefox build, and publishes a GitHub **pre-release** tagged
+`extension-v<version>`, with the Chromium build zipped and the Firefox build signed by Mozilla as an unlisted add-on
+(given the `AMO_` secrets; see {doc}`github-setup`). A pre-release is never GitHub's latest release, and its tag does
+not match semantic-release's `v<version>`, so the module's releases are not disturbed. It stops if the version is
+already released.
+
+The extension's commits are released with the module too, as semantic-release counts every commit on `main`. Until the
+packages are released apart, keep its commits under the `extension` or `setup` scope, so that the module's changelog
+shows them as the extension's.
 
 ## Dependency updates
 

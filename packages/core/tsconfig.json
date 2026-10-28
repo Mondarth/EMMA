@@ -1,0 +1,19 @@
+{
+  // Shared code: no Foundry or browser globals, so it can run in a Foundry world, on the setup screen and in the extension.
+  "compilerOptions": {
+    "moduleResolution": "bundler",
+    "module": "esnext",
+    "target": "esnext",
+    "lib": ["esnext"],
+    "types": [],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "verbatimModuleSyntax": true,
+    // Vitest's declarations, which the tests import, assume web globals that this package leaves out.
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["src/**/*", "tests/**/*"]
+}

@@ -7,6 +7,7 @@ Replaces the Foundry manage module app.
 :caption: Contents:
 
 usage.md
+extension.md
 ```
 
 ```{toctree}

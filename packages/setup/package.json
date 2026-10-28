@@ -1,0 +1,17 @@
+{
+  "name": "@mondarth/emma-setup",
+  "description": "EMMA on Foundry VTT's setup screen: the code the browser extension injects there.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "svelte-check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
+    "test": "vitest --run",
+    "test:coverage": "vitest --run --coverage"
+  },
+  "dependencies": {
+    "@mondarth/emma-core": "workspace:*"
+  }
+}

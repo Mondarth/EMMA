@@ -6,8 +6,8 @@
 import { readActivation } from '@module/adapters/modules';
 import { readPlatform } from '@module/adapters/platform';
 import { MODULE_ID } from '@module/lib/constants';
-import type { WorldRecord, WorldRecordContent } from '@module/lib/world-record';
-import { WORLD_RECORD_FILE, WORLD_RECORD_SCHEMA } from '@module/lib/world-record';
+import type { WorldRecord, WorldRecordContent } from '@mondarth/emma-core/world-record';
+import { WORLD_RECORD_FILE, WORLD_RECORD_SCHEMA } from '@mondarth/emma-core/world-record';
 
 /** The file source that holds the user data folder, where the worlds are. */
 const SOURCE = 'data';
