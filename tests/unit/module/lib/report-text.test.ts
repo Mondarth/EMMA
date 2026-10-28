@@ -58,7 +58,7 @@ describe('report text', () => {
     expect(planText(SETUP, []).split('\n').at(-1)).toBe('Empty');
   });
 
-  test('checks every module, with its verdict and notes, or that there is nothing to report', () => {
+  test('checks every module with something to report, then lists those with nothing to report together', () => {
     const check: SetupCheck = {
       setup: SETUP,
       valid: false,
@@ -80,13 +80,30 @@ describe('report text', () => {
       '',
       'Invalid',
       '',
-      'MONDARTH-EMMA.Report.Check.ModuleUnjudged {"title":"A","version":"1.0"}',
-      '  - Nothing',
       'MONDARTH-EMMA.Report.Check.Module {"title":"B","version":"2.0","verdict":"Unverified"}',
       '  - One.',
       '  - Two.',
+      // Two blank lines set the modules with nothing to report apart.
+      '',
+      '',
+      'Nothing',
+      '- MONDARTH-EMMA.Report.Check.ModuleUnjudged {"title":"A","version":"1.0"}',
     ]);
     expect(checkText({ ...check, valid: true, modules: [] }).split('\n')[3]).toBe('Valid');
+  });
+
+  test('lists every module right after the verdict when none has anything to report', () => {
+    const check: SetupCheck = {
+      setup: SETUP,
+      valid: true,
+      modules: [{ id: 'a', title: 'A', version: '1.0', badge: null, notes: [] }],
+    };
+
+    expect(checkText(check).split('\n').slice(4)).toEqual([
+      '',
+      'Nothing',
+      '- MONDARTH-EMMA.Report.Check.ModuleUnjudged {"title":"A","version":"1.0"}',
+    ]);
   });
 
   test('resolves to changes, to nothing to change, to why not, or to what it needs', () => {

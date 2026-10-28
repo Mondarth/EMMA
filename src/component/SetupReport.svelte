@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { SetupChange, SetupReportData, SetupSolve } from '@module/adapters/report';
+  import type { ReportedPackage, SetupChange, SetupReportData, SetupSolve } from '@module/adapters/report';
   import { format, formatList, localize } from '@module/lib/i18n';
   import { log } from '@module/lib/logger';
   import type { ReportStyle } from '@module/lib/report-text';
@@ -96,6 +96,17 @@
   const applyLabel = $derived(localize('MONDARTH-EMMA.Report.Apply'));
 </script>
 
+<!-- A module the check reports on: its title, its version's badge and Foundry's verdict. -->
+{#snippet checkedPackage(reported: ReportedPackage)}
+  <span class="emma-report-package">
+    <strong>{reported.title}</strong>
+    <VersionBadge version={reported.version} badge={reported.badge} />
+    {#if reported.badge !== null}
+      <span class="emma-report-verdict-text">{reported.badge.text}</span>
+    {/if}
+  </span>
+{/snippet}
+
 <!-- The active modules that cannot be had, which every report leaves out, ending each. -->
 {#snippet notAvailable()}
   {#if report.unavailable.length > 0}
@@ -174,24 +185,35 @@
       {#if check.modules.length === 0}
         <p>{localize('MONDARTH-EMMA.Report.Plan.Empty')}</p>
       {:else}
-        <ul class="emma-report-packages">
-          {#each check.modules as reported (reported.id)}
-            <li>
-              <span class="emma-report-package">
-                <strong>{reported.title}</strong>
-                <VersionBadge version={reported.version} badge={reported.badge} />
-                {#if reported.badge !== null}
-                  <span class="emma-report-verdict-text">{reported.badge.text}</span>
-                {/if}
-              </span>
-              <ul class="emma-report-notes">
-                {#each reported.notes.length === 0 ? [localize('MONDARTH-EMMA.Report.Check.Nothing')] : reported.notes as note (note)}
-                  <li>{note}</li>
-                {/each}
-              </ul>
-            </li>
-          {/each}
-        </ul>
+        {@const noted = check.modules.filter(({ notes }) => notes.length > 0)}
+        {@const quiet = check.modules.filter(({ notes }) => notes.length === 0)}
+        {#if noted.length > 0}
+          <ul class="emma-report-packages">
+            {#each noted as reported (reported.id)}
+              <li>
+                {@render checkedPackage(reported)}
+                <ul class="emma-report-notes">
+                  {#each reported.notes as note (note)}
+                    <li>{note}</li>
+                  {/each}
+                </ul>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+        <!-- The modules checking found nothing to say of, together after the others, folded away until opened. -->
+        {#if quiet.length > 0}
+          <details class="emma-report-quiet">
+            <summary>
+              {format('MONDARTH-EMMA.Report.Check.NothingCount', { count: String(quiet.length) })}
+            </summary>
+            <ul class="emma-report-packages">
+              {#each quiet as reported (reported.id)}
+                <li>{@render checkedPackage(reported)}</li>
+              {/each}
+            </ul>
+          </details>
+        {/if}
       {/if}
       {@render notAvailable()}
     </section>
@@ -346,6 +368,23 @@
   ul {
     margin: 0;
     padding-inline-start: 1.25rem;
+  }
+
+  /* Set apart from the modules with something to report: a box of its own, folded away until opened. */
+  .emma-report-quiet {
+    padding: 0.375rem 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    color: var(--color-text-secondary);
+  }
+
+  .emma-report-quiet summary {
+    font-weight: bold;
+    cursor: pointer;
+  }
+
+  .emma-report-quiet[open] summary {
+    margin-bottom: 0.5rem;
   }
 
   .emma-report-packages {
