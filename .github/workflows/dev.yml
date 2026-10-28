@@ -85,7 +85,8 @@ jobs:
         if: ${{ !cancelled() }}
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
-          files: packages/module/coverage/lcov.info
+          files: >-
+            packages/module/coverage/lcov.info,packages/core/coverage/lcov.info,packages/setup/coverage/lcov.info,packages/extension/coverage/lcov.info
           flags: unit
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
@@ -94,7 +95,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: coverage
-          path: packages/module/coverage/
+          path: packages/*/coverage/
           if-no-files-found: ignore
           retention-days: 7
 
@@ -112,6 +113,20 @@ jobs:
           path: |
             packages/module/dist/
             packages/module/module.json
+          if-no-files-found: error
+          retention-days: 7
+      # The browser extension: Mozilla's checks on the Firefox build, and the Chromium build loaded into Chromium.
+      - name: Lint the Firefox extension
+        run: pnpm --filter @mondarth/emma-extension run lint:firefox
+      - name: Install Chromium for the extension check
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Load the extension into Chromium
+        run: pnpm --filter @mondarth/emma-extension run test:browser
+      - name: Upload the extension
+        uses: actions/upload-artifact@v7
+        with:
+          name: extension
+          path: packages/extension/dist/
           if-no-files-found: error
           retention-days: 7
 

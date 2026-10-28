@@ -13,6 +13,7 @@ releases/
 **/tests/e2e/.data/
 **/tests/e2e/test-results/
 **/tests/e2e/playwright-report/
+**/tests/browser/test-results/
 node_modules/
 .foundryvtt/data/
 .foundryvtt/secrets.json
