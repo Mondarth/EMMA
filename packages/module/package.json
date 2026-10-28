@@ -1,0 +1,26 @@
+{
+  "name": "@mondarth/emma-module",
+  "description": "EMMA - Enhanced Module Manager Application, the Foundry VTT module.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "svelte-check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.test.json",
+    "test:coverage": "vitest --run --coverage",
+    "test:e2e": "playwright test --config tests/e2e/playwright.config.ts",
+    "test:e2e:xvfb": "xvfb-run --auto-servernum --server-args=\"-screen 0 1920x1080x24\" playwright test --config tests/e2e/playwright.config.ts",
+    "e2e:packages": "node scripts/e2e/install-packages.ts",
+    "e2e:server": "mkdir -p tests/e2e/.data/Data/modules/mondarth-emma && HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose -f tests/e2e/compose.yaml up --detach --wait --force-recreate",
+    "e2e:server:stop": "docker compose -f tests/e2e/compose.yaml down",
+    "test": "vitest --typecheck --run",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@mondarth/emma-core": "workspace:*",
+    "@mondarth/fvtt-resolver": "0.8.0"
+  }
+}

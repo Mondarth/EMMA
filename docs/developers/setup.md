@@ -14,12 +14,12 @@ reach a release, and `CONTRIBUTING.md` the checks and commit message rules.
 
 ## Running a development Foundry VTT
 
-The compose file in `.foundryvtt/` runs the pinned Foundry VTT release (`VERSION` in `.foundryvtt/.env`) with this
-project mounted as the `mondarth-emma` module.
+The compose file in `.foundryvtt/` runs the pinned Foundry VTT release (`VERSION` in `.foundryvtt/.env`) with
+`packages/module` mounted as the `mondarth-emma` module.
 
 1. Copy `.foundryvtt/secrets.example.json` to `.foundryvtt/secrets.json` and fill in your foundryvtt.com credentials,
    your licence key and an admin password for the server. The file is ignored by {program}`git`.
-2. Build the module once, so that Foundry finds the bundle named in `module.json`:
+2. Build the module once, so that Foundry finds the bundle named in `packages/module/module.json`:
 
    ```sh
    pnpm build
@@ -45,19 +45,20 @@ project mounted as the `mondarth-emma` module.
    pnpm dev
    ```
 
-   Open <http://localhost:31002> rather than port 30000. The development server serves the module straight from `src/`
+   Open <http://localhost:31002> rather than port 30000. The development server serves the module straight from
+   `packages/module/src/`
    and passes everything else on to Foundry VTT.
 
    The host name the development server answers to (besides `localhost`) and the two ports default to the values in
-   `DEFAULTS` at the top of `vite.config.ts`. To change them on one machine without editing that file, create
-   `.pdt/mount.json`, which is ignored by {program}`git`. Every key is optional:
+   `DEFAULTS` at the top of `packages/module/vite.config.ts`. To change them on one machine without editing that file,
+   create `.pdt/mount.json` at the root of the repository, which is ignored by {program}`git`. Every key is optional:
 
    ```json
    { "hostname": "my-dev-box", "ports": { "base": 30000, "dev": 31002 } }
    ```
 
    Set the `PDT_MOUNT_CONFIG` environment variable to read the settings from a different file; a relative path is
-   resolved from the directory containing `vite.config.ts`.
+   resolved from the root of the repository.
 
 ## The module manifest
 

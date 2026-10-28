@@ -1,0 +1,22 @@
+{
+  "name": "@mondarth/emma-extension",
+  "description": "The browser extension that brings EMMA to Foundry VTT's setup screen.",
+  "version": "0.1.0",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build --mode chromium && vite build --mode firefox",
+    "svelte-check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
+    "test": "vitest --run",
+    "test:coverage": "vitest --run --coverage",
+    "lint:firefox": "web-ext lint --source-dir dist/firefox --self-hosted",
+    "test:browser": "playwright test --config tests/browser/playwright.config.ts"
+  },
+  "devDependencies": {
+    "@mondarth/emma-setup": "workspace:*",
+    "@types/chrome": "^0.3.6",
+    "web-ext": "^10.8.0"
+  }
+}

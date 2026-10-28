@@ -1,6 +1,6 @@
 {
   "name": "mondarth-emma",
-  "description": "Replaces the Foundry manage module app.",
+  "description": "EMMA - Enhanced Module Manager Application: the Foundry VTT module and the tools around it.",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -15,20 +15,19 @@
       "maxHeaderWidth": 72
     }
   },
-  "types": "./dist/index.d.ts",
   "scripts": {
     "preinstall": "npx only-allow pnpm",
-    "build": "vite build",
-    "dev": "vite",
-    "svelte-check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.test.json",
-    "test:coverage": "vitest --run --coverage",
-    "test:e2e": "playwright test --config tests/e2e/playwright.config.ts",
-    "test:e2e:xvfb": "xvfb-run --auto-servernum --server-args=\"-screen 0 1920x1080x24\" playwright test --config tests/e2e/playwright.config.ts",
-    "e2e:packages": "node scripts/e2e/install-packages.ts",
-    "e2e:server": "mkdir -p tests/e2e/.data/Data/modules/mondarth-emma && HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose -f tests/e2e/compose.yaml up --detach --wait --force-recreate",
-    "e2e:server:stop": "docker compose -f tests/e2e/compose.yaml down",
-    "test": "vitest --typecheck --run",
+    "build": "pnpm -r --if-present run build",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "svelte-check": "pnpm -r --if-present run svelte-check",
+    "test": "pnpm -r --if-present run test",
+    "test:coverage": "pnpm -r --if-present run test:coverage",
+    "test:e2e": "pnpm --filter @mondarth/emma-module run test:e2e",
+    "test:e2e:xvfb": "pnpm --filter @mondarth/emma-module run test:e2e:xvfb",
+    "e2e:packages": "pnpm --filter @mondarth/emma-module run e2e:packages",
+    "e2e:server": "pnpm --filter @mondarth/emma-module run e2e:server",
+    "e2e:server:stop": "pnpm --filter @mondarth/emma-module run e2e:server:stop",
+    "dev": "pnpm --filter @mondarth/emma-module run dev",
     "eslint": "eslint .",
     "prepare": "husky",
     "release": "semantic-release",
@@ -36,10 +35,10 @@
     "build:docs": "docker compose run --rm --user \"$(id -u):$(id -g)\" docs make html",
     "serve:docs": "docker run --rm --name docserver -d -p 8080:80 -v \"$(pwd)/docs/_build/html\":/usr/share/nginx/html:ro nginx",
     "devserve:docs": "docker compose run --rm --service-ports --user \"$(id -u):$(id -g)\" docs make livehtml",
-    "prettier:format": "prettier --config .prettierrc.json --write \"./src/**/*.{ts,js,mjs,json,scss,css}\"",
+    "prettier:format": "prettier --config .prettierrc.json --write \"./packages/*/src/**/*.{ts,js,mjs,json,scss,css}\"",
     "lint-staged": "lint-staged",
-    "lint": "eslint src/",
-    "lint:fix": "eslint src/ --fix"
+    "lint": "eslint packages/",
+    "lint:fix": "eslint packages/ --fix"
   },
   "devDependencies": {
     "@commitlint/cli": "21.2.4",
@@ -90,8 +89,5 @@
   "browserslist": [
     ">5%",
     "not IE 11"
-  ],
-  "dependencies": {
-    "@mondarth/fvtt-resolver": "0.8.0"
-  }
+  ]
 }

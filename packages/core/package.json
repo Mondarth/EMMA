@@ -1,0 +1,15 @@
+{
+  "name": "@mondarth/emma-core",
+  "description": "Code shared by EMMA's Foundry VTT module and its setup screen tool.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./world-record": "./src/world-record.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
+    "test": "vitest --run",
+    "test:coverage": "vitest --run --coverage"
+  }
+}

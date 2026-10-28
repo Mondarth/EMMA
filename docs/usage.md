@@ -3,13 +3,14 @@
 ## Requirements
 
 - Foundry VTT version 14 or later.
+- [libWrapper](https://github.com/ruipin/fvtt-lib-wrapper) 1.13 or later. Foundry offers to install it with EMMA.
 
 ## Installation
 
 In Foundry's **Add-on Modules** tab choose **Install Module** and paste the manifest URL:
 
 ```
-https://github.com/Mondarth/EMMA/releases/latest/download/module.json
+https://raw.githubusercontent.com/Mondarth/EMMA/main/packages/module/module.json
 ```
 
 Then enable **EMMA - Enhanced Module Manager Application** in your world under **Manage Modules**.
@@ -232,7 +233,10 @@ pressed while its report is open, and pressing it again closes the report:
   its badge, Foundry's verdict and, in words, everything found about it: what keeps it from being used (a module it
   depends on at the wrong version, a system it does not run in), what it prefers and is not given (a Foundry version
   or system version it is not verified with), what it advises (a module it recommends that is not active), and whether
-  it is not known, or known only from a listing and so checked without its dependencies.
+  it is not known, or known only from a listing and so checked without its dependencies. The modules it finds nothing
+  to report on are grouped after the others in a folded section, **Nothing to report**, with how many there are: click
+  it to list them, each with its badge and verdict. In the downloaded text they follow the others after two blank
+  lines.
 - **Update** (an arrow up in a circle): the best versions of the active modules for the Foundry version and system
   chosen: the newest version of each, from the one chosen up, that works with the others' and with
   that Foundry version and system. A version that is only a compatibility risk (not verified for this Foundry, but not
@@ -340,6 +344,27 @@ If your changes would deactivate EMMA itself, the footer warns you: once saved, 
 Foundry's own Module Management window instead, from which you can activate EMMA again.
 
 Only a GM or assistant GM with permission to modify configuration settings can save. Everyone else sees EMMA read-only.
+
+## The world record
+
+EMMA keeps a small file, `mondarth-emma.json`, in the root of each world's folder that has EMMA active. It records the
+world's setup: the Foundry version, the game system and its version, and each module the world has saved as active,
+with its version. Tools outside the world can read it, so that a world can be checked before it is launched: EMMA's
+[browser extension](extension.md) shows it on the setup screen.
+
+A GM keeps it up to date, without being asked:
+
+- when the world starts, by the world's active GM;
+- when changes are saved from EMMA, before the world reloads;
+- when a GM logs out or returns to setup, so that changes saved in Foundry's own Module Management window are recorded
+  too.
+
+The file is rewritten only when the setup has changed. Closing the browser tab, or stopping the server, does not
+update it; the next start does. A world backup holds the whole world folder, so it includes the record, and restoring
+the backup restores the record that matches it.
+
+The file holds nothing private, but like everything in a world's folder, anyone who can reach your Foundry server can
+read it. Only a GM or assistant GM allowed to browse and upload files can write it.
 
 ## Settings
 

@@ -1,0 +1,412 @@
+<script lang="ts">
+  import type { ReportedPackage, SetupChange, SetupReportData, SetupSolve } from '@module/adapters/report';
+  import { format, formatList, localize } from '@module/lib/i18n';
+  import { log } from '@module/lib/logger';
+  import type { ReportStyle } from '@module/lib/report-text';
+  import {
+    changeText,
+    checkText,
+    ignoredWarning,
+    planTables,
+    planText,
+    updateText,
+    setupSummary,
+    unavailableLines,
+    unavailableText,
+  } from '@module/lib/report-text';
+
+  import VersionBadge from './VersionBadge.svelte';
+
+  interface Props {
+    /** Which report this is. */
+    style: ReportStyle;
+    /** The report to show first. */
+    report: SetupReportData;
+    /** Given, once, the function that shows another report in this one's place. */
+    follow?: (show: (report: SetupReportData) => void) => void;
+    /** Saves the report shown, as text. */
+    onDownload: (text: string, style: ReportStyle) => void;
+    /** Chooses the versions the update recommends, in the hypothetical setup reported on. */
+    onApply: (changes: readonly SetupChange[]) => void;
+  }
+
+  const { style, report: first, follow, onDownload, onApply }: Props = $props();
+
+  // The report shown: the one given, then each one `follow`'s function is given, such as the one on the setup choosing
+  // the versions an update recommends makes. The window is mounted afresh for each report, so these are read once.
+  // svelte-ignore state_referenced_locally
+  let report: SetupReportData = $state.raw(first);
+  const { plan, check } = $derived(report);
+  // svelte-ignore state_referenced_locally
+  follow?.((next: SetupReportData) => {
+    report = next;
+  });
+
+  const uid = $props.id();
+
+  let solved = $state<SetupSolve | null>(null);
+  let failed = $state(false);
+
+  // The update follows the report's solve, a new one with each report; the others need none, so ask for none.
+  $effect(() => {
+    if (style !== 'update') return;
+    let live = true;
+    solved = null;
+    failed = false;
+    report.solve().then(
+      result => {
+        if (live) solved = result;
+      },
+      (error: unknown) => {
+        log.error('Unable to work out the best versions', error);
+        if (live) failed = true;
+      },
+    );
+    return () => {
+      live = false;
+    };
+  });
+
+  /** The warning every report gives when hypothetical mode ignores some of the setup's modules. */
+  const warning = $derived(ignoredWarning(report.ignored));
+
+  /** The report shown, as text, after the warning if there is one; `null` while the setup is still being resolved. */
+  const text = $derived.by((): string | null => {
+    const body = (() => {
+      switch (style) {
+        case 'plan':
+          return planText(check.setup, plan);
+        case 'check':
+          return checkText(check);
+        default:
+          return solved === null ? null : updateText(check.setup, solved);
+      }
+    })();
+    if (body === null) return null;
+    // Every report ends naming the modules that cannot be had.
+    const whole = [body, ...unavailableLines(report.unavailable)].join('\n');
+    return warning === null ? whole : `${warning}\n\n${whole}`;
+  });
+
+  const downloadLabel = $derived(localize('MONDARTH-EMMA.Report.Download'));
+
+  /** The changes the update recommends; none until it is worked out, or when it finds none to make. */
+  const changes = $derived(solved?.solution.kind === 'found' ? solved.solution.changes : []);
+
+  const applyLabel = $derived(localize('MONDARTH-EMMA.Report.Apply'));
+</script>
+
+<!-- A module the check reports on: its title, its version's badge and Foundry's verdict. -->
+{#snippet checkedPackage(reported: ReportedPackage)}
+  <span class="emma-report-package">
+    <strong>{reported.title}</strong>
+    <VersionBadge version={reported.version} badge={reported.badge} />
+    {#if reported.badge !== null}
+      <span class="emma-report-verdict-text">{reported.badge.text}</span>
+    {/if}
+  </span>
+{/snippet}
+
+<!-- The active modules that cannot be had, which every report leaves out, ending each. -->
+{#snippet notAvailable()}
+  {#if report.unavailable.length > 0}
+    <section class="emma-report-unavailable" aria-labelledby={`${uid}-unavailable`}>
+      <h4 id={`${uid}-unavailable`}>{localize('MONDARTH-EMMA.Report.Unavailable.Heading')}</h4>
+      <p>{localize('MONDARTH-EMMA.Report.Unavailable.Intro')}</p>
+      <ul>
+        {#each report.unavailable as unavailable (unavailable.title)}
+          <li>{unavailableText(unavailable)}</li>
+        {/each}
+      </ul>
+    </section>
+  {/if}
+{/snippet}
+
+<div class="emma-report">
+  <div class="emma-report-controls">
+    {#if style === 'update' && changes.length > 0}
+      <button
+        type="button"
+        class="icon fa-solid fa-wand-magic-sparkles"
+        aria-label={applyLabel}
+        data-tooltip={applyLabel}
+        onclick={() => {
+          onApply(changes);
+        }}></button>
+    {/if}
+    <button
+      type="button"
+      class="icon fa-solid fa-download"
+      aria-label={downloadLabel}
+      data-tooltip={downloadLabel}
+      disabled={text === null}
+      onclick={() => {
+        // Only enabled once there is text to download.
+        onDownload(text as string, style);
+      }}></button>
+  </div>
+
+  {#if warning !== null}
+    <p class="emma-report-warning" role="note">
+      <i class="fa-solid fa-triangle-exclamation" inert></i>
+      {warning}
+    </p>
+  {/if}
+
+  {#if style === 'plan'}
+    <section class="emma-report-pane" aria-labelledby={`${uid}-plan`}>
+      <h3 id={`${uid}-plan`}>{localize('MONDARTH-EMMA.Report.Plan.Heading')}</h3>
+      <p class="emma-report-setup">{setupSummary(check.setup)}</p>
+      {#if plan.length === 0}
+        <p>{localize('MONDARTH-EMMA.Report.Plan.Empty')}</p>
+      {:else}
+        {@const tables = planTables(plan)}
+        {#each [{ key: 'Changes', none: 'NoChanges', lines: tables.changes }, { key: 'Kept', none: 'NoneKept', lines: tables.kept }] as list (list.key)}
+          <section class="emma-report-plan-list" aria-labelledby={`${uid}-plan-${list.key}`}>
+            <h4 id={`${uid}-plan-${list.key}`}>{localize(`MONDARTH-EMMA.Report.Plan.${list.key}`)}</h4>
+            {#if list.lines === null}
+              <p>{localize(`MONDARTH-EMMA.Report.Plan.${list.none}`)}</p>
+            {:else}
+              <pre class="emma-report-plan">{list.lines.join('\n')}</pre>
+            {/if}
+          </section>
+        {/each}
+      {/if}
+      {@render notAvailable()}
+    </section>
+  {:else if style === 'check'}
+    <section class="emma-report-pane" aria-labelledby={`${uid}-check`}>
+      <h3 id={`${uid}-check`}>{localize('MONDARTH-EMMA.Report.Check.Heading')}</h3>
+      <p class="emma-report-setup">{setupSummary(check.setup)}</p>
+      <p class={['emma-report-verdict', check.valid ? 'valid' : 'invalid']}>
+        <i class={['fa-solid', check.valid ? 'fa-circle-check' : 'fa-circle-xmark']} inert></i>
+        {localize(check.valid ? 'MONDARTH-EMMA.Report.Check.Valid' : 'MONDARTH-EMMA.Report.Check.Invalid')}
+      </p>
+      {#if check.modules.length === 0}
+        <p>{localize('MONDARTH-EMMA.Report.Plan.Empty')}</p>
+      {:else}
+        {@const noted = check.modules.filter(({ notes }) => notes.length > 0)}
+        {@const quiet = check.modules.filter(({ notes }) => notes.length === 0)}
+        {#if noted.length > 0}
+          <ul class="emma-report-packages">
+            {#each noted as reported (reported.id)}
+              <li>
+                {@render checkedPackage(reported)}
+                <ul class="emma-report-notes">
+                  {#each reported.notes as note (note)}
+                    <li>{note}</li>
+                  {/each}
+                </ul>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+        <!-- The modules checking found nothing to say of, together after the others, folded away until opened. -->
+        {#if quiet.length > 0}
+          <details class="emma-report-quiet">
+            <summary>
+              {format('MONDARTH-EMMA.Report.Check.NothingCount', { count: String(quiet.length) })}
+            </summary>
+            <ul class="emma-report-packages">
+              {#each quiet as reported (reported.id)}
+                <li>{@render checkedPackage(reported)}</li>
+              {/each}
+            </ul>
+          </details>
+        {/if}
+      {/if}
+      {@render notAvailable()}
+    </section>
+  {:else}
+    <section class="emma-report-pane" aria-labelledby={`${uid}-solve`}>
+      <h3 id={`${uid}-solve`}>{localize('MONDARTH-EMMA.Report.Solve.Heading')}</h3>
+      <p class="emma-report-setup">{setupSummary(check.setup)}</p>
+      {#if failed}
+        <p class="emma-report-verdict invalid">
+          <i class="fa-solid fa-triangle-exclamation" inert></i>
+          {localize('MONDARTH-EMMA.Report.Solve.Failed')}
+        </p>
+      {:else if solved === null}
+        <p role="status">
+          <i class="fa-solid fa-spinner fa-spin" inert></i>
+          {localize('MONDARTH-EMMA.Report.Solve.Loading')}
+        </p>
+      {:else}
+        {@const { solution, unloaded } = solved}
+        {#if solution.kind === 'found'}
+          <p class="emma-report-verdict valid">
+            <i class="fa-solid fa-circle-check" inert></i>
+            {localize('MONDARTH-EMMA.Report.Solve.Found')}
+            {localize(
+              solution.changes.length === 0
+                ? 'MONDARTH-EMMA.Report.Solve.NoChanges'
+                : 'MONDARTH-EMMA.Report.Solve.Changes',
+            )}
+          </p>
+          {#if solution.changes.length > 0}
+            <ul class="emma-report-changes">
+              {#each solution.changes as change (change.title)}
+                <li>{changeText(change)}</li>
+              {/each}
+            </ul>
+          {/if}
+        {:else if solution.kind === 'none'}
+          <p class="emma-report-verdict invalid">
+            <i class="fa-solid fa-circle-xmark" inert></i>
+            {localize('MONDARTH-EMMA.Report.Solve.None')}
+          </p>
+          <ul class="emma-report-explanation">
+            {#each solution.lines as line, index (index)}
+              <li>{line}</li>
+            {/each}
+          </ul>
+        {:else}
+          <p>{format('MONDARTH-EMMA.Report.Solve.Undecided', { packages: formatList(solution.needs) })}</p>
+        {/if}
+        {#if unloaded.length > 0}
+          <p>{format('MONDARTH-EMMA.Report.Solve.Unloaded', { packages: formatList(unloaded) })}</p>
+        {/if}
+      {/if}
+      {@render notAvailable()}
+    </section>
+  {/if}
+</div>
+
+<style>
+  /* Every report warns of the modules it leaves out, above the report, in Foundry's warning colours. */
+  .emma-report-warning {
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
+    margin: 0;
+    padding: 0.375rem 0.5rem;
+    border: 1px solid var(--color-level-warning-border);
+    border-radius: 4px;
+    background: var(--color-level-warning-bg);
+  }
+
+  /* The report fills the window: its buttons stay put, and the report scrolls beneath them. */
+  .emma-report {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-height: 0;
+    font-family: var(--font-body);
+  }
+
+  .emma-report p,
+  .emma-report h3,
+  .emma-report h4 {
+    margin: 0;
+  }
+
+  .emma-report h4 {
+    font-family: var(--font-body);
+    font-size: var(--font-size-14);
+    font-weight: bold;
+  }
+
+  /* Foundry's headings are sized for documents; these head the parts of a small window. */
+  .emma-report h3 {
+    padding-bottom: 0.125rem;
+    border-bottom: 1px solid var(--color-border);
+    font-family: var(--font-body);
+    font-size: var(--font-size-16);
+    font-weight: bold;
+  }
+
+  /* Its buttons act on the report, so sit at the end, as a window's own controls do. */
+  .emma-report-controls {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+
+  .emma-report-pane {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .emma-report-controls button {
+    flex: none;
+  }
+
+  section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .emma-report-setup {
+    color: var(--color-text-secondary);
+  }
+
+  /* The plan's columns line up as they do in the downloaded text. */
+  .emma-report-plan {
+    margin: 0;
+    padding: 0.5rem;
+    overflow-x: auto;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    font-family: var(--font-mono, monospace);
+    font-size: var(--font-size-12);
+    white-space: pre;
+  }
+
+  .emma-report-verdict.valid i {
+    color: var(--color-level-success);
+  }
+
+  .emma-report-verdict.invalid i {
+    color: var(--color-level-error);
+  }
+
+  ul {
+    margin: 0;
+    padding-inline-start: 1.25rem;
+  }
+
+  /* Set apart from the modules with something to report: a box of its own, folded away until opened. */
+  .emma-report-quiet {
+    padding: 0.375rem 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    color: var(--color-text-secondary);
+  }
+
+  .emma-report-quiet summary {
+    font-weight: bold;
+    cursor: pointer;
+  }
+
+  .emma-report-quiet[open] summary {
+    margin-bottom: 0.5rem;
+  }
+
+  .emma-report-packages {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0;
+    list-style: none;
+  }
+
+  .emma-report-package {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .emma-report-verdict-text {
+    color: var(--color-text-secondary);
+  }
+
+  .emma-report-explanation {
+    padding: 0;
+    list-style: none;
+  }
+</style>

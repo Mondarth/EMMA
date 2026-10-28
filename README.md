@@ -10,10 +10,12 @@
 Replaces Foundry's Module Management window with one that is easier to work with, and lets GMs try out other versions
 of Foundry, the game system and their modules before changing anything.
 
-A module for [Foundry VTT](https://foundryvtt.com) version 14 and later. Install it from the manifest URL:
+A module for [Foundry VTT](https://foundryvtt.com) version 14 and later. It requires
+[libWrapper](https://github.com/ruipin/fvtt-lib-wrapper), which Foundry offers to install with it. Install it from the
+manifest URL:
 
 ```
-https://github.com/Mondarth/EMMA/releases/latest/download/module.json
+https://raw.githubusercontent.com/Mondarth/EMMA/main/packages/module/module.json
 ```
 
 ## Features
@@ -33,6 +35,9 @@ Managing modules:
 - **Staged changes**: nothing changes until you save. The footer counts what is staged, names any requirement still
   missing, warns before EMMA deactivates itself, and asks before closing with changes unsaved. Saving reloads the
   world for everyone. Players see EMMA read-only.
+- **World record**: a `mondarth-emma.json` file in each world's folder records its Foundry version, system and active
+  modules, for tools that check a world before it is launched. It is kept up to date when the world starts, when
+  changes are saved, and when a GM logs out or returns to setup, and goes with the world into its backups.
 
 Hypothetical mode, for GMs:
 

@@ -1,0 +1,46 @@
+{
+  "id": "mondarth-emma",
+  "title": "EMMA - Enhanced Module Manager Application",
+  "version": "0.8.2",
+  "compatibility": {
+    "minimum": "14",
+    "verified": "14"
+  },
+  "relationships": {
+    "requires": [
+      {
+        "id": "lib-wrapper",
+        "type": "module",
+        "manifest": "https://github.com/ruipin/fvtt-lib-wrapper/releases/latest/download/module.json",
+        "compatibility": {
+          "minimum": "1.13.0.0"
+        }
+      }
+    ]
+  },
+  "esmodules": ["dist/mondarth-emma.js"],
+  "styles": ["dist/mondarth-emma.css"],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "dist/lang/en.json"
+    }
+  ],
+  "authors": [
+    {
+      "name": "Ulenar of Mondarth",
+      "email": "ulenarofmondarth@gmail.com",
+      "url": "https://github.com/Mondarth/EMMA",
+      "flags": {}
+    }
+  ],
+  "description": "Replaces the Foundry manage module app.",
+  "flags": {},
+  "url": "https://github.com/Mondarth/EMMA",
+  "readme": "https://github.com/Mondarth/EMMA/blob/main/README.md",
+  "bugs": "https://github.com/Mondarth/EMMA/issues",
+  "changelog": "https://github.com/Mondarth/EMMA/releases/latest",
+  "manifest": "https://raw.githubusercontent.com/Mondarth/EMMA/main/packages/module/module.json",
+  "download": "https://github.com/Mondarth/EMMA/releases/download/v0.8.2/module-v0.8.2.zip"
+}

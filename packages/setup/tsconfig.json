@@ -1,0 +1,19 @@
+{
+  "extends": "@tsconfig/svelte/tsconfig.json",
+  "compilerOptions": {
+    "moduleResolution": "bundler",
+    "module": "esnext",
+    "target": "esnext",
+    "lib": ["esnext", "dom"],
+    // Foundry's types give the setup screen's ApplicationV2 and FilePicker; its `game`, which they do not describe,
+    // is typed locally in src/foundry/setup-game.ts.
+    "types": ["svelte", "fvtt-types", "vitest/importMeta"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "resolveJsonModule": true,
+    "noEmit": true
+  },
+  "include": ["src/**/*", "tests/**/*"]
+}

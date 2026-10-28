@@ -1,0 +1,322 @@
+{
+  "MONDARTH-EMMA": {
+    "Title": "EMMA - Enhanced Module Manager Application",
+    "App": {
+      "Title": "EMMA - module management"
+    },
+    "Count": "({count})",
+    "Toolbar": {
+      "Label": "Views",
+      "List": "List view",
+      "Split": "Split view",
+      "Expand": "Expand all module details",
+      "Collapse": "Collapse all module details",
+      "Group": "Group related modules",
+      "Hypothetical": "Hypothetical mode",
+      "CoreTooltip": "Foundry Virtual Tabletop {version}",
+      "System": "{id} {version}",
+      "SystemTooltip": "{title} {version}"
+    },
+    "Versions": {
+      "Choose": "{module} version {version}: choose another version",
+      "List": "Versions of {module}",
+      "Loading": "Looking up module versions…",
+      "Failed": "Module versions could not be looked up. See the console for details.",
+      "Unreached": "Not every version could be looked up for: {packages}.",
+      "UnreachedNoProxy": "Not every version could be looked up for: {packages}. Choose a version lookup proxy in EMMA's settings to look further.",
+      "Core": "Foundry Virtual Tabletop",
+      "Unlisted": "Not on Foundry's package listing: its author has published it elsewhere, such as on GitLab, ahead of the listing, so Foundry's installer does not offer it.",
+      "Fit": {
+        "Verified": "The system and every active module are verified with this version.",
+        "Unusable": "Will not work: {packages}.",
+        "Unverified": "May not work: {packages}."
+      }
+    },
+    "Report": {
+      "Group": "Reports on the setup chosen",
+      "Reports": {
+        "plan": "Plan",
+        "check": "Check",
+        "update": "Update"
+      },
+      "Tooltips": {
+        "plan": "Plan: the active modules in the order to install them",
+        "check": "Check: whether every package can be used in the setup chosen",
+        "update": "Update: the best versions of the active modules"
+      },
+      "Titles": {
+        "plan": "EMMA - plan",
+        "check": "EMMA - check",
+        "update": "EMMA - update"
+      },
+      "Setup": "Foundry Virtual Tabletop {core}, {system}. Active modules: {count}",
+      "Download": "Download this report as text",
+      "Apply": "Choose these versions in the hypothetical setup",
+      "Plan": {
+        "Heading": "Plan: the active modules in the order to install them, those others depend on first",
+        "Changes": "Install: versions that differ from those installed, and modules not installed",
+        "Kept": "Keep: versions already installed",
+        "NoChanges": "Nothing to install: every active module stays at the version installed.",
+        "NoneKept": "Nothing to keep: every active module changes version.",
+        "Id": "ID",
+        "Name": "Name",
+        "Manifest": "Manifest URL",
+        "NoManifest": "none for this version",
+        "Empty": "No modules are active."
+      },
+      "Unavailable": {
+        "Heading": "Not available",
+        "Intro": "These active modules cannot be had, so this report leaves them out. Modules that require them will not find them.",
+        "Entry": "{title}: {reason}",
+        "EntryNote": "{title}: {reason} {note}",
+        "archived": "Archived. Foundry VTT no longer offers it.",
+        "gone": "Gone. Its files are no longer available."
+      },
+      "Ignored": "Hypothetical mode ignores {modules}, so this report leaves them out. They are taken as present for the modules that require them, but whether they suit this setup is not known: the report may be inaccurate.",
+      "Check": {
+        "Heading": "Check of the setup chosen",
+        "Valid": "Every package can be used in this setup.",
+        "Invalid": "Some packages cannot be used in this setup.",
+        "Unknown": "Not known, so not checked.",
+        "Listed": "Known only from a listing, so checked without its dependencies.",
+        "Missed": "{release} is not verified with {package}.",
+        "Recommends": "{release} recommends {package}, which is not active.",
+        "Conflicts": "{release} conflicts with {package}, which is active.",
+        "Nothing": "Nothing to report",
+        "NothingCount": "Nothing to report ({count})",
+        "Module": "{title} {version}: {verdict}",
+        "ModuleUnjudged": "{title} {version}"
+      },
+      "Solve": {
+        "Heading": "Best versions of the active modules for the Foundry version and system chosen",
+        "Loading": "Looking for the best versions…",
+        "Found": "The best versions are found.",
+        "NoChanges": "Every active module is already at its best version.",
+        "Changes": "Change these versions:",
+        "Change": "{package}: {from} to {to}",
+        "Add": "{package}: add {version}",
+        "None": "No versions of the active modules work together with the Foundry version and system chosen:",
+        "Undecided": "There is no answer without the manifests of: {packages}.",
+        "Failed": "The best versions could not be worked out. See the console for details.",
+        "Unloaded": "Could not be loaded, so judged from their listings: {packages}."
+      },
+      "Explain": {
+        "Requirements": "the active modules",
+        "WorldSystem": "the world’s system",
+        "Term": "{name} {versions}",
+        "AnySystemWorld": "a world with a system",
+        "World": "a world with {systems}",
+        "System": "{id} {versions}",
+        "FromInclusive": "{version} or later",
+        "FromExclusive": "later than {version}",
+        "ToInclusive": "{version} or earlier",
+        "ToExclusive": "earlier than {version}",
+        "BetweenInclusiveInclusive": "{lower} to {upper}",
+        "BetweenInclusiveExclusive": "{lower} up to but not including {upper}",
+        "BetweenExclusiveInclusive": "after {lower} to {upper}",
+        "BetweenExclusiveExclusive": "after {lower} up to but not including {upper}",
+        "OtherThan": "other than {versions}",
+        "OtherSystems": "a system other than {systems}",
+        "None": "no version",
+        "DependsOn": "{release} depends on {on}",
+        "ConflictsWith": "{release} conflicts with {on}",
+        "RunsIn": "{release} runs only in {systems}",
+        "Unusable": "{release} declares no Foundry VTT compatibility, which is not accepted",
+        "Excluded": "{release} cannot be used ({reason})",
+        "ExcludedWith": "{release} cannot be used with {on} ({reason})",
+        "Overridden": "{text} ({reason})",
+        "CoreLimit": "{core} cannot be used: {reason}",
+        "Requirement": "{on} is active",
+        "Pin": "{on} is chosen",
+        "SetupNeeds": "a setup needs {what}",
+        "IsWorldSystem": "{system} is the world’s system exactly when it is installed",
+        "NoVersions": "no version of {term} is available",
+        "NoSystem": "no system is available",
+        "NoSystemIn": "no system in {systems} is available",
+        "Failed": "the active modules cannot all be used together",
+        "Wanted": "the active modules are wanted",
+        "Forbidden": "{term} cannot be used",
+        "Needed": "{term} is needed",
+        "Needs": "{term} needs {needed}",
+        "RequirementsNeed": "the active modules need {needed}",
+        "Incompatible": "{a} cannot be used with {b}",
+        "Either": "either {terms} is needed",
+        "IfThen": "if {given} are used, then {then} is needed",
+        "Because": "Because {a} and {b}, {conclusion}.",
+        "AndBecause": "And because {a}, {conclusion}.",
+        "SoBecause": "So, because {a}, {conclusion}.",
+        "AndBecauseBoth": "And because {a} and {b}, {conclusion}.",
+        "SoBecauseBoth": "So, because {a} and {b}, {conclusion}.",
+        "Thus": "Thus, {conclusion}.",
+        "Sentence": "{text}.",
+        "See": "{phrase} ({number})"
+      }
+    },
+    "List": {
+      "Label": "Installed modules",
+      "Empty": "No modules are installed.",
+      "All": "All modules"
+    },
+    "Split": {
+      "Inactive": "Inactive",
+      "Active": "Active",
+      "Activate": "Activate the selected modules",
+      "Deactivate": "Deactivate the selected modules",
+      "NoneInactive": "Every module is active.",
+      "NoneActive": "No module is active.",
+      "Confirm": "Activate this recommended module too"
+    },
+    "Drawer": {
+      "Show": "Show details of {module}",
+      "Hide": "Hide details of {module}",
+      "Field": {
+        "description": "Description",
+        "authors": "Authors",
+        "languages": "Languages",
+        "links": "Links",
+        "compatibility": "Compatibility",
+        "systems": "Game systems",
+        "requires": "Requires",
+        "recommends": "Recommends",
+        "conflicts": "Conflicts with",
+        "packs": "Compendium packs",
+        "library": "Library",
+        "id": "Module ID"
+      },
+      "Count": {
+        "authors": "{count} authors",
+        "languages": "{count} languages",
+        "systems": "{count} game systems",
+        "requires": "{count} packages",
+        "recommends": "{count} packages",
+        "conflicts": "{count} packages",
+        "packs": "{count} packs"
+      },
+      "Link": {
+        "url": "Project page",
+        "readme": "Readme",
+        "changelog": "Changelog",
+        "bugs": "Report a bug",
+        "license": "Licence",
+        "manifest": "Manifest",
+        "download": "Download"
+      },
+      "Compatibility": {
+        "minimum": "Minimum",
+        "verified": "Verified",
+        "maximum": "Maximum"
+      },
+      "Type": {
+        "module": "module",
+        "system": "game system",
+        "world": "world"
+      },
+      "IsLibrary": "Yes: it provides features for other modules to use rather than its own.",
+      "Email": "Email {name}",
+      "Discord": "Discord",
+      "Empty": "The module's manifest gives none of the details chosen to show.",
+      "NoneChosen": "No details are chosen to show. Choose them under Game Settings, in the section for EMMA."
+    },
+    "Footer": {
+      "Save": "Save",
+      "Reset": "Reset",
+      "Changes": "Changes staged: {count}",
+      "ReadOnly": "Only a GM can change which modules are active.",
+      "DisablesEmma": "Saving deactivates EMMA itself, so Foundry's own Module Management window will open from then on.",
+      "NativeBadges": "The badges show Foundry VTT's own checks, which judge the Foundry version alone, not the game system or the modules each requires: they may be inaccurate. Choose EMMA's checks under Badge checks in EMMA's settings.",
+      "NoProxy": "No version lookup proxy is used, so Foundry's package listing and release notes can't be read: fewer module versions are found, and no newer Foundry version is offered. Choose a proxy in EMMA's settings to look further."
+    },
+    "Requirements": {
+      "Unmet": "{module} requires {missing}, which must be active too.",
+      "LockedOne": "{module} is required by {parent}, so it must stay active while it is.",
+      "LockedMany": "{module} is required by {parents}, so it must stay active while they are."
+    },
+    "Relation": {
+      "required": "Required",
+      "recommended": "Recommended",
+      "Conflict": "Conflict"
+    },
+    "Discard": {
+      "Title": "Discard staged changes?",
+      "Body": "The changes you staged in EMMA have not been saved. Closing the window discards them.",
+      "Discard": "Discard and close",
+      "Keep": "Keep editing"
+    },
+    "Settings": {
+      "Disabled": {
+        "Name": "Disable EMMA",
+        "Hint": "Use Foundry's built-in Module Management window instead of EMMA. Takes effect immediately."
+      },
+      "OlderVersions": {
+        "Name": "Show older versions",
+        "Hint": "How many versions before the one installed hypothetical mode offers in each version drop-down, and its reports consider. Installing an older version into an existing world is risky, as its data may not go back, so none are shown by default; one or two are enough to try rolling back an update. Warning: each version shown is judged against every other, so showing many older versions can make hypothetical mode noticeably slower."
+      },
+      "BadgeChecks": {
+        "Name": "Badge checks",
+        "Hint": "Whose checks the version badges show outside hypothetical mode. EMMA's check each module against the game system and its version, and an active module against the modules it requires and conflicts with, as well as the Foundry version. Foundry's own check the Foundry version alone, as its Module Management does, so may show a module as verified that will not work with your system: they may be inaccurate. Hypothetical mode always uses EMMA's.",
+        "Emma": "EMMA's checks (recommended)",
+        "Foundry": "Foundry VTT's own checks (may be inaccurate)"
+      },
+      "AutoRecommended": {
+        "Name": "Automatically activate/deactivate recommended modules",
+        "Hint": "When you activate a module in EMMA, also activate the modules it recommends, and deactivate them again with it. Required modules always follow the module that requires them."
+      },
+      "VersionProxy": {
+        "Name": "Version lookup proxy",
+        "Label": "Set proxy",
+        "Hint": "Browsers may not read Foundry's package listing, its release notes or most module manifests, so hypothetical mode looks versions up through a CORS proxy: EMMA's own, unless you set one you trust.",
+        "Title": "EMMA - version lookup proxy",
+        "Choice": "Look versions up through",
+        "Modes": {
+          "Default": "EMMA's proxy",
+          "DefaultHint": "Recommended. EMMA's package catalogue, which keeps every version of the packages asked for, then a proxy run for EMMA for anything the catalogue does not have yet. Both deal only in package information: release lists, manifests and Foundry's package listing. They see this server's address and the packages it looks up.",
+          "Own": "My own proxy",
+          "OwnHint": "A CORS proxy you run or trust, with its API key if it asks for one.",
+          "None": "No proxy",
+          "NoneHint": "Looks versions up directly, so finds far fewer of them and nothing newer of Foundry."
+        },
+        "Url": "Proxy URL",
+        "UrlHint": "The URL of a CORS proxy you trust, with {url} where the address to fetch goes, such as https://proxy.example.com/?url={url}. Every lookup is sent through it.",
+        "Invalid": "The URL needs {url} where the address to fetch goes.",
+        "Key": "API key",
+        "KeyHint": "Sent to the proxy in an X-API-Key header, for a proxy that asks for one. Kept in this browser only, so other users never see it: enter it again on each browser you use. Leave blank to send none.",
+        "Save": "Save",
+        "NoProxy": {
+          "Title": "Look versions up without a proxy?",
+          "Body": "Without a proxy, hypothetical mode can read only GitHub's and GitLab's release lists and the manifests installed modules came with. It cannot read Foundry's package listing or release notes, nor the manifests of most releases, so it finds far fewer versions, offers no newer Foundry version, and judges many versions without knowing which Foundry or system they suit. GitHub also allows only 60 lookups an hour from this browser's address, which a large world can use up. EMMA's proxy has none of these limits.",
+          "Confirm": "Use no proxy",
+          "Cancel": "Keep a proxy"
+        },
+        "Discard": {
+          "Title": "Discard proxy changes?",
+          "Body": "The proxy changes you made have not been saved. Closing the window discards them."
+        }
+      },
+      "Fields": {
+        "Name": "Module details",
+        "Label": "Choose details",
+        "Hint": "Choose which details of each module EMMA's drawers show. Only you see your choice.",
+        "Title": "EMMA - module details",
+        "Legend": "Details shown in each module's drawer",
+        "Defaults": "Reset to defaults",
+        "Save": "Save",
+        "Discard": {
+          "Title": "Discard your changes?",
+          "Body": "The details you chose have not been saved. Closing the window discards them."
+        }
+      }
+    },
+    "Ignore": {
+      "Add": "No hypotheticals",
+      "Remove": "Add to hypotheticals",
+      "Tooltip": "Hypothetical mode ignores this module: it is never looked up or judged, and is taken as present for the modules that require it."
+    },
+    "Errors": {
+      "OpenFailed": "EMMA could not open, so Foundry's Module Management window has been opened instead. See the console for details.",
+      "SaveFailed": "EMMA could not save which modules are active. See the console for details.",
+      "FieldsFailed": "EMMA could not save which module details to show. See the console for details.",
+      "ProxyFailed": "EMMA could not save the version lookup proxy. See the console for details.",
+      "IgnoreFailed": "EMMA could not save which modules hypothetical mode ignores. See the console for details."
+    }
+  }
+}

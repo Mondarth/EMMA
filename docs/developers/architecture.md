@@ -3,14 +3,19 @@
 EMMA is split into layers so that as little code as possible touches Foundry VTT directly. Everything below the
 adapters is plain TypeScript and Svelte, tested without a Foundry server.
 
+The module is the `packages/module` package of the repository's pnpm workspace; the paths below are relative to it.
+
 `src/index.ts`
 : The entry point. On `init` it registers the settings, the Module details settings menu and the Module Management
-  takeover.
+  takeover; on `ready` it starts keeping the world record (`startWorldRecord`).
 
 `src/module/foundry/`
 : The parts that depend on how Foundry behaves rather than on its public API. `settings-entry.ts` takes clicks on the
-  Settings sidebar's **Manage Modules** button, because Foundry offers no public way to replace that window. Code here
-  is fragile by nature; keep it small and covered by the end-to-end tests.
+  Settings sidebar's **Manage Modules** button, because Foundry offers no public way to replace that window.
+  `session-exit.ts` runs a task before a user logs out or returns to setup, as Foundry fires no hook for either: it
+  wraps `Game#logOut` and `Game#shutDown` with libWrapper (a required module, and the only way EMMA wraps Foundry's
+  functions), waiting at most five seconds for the task. Code here is fragile by nature; keep it small and covered by
+  the end-to-end tests.
 
 `src/module/adapters/`
 : The only code that reads or changes Foundry's game data. `modules.ts` lists the installed modules and reads and
@@ -22,7 +27,10 @@ adapters is plain TypeScript and Svelte, tested without a Foundry server.
   The version badge comes from Foundry's `Module#getVersionBadge`, so EMMA judges compatibility exactly as Foundry
   does; only its styles are EMMA's, since Foundry's apply only inside its own package lists.
   `platform.ts` reads the Foundry version and the game system in use, and whether the user is a GM, for hypothetical
-  mode. `versions.ts` looks up the versions of the system and the active modules with `@mondarth/fvtt-resolver`: the
+  mode. `world-record.ts` reads and writes the world record, `mondarth-emma.json` in the root of the world's folder:
+  it lists the folder with `FilePicker.browse` first, so a missing record costs no failed request, fetches the file
+  as the server serves it, and writes it with `FilePicker.upload`. Its format, and the comparison that ignores when
+  it was written, are in `src/module/lib/world-record.ts`. `versions.ts` looks up the versions of the system and the active modules with `@mondarth/fvtt-resolver`: the
   installed manifests (from `toObject()`), GitHub's and GitLab's release lists, declared manifest URLs and, through
   the proxy setting only (the resolver's `proxiedFetch`), Foundry's package listing and, with the system, Foundry's
   core builds from its release notes (`foundryCoreReleases`). Without a proxy it never asks a host that sends no CORS
@@ -87,6 +95,10 @@ adapters is plain TypeScript and Svelte, tested without a Foundry server.
   every user who joins. Each mounts its Svelte component on first render and unmounts it on close. All but the report ask
   before closing with unsaved changes (staged activation in `EmmaApp`, a changed draft in the menus), through
   `confirmDiscard` in `confirm-discard.ts`; `close({ discard: true })` closes without asking.
+  `world-record.ts` keeps the world record in step with the world (`syncWorldRecord`), one check at a time, writing
+  it only when it is missing or says something else. The active GM checks it on `ready`, `saveModules` (in
+  `save.ts`) after each save and before asking to reload, and every user who may keep it before logging out or
+  returning to setup. A failure is logged, never shown, as the record must not get in the way.
 
 `src/component/`
 : The Svelte components. They read and change a `ModuleState` and never use `game` directly; text comes through
@@ -95,6 +107,42 @@ adapters is plain TypeScript and Svelte, tested without a Foundry server.
   drawer a level-2 row below it. The treegrid keeps focus and points at the keyboard's row with
   `aria-activedescendant`, so its triangles are left out of the Tab order and its key handling ignores keys pressed
   on a drawer's links.
+
+## The setup screen and the browser extension
+
+Foundry offers modules no way into its setup screen, so EMMA reaches it through a browser extension, which injects a
+script into the page with the user's permission (see {doc}`../extension`). Three packages make it up, besides the
+module:
+
+`packages/core` (`@mondarth/emma-core`)
+: Code that more than one package needs, and that uses no Foundry or browser globals: so far the world record's format
+  (`src/world-record.ts`), which the module writes and the setup screen reads, with `parseWorldRecord` to read a record
+  that anything may have written. Packages import it from its source, through its `exports`.
+
+`packages/setup` (`@mondarth/emma-setup`)
+: EMMA on the setup screen, built into one classic script with its styles inside, `dist/emma-setup.js`, which is all
+  the extension injects. It starts only on Foundry's setup screen (`game.view === "setup"`), and once per page.
+  `src/foundry/` holds the only code that touches the page: `setup-game.ts` reads the setup screen's `game`, which
+  Foundry's types do not describe, behind a type guard; `records.ts` reads each world's record, listing the world's
+  folder with `FilePicker.browse` first; `menu-button.ts` adds EMMA's button to the `SetupMenu` on each
+  `renderSetupMenu` hook; and `guard.ts`, the fragile part, stops clicks on the Install, Update and Update All buttons
+  in the capture phase and wraps `game.post` to refuse `installPackage`. libWrapper is a module, not loaded on the
+  setup screen, so the guard wraps `game.post` itself. `src/lib/overview.ts` compares each world's record with what is
+  installed and summarises the installation; `src/lib/tree.ts` gives the tree's rows and keyboard moves. The window,
+  `EmmaSetupApp`, is an `ApplicationV2`, as on the module, mounting `SetupRoot`. Its text is its own
+  (`src/lang/en.json`), as Foundry's translations on the setup screen do not include EMMA's.
+
+`packages/extension` (`@mondarth/emma-extension`)
+: The extension, built for Chromium and Firefox from the same source (`vite build --mode chromium` or `--mode
+  firefox`, which sets `__TARGET__`), into `dist/<browser>`, with the setup screen's script copied in. Its manifest
+  (`scripts/manifest.ts`) asks for no site: host permissions are optional, asked for per server when the user activates
+  EMMA on it (`src/browser/actions.ts`). The servers activated are kept in `chrome.storage.local`. For those EMMA opens
+  on by itself, a small loader (`src/loader.ts`) is registered as a content script; on a setup screen it asks the
+  background script (`src/background.ts`), which checks the server's origin against those remembered and injects
+  `emma-setup.js` into the page itself (`world: "MAIN"`, Chrome 102 and Firefox 128). The background checks the
+  origin, rather than trusting the loader's match patterns, because Firefox's patterns cannot name a port.
+  **Open EMMA just this once** injects through `activeTab`, with no permission kept. `src/browser/api.ts` is the only
+  code that uses the extension API.
 
 ## Activation changes
 

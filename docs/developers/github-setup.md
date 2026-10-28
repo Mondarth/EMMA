@@ -48,11 +48,18 @@ Under *Settings → Secrets and variables → Actions → Secrets*:
 | `CODECOV_TOKEN`         | Dev CI  | Optional. Uploads coverage to [Codecov](https://about.codecov.io) (step 8)        |
 | `EMMA_DEFAULT_PROXY_KEY` | Release | Optional. The API key of the default version lookup proxy (see {doc}`default-proxy`) |
 | `EMMA_DEFAULT_CATALOGUE_KEY` | Release | Optional. The API key of the default package catalogue (see {doc}`default-proxy`) |
+| `AMO_JWT_ISSUER`        | Extension release | Optional. The issuer of an API key from addons.mozilla.org, to have Mozilla sign the Firefox extension |
+| `AMO_JWT_SECRET`        | Extension release | Optional. That API key's secret                                          |
 
 And under *Variables*, `EMMA_DEFAULT_PROXY_URL`, the default proxy's URL template, and `EMMA_DEFAULT_CATALOGUE_URL`,
 the default catalogue's URL. Without both of a pair, a release has no default proxy, or no default catalogue.
 
 Pull requests from forks cannot read secrets, so the end-to-end tests are skipped for them.
+
+For the Firefox extension to be signed, create a Mozilla account for the publisher (Mondarth), sign in to
+[addons.mozilla.org](https://addons.mozilla.org), and under *Tools → Manage API Keys* generate a key: its JWT issuer
+and JWT secret are the two `AMO_` secrets. Signing an unlisted add-on lists nothing on Firefox Add-ons. Without them,
+the extension release attaches the Firefox build unsigned.
 
 ## 4. Enable GitHub Pages and code security
 
@@ -117,7 +124,7 @@ the documentation and fast-forward `dev` to the release commit.
 
 Sign in at [codecov.io](https://about.codecov.io) with GitHub, add the repository, and store the upload token it
 shows as the `CODECOV_TOKEN` secret. Codecov then comments coverage changes on pull requests. Its checks are
-informational (`codecov.yml`); the coverage thresholds in `vite.config.ts` are what fail CI.
+informational (`codecov.yml`); the coverage thresholds in `packages/module/vite.config.ts` are what fail CI.
 
 ## Troubleshooting
 

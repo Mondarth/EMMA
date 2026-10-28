@@ -1,0 +1,108 @@
+#!/usr/bin/env node
+
+/**
+ * Install the pinned game system (and any modules) that EMMA - Enhanced Module Manager Application is tested with into the end-to-end test data
+ * directory, along with the empty fixture modules in `tests/e2e/fixtures/modules` that the tests activate.
+ *
+ * Usage: `node scripts/e2e/install-packages.ts`
+ */
+
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+const ROOT = path.resolve(import.meta.dirname, '../..');
+const DATA = path.join(ROOT, 'tests/e2e/.data/Data');
+const FIXTURES = path.join(ROOT, 'tests/e2e/fixtures/modules');
+
+interface PinnedPackage {
+  /** Directory under the Foundry user data folder: `systems` or `modules`. */
+  type: 'systems' | 'modules';
+  id: string;
+  /** The manifest file that marks the package root inside the archive. */
+  manifest: 'system.json' | 'module.json';
+  url: string;
+}
+
+/** Bump these deliberately; the end-to-end tests run against exactly these builds. */
+const PACKAGES: PinnedPackage[] = [
+  {
+    type: 'systems',
+    id: 'dnd5e',
+    manifest: 'system.json',
+    url: 'https://github.com/foundryvtt/dnd5e/releases/download/release-5.3.3/dnd5e-release-5.3.3.zip',
+  },
+  {
+    type: 'modules',
+    id: 'lib-wrapper',
+    manifest: 'module.json',
+    url: 'https://github.com/ruipin/fvtt-lib-wrapper/releases/download/v1.13.5.1/lib-wrapper-v1.13.5.1.zip',
+  },
+];
+
+/**
+ * Find the directory inside an extracted archive that holds the package manifest: the archive root, or a single
+ * top-level folder.
+ * @param extracted - Directory the archive was extracted into
+ * @param manifest - Manifest file name to look for
+ * @returns The package root directory
+ */
+function findPackageRoot(extracted: string, manifest: string): string {
+  if (fs.existsSync(path.join(extracted, manifest))) return extracted;
+
+  const nested = fs
+    .readdirSync(extracted, { withFileTypes: true })
+    .filter(entry => entry.isDirectory() && fs.existsSync(path.join(extracted, entry.name, manifest)));
+  const [only] = nested;
+  if (nested.length !== 1 || !only) throw new Error(`Could not find ${manifest} in the archive`);
+
+  return path.join(extracted, only.name);
+}
+
+/**
+ * Download and unpack one package, unless it is already installed.
+ * @param pinned - The package to install
+ */
+async function install(pinned: PinnedPackage): Promise<void> {
+  const target = path.join(DATA, pinned.type, pinned.id);
+  if (fs.existsSync(path.join(target, pinned.manifest))) {
+    console.log(`${pinned.id}: already installed`);
+    return;
+  }
+
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), `mondarth-emma-e2e-${pinned.id}-`));
+  try {
+    const archive = path.join(work, 'package.zip');
+    const extracted = path.join(work, 'extracted');
+
+    const response = await fetch(pinned.url);
+    if (!response.ok) throw new Error(`Download of ${pinned.url} failed: ${response.status} ${response.statusText}`);
+    fs.writeFileSync(archive, Buffer.from(await response.arrayBuffer()));
+
+    fs.mkdirSync(extracted);
+    execFileSync('unzip', ['-q', archive, '-d', extracted], { stdio: 'inherit' });
+
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.cpSync(findPackageRoot(extracted, pinned.manifest), target, { recursive: true });
+    console.log(`${pinned.id}: installed from ${pinned.url}`);
+  } finally {
+    fs.rmSync(work, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Copy the fixture modules into the test data, replacing any older copies so they always match the repository.
+ */
+function installFixtures(): void {
+  for (const entry of fs.readdirSync(FIXTURES, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const target = path.join(DATA, 'modules', entry.name);
+    fs.rmSync(target, { recursive: true, force: true });
+    fs.cpSync(path.join(FIXTURES, entry.name), target, { recursive: true });
+    console.log(`${entry.name}: installed from the fixtures`);
+  }
+}
+
+for (const pinned of PACKAGES) await install(pinned);
+installFixtures();

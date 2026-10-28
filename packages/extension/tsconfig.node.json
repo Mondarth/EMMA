@@ -1,0 +1,17 @@
+{
+  // The Vite configuration and the build scripts, which run under Node.
+  "compilerOptions": {
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "target": "esnext",
+    "lib": ["esnext"],
+    "types": ["node"],
+    "strict": true,
+    "verbatimModuleSyntax": true,
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["vite.config.ts", "scripts/**/*.ts"]
+}
