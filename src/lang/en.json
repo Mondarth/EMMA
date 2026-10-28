@@ -82,7 +82,8 @@
         "Missed": "{release} is not verified with {package}.",
         "Recommends": "{release} recommends {package}, which is not active.",
         "Conflicts": "{release} conflicts with {package}, which is active.",
-        "Nothing": "Nothing to report.",
+        "Nothing": "Nothing to report",
+        "NothingCount": "Nothing to report ({count})",
         "Module": "{title} {version}: {verdict}",
         "ModuleUnjudged": "{title} {version}"
       },

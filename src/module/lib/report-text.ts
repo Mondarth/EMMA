@@ -153,19 +153,30 @@ export function planText(setup: ReportedSetup, plan: readonly PlanEntry[]): stri
  * @returns The text
  */
 export function checkText(check: SetupCheck): string {
-  const modules = check.modules.flatMap(({ title, version, badge, notes }) => [
+  const line = ({ title, version, badge }: SetupCheck['modules'][number]) =>
     badge === null
       ? format('MONDARTH-EMMA.Report.Check.ModuleUnjudged', { title, version })
-      : format('MONDARTH-EMMA.Report.Check.Module', { title, version, verdict: badge.text }),
-    ...indented('  - ', notes.length === 0 ? [localize('MONDARTH-EMMA.Report.Check.Nothing')] : notes),
-  ]);
+      : format('MONDARTH-EMMA.Report.Check.Module', { title, version, verdict: badge.text });
+  const noted = check.modules
+    .filter(({ notes }) => notes.length > 0)
+    .flatMap(reported => [line(reported), ...indented('  - ', reported.notes)]);
+  // The modules checking found nothing to say of, together after the others.
+  const quiet = check.modules.filter(({ notes }) => notes.length === 0).map(line);
   return [
     localize('MONDARTH-EMMA.Report.Check.Heading'),
     setupSummary(check.setup),
     '',
     localize(check.valid ? 'MONDARTH-EMMA.Report.Check.Valid' : 'MONDARTH-EMMA.Report.Check.Invalid'),
     '',
-    ...modules,
+    ...noted,
+    // Set apart from the modules above by two blank lines.
+    ...(quiet.length === 0
+      ? []
+      : [
+          ...(noted.length === 0 ? [] : ['', '']),
+          localize('MONDARTH-EMMA.Report.Check.Nothing'),
+          ...indented('- ', quiet),
+        ]),
   ].join('\n');
 }
 

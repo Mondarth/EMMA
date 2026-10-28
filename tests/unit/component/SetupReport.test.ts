@@ -179,13 +179,60 @@ describe('SetupReport', () => {
     expect(check).toHaveTextContent(SUMMARY);
     expect(check.querySelector('.emma-report-verdict')).toHaveClass('invalid');
     expect(check).toHaveTextContent('MONDARTH-EMMA.Report.Check.Invalid');
-    const [lib, midi] = check.querySelectorAll('.emma-report-packages > li');
-    expect(lib).toHaveTextContent('libWrapper');
-    expect(lib).toHaveTextContent('MONDARTH-EMMA.Report.Check.Nothing');
-    expect(lib?.querySelector('.emma-report-verdict-text')).toBeNull();
+    const [midi, lib] = check.querySelectorAll('.emma-report-packages > li');
     expect(midi?.querySelector('.emma-badge.warning')).toHaveTextContent('13.0.2');
     expect(midi?.querySelector('.emma-report-verdict-text')).toHaveTextContent('Unverified');
     expect(midi).toHaveTextContent('Midi QOL 13.0.2 is not verified with dnd5e 6.0.0.');
+    expect(lib).toHaveTextContent('libWrapper');
+    expect(lib?.querySelector('.emma-report-verdict-text')).toBeNull();
+  });
+
+  /**
+   * The folded-away group of modules the check found nothing to report on.
+   * @param count - How many it should hold
+   * @returns The group, if there is one
+   */
+  const quietGroup = (count: number) =>
+    screen
+      .queryByText(`MONDARTH-EMMA.Report.Check.NothingCount {"count":"${String(count)}"}`, { selector: 'summary' })
+      ?.closest('details') ?? null;
+
+  test('groups the modules it found nothing to report on after the others, folded away, opened on request', async () => {
+    renderReport('check', {
+      check: {
+        ...CHECK,
+        modules: [
+          ...CHECK.modules,
+          { id: 'dice', title: 'Dice', version: '5.2.4', badge: CHECK.modules[1]?.badge ?? null, notes: [] },
+        ],
+      },
+    });
+
+    const quiet = quietGroup(2);
+    expect(quiet).not.toBeNull();
+    expect(quiet?.open).toBe(false);
+    const listed = [...(quiet?.querySelectorAll('li') ?? [])];
+    expect(listed.map(item => item.querySelector('strong')?.textContent)).toEqual(['libWrapper', 'Dice']);
+    expect(listed[1]?.querySelector('.emma-badge')).toHaveTextContent('5.2.4');
+    expect(listed[1]?.querySelector('.emma-report-verdict-text')).toHaveTextContent('Unverified');
+    // Said once, for them all, after the modules with something to report.
+    expect(quiet?.querySelectorAll('.emma-report-notes')).toHaveLength(0);
+    const midi = screen.getByText('Midi QOL', { selector: 'strong' });
+    expect(quiet && midi.compareDocumentPosition(quiet) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    await userEvent.click(screen.getByText(/NothingCount/, { selector: 'summary' }));
+
+    expect(quiet?.open).toBe(true);
+  });
+
+  test('has no such group when every module has something to report, nor others when none does', () => {
+    renderReport('check', { check: { ...CHECK, modules: CHECK.modules.slice(1) } });
+    expect(screen.queryByText(/NothingCount/, { selector: 'summary' })).toBeNull();
+
+    document.body.replaceChildren();
+    renderReport('check', { check: { ...CHECK, modules: CHECK.modules.slice(0, 1) } });
+    expect(region('Check').querySelectorAll('.emma-report-packages')).toHaveLength(1);
+    expect(quietGroup(1)).toHaveTextContent('libWrapper');
   });
 
   test.each(['plan', 'check'] as const)('asks for no solve in the %s', style => {

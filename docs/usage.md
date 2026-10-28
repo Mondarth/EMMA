@@ -232,7 +232,10 @@ pressed while its report is open, and pressing it again closes the report:
   its badge, Foundry's verdict and, in words, everything found about it: what keeps it from being used (a module it
   depends on at the wrong version, a system it does not run in), what it prefers and is not given (a Foundry version
   or system version it is not verified with), what it advises (a module it recommends that is not active), and whether
-  it is not known, or known only from a listing and so checked without its dependencies.
+  it is not known, or known only from a listing and so checked without its dependencies. The modules it finds nothing
+  to report on are grouped after the others in a folded section, **Nothing to report**, with how many there are: click
+  it to list them, each with its badge and verdict. In the downloaded text they follow the others after two blank
+  lines.
 - **Update** (an arrow up in a circle): the best versions of the active modules for the Foundry version and system
   chosen: the newest version of each, from the one chosen up, that works with the others' and with
   that Foundry version and system. A version that is only a compatibility risk (not verified for this Foundry, but not
