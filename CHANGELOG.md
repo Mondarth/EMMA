@@ -1,3 +1,9 @@
+## [0.8.2](https://github.com/Mondarth/EMMA/compare/v0.8.1...v0.8.2) (2026-10-28)
+
+### Bug Fixes
+
+* **ui:** pin each ignored module in the update, active or not ([cc4cd26](https://github.com/Mondarth/EMMA/commit/cc4cd265ef40cf5eac5292fd3ea64b7acdf2deb0))
+
 ## [0.8.1](https://github.com/Mondarth/EMMA/compare/v0.8.0...v0.8.1) (2026-10-27)
 
 ### Bug Fixes
