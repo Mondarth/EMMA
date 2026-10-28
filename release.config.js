@@ -20,7 +20,7 @@ export default {
         successCmd: 'echo "version=${nextRelease.version}" >> "$GITHUB_OUTPUT"',
       },
     ],
-    // Committing module.json to main also keeps the manifest in the repository current.
+    // Committing module.json to main updates the stable manifest URL Foundry finds updates at.
     [
       '@semantic-release/git',
       {
@@ -28,7 +28,8 @@ export default {
         message: 'chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}',
       },
     ],
-    // module.json is attached so that releases/latest/download/module.json is a stable manifest URL for Foundry.
+    // module.json is attached so that each release has a manifest of its own, for installing that version. Foundry
+    // finds updates from the copy committed to main (see packages/module/scripts/release/package.ts).
     [
       '@semantic-release/github',
       {

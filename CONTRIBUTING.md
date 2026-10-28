@@ -119,8 +119,9 @@ to `main` and merge it, with a merge commit, once **CI passed** and **E2E passed
 The workflow pushes to the protected branches as a GitHub App, whose credentials are the `RELEASE_APP_CLIENT_ID`
 variable and the `RELEASE_APP_PRIVATE_KEY` secret.
 
-Foundry installs and updates the module from the stable manifest URL
-`https://github.com/Mondarth/EMMA/releases/latest/download/module.json`.
+Foundry installs and updates the module from the manifest committed to `main`,
+`https://raw.githubusercontent.com/Mondarth/EMMA/main/packages/module/module.json`, which the release commit updates.
+Each release also keeps its own manifest, at `releases/download/v<version>/module.json`.
 
 To try the packaging step locally, run `node packages/module/scripts/release/package.ts <version>` and then discard the changes it makes
 to `packages/module/module.json` and `docs/conf.py`.

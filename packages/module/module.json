@@ -41,6 +41,6 @@
   "readme": "https://github.com/Mondarth/EMMA/blob/main/README.md",
   "bugs": "https://github.com/Mondarth/EMMA/issues",
   "changelog": "https://github.com/Mondarth/EMMA/releases/latest",
-  "manifest": "https://github.com/Mondarth/EMMA/releases/latest/download/module.json",
+  "manifest": "https://raw.githubusercontent.com/Mondarth/EMMA/main/packages/module/module.json",
   "download": "https://github.com/Mondarth/EMMA/releases/download/v0.8.2/module-v0.8.2.zip"
 }

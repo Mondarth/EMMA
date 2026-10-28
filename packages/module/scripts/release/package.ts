@@ -21,6 +21,14 @@ const DOCS_CONF = path.join(REPOSITORY, 'docs/conf.py');
 const DIST = path.join(ROOT, 'dist');
 const RELEASES = path.join(ROOT, 'releases');
 
+/**
+ * Where Foundry finds the latest manifest, so installed copies keep finding updates: the manifest committed to `main`,
+ * which the release commit updates. It does not depend on which GitHub release is the latest, which may not be the
+ * module's once the repository releases other packages, and it is on GitHub, where the resolver finds the module's
+ * releases from it. Each release keeps its own manifest too, at `releases/download/v<version>/module.json`.
+ */
+const STABLE_MANIFEST = 'https://raw.githubusercontent.com/Mondarth/EMMA/main/packages/module/module.json';
+
 /** Files and directories of the module's package shipped in the Foundry package, when present. */
 const PACKAGE_CONTENTS = ['module.json', 'dist', 'packs'];
 
@@ -52,8 +60,7 @@ function stampManifest(version: string): void {
   const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8')) as Manifest;
 
   manifest.version = version;
-  // `manifest` stays on the stable "latest" URL so installed copies keep finding updates.
-  manifest.manifest = `${manifest.url}/releases/latest/download/module.json`;
+  manifest.manifest = STABLE_MANIFEST;
   manifest.download = `${manifest.url}/releases/download/v${version}/${archiveName(version)}`;
 
   fs.writeFileSync(MANIFEST, `${JSON.stringify(manifest, null, 2)}\n`);
