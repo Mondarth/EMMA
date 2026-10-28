@@ -26,6 +26,17 @@ async function readRecord(page: Page): Promise<{ core: string; system: Recorded;
 }
 
 /**
+ * Wait until a logout has reached the join page and Foundry has finished loading it. The page goes on fetching its
+ * translations after it loads; leaving it before they arrive makes Firefox and WebKit log the requests cut short as
+ * errors.
+ * @param page - The page logging out
+ */
+async function loggedOut(page: Page): Promise<void> {
+  await page.waitForURL('**/join');
+  await page.waitForLoadState('networkidle');
+}
+
+/**
  * Set whether a module is saved as active, without reloading the world.
  * @param page - A page logged in as the GM
  * @param id - The module
@@ -60,7 +71,7 @@ test('logging out brings the world record up to date first', async ({ page }) =>
 
     await page.getByRole('tab', { name: 'Settings', exact: true }).click();
     await page.getByRole('button', { name: 'Log Out' }).click();
-    await page.waitForURL('**/join');
+    await loggedOut(page);
 
     expect((await readRecord(page))?.modules.map(({ id }) => id)).toContain(FIXTURE);
   } finally {
@@ -70,7 +81,7 @@ test('logging out brings the world record up to date first', async ({ page }) =>
     await page.evaluate(() => {
       game.logOut();
     });
-    await page.waitForURL('**/join');
+    await loggedOut(page);
   }
 
   expect((await readRecord(page))?.modules.map(({ id }) => id)).not.toContain(FIXTURE);
