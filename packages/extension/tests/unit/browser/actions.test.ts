@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import { activate, forget, openOnce, setAuto } from '../../../src/browser/actions';
-import { LOADER_ID, SITES_KEY } from '../../../src/browser/api';
+import { LOADER_ID, LOADER_SCRIPT, SETUP_SCRIPT, SITES_KEY } from '../../../src/browser/api';
 import { installChromeMock } from '../../mocks/chrome';
 
 const LOCAL = 'http://localhost:30000';
@@ -17,13 +17,13 @@ describe('activate', () => {
     expect(registered.get(LOADER_ID)).toEqual({
       id: LOADER_ID,
       matches: ['http://localhost:30000/*'],
-      js: ['loader.js'],
+      js: ['/loader.js'],
       runAt: 'document_idle',
       persistAcrossSessions: true,
     });
     expect(chrome.scripting.executeScript).toHaveBeenCalledExactlyOnceWith({
       target: { tabId: 7 },
-      files: ['emma-setup.js'],
+      files: ['/emma-setup.js'],
       world: 'MAIN',
     });
   });
@@ -62,6 +62,18 @@ describe('activate', () => {
     await expect(activate({ id: 7, url: 'chrome://extensions' })).resolves.toBe('unsupported');
 
     expect(chrome.permissions.request).not.toHaveBeenCalled();
+  });
+});
+
+describe('the scripts', () => {
+  test("are named from the extension's root, as Firefox resolves a relative path from the page that asks", async () => {
+    const { chrome, registered } = installChromeMock();
+
+    await activate({ id: 7, url: `${LOCAL}/setup` });
+
+    expect(registered.get(LOADER_ID)?.js).toEqual([LOADER_SCRIPT]);
+    expect(chrome.scripting.executeScript).toHaveBeenCalledWith(expect.objectContaining({ files: [SETUP_SCRIPT] }));
+    for (const script of [LOADER_SCRIPT, SETUP_SCRIPT]) expect(script).toMatch(/^\//);
   });
 });
 

@@ -139,8 +139,7 @@ module:
   EMMA on it (`src/browser/actions.ts`). The servers activated are kept in `chrome.storage.local`. For those EMMA opens
   on by itself, a small loader (`src/loader.ts`) is registered as a content script; on a setup screen it asks the
   background script (`src/background.ts`), which checks the server's origin against those remembered and injects
-  `emma-setup.js` into the page itself (`world: "MAIN"`, from Chrome 102 and Firefox 157: Firefox has the option from 128, but EMMA's injection failed in an
-  older release with "Unable to load script"). The background checks the
+  `emma-setup.js` into the page itself (`world: "MAIN"`, Chrome 102 and Firefox 128). The background checks the
   origin, rather than trusting the loader's match patterns, because Firefox's patterns cannot name a port.
   **Open EMMA just this once** injects through `activeTab`, with no permission kept. `src/browser/api.ts` is the only
   code that uses the extension API.

@@ -40,9 +40,8 @@ export function manifestFor(target: Target, version: string): Record<string, unk
           browser_specific_settings: {
             gecko: {
               id: GECKO_ID,
-              // Firefox 128 introduced running a script in the page itself (`world: "MAIN"`), but EMMA's injection
-              // failed in a release before 157 ("Unable to load script"). 157 is the oldest it has been seen to work in.
-              strict_min_version: '157.0',
+              // Running a script in the page itself (`world: "MAIN"`) needs Firefox 128.
+              strict_min_version: '128.0',
               // The extension sends nothing anywhere.
               data_collection_permissions: { required: ['none'] },
             },

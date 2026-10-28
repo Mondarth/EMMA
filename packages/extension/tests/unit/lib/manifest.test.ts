@@ -24,11 +24,11 @@ describe('manifestFor', () => {
     });
   });
 
-  test('runs the background as a script on Firefox, from Firefox 157, collecting no data', () => {
+  test('runs the background as a script on Firefox, from Firefox 128, collecting no data', () => {
     expect(manifestFor('firefox', '0.1.0')).toMatchObject({
       background: { scripts: ['background.js'], type: 'module' },
       browser_specific_settings: {
-        gecko: { id: GECKO_ID, strict_min_version: '157.0', data_collection_permissions: { required: ['none'] } },
+        gecko: { id: GECKO_ID, strict_min_version: '128.0', data_collection_permissions: { required: ['none'] } },
       },
     });
   });

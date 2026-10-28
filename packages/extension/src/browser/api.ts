@@ -1,6 +1,6 @@
 /**
  * The only place the extension uses the browser's extension API, through the `chrome` namespace, which Chromium and
- * Firefox (version 157 and later, with Manifest V3) both provide, with promises.
+ * Firefox (version 128 and later, with Manifest V3) both provide, with promises.
  */
 import type { Site, Target } from '../lib/sites';
 import { autoPatterns, parseSites } from '../lib/sites';
@@ -11,8 +11,14 @@ export const SITES_KEY = 'sites';
 /** The ID of EMMA's loader, registered for the servers EMMA opens on by itself. */
 export const LOADER_ID = 'mondarth-emma-loader';
 
-/** The script that brings EMMA to the setup screen, from `@mondarth/emma-setup`. */
-export const SETUP_SCRIPT = 'emma-setup.js';
+/**
+ * The script that brings EMMA to the setup screen, from `@mondarth/emma-setup`. Like {@link LOADER_SCRIPT}, it is named
+ * from the extension's root: Firefox resolves a relative path from the page that asks, such as the popup's.
+ */
+export const SETUP_SCRIPT = '/emma-setup.js';
+
+/** EMMA's loader (`src/loader.ts`), named from the extension's root. */
+export const LOADER_SCRIPT = '/loader.js';
 
 /** The message the loader sends when a page it runs on may be a setup screen. */
 export const SETUP_PAGE_MESSAGE = 'mondarth-emma/setup-page';
@@ -64,7 +70,7 @@ export async function syncLoader(sites: readonly Site[], target: Target): Promis
   const matches = autoPatterns(sites, target);
   if (matches.length === 0) return;
   await chrome.scripting.registerContentScripts([
-    { id: LOADER_ID, matches, js: ['loader.js'], runAt: 'document_idle', persistAcrossSessions: true },
+    { id: LOADER_ID, matches, js: [LOADER_SCRIPT], runAt: 'document_idle', persistAcrossSessions: true },
   ]);
 }
 
