@@ -1,3 +1,13 @@
+## [0.9.0](https://github.com/Mondarth/EMMA/compare/v0.8.2...v0.9.0) (2026-10-28)
+
+### Features
+
+* **core:** share the world record format between packages ([10817c8](https://github.com/Mondarth/EMMA/commit/10817c8e3cd2138b6717f1f50522c934ff58264a))
+* **extension:** bring EMMA to the setup screen with a browser extension ([f36e1dd](https://github.com/Mondarth/EMMA/commit/f36e1dd12a820474be15fd5e2f99e7ddeaaf3300))
+* **setup:** show the installation on Foundry's setup screen ([a82a4f6](https://github.com/Mondarth/EMMA/commit/a82a4f6f45fcb31be7bf3a8c0904c60619ee8f3c))
+* **ui:** fold the modules with nothing to report into one group ([60226c1](https://github.com/Mondarth/EMMA/commit/60226c1d6033bd67a72039536ea0f83c9e5bb568))
+* **world:** keep a record of each world's setup in its folder ([ca642e4](https://github.com/Mondarth/EMMA/commit/ca642e45876c4c5266e179f055017578baa4c998)), closes [Game#logOut](https://github.com/Mondarth/Game/issues/logOut) [Game#shutDown](https://github.com/Mondarth/Game/issues/shutDown)
+
 ## [0.8.2](https://github.com/Mondarth/EMMA/compare/v0.8.1...v0.8.2) (2026-10-28)
 
 ### Bug Fixes
