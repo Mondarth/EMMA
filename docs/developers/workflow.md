@@ -99,7 +99,7 @@ Runs on every push to `main`:
    1. on the very first run, tags the first commit `v0.0.0`, so that versions start at `0.x` (see `CONTRIBUTING.md`);
    2. works out the next version from the commits since the last tag, and stops if none warrants a release;
    3. writes the release notes and `CHANGELOG.md`;
-   4. runs `scripts/release/package.ts`, which stamps the version into `module.json` and `docs/conf.py`, builds
+   4. runs `packages/module/scripts/release/package.ts`, which stamps the version into `module.json` and `docs/conf.py`, builds
       the module and zips it as `releases/module-v<version>.zip`;
    5. commits `chore(release): <version> [skip ci]` to `main` and tags it `v<version>`;
    6. publishes the GitHub release with the zip and `module.json` attached.
@@ -109,11 +109,21 @@ Runs on every push to `main`:
      changelog. If `dev` has moved on in the meantime, it opens a pull request from `main` to `dev` instead; merge it
      with a merge commit.
 
-Foundry VTT installs and updates the module from the manifest of the latest release:
+Foundry VTT installs and updates the module from the manifest committed to `main`, which the release commit
+updates:
 
 ```
-https://github.com/Mondarth/EMMA/releases/latest/download/module.json
+https://raw.githubusercontent.com/Mondarth/EMMA/main/packages/module/module.json
 ```
+
+It does not depend on which GitHub release is the latest, which need not be the module's once the repository releases
+other packages too. Changes to the manifest merged into `main` without a release keep the released version, so Foundry
+offers no update for them. Each release also keeps its own manifest, at
+`https://github.com/Mondarth/EMMA/releases/download/v<version>/module.json`, for installing that version.
+
+Copies installed from the earlier URL, `https://github.com/Mondarth/EMMA/releases/latest/download/module.json`, find the next
+release there, and its manifest moves them to the URL above. Release the module at least once before any other package
+of the repository, so that the latest release is still the module's when they look.
 
 The workflow can also be started by hand on `main` (*Actions → Release → Run workflow*). It then releases only if
 there are releasable commits.
@@ -135,7 +145,7 @@ example `vitest` without `@vitest/coverage-v8`), close it and merge the grouped 
 
 ## Coverage
 
-The unit tests fail when coverage drops below the thresholds in `vite.config.ts`. Set them just below the measured
+The unit tests fail when coverage drops below the thresholds in `packages/module/vite.config.ts`. Set them just below the measured
 level and raise them as tests are added; never lower them to get a change through. When a tool upgrade changes how
 coverage is measured, re-measure and say so in the commit.
 

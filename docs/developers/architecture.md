@@ -3,6 +3,8 @@
 EMMA is split into layers so that as little code as possible touches Foundry VTT directly. Everything below the
 adapters is plain TypeScript and Svelte, tested without a Foundry server.
 
+The module is the `packages/module` package of the repository's pnpm workspace; the paths below are relative to it.
+
 `src/index.ts`
 : The entry point. On `init` it registers the settings, the Module details settings menu and the Module Management
   takeover; on `ready` it starts keeping the world record (`startWorldRecord`).

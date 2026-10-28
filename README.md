@@ -15,7 +15,7 @@ A module for [Foundry VTT](https://foundryvtt.com) version 14 and later. It requ
 manifest URL:
 
 ```
-https://github.com/Mondarth/EMMA/releases/latest/download/module.json
+https://raw.githubusercontent.com/Mondarth/EMMA/main/packages/module/module.json
 ```
 
 ## Features

@@ -10,7 +10,7 @@
 In Foundry's **Add-on Modules** tab choose **Install Module** and paste the manifest URL:
 
 ```
-https://github.com/Mondarth/EMMA/releases/latest/download/module.json
+https://raw.githubusercontent.com/Mondarth/EMMA/main/packages/module/module.json
 ```
 
 Then enable **EMMA - Enhanced Module Manager Application** in your world under **Manage Modules**.

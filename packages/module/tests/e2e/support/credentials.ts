@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 /** The development server's secrets file, which the e2e server reads too unless `FOUNDRY_SECRETS_FILE` names another. */
-const DEFAULT_SECRETS_FILE = path.resolve(import.meta.dirname, '../../../.foundryvtt/secrets.json');
+const DEFAULT_SECRETS_FILE = path.resolve(import.meta.dirname, '../../../../../.foundryvtt/secrets.json');
 
 /**
  * The password for the Foundry setup screen, found as the e2e server finds it (see `tests/e2e/compose.yaml`): from the

@@ -14,7 +14,7 @@ services:
         source: ./data
         target: /data
       - type: bind
-        source: ..
+        source: ../packages/module
         target: /data/Data/modules/mondarth-emma
     environment:
       - CONTAINER_PRESERVE_CONFIG=true

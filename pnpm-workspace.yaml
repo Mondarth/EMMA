@@ -10,3 +10,7 @@ minimumReleaseAgeExclude:
   - "@mondarth/fvtt-resolver"
   # The catalogue's contract, which the resolver depends on, is the maintainer's own too.
   - "@mondarth/fvtt-package-catalogue-contract"
+# The Foundry module and, to come, the browser extension and the code it injects. Tooling shared by all of them is a
+# development dependency of the workspace root, which every package resolves from.
+packages:
+  - packages/*
