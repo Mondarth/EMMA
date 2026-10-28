@@ -7,7 +7,7 @@ import {
   readWorldRecord,
   writeWorldRecord,
 } from '@module/adapters/world-record';
-import { stampRecord } from '@module/lib/world-record';
+import { stampRecord } from '@mondarth/emma-core/world-record';
 import type { FoundryMockOptions } from '../../mocks/foundry';
 import { installFoundryMocks } from '../../mocks/foundry';
 
