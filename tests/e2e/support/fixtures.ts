@@ -6,9 +6,12 @@ import { test as base, expect } from '@playwright/test';
  */
 const ALLOWED_CONSOLE_ERRORS: RegExp[] = [];
 
-/** The sites hypothetical mode looks package versions up on, which no test may reach. */
+/**
+ * The sites hypothetical mode looks package versions up on, which no test may reach. EMMA's own manifest is on its
+ * documentation site, which has no manifest until a release publishes one.
+ */
 const PACKAGE_SITES =
-  /^https:\/\/(api\.github\.com|github\.com|gitlab\.com|raw\.githubusercontent\.com|r2\.foundryvtt\.com)\//;
+  /^https:\/\/(api\.github\.com|github\.com|gitlab\.com|raw\.githubusercontent\.com|r2\.foundryvtt\.com|mondarth\.github\.io)\//;
 
 export const test = base.extend<{
   failOnBrowserErrors: undefined;
