@@ -13,9 +13,12 @@ The pnpm version is pinned by `packageManager` in `package.json`. The module sou
 
 The repository is a pnpm workspace. Each package is in `packages/`:
 
-| Package           | What it is                                                                                     |
-| ----------------- | ---------------------------------------------------------------------------------------------- |
-| `packages/module` | The Foundry VTT module, `@mondarth/emma-module`: its source, tests, manifest and build scripts |
+| Package              | What it is                                                                                     |
+| -------------------- | ---------------------------------------------------------------------------------------------- |
+| `packages/module`    | The Foundry VTT module, `@mondarth/emma-module`: its source, tests, manifest and build scripts |
+| `packages/core`      | `@mondarth/emma-core`: code shared by the other packages, such as the world record's format    |
+| `packages/setup`     | `@mondarth/emma-setup`: EMMA on the setup screen, built into the script the extension injects  |
+| `packages/extension` | `@mondarth/emma-extension`: the browser extension, for Chromium and Firefox                    |
 
 Paths in the developer documentation, such as `src/module/settings.ts` or `tests/e2e`, are relative to the package they
 belong to. The root holds what every package shares: the documentation, the release configuration, the linting and

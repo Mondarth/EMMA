@@ -349,7 +349,8 @@ Only a GM or assistant GM with permission to modify configuration settings can s
 
 EMMA keeps a small file, `mondarth-emma.json`, in the root of each world's folder that has EMMA active. It records the
 world's setup: the Foundry version, the game system and its version, and each module the world has saved as active,
-with its version. Tools outside the world can read it, so that a world can be checked before it is launched.
+with its version. Tools outside the world can read it, so that a world can be checked before it is launched: EMMA's
+[browser extension](extension.md) shows it on the setup screen.
 
 A GM keeps it up to date, without being asked:
 
