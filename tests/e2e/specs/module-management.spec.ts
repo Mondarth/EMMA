@@ -222,7 +222,8 @@ test.describe('EMMA views', () => {
     await page.keyboard.press('Home');
     await page.keyboard.press('ControlOrMeta+a');
 
-    const count = await active.getByRole('row').count();
+    // A locked module, such as libWrapper while EMMA requires it, cannot be selected.
+    const count = await active.getByRole('row', { disabled: false }).count();
     await expect(active.getByRole('row', { selected: true })).toHaveCount(count);
     await expect(emma.getByRole('button', { name: 'Deactivate the selected modules', exact: true })).toBeEnabled();
   });
@@ -558,7 +559,8 @@ test.describe('Related modules in the list view', () => {
     await addon.uncheck();
 
     await expect(emma.getByRole('checkbox', { name: LIBRARY.title })).not.toBeChecked();
-    await expect(emma.getByRole('img', { name: 'Required', exact: true })).toHaveCount(0);
+    // Only the fixtures' relations: EMMA's own requirement, libWrapper, is always shown.
+    await expect(library.getByRole('img', { name: 'Required', exact: true })).toHaveCount(0);
     await expect(emma.getByRole('img', { name: 'Conflict', exact: true })).toHaveCount(0);
     await expect(emma.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
   });
@@ -651,8 +653,10 @@ test.describe('List view controls', () => {
     await (await moduleManagementButton(page)).click();
     const emma = page.locator(EMMA_WINDOW);
     const group = emma.getByRole('button', { name: 'Group related modules', exact: true });
+    // The library's row, which is grouped under the add-on that requires it.
+    const library = emma.getByRole('listitem').filter({ has: page.getByRole('checkbox', { name: LIBRARY.title }) });
     await emma.getByRole('checkbox', { name: ADDON.title }).check();
-    await expect(emma.getByRole('img', { name: 'Required', exact: true })).toBeVisible();
+    await expect(library.getByRole('img', { name: 'Required', exact: true })).toBeVisible();
 
     await group.click();
 

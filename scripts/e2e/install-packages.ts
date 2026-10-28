@@ -33,6 +33,12 @@ const PACKAGES: PinnedPackage[] = [
     manifest: 'system.json',
     url: 'https://github.com/foundryvtt/dnd5e/releases/download/release-5.3.3/dnd5e-release-5.3.3.zip',
   },
+  {
+    type: 'modules',
+    id: 'lib-wrapper',
+    manifest: 'module.json',
+    url: 'https://github.com/ruipin/fvtt-lib-wrapper/releases/download/v1.13.5.1/lib-wrapper-v1.13.5.1.zip',
+  },
 ];
 
 /**

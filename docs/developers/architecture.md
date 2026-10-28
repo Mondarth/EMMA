@@ -5,12 +5,15 @@ adapters is plain TypeScript and Svelte, tested without a Foundry server.
 
 `src/index.ts`
 : The entry point. On `init` it registers the settings, the Module details settings menu and the Module Management
-  takeover.
+  takeover; on `ready` it starts keeping the world record (`startWorldRecord`).
 
 `src/module/foundry/`
 : The parts that depend on how Foundry behaves rather than on its public API. `settings-entry.ts` takes clicks on the
-  Settings sidebar's **Manage Modules** button, because Foundry offers no public way to replace that window. Code here
-  is fragile by nature; keep it small and covered by the end-to-end tests.
+  Settings sidebar's **Manage Modules** button, because Foundry offers no public way to replace that window.
+  `session-exit.ts` runs a task before a user logs out or returns to setup, as Foundry fires no hook for either: it
+  wraps `Game#logOut` and `Game#shutDown` with libWrapper (a required module, and the only way EMMA wraps Foundry's
+  functions), waiting at most five seconds for the task. Code here is fragile by nature; keep it small and covered by
+  the end-to-end tests.
 
 `src/module/adapters/`
 : The only code that reads or changes Foundry's game data. `modules.ts` lists the installed modules and reads and
@@ -22,7 +25,10 @@ adapters is plain TypeScript and Svelte, tested without a Foundry server.
   The version badge comes from Foundry's `Module#getVersionBadge`, so EMMA judges compatibility exactly as Foundry
   does; only its styles are EMMA's, since Foundry's apply only inside its own package lists.
   `platform.ts` reads the Foundry version and the game system in use, and whether the user is a GM, for hypothetical
-  mode. `versions.ts` looks up the versions of the system and the active modules with `@mondarth/fvtt-resolver`: the
+  mode. `world-record.ts` reads and writes the world record, `mondarth-emma.json` in the root of the world's folder:
+  it lists the folder with `FilePicker.browse` first, so a missing record costs no failed request, fetches the file
+  as the server serves it, and writes it with `FilePicker.upload`. Its format, and the comparison that ignores when
+  it was written, are in `src/module/lib/world-record.ts`. `versions.ts` looks up the versions of the system and the active modules with `@mondarth/fvtt-resolver`: the
   installed manifests (from `toObject()`), GitHub's and GitLab's release lists, declared manifest URLs and, through
   the proxy setting only (the resolver's `proxiedFetch`), Foundry's package listing and, with the system, Foundry's
   core builds from its release notes (`foundryCoreReleases`). Without a proxy it never asks a host that sends no CORS
@@ -87,6 +93,10 @@ adapters is plain TypeScript and Svelte, tested without a Foundry server.
   every user who joins. Each mounts its Svelte component on first render and unmounts it on close. All but the report ask
   before closing with unsaved changes (staged activation in `EmmaApp`, a changed draft in the menus), through
   `confirmDiscard` in `confirm-discard.ts`; `close({ discard: true })` closes without asking.
+  `world-record.ts` keeps the world record in step with the world (`syncWorldRecord`), one check at a time, writing
+  it only when it is missing or says something else. The active GM checks it on `ready`, `saveModules` (in
+  `save.ts`) after each save and before asking to reload, and every user who may keep it before logging out or
+  returning to setup. A failure is logged, never shown, as the record must not get in the way.
 
 `src/component/`
 : The Svelte components. They read and change a `ModuleState` and never use `game` directly; text comes through

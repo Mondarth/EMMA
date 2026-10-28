@@ -123,7 +123,7 @@ lacks falls back to the matching variable above. Then:
 
 ```sh
 pnpm build
-pnpm run e2e:packages                    # install the pinned game system and the fixture modules into tests/e2e/.data
+pnpm run e2e:packages                    # install the pinned game system, libWrapper and the fixture modules into tests/e2e/.data
 pnpm run e2e:server                      # start the pinned Foundry VTT server on http://localhost:30001
 pnpm exec playwright install chromium    # once per Playwright version
 pnpm run test:e2e --project=chromium

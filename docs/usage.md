@@ -3,6 +3,7 @@
 ## Requirements
 
 - Foundry VTT version 14 or later.
+- [libWrapper](https://github.com/ruipin/fvtt-lib-wrapper) 1.13 or later. Foundry offers to install it with EMMA.
 
 ## Installation
 
@@ -343,6 +344,26 @@ If your changes would deactivate EMMA itself, the footer warns you: once saved, 
 Foundry's own Module Management window instead, from which you can activate EMMA again.
 
 Only a GM or assistant GM with permission to modify configuration settings can save. Everyone else sees EMMA read-only.
+
+## The world record
+
+EMMA keeps a small file, `mondarth-emma.json`, in the root of each world's folder that has EMMA active. It records the
+world's setup: the Foundry version, the game system and its version, and each module the world has saved as active,
+with its version. Tools outside the world can read it, so that a world can be checked before it is launched.
+
+A GM keeps it up to date, without being asked:
+
+- when the world starts, by the world's active GM;
+- when changes are saved from EMMA, before the world reloads;
+- when a GM logs out or returns to setup, so that changes saved in Foundry's own Module Management window are recorded
+  too.
+
+The file is rewritten only when the setup has changed. Closing the browser tab, or stopping the server, does not
+update it; the next start does. A world backup holds the whole world folder, so it includes the record, and restoring
+the backup restores the record that matches it.
+
+The file holds nothing private, but like everything in a world's folder, anyone who can reach your Foundry server can
+read it. Only a GM or assistant GM allowed to browse and upload files can write it.
 
 ## Settings
 

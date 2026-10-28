@@ -61,7 +61,7 @@ setup('prepare the Foundry world', async ({ page }) => {
     }
   }
 
-  // 4. Enable the module (and any modules it requires) and create a player to test non-GM behaviour with.
+  // 4. Enable the module and the modules it requires (libWrapper) and create a player to test non-GM behaviour with.
   await joinAs(page, USERS.gm);
 
   const needsReload = await page.evaluate(
@@ -82,7 +82,7 @@ setup('prepare the Foundry world', async ({ page }) => {
       });
       return true;
     },
-    { moduleIds: [MODULE_ID], playerName: USERS.player },
+    { moduleIds: [MODULE_ID, 'lib-wrapper'], playerName: USERS.player },
   );
 
   if (needsReload) {
