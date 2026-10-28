@@ -109,11 +109,17 @@ Runs on every push to `main`:
      changelog. If `dev` has moved on in the meantime, it opens a pull request from `main` to `dev` instead; merge it
      with a merge commit.
 
-Foundry VTT installs and updates the module from the manifest of the latest release:
+Foundry VTT installs and updates the module from a stable manifest URL, on the documentation site:
 
 ```
-https://github.com/Mondarth/EMMA/releases/latest/download/module.json
+https://mondarth.github.io/EMMA/module.json
 ```
+
+**Publish documentation** copies it there from the newest module release (tagged `v<version>`), not from `main`, which
+may hold manifest changes not yet released. GitHub Pages caches it for up to ten minutes. Each release also keeps its
+own manifest, at `https://github.com/Mondarth/EMMA/releases/download/v<version>/module.json`, for installing that
+version. Copies installed from the old URL, `https://github.com/Mondarth/EMMA/releases/latest/download/module.json`, still update: that
+URL serves the newest release's manifest, which points them to the stable URL.
 
 The workflow can also be started by hand on `main` (*Actions → Release → Run workflow*). It then releases only if
 there are releasable commits.

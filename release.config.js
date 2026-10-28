@@ -28,7 +28,8 @@ export default {
         message: 'chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}',
       },
     ],
-    // module.json is attached so that releases/latest/download/module.json is a stable manifest URL for Foundry.
+    // module.json is attached so that each release has a manifest of its own, and so that the documentation site can
+    // serve the newest one as the stable manifest URL.
     [
       '@semantic-release/github',
       {

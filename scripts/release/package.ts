@@ -18,6 +18,13 @@ const DOCS_CONF = path.join(ROOT, 'docs/conf.py');
 const DIST = path.join(ROOT, 'dist');
 const RELEASES = path.join(ROOT, 'releases');
 
+/**
+ * Where Foundry finds the latest manifest, so installed copies keep finding updates. The documentation site serves it
+ * (see `.github/workflows/build-and-deploy-docs.yml`), copied from the newest module release; each release keeps its
+ * own manifest too, at `releases/download/v<version>/module.json`.
+ */
+const STABLE_MANIFEST = 'https://mondarth.github.io/EMMA/module.json';
+
 /** Files and directories shipped in the Foundry package, when present. */
 const PACKAGE_CONTENTS = ['module.json', 'dist', 'packs', 'LICENSE', 'README.md', 'CHANGELOG.md'];
 
@@ -46,8 +53,7 @@ function stampManifest(version: string): void {
   const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8')) as Manifest;
 
   manifest.version = version;
-  // `manifest` stays on the stable "latest" URL so installed copies keep finding updates.
-  manifest.manifest = `${manifest.url}/releases/latest/download/module.json`;
+  manifest.manifest = STABLE_MANIFEST;
   manifest.download = `${manifest.url}/releases/download/v${version}/${archiveName(version)}`;
 
   fs.writeFileSync(MANIFEST, `${JSON.stringify(manifest, null, 2)}\n`);

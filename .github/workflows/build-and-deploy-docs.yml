@@ -29,6 +29,22 @@ jobs:
       - name: Build Documentation
         run: docker compose run --rm --user "$(id -u):$(id -g)" docs make html
 
+      # Foundry installs and updates the module from <site>/module.json: the manifest attached to the newest module
+      # release (tagged v<major>.<minor>.<patch>). It is taken from the release, not from main, which may hold changes
+      # to the manifest not yet released.
+      - name: Add the module manifest
+        run: |
+          tag="$(gh release list --exclude-drafts --exclude-pre-releases --limit 100 --json tagName,publishedAt \
+            --jq '[.[] | select(.tagName | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))] | sort_by(.publishedAt) | last | .tagName')"
+          if [ -z "$tag" ]; then
+            echo "::error::No module release found to take the manifest from"
+            exit 1
+          fi
+          gh release download "$tag" --pattern module.json --dir docs/_build/html --clobber
+          echo "Published the manifest of ${tag}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
       - name: Upload Documentation
         uses: actions/upload-pages-artifact@v5
         with:
