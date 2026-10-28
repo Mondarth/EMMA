@@ -12,7 +12,7 @@ it by hand, as described below. For now it only shows the installation: it does 
 
 ## Requirements
 
-- A Chromium browser (Chrome, Edge, Brave, Vivaldi, Opera…), version 102 or later, or Firefox 128 or later. Safari is
+- A Chromium browser (Chrome, Edge, Brave, Vivaldi, Opera…), version 102 or later, or Firefox 157 or later. Safari is
   not supported yet.
 - A Foundry VTT server, version 14 or later, whose setup screen you can open: you need its administrator password.
 - EMMA 0.9 or later active in the worlds you want to see in detail (see [worlds without a record](#worlds-without-a-record)).

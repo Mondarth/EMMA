@@ -1,6 +1,6 @@
 /**
  * The only place the extension uses the browser's extension API, through the `chrome` namespace, which Chromium and
- * Firefox (version 128 and later, with Manifest V3) both provide, with promises.
+ * Firefox (version 157 and later, with Manifest V3) both provide, with promises.
  */
 import type { Site, Target } from '../lib/sites';
 import { autoPatterns, parseSites } from '../lib/sites';
