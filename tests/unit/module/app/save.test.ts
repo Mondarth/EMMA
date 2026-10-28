@@ -40,6 +40,31 @@ describe('saveModules', () => {
     expect(foundry.reloadConfirm).toHaveBeenCalledExactlyOnceWith({ world: true });
   });
 
+  test('brings the world record up to date before asking to reload', async () => {
+    const { foundry, modules } = setUp();
+    modules.setActive('lib', true);
+    let recordAtReload: string | undefined;
+    foundry.reloadConfirm.mockImplementationOnce(() => {
+      recordAtReload = foundry.files.get('worlds/test-world/mondarth-emma.json');
+      return Promise.resolve();
+    });
+
+    await saveModules(modules);
+
+    expect(JSON.parse(recordAtReload ?? '{}')).toMatchObject({
+      modules: [{ id: 'lib', title: 'lib', version: '1.0.0' }],
+    });
+  });
+
+  test('checks the world record even when nothing changed', async () => {
+    const { foundry, modules } = setUp({ settings: { 'core.moduleConfiguration': { lib: true } } });
+    modules.setActive('lib', true);
+
+    await saveModules(modules);
+
+    expect(foundry.files.has('worlds/test-world/mondarth-emma.json')).toBe(true);
+  });
+
   test('makes the saved activation the new baseline', async () => {
     const { modules } = setUp();
     modules.setActive('lib', true);

@@ -23,9 +23,10 @@ describe('module entry point', () => {
   test('does nothing until Foundry fires init', async () => {
     const { hooks, game } = await loadModule();
 
-    expect(hooks.once).toHaveBeenCalledTimes(2);
+    expect(hooks.once).toHaveBeenCalledTimes(3);
     expect(hooks.once).toHaveBeenCalledWith('init', expect.any(Function));
     expect(hooks.once).toHaveBeenCalledWith('setup', expect.any(Function));
+    expect(hooks.once).toHaveBeenCalledWith('ready', expect.any(Function));
     expect(console.info).not.toHaveBeenCalled();
     expect(game.settings.register).not.toHaveBeenCalled();
   });
@@ -56,6 +57,19 @@ describe('module entry point', () => {
 
     expect(game.settings.register).toHaveBeenCalledWith('mondarth-emma', 'autoRecommended', expect.any(Object));
     expect(game.settings.register).toHaveBeenCalledWith('mondarth-emma', 'olderVersions', expect.any(Object));
+  });
+
+  test('starts keeping the world record once the world is ready', async () => {
+    const { hooks, libWrapper } = await loadModule();
+
+    hooks.run('ready');
+
+    expect(libWrapper.register).toHaveBeenCalledWith(
+      'mondarth-emma',
+      'foundry.Game.prototype.logOut',
+      expect.any(Function),
+      'WRAPPER',
+    );
   });
 
   test('only initializes once', async () => {

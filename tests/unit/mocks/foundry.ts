@@ -120,6 +120,15 @@ export interface GameMockOptions {
   isGM?: boolean | null;
   /** Whether the current user holds the "Modify Configuration Settings" permission. Defaults to `isGM`. */
   canModifySettings?: boolean;
+  /** Whether the current user may browse and upload files. Defaults to `isGM`. */
+  canUseFiles?: boolean;
+  /**
+   * Who the world's active GM is: the current user, another, or nobody. Defaults to the current user for a GM, and to
+   * another user otherwise.
+   */
+  activeGM?: 'self' | 'other' | null;
+  /** The world, `game.world`. Defaults to `test-world`, titled `Test World`. */
+  world?: { id: string; title: string };
   /** The user's language, `game.i18n.lang`. Defaults to `en`. */
   lang?: string;
   /** Modules known to `game.modules`, keyed by ID. */
@@ -220,6 +229,10 @@ export function createGameMock(options: GameMockOptions = {}) {
     version = '14.368',
   } = options;
   const canModifySettings = options.canModifySettings ?? isGM === true;
+  const canUseFiles = options.canUseFiles ?? isGM === true;
+  const activeGM = options.activeGM === undefined ? (isGM === true ? 'self' : 'other') : options.activeGM;
+  const world = options.world ?? { id: 'test-world', title: 'Test World' };
+  const FILE_PERMISSIONS = ['FILES_BROWSE', 'FILES_UPLOAD'];
   const stored = new Map<string, unknown>(Object.entries(settings));
   // Core settings EMMA reads, with Foundry's defaults.
   const defaults = new Map<string, unknown>([['core.moduleConfiguration', {}]]);
@@ -229,7 +242,16 @@ export function createGameMock(options: GameMockOptions = {}) {
     user:
       isGM === null
         ? null
-        : { isGM, can: vi.fn((permission: string): boolean => permission === 'SETTINGS_MODIFY' && canModifySettings) },
+        : {
+            isGM,
+            can: vi.fn(
+              (permission: string): boolean =>
+                (permission === 'SETTINGS_MODIFY' && canModifySettings) ||
+                (FILE_PERMISSIONS.includes(permission) && canUseFiles),
+            ),
+          },
+    users: { activeGM: activeGM === null ? null : { isSelf: activeGM === 'self' } },
+    world,
     modules: new Map(Object.entries(modules).map(([id, data]) => [id, createModuleMock(id, data)])),
     system: {
       version: '5.1.0',
@@ -379,9 +401,37 @@ export function createFoundryNamespaceMock() {
     badgeOf(availability, data),
   );
 
+  // The user data folder, by path, such as `worlds/test-world/mondarth-emma.json`. Uploads write to it and browsing
+  // lists it, as Foundry's file picker does on the server.
+  const files = new Map<string, string>();
+  const browse = vi.fn((_source: string, target: string) =>
+    Promise.resolve({
+      target,
+      dirs: [] as string[],
+      files: [...files.keys()].filter(path => path.slice(0, path.lastIndexOf('/')) === target),
+      extensions: [] as string[],
+      gridSize: null,
+      private: false,
+      privateDirs: [] as string[],
+    }),
+  );
+  const upload = vi.fn(
+    async (_source: string, target: string, file: File, _body?: object, _options?: { notify?: boolean }) => {
+      const path = `${target}/${file.name}`;
+      files.set(path, await file.text());
+      return { status: 'success' as const, path, message: `${file.name} saved to ${target}` };
+    },
+  );
+  // Serves the user data folder as the Foundry server does, for a test to stub `fetch` with.
+  const serveFiles = vi.fn((url: string, _init?: RequestInit): Promise<Response> => {
+    const body = files.get(url.replace(/^\//, ''));
+    return Promise.resolve(body === undefined ? new Response('', { status: 404 }) : new Response(body));
+  });
+
   return {
     applications: {
       api: { ApplicationV2: ApplicationV2Mock, DialogV2: { confirm } },
+      apps: { FilePicker: { implementation: { browse, upload } } },
       settings: { SettingsConfig: { reloadConfirm } },
       // Foundry's context menu, recorded: its container, selector, entries and options.
       ux: {
@@ -425,6 +475,14 @@ export function createFoundryNamespaceMock() {
     systemVersionBadge,
     /** `utils.saveDataToFile`, which downloads text as a file. */
     saveDataToFile,
+    /** The user data folder's files, by path. */
+    files,
+    /** `FilePicker.browse`, which lists a folder. */
+    browse,
+    /** `FilePicker.upload`, which writes a file. */
+    upload,
+    /** A stand-in for `fetch` that serves {@link files}. */
+    serveFiles,
   };
 }
 
@@ -434,7 +492,7 @@ export interface FoundryMockOptions extends GameMockOptions {
 }
 
 /**
- * Install mock Foundry globals (`foundry`, `Hooks`, `game`, `ui`, `CONFIG`) for the current test.
+ * Install mock Foundry globals (`foundry`, `Hooks`, `game`, `ui`, `CONFIG`, `libWrapper`) for the current test.
  * Undo with `vi.unstubAllGlobals()`.
  * @param options - Initial state
  * @returns Handles to the installed mocks
@@ -455,6 +513,9 @@ export function installFoundryMocks(options: FoundryMockOptions = {}) {
   vi.stubGlobal('game', game);
   vi.stubGlobal('ui', ui);
   vi.stubGlobal('CONFIG', config);
+  // libWrapper, which only records the wrappers registered.
+  const wrappers = { register: vi.fn((..._args: Parameters<libWrapper.Api['register']>) => 1) };
+  vi.stubGlobal('libWrapper', wrappers);
 
-  return { foundry, hooks, game, ui, config };
+  return { foundry, hooks, game, ui, config, libWrapper: wrappers };
 }
