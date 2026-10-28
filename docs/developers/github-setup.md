@@ -117,7 +117,7 @@ the documentation and fast-forward `dev` to the release commit.
 
 Sign in at [codecov.io](https://about.codecov.io) with GitHub, add the repository, and store the upload token it
 shows as the `CODECOV_TOKEN` secret. Codecov then comments coverage changes on pull requests. Its checks are
-informational (`codecov.yml`); the coverage thresholds in `vite.config.ts` are what fail CI.
+informational (`codecov.yml`); the coverage thresholds in `packages/module/vite.config.ts` are what fail CI.
 
 ## Troubleshooting
 

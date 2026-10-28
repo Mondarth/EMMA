@@ -11,12 +11,12 @@ export default {
     ['@semantic-release/commit-analyzer', { preset: 'conventionalcommits' }],
     ['@semantic-release/release-notes-generator', { preset: 'conventionalcommits' }],
     '@semantic-release/changelog',
-    // Stamps the version into module.json and docs/conf.py, builds, and zips releases/module-v<version>.zip.
+    // Stamps the version into module.json and docs/conf.py, builds, and zips packages/module/releases/module-v<version>.zip.
     // Afterwards, hands the version to the later jobs of the release workflow.
     [
       '@semantic-release/exec',
       {
-        prepareCmd: 'node scripts/release/package.ts ${nextRelease.version}',
+        prepareCmd: 'node packages/module/scripts/release/package.ts ${nextRelease.version}',
         successCmd: 'echo "version=${nextRelease.version}" >> "$GITHUB_OUTPUT"',
       },
     ],
@@ -24,7 +24,7 @@ export default {
     [
       '@semantic-release/git',
       {
-        assets: ['CHANGELOG.md', 'module.json', 'docs/conf.py'],
+        assets: ['CHANGELOG.md', 'packages/module/module.json', 'docs/conf.py'],
         message: 'chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}',
       },
     ],
@@ -33,8 +33,8 @@ export default {
       '@semantic-release/github',
       {
         assets: [
-          { path: 'releases/module-v*.zip', label: 'Foundry VTT module package' },
-          { path: 'module.json', label: 'Foundry VTT manifest' },
+          { path: 'packages/module/releases/module-v*.zip', label: 'Foundry VTT module package' },
+          { path: 'packages/module/module.json', label: 'Foundry VTT manifest' },
         ],
       },
     ],

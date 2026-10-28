@@ -12,14 +12,20 @@ import path from 'node:path';
 
 import { filesHolding } from '../build/default-proxy.ts';
 
+/** The module's package, `packages/module`. */
 const ROOT = path.resolve(import.meta.dirname, '../..');
+/** The repository, which holds the documentation and the files shared by every package. */
+const REPOSITORY = path.resolve(ROOT, '../..');
 const MANIFEST = path.join(ROOT, 'module.json');
-const DOCS_CONF = path.join(ROOT, 'docs/conf.py');
+const DOCS_CONF = path.join(REPOSITORY, 'docs/conf.py');
 const DIST = path.join(ROOT, 'dist');
 const RELEASES = path.join(ROOT, 'releases');
 
-/** Files and directories shipped in the Foundry package, when present. */
-const PACKAGE_CONTENTS = ['module.json', 'dist', 'packs', 'LICENSE', 'README.md', 'CHANGELOG.md'];
+/** Files and directories of the module's package shipped in the Foundry package, when present. */
+const PACKAGE_CONTENTS = ['module.json', 'dist', 'packs'];
+
+/** Files of the repository shipped in the Foundry package, at its root, when present. */
+const REPOSITORY_CONTENTS = ['LICENSE', 'README.md', 'CHANGELOG.md'];
 
 interface Manifest {
   url: string;
@@ -89,18 +95,22 @@ function build(): void {
 }
 
 /**
- * Zip the package contents into `releases/module-v<version>.zip`, with `module.json` at the archive root.
+ * Zip the package contents into `releases/module-v<version>.zip`, with `module.json` and the repository's licence,
+ * readme and changelog at the archive root.
  * @param version - The release version, without a leading `v`
  * @returns The path of the created archive
  */
 function createArchive(version: string): string {
   const archive = path.join(RELEASES, archiveName(version));
   const contents = PACKAGE_CONTENTS.filter(entry => fs.existsSync(path.join(ROOT, entry)));
+  const shared = REPOSITORY_CONTENTS.filter(entry => fs.existsSync(path.join(REPOSITORY, entry)));
 
   fs.mkdirSync(RELEASES, { recursive: true });
   fs.rmSync(archive, { force: true });
   // Type declarations are for developers consuming the API, not for the Foundry runtime.
   execFileSync('zip', ['-r', '-D', archive, ...contents, '-x', '*.d.ts'], { cwd: ROOT, stdio: 'inherit' });
+  // Zipped from the repository, so they too land at the archive root.
+  execFileSync('zip', ['-D', archive, ...shared], { cwd: REPOSITORY, stdio: 'inherit' });
 
   return archive;
 }

@@ -16,8 +16,8 @@ import { defineConfig } from 'vitest/config';
 import { z } from 'zod';
 
 // Defaults for the dev server. Any of them can be overridden without editing this file through a JSON file, by default
-// `.pdt/mount.json` next to this configuration; set `PDT_MOUNT_CONFIG` to read a different file (a relative path is
-// resolved from this directory). The file may supply any subset of the values:
+// `.pdt/mount.json` at the root of the repository; set `PDT_MOUNT_CONFIG` to read a different file (a relative path is
+// resolved from the root of the repository). The file may supply any subset of the values:
 //
 //   { "hostname": "foundrymoddev1", "ports": { "base": 30000, "dev": 31002 } }
 const DEFAULTS = {
@@ -43,7 +43,7 @@ const mountConfigSchema = z.object({
  */
 function loadMountConfig(): typeof DEFAULTS {
   const override = process.env.PDT_MOUNT_CONFIG;
-  const file = path.resolve(import.meta.dirname, override ?? DEFAULT_MOUNT_CONFIG);
+  const file = path.resolve(import.meta.dirname, '../..', override ?? DEFAULT_MOUNT_CONFIG);
 
   if (!fs.existsSync(file)) {
     // The default file is optional, but a file that was asked for explicitly must exist.

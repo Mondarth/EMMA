@@ -9,6 +9,21 @@ pnpm install   # also installs the git hooks (husky)
 
 The pnpm version is pinned by `packageManager` in `package.json`. The module source is TypeScript only.
 
+## Repository layout
+
+The repository is a pnpm workspace. Each package is in `packages/`:
+
+| Package           | What it is                                                                                     |
+| ----------------- | ---------------------------------------------------------------------------------------------- |
+| `packages/module` | The Foundry VTT module, `@mondarth/emma-module`: its source, tests, manifest and build scripts |
+
+Paths in the developer documentation, such as `src/module/settings.ts` or `tests/e2e`, are relative to the package they
+belong to. The root holds what every package shares: the documentation, the release configuration, the linting and
+formatting configuration, the git hooks, and the development tooling, which is a development dependency of the root
+and which every package resolves from there. A package lists only its own runtime dependencies. The scripts in the
+table below run in every package that has them; run one package's script with
+`pnpm --filter @mondarth/emma-module run <script>`.
+
 ## Workflow
 
 1. Create a short-lived branch from **`dev`**, named for the change: `feat/...`, `fix/...`, `docs/...`.
@@ -28,7 +43,7 @@ set up the GitHub repository for them.
 | `pnpm run eslint`        | Lints the whole repository (Prettier formatting is reported by ESLint) |
 | `pnpm test`              | Runs the unit tests                                                    |
 | `pnpm run test:coverage` | Runs the unit tests and enforces the coverage thresholds               |
-| `pnpm build`             | Builds the bundle and type declarations into `dist/`                   |
+| `pnpm build`             | Builds each package (the module into `packages/module/dist/`)          |
 
 Every bug fix needs a regression test: write the failing test first, then the fix.
 
@@ -94,7 +109,7 @@ to `main` and merge it, with a merge commit, once **CI passed** and **E2E passed
    let the token put a tag on a commit with older workflow files. To count from the first commit all the same, push the
    tag yourself before the first release: `git tag v0.0.0 <first commit> && git push origin v0.0.0`.
 
-3. `scripts/release/package.ts` stamps the version into `module.json` and `docs/conf.py`, builds from a clean `dist/`
+3. `packages/module/scripts/release/package.ts` stamps the version into `module.json` and `docs/conf.py`, builds from a clean `dist/`
    and creates `releases/module-v<version>.zip`.
 4. `CHANGELOG.md`, `module.json` and `docs/conf.py` are committed back to `main` as `chore(release): <version>`, the
    commit is tagged, and a GitHub release is published with the zip and `module.json` attached.
@@ -107,8 +122,8 @@ variable and the `RELEASE_APP_PRIVATE_KEY` secret.
 Foundry installs and updates the module from the stable manifest URL
 `https://github.com/Mondarth/EMMA/releases/latest/download/module.json`.
 
-To try the packaging step locally, run `node scripts/release/package.ts <version>` and then discard the changes it makes
-to `module.json` and `docs/conf.py`.
+To try the packaging step locally, run `node packages/module/scripts/release/package.ts <version>` and then discard the changes it makes
+to `packages/module/module.json` and `docs/conf.py`.
 
 ## End-to-end tests
 
@@ -123,7 +138,7 @@ lacks falls back to the matching variable above. Then:
 
 ```sh
 pnpm build
-pnpm run e2e:packages                    # install the pinned game system, libWrapper and the fixture modules into tests/e2e/.data
+pnpm run e2e:packages                    # install the pinned game system, libWrapper and the fixture modules into packages/module/tests/e2e/.data
 pnpm run e2e:server                      # start the pinned Foundry VTT server on http://localhost:30001
 pnpm exec playwright install chromium    # once per Playwright version
 pnpm run test:e2e --project=chromium
@@ -135,7 +150,7 @@ tested without touching EMMA. After changing them, run `pnpm run e2e:packages` a
 finds new modules when it starts.
 
 The first test run accepts the licence agreement, creates and launches a world, enables the module and creates a
-player user. Delete `tests/e2e/.data` to start again from nothing. The Firefox project opens a browser window: headless
+player user. Delete `packages/module/tests/e2e/.data` to start again from nothing. The Firefox project opens a browser window: headless
 Firefox cannot create the WebGL context Foundry VTT needs. Without a desktop session (over SSH, in a container, in CI),
 run the tests with `pnpm run test:e2e:xvfb` instead, which gives the browsers a virtual 1920x1080 display (`xvfb` must
 and `xauth` must be installed: `sudo apt-get install xvfb xauth` on Debian or Ubuntu); it takes the same arguments, such as `--project=firefox`. Start the server with `pnpm run e2e:server` rather than

@@ -10,14 +10,14 @@ export default defineConfig(
   {
     ignores: [
       '.foundryvtt/',
-      '.vite-cache/',
-      'coverage/',
-      'dist/',
       'docs/_build/',
-      'releases/',
-      'tests/e2e/.data/',
-      'tests/e2e/test-results/',
-      'tests/e2e/playwright-report/',
+      '**/.vite-cache/',
+      '**/coverage/',
+      '**/dist/',
+      '**/releases/',
+      '**/tests/e2e/.data/',
+      '**/tests/e2e/test-results/',
+      '**/tests/e2e/playwright-report/',
     ],
   },
   js.configs.recommended,
@@ -28,7 +28,7 @@ export default defineConfig(
     languageOptions: {
       globals: globals.node,
       parserOptions: {
-        project: ['./tsconfig.test.json', './tsconfig.node.json'],
+        project: ['./packages/*/tsconfig.test.json', './packages/*/tsconfig.node.json'],
         tsconfigRootDir: import.meta.dirname,
         extraFileExtensions: ['.svelte'],
       },
@@ -50,7 +50,7 @@ export default defineConfig(
   },
   {
     // Module source runs in the Foundry client, where jQuery is still a global.
-    files: ['src/**'],
+    files: ['packages/module/src/**'],
     languageOptions: { globals: { ...globals.browser, ...globals.jquery } },
   },
   {
@@ -64,7 +64,7 @@ export default defineConfig(
   },
   {
     // Assertions on mocked methods (`expect(obj.method)`) are safe; the rule cannot tell them from real unbound calls.
-    files: ['tests/**'],
+    files: ['packages/*/tests/**'],
     rules: { '@typescript-eslint/unbound-method': 'off' },
   },
   {

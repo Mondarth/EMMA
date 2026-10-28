@@ -99,7 +99,7 @@ Runs on every push to `main`:
    1. on the very first run, tags the first commit `v0.0.0`, so that versions start at `0.x` (see `CONTRIBUTING.md`);
    2. works out the next version from the commits since the last tag, and stops if none warrants a release;
    3. writes the release notes and `CHANGELOG.md`;
-   4. runs `scripts/release/package.ts`, which stamps the version into `module.json` and `docs/conf.py`, builds
+   4. runs `packages/module/scripts/release/package.ts`, which stamps the version into `module.json` and `docs/conf.py`, builds
       the module and zips it as `releases/module-v<version>.zip`;
    5. commits `chore(release): <version> [skip ci]` to `main` and tags it `v<version>`;
    6. publishes the GitHub release with the zip and `module.json` attached.
@@ -135,7 +135,7 @@ example `vitest` without `@vitest/coverage-v8`), close it and merge the grouped 
 
 ## Coverage
 
-The unit tests fail when coverage drops below the thresholds in `vite.config.ts`. Set them just below the measured
+The unit tests fail when coverage drops below the thresholds in `packages/module/vite.config.ts`. Set them just below the measured
 level and raise them as tests are added; never lower them to get a change through. When a tool upgrade changes how
 coverage is measured, re-measure and say so in the commit.
 

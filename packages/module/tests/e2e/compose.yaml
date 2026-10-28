@@ -8,7 +8,7 @@
 # makes the directories mounted here before Docker would make them as root.
 secrets:
   config_json:
-    file: ${FOUNDRY_SECRETS_FILE:-../../.foundryvtt/secrets.json}
+    file: ${FOUNDRY_SECRETS_FILE:-../../../../.foundryvtt/secrets.json}
 
 services:
   foundry:
@@ -30,7 +30,7 @@ services:
         target: config.json
     volumes:
       - ./.data:/data
-      # The module under test: module.json plus the built dist/ from the repository root.
+      # The module under test: module.json plus the built dist/ from packages/module.
       - ../..:/data/Data/modules/mondarth-emma:ro
     ports:
       # Port 30001 on the host, so a development Foundry VTT can keep port 30000.
