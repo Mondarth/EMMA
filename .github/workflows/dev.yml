@@ -86,7 +86,7 @@ jobs:
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           files: >-
-            packages/module/coverage/lcov.info,packages/core/coverage/lcov.info,packages/setup/coverage/lcov.info,packages/extension/coverage/lcov.info
+            packages/module/coverage/lcov.info,packages/core/coverage/lcov.info,packages/setup/coverage/lcov.info,packages/extension/coverage/lcov.info,packages/release/coverage/lcov.info
           flags: unit
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
