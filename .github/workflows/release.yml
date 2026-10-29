@@ -3,10 +3,10 @@ name: Release
 # Pushes to `main` (normally the merge of a pull request from `dev`) are released:
 #
 #   1. Dev CI runs in full. Nothing is released unless it passes.
-#   2. semantic-release works out the version from the commits, stamps and packages the module, commits the changelog
-#      and manifest, tags the commit and publishes the GitHub release.
-#   3. If a release was published, the documentation is deployed and `dev` is brought up to date with the release
-#      commit.
+#   2. semantic-release releases each package on its own, from the commits that change it (docs/developers/releases.md):
+#      the module first, then the browser extension. For each, it works out the version from the commits, stamps and
+#      packages the package, commits its changelog and version, tags the commit and publishes the GitHub release.
+#   3. If either was released, the documentation is deployed and `dev` is brought up to date with the release commits.
 #
 # It can also be started by hand on `main` (Actions > Release > Run workflow); it then releases only if there is
 # something to release.
@@ -43,7 +43,8 @@ jobs:
       issues: write
       pull-requests: write
     outputs:
-      version: ${{ steps.release.outputs.version }}
+      module-version: ${{ steps.module.outputs.version }}
+      extension-version: ${{ steps.extension.outputs.version }}
     steps:
       # The release App is on the rulesets' bypass list, so its token may push to the protected branches. Each token
       # expires within an hour.
@@ -96,9 +97,9 @@ jobs:
             git push origin v0.0.0
           fi
 
-      - name: Release
-        id: release
-        run: pnpm exec semantic-release
+      - name: Release the module
+        id: module
+        run: pnpm run release:module
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           # The default version lookup proxy, built into the release obscured (docs/developers/default-proxy.md).
@@ -113,10 +114,26 @@ jobs:
           GIT_COMMITTER_NAME: ${{ steps.identity.outputs.name }}
           GIT_COMMITTER_EMAIL: ${{ steps.identity.outputs.email }}
 
+      # After the module, so that it releases from the module's release commit, if there is one. Its releases are
+      # pre-releases, so the latest release stays the module's.
+      - name: Release the extension
+        id: extension
+        run: pnpm run release:extension
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          # An API key from addons.mozilla.org, to have Mozilla sign the Firefox build as an unlisted add-on. Without
+          # it, the Firefox build is released unsigned, which Firefox installs only until it restarts.
+          AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+          AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+          GIT_AUTHOR_NAME: ${{ steps.identity.outputs.name }}
+          GIT_AUTHOR_EMAIL: ${{ steps.identity.outputs.email }}
+          GIT_COMMITTER_NAME: ${{ steps.identity.outputs.name }}
+          GIT_COMMITTER_EMAIL: ${{ steps.identity.outputs.email }}
+
   docs:
     name: Publish documentation
     needs: release
-    if: ${{ needs.release.outputs.version != '' }}
+    if: ${{ needs.release.outputs.module-version != '' || needs.release.outputs.extension-version != '' }}
     permissions:
       contents: read
       pages: write
@@ -126,7 +143,7 @@ jobs:
   sync-dev:
     name: Bring dev up to date
     needs: release
-    if: ${{ needs.release.outputs.version != '' }}
+    if: ${{ needs.release.outputs.module-version != '' || needs.release.outputs.extension-version != '' }}
     runs-on: ubuntu-latest
     steps:
       # The release App is on the rulesets' bypass list, so its token may push to the protected branches. Each token
@@ -144,7 +161,7 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
 
-      # Fast-forwards dev onto the release commit. If dev has moved on, or the push is refused, opens a pull request from
+      # Fast-forwards dev onto the release commits. If dev has moved on, or the push is refused, opens a pull request from
       # main to dev instead (unless one is already open).
       - name: Merge main into dev
         run: |
@@ -157,8 +174,7 @@ jobs:
             exit 0
           fi
           gh pr create --base dev --head main \
-            --title "chore(release): merge v${VERSION} back into dev" \
-            --body "Brings the release commit (version, changelog, manifest) from main back into dev."
+            --title "chore(release): merge the release back into dev" \
+            --body "Brings the release commits (versions, changelogs, manifest) from main back into dev."
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          VERSION: ${{ needs.release.outputs.version }}

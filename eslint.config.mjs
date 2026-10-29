@@ -38,6 +38,8 @@ export default defineConfig(
           './packages/setup/tsconfig.node.json',
           './packages/extension/tsconfig.json',
           './packages/extension/tsconfig.node.json',
+          './packages/release/tsconfig.json',
+          './packages/release/tsconfig.node.json',
         ],
         tsconfigRootDir: import.meta.dirname,
         extraFileExtensions: ['.svelte'],
