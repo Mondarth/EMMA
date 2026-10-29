@@ -57,7 +57,7 @@ describe('the background script', () => {
     });
     expect(chrome.scripting.executeScript).toHaveBeenCalledWith({
       target: { tabId: 7 },
-      files: ['emma-setup.js'],
+      files: ['/emma-setup.js'],
       world: 'MAIN',
     });
   });

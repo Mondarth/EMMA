@@ -18,6 +18,7 @@ developers/prerequisites.md
 developers/setup.md
 developers/architecture.md
 developers/workflow.md
+developers/releases.md
 developers/github-setup.md
 developers/default-proxy.md
 developers/documentation.md

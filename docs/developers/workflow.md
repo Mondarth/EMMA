@@ -38,7 +38,8 @@ required checks have passed. Only the release App may bypass them, to push the r
 2. Merge it with a **merge commit**, the only method `main` allows, so that semantic-release sees every commit.
 3. The *Release* workflow takes over: nothing in a release is done by hand.
 
-The commits since the last release decide the version:
+The repository releases the module and the browser extension each on its own, from the commits that change it (see
+{doc}`releases`). The commits since a package's last release decide its version:
 
 | Commit                                                              | Release |
 | ------------------------------------------------------------------- | ------- |
@@ -47,8 +48,8 @@ The commits since the last release decide the version:
 | `!` after the scope, or a `BREAKING CHANGE:` footer                 | major   |
 | `docs`, `test`, `refactor`, `style`, `perf`, `build`, `ci`, `chore` | none    |
 
-A merge with no `fix`, `feat` or breaking change releases nothing; the commits are released with the next one that
-does.
+A merge with no `fix`, `feat` or breaking change to a package releases nothing of it; the commits are released with the
+next one that does.
 
 ## Workflows
 
@@ -57,7 +58,6 @@ does.
 | Dev CI (`dev.yml`)                       | pushes to `dev`, pull requests, the release workflow       | The quality gate                                              |
 | E2E (`e2e.yml`)                          | pull requests to `main`, by hand                           | Playwright against a real Foundry VTT server                  |
 | Release (`release.yml`)                  | pushes to `main`, by hand                                  | Dev CI, then semantic-release, the docs and the `dev` update  |
-| Extension release (`extension-release.yml`) | by hand, on `main`                                      | Publishes an alpha of the browser extension as a pre-release  |
 | Build and Deploy Docs                    | pushes to `main` that change `docs/`, the release workflow | Builds the Sphinx site and deploys it to GitHub Pages         |
 | CodeQL (`codeql.yml`)                    | pushes and pull requests to `dev` and `main`, weekly       | Code scanning of the TypeScript and of the workflows|
 | Dependency review                        | pull requests                                              | Fails pull requests that add vulnerable dependencies          |
@@ -96,18 +96,25 @@ cannot read the licence secrets, so it is skipped for them.
 Runs on every push to `main`:
 
 1. **CI**: the whole of Dev CI. Nothing is released unless it passes.
-2. **Semantic release**, with a token from the release App:
+2. **Semantic release**, with a token from the release App, releases each package from the commits that change it (see
+   {doc}`releases`). First **the module**:
    1. on the very first run, tags the first commit `v0.0.0`, so that versions start at `0.x` (see `CONTRIBUTING.md`);
-   2. works out the next version from the commits since the last tag, and stops if none warrants a release;
+   2. works out the next version from the commits since the last `v*` tag, and stops if none warrants a release;
    3. writes the release notes and `CHANGELOG.md`;
    4. runs `packages/module/scripts/release/package.ts`, which stamps the version into `module.json` and `docs/conf.py`, builds
       the module and zips it as `releases/module-v<version>.zip`;
    5. commits `chore(release): <version> [skip ci]` to `main` and tags it `v<version>`;
    6. publishes the GitHub release with the zip and `module.json` attached.
-3. If a release was published, in parallel:
+
+   Then **the browser extension**, in the same way, from the commits since the last `extension-v*` tag: its notes go
+   into `packages/extension/CHANGELOG.md`, `packages/extension/scripts/release/package.ts` stamps the version into its
+   `package.json`, builds and checks it and packages the Chromium and Firefox builds (the Firefox build signed by
+   Mozilla, given the `AMO_` secrets; see {doc}`github-setup`), and the release commit `chore(release): extension
+   <version> [skip ci]` is tagged `extension-v<version>`. Its GitHub release is a pre-release.
+3. If either package was released, in parallel:
    - **Publish documentation** builds the site from `main` and deploys it to GitHub Pages.
-   - **Bring dev up to date** fast-forwards `dev` to the release commit, so that `dev` carries the new version and
-     changelog. If `dev` has moved on in the meantime, it opens a pull request from `main` to `dev` instead; merge it
+   - **Bring dev up to date** fast-forwards `dev` to the release commits, so that `dev` carries the new versions and
+     changelogs. If `dev` has moved on in the meantime, it opens a pull request from `main` to `dev` instead; merge it
      with a merge commit.
 
 Foundry VTT installs and updates the module from the manifest committed to `main`, which the release commit
@@ -123,29 +130,11 @@ offers no update for them. Each release also keeps its own manifest, at
 `https://github.com/Mondarth/EMMA/releases/download/v<version>/module.json`, for installing that version.
 
 Copies installed from the earlier URL, `https://github.com/Mondarth/EMMA/releases/latest/download/module.json`, find the next
-release there, and its manifest moves them to the URL above. Release the module at least once before any other package
-of the repository, so that the latest release is still the module's when they look.
+release there, and its manifest moves them to the URL above. That is why the module's releases stay GitHub's latest,
+and the extension's are pre-releases.
 
 The workflow can also be started by hand on `main` (*Actions → Release → Run workflow*). It then releases only if
 there are releasable commits.
-
-### Extension release
-
-The browser extension is released by hand, apart from the module, while it is an alpha:
-
-1. Raise `version` in `packages/extension/package.json` (three numbers, as browsers require), and merge the change to
-   `main` with a release of the module.
-2. Start *Actions → Extension release → Run workflow* on `main`.
-
-The workflow builds every package, checks the Firefox build, and publishes a GitHub **pre-release** tagged
-`extension-v<version>`, with the Chromium build zipped and the Firefox build signed by Mozilla as an unlisted add-on
-(given the `AMO_` secrets; see {doc}`github-setup`). A pre-release is never GitHub's latest release, and its tag does
-not match semantic-release's `v<version>`, so the module's releases are not disturbed. It stops if the version is
-already released.
-
-The extension's commits are released with the module too, as semantic-release counts every commit on `main`. Until the
-packages are released apart, keep its commits under the `extension` or `setup` scope, so that the module's changelog
-shows them as the extension's.
 
 ## Dependency updates
 
