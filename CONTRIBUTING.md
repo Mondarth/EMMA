@@ -19,10 +19,10 @@ The repository is a pnpm workspace. Each package is in `packages/`:
 | `packages/core`      | `@mondarth/emma-core`: code shared by the other packages, such as the world record's format    |
 | `packages/setup`     | `@mondarth/emma-setup`: EMMA on the setup screen, built into the script the extension injects  |
 | `packages/extension` | `@mondarth/emma-extension`: the browser extension, for Chromium and Firefox                    |
+| `packages/release`   | `@mondarth/emma-release`: the release tooling, which releases each package on its own          |
 
 Paths in the developer documentation, such as `src/module/settings.ts` or `tests/e2e`, are relative to the package they
-belong to. The root holds what every package shares: the documentation, the release configuration, the linting and
-formatting configuration, the git hooks, and the development tooling, which is a development dependency of the root
+belong to. The root holds what every package shares: the documentation, the linting and formatting configuration, the git hooks, and the development tooling, which is a development dependency of the root
 and which every package resolves from there. A package lists only its own runtime dependencies. The scripts in the
 table below run in every package that has them; run one package's script with
 `pnpm --filter @mondarth/emma-module run <script>`.
@@ -100,9 +100,15 @@ If the commit has already been pushed, do not amend it; push a follow-up commit 
 Releases are fully automated; never bump a version or create a tag by hand. To release, open a pull request from `dev`
 to `main` and merge it, with a merge commit, once **CI passed** and **E2E passed** are green.
 
+The module and the browser extension are released each on its own, with their own versions, tags and changelogs, from
+the commits that change them or the workspace packages they are built from: a `fix(core)` commit releases both, a
+`fix(extension)` commit only the extension. `docs/developers/releases.md` describes the two release streams and the
+tooling in `packages/release` that keeps them apart. The steps below are the module's; the extension's are the same,
+with `extension-v<version>` tags, `packages/extension/CHANGELOG.md`, and a GitHub pre-release.
+
 1. The push to `main` runs the **Release** workflow, which first runs the whole of Dev CI.
 2. When CI passes, [semantic-release](https://semantic-release.gitbook.io/) reads the commits since the last `v*` tag
-   and decides the next version: `fix` → patch, `feat` → minor, `!` or `BREAKING CHANGE:` → major. Other types
+   that change the module or the shared code, and decides the next version: `fix` → patch, `feat` → minor, `!` or `BREAKING CHANGE:` → major. Other types
    (`docs`, `test`, `ci`, …) do not trigger a release. Versions start from `0.0.0`: on its first run the workflow tags
    the repository's first commit `v0.0.0`, so the first `feat` is released as `0.1.0`. (A `fix` before any `feat`
    would be `0.0.1`, and a breaking change moves to `1.0.0`.)
@@ -116,8 +122,9 @@ to `main` and merge it, with a merge commit, once **CI passed** and **E2E passed
    and creates `releases/module-v<version>.zip`.
 4. `CHANGELOG.md`, `module.json` and `docs/conf.py` are committed back to `main` as `chore(release): <version>`, the
    commit is tagged, and a GitHub release is published with the zip and `module.json` attached.
-5. The documentation is rebuilt and deployed, and `dev` is fast-forwarded to the release commit (or, if `dev` has moved
-   on, a pull request from `main` to `dev` is opened; merge it with a merge commit).
+5. The extension is released in the same way, after the module.
+6. The documentation is rebuilt and deployed, and `dev` is fast-forwarded to the release commits (or, if `dev` has
+   moved on, a pull request from `main` to `dev` is opened; merge it with a merge commit).
 
 The workflow pushes to the protected branches as a GitHub App, whose credentials are the `RELEASE_APP_CLIENT_ID`
 variable and the `RELEASE_APP_PRIVATE_KEY` secret.
@@ -127,7 +134,8 @@ Foundry installs and updates the module from the manifest committed to `main`,
 Each release also keeps its own manifest, at `releases/download/v<version>/module.json`.
 
 To try the packaging step locally, run `node packages/module/scripts/release/package.ts <version>` and then discard the changes it makes
-to `packages/module/module.json` and `docs/conf.py`.
+to `packages/module/module.json` and `docs/conf.py`; the extension's is `node packages/extension/scripts/release/package.ts
+<version>`, which changes `packages/extension/package.json`.
 
 ## End-to-end tests
 
