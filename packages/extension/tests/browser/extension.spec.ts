@@ -37,6 +37,25 @@ test('the extension loads, its background starts, and it asks for no site until 
   expect(granted?.origins).toEqual([]);
 });
 
+test("Chromium takes the scripts' paths from the extension's root, as Firefox needs them", async ({
+  context,
+  extensionId,
+}) => {
+  const worker = context.serviceWorkers().find(candidate => candidate.url().includes(extensionId));
+
+  const registered = await worker?.evaluate(async () => {
+    await chrome.scripting.registerContentScripts([
+      { id: 'check', matches: ['http://localhost/*'], js: ['/loader.js'] },
+    ]);
+    const [script] = await chrome.scripting.getRegisteredContentScripts({ ids: ['check'] });
+    await chrome.scripting.unregisterContentScripts({ ids: ['check'] });
+    return script?.js;
+  });
+
+  // Chromium accepts the path, and keeps it as the same file at the extension's root.
+  expect(registered).toEqual(['loader.js']);
+});
+
 test('its popup shows, explaining where EMMA runs', async ({ context, extensionId }) => {
   const page = await context.newPage();
   const errors: string[] = [];
