@@ -28,6 +28,7 @@
     "e2e:server": "pnpm --filter @mondarth/emma-module run e2e:server",
     "e2e:server:stop": "pnpm --filter @mondarth/emma-module run e2e:server:stop",
     "dev": "pnpm --filter @mondarth/emma-module run dev",
+    "dev:setup": "pnpm --filter @mondarth/emma-setup run dev",
     "eslint": "eslint .",
     "prepare": "husky",
     "release:module": "semantic-release --extends ./packages/module/release.config.js",
