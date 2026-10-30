@@ -91,20 +91,47 @@ here**. The browser remembers the choice for that server.
 
 ### The installation tree
 
-EMMA's window shows the installation as a tree, and beside it what is selected in it:
+EMMA's window shows the installation as a tree, and beside it what is selected in it. The tree is in two halves, the
+game systems with the worlds that use them, and the modules:
+
+```text
+Foundry VTT
+  Game systems
+    D&D 5e
+      World 1
+        the modules World 1 runs
+      World 2
+        the modules World 2 runs
+    Pathfinder 2e
+      World 3 …
+  Modules
+    Universal
+      the modules for any game system
+    D&D 5e
+      the modules for D&D 5e
+```
 
 - **The root**, Foundry VTT and its version: a summary of the worlds (how many, by game system, and how their records
   compare with what is installed) and of the modules (how many, and how many a recorded world runs).
-- **Each world**, with how its record compares with what is installed now:
+- **Game systems**: each installed system, with its version and the worlds that use it, and any system a world uses that
+  is not installed, marked **Not installed**. Each world shows how its record compares with what is installed now:
   - **Matches its record**: Foundry, the game system and every module are installed at the versions the world last ran
     with.
   - **Changed since it last ran**: something has been updated or uninstalled since. The world's panel lists what.
   - **No record**, or **Record unreadable**: see below.
 - **Under each world**, the modules it runs, with the version it last ran with and whether that version is installed,
-  another version is, or none is. A module's panel lists the other recorded worlds that run it.
+  another version is, or none is.
+- **Modules**: every installed module, grouped by the game systems its manifest names. **Universal** holds the modules
+  that name none, for use with any system. A module for several systems is in each of their groups.
+- **Under each module**, wherever it shows, the modules it requires, and under those the modules they require in turn.
+  A requirement that is not installed is marked **Not installed**.
 
-The tree is driven from the keyboard too: the arrow keys move up and down, and open and close a world, and Home and End
-go to the first and last row. **Read again** reads the installation afresh.
+So a module may show in many places. Its panel is the same wherever it is selected: the version installed, the game
+systems it is for, the modules it requires and those that require it, and the recorded worlds that run it; under a
+world, also the version that world last ran with.
+
+Every row with rows under it opens and closes, from its triangle or from the keyboard: the arrow keys move up and down,
+and open and close a row, and Home and End go to the first and last row. **Read again** reads the installation afresh.
 
 ### Worlds without a record
 

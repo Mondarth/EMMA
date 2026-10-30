@@ -6,7 +6,7 @@ import { SetupState } from '../../../src/app/setup-state.svelte';
 import SetupRoot from '../../../src/component/SetupRoot.svelte';
 import type { RecordState } from '../../../src/foundry/records';
 import { buildOverview } from '../../../src/lib/overview';
-import { installation, record, recorded } from '../../mocks/fixtures';
+import { installation, installedModule, record, recorded } from '../../mocks/fixtures';
 
 const OVERVIEW = buildOverview(
   installation({
@@ -17,8 +17,8 @@ const OVERVIEW = buildOverview(
       { id: 'd', title: 'Delta', system: 'dnd5e' },
     ],
     modules: [
-      { id: 'lib', title: 'Library', version: '1.1.0' },
-      { id: 'idle', title: 'Idle', version: '1.0.0' },
+      installedModule('lib', 'Library', '1.1.0'),
+      installedModule('idle', 'Idle', '1.0.0', { systems: ['dnd5e'], requires: ['lib'] }),
     ],
   }),
   new Map<string, RecordState>([
@@ -52,6 +52,34 @@ async function setUp({ guardOn = true } = {}) {
   render(SetupRoot, { setup });
   return { setup, onGuardChange, user: userEvent.setup() };
 }
+
+/**
+ * A row of the tree, the first if several have the name.
+ * @param name - Its name
+ * @returns The row
+ */
+const row = (name: RegExp) => screen.getAllByRole('treeitem', { name })[0] as HTMLElement;
+
+/**
+ * Expand or collapse a row from its triangle.
+ * @param user - The user
+ * @param name - The row's name
+ */
+async function toggle(user: ReturnType<typeof userEvent.setup>, name: RegExp): Promise<void> {
+  const triangle = row(name).querySelector('.emma-tree-toggle');
+  if (triangle === null) throw new Error(`No triangle on ${String(name)}`);
+  await user.click(triangle);
+}
+
+/**
+ * The items of a list in a region.
+ * @param name - The region's name
+ * @returns Their text
+ */
+const items = (name: string) =>
+  within(screen.getByRole('region', { name }))
+    .getAllByRole('listitem')
+    .map(item => item.textContent.replace(/\s+/g, ' ').trim());
 
 describe('SetupRoot', () => {
   test('says it is reading the installation, or that it could not', async () => {
@@ -107,6 +135,7 @@ describe('SetupRoot', () => {
 
   test('shows a world: what it last ran with, and what has changed since', async () => {
     const { user } = await setUp();
+    await toggle(user, /^D&D 5e/);
 
     await user.click(screen.getByRole('treeitem', { name: /Alpha/ }));
 
@@ -125,10 +154,11 @@ describe('SetupRoot', () => {
   });
 
   test.each([
-    ['Beta', 'This world has no record'],
-    ['Gamma', "EMMA cannot read this world's record"],
-  ])('explains why %s shows no modules', async (title, text) => {
+    ['Beta', /^pf2e/, 'This world has no record'],
+    ['Gamma', /^D&D 5e/, "EMMA cannot read this world's record"],
+  ])('explains why %s shows no modules', async (title, system, text) => {
     const { user } = await setUp();
+    await toggle(user, system);
 
     await user.click(screen.getByRole('treeitem', { name: new RegExp(title) }));
 
@@ -138,6 +168,7 @@ describe('SetupRoot', () => {
 
   test("names a world's system by its ID while it is not installed", async () => {
     const { user } = await setUp();
+    await toggle(user, /^pf2e/);
 
     await user.click(screen.getByRole('treeitem', { name: /Beta/ }));
 
@@ -146,6 +177,7 @@ describe('SetupRoot', () => {
 
   test('shows a module a world runs, and the worlds that run it', async () => {
     const { user } = await setUp();
+    await toggle(user, /^D&D 5e/);
     await user.click(screen.getByRole('treeitem', { name: /Alpha/ }));
     await user.keyboard('{ArrowRight}');
 
@@ -154,14 +186,57 @@ describe('SetupRoot', () => {
     expect(screen.getByRole('heading', { name: 'Library' })).toBeInTheDocument();
     expect(screen.getByText('In Alpha')).toBeInTheDocument();
     expect(screen.getByText('Installed').nextElementSibling).toHaveTextContent('1.1.0');
-    const runBy = screen.getByRole('region', { name: 'Run by' });
-    expect(
-      within(runBy)
-        .getAllByRole('listitem')
-        .map(item => item.textContent),
-    ).toEqual(['Alpha', 'Delta']);
+    expect(screen.getByText('Last ran with').nextElementSibling).toHaveTextContent('1.0.0');
+    expect(items('Run by')).toEqual(['Alpha', 'Delta']);
+    expect(items('Required by')).toEqual(['Idle']);
 
     await user.click(screen.getByRole('treeitem', { name: /Gone/ }));
     expect(screen.getByText('Installed').nextElementSibling).toHaveTextContent('Not installed');
+    expect(screen.queryByText('Game systems', { selector: 'dt' })).toBeNull();
+  });
+
+  test('shows an installed module: the game systems it is for, what it requires, and that no world runs it', async () => {
+    const { user } = await setUp();
+    await toggle(user, /^D&D 5e/);
+    await user.click(screen.getAllByRole('treeitem', { name: /^D&D 5e/ })[1] as HTMLElement);
+    expect(screen.getByRole('heading', { name: 'D&D 5e' })).toBeInTheDocument();
+    await user.keyboard('{ArrowRight}{ArrowRight}');
+
+    expect(screen.getByRole('heading', { name: 'Idle' })).toBeInTheDocument();
+    expect(screen.queryByText(/^In /)).toBeNull();
+    expect(screen.getByText('Game systems', { selector: 'dt' }).nextElementSibling).toHaveTextContent('D&D 5e');
+    expect(items('Requires')).toEqual(['Library']);
+    expect(screen.getByText('No recorded world runs this module.')).toBeInTheDocument();
+  });
+
+  test('shows a game system: its version, its worlds, and how many modules are for it', async () => {
+    const { user } = await setUp();
+
+    await user.click(row(/^D&D 5e/));
+    expect(screen.getByRole('heading', { name: 'D&D 5e' })).toBeInTheDocument();
+    expect(screen.getByText('Installed').nextElementSibling).toHaveTextContent('5.3.3');
+    expect(screen.getByText('Modules for it').nextElementSibling).toHaveTextContent('1');
+    expect(items('Worlds')).toEqual(['Alpha', 'Gamma', 'Delta']);
+
+    await user.click(row(/^pf2e/));
+    expect(screen.getByText('Installed').nextElementSibling).toHaveTextContent('Not installed');
+  });
+
+  test('shows what the groups hold', async () => {
+    const { user } = await setUp();
+
+    await user.click(row(/^Game systems/));
+    expect(screen.getByRole('heading', { name: 'Game systems' })).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem').map(item => item.textContent.replace(/\s+/g, ' ').trim())).toEqual([
+      'D&D 5e 3 worlds',
+      'pf2e 1 worlds',
+    ]);
+
+    await user.click(row(/^Modules/));
+    expect(screen.getByText(/^2 modules installed/)).toBeInTheDocument();
+
+    await user.click(row(/^Universal/));
+    expect(screen.getByText('Modules that name no game system, for use with any.')).toBeInTheDocument();
+    expect(screen.getByText('Library')).toBeInTheDocument();
   });
 });

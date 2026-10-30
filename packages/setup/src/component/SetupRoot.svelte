@@ -3,11 +3,15 @@
 -->
 <script lang="ts">
   import type { SetupState } from '../app/setup-state.svelte';
+  import { groupDetail, moduleDetail, systemDetail } from '../lib/details';
   import { localize } from '../lib/i18n';
-  import type { TreeSelection } from '../lib/tree';
+  import type { TreeRow, TreeSelection } from '../lib/tree';
+  import { ROOT } from '../lib/tree';
+  import GroupPanel from './GroupPanel.svelte';
   import InstallationTree from './InstallationTree.svelte';
   import ModulePanel from './ModulePanel.svelte';
   import RootPanel from './RootPanel.svelte';
+  import SystemPanel from './SystemPanel.svelte';
   import WorldPanel from './WorldPanel.svelte';
 
   interface Props {
@@ -16,20 +20,14 @@
 
   let { setup }: Props = $props();
 
-  let selection = $state<TreeSelection>({ kind: 'root' });
+  /** The row selected, by its key, and what it shows. */
+  let selected = $state<{ key: string; selection: TreeSelection }>({ key: ROOT, selection: { kind: 'root' } });
 
   const overview = $derived(setup.overview);
+  const selection = $derived(selected.selection);
   // What is selected, if it is still there: after reading again, a world may have gone.
-  const worldId = $derived(selection.kind === 'root' ? undefined : selection.world);
-  const moduleId = $derived(selection.kind === 'module' ? selection.module : undefined);
-  const world = $derived(overview?.worlds.find(({ world: { id } }) => id === worldId));
-  const chosen = $derived(world?.modules.find(({ id }) => id === moduleId));
-  const runBy = $derived(
-    chosen === undefined
-      ? []
-      : (overview?.worlds ?? [])
-          .filter(({ modules }) => modules.some(({ id }) => id === chosen.id))
-          .map(({ world: { title } }) => title),
+  const world = $derived(
+    selection.kind === 'world' ? overview?.worlds.find(({ world: { id } }) => id === selection.world) : undefined,
   );
 </script>
 
@@ -41,13 +39,17 @@
   {:else}
     <InstallationTree
       {overview}
-      {selection}
-      onSelect={(next: TreeSelection) => {
-        selection = next;
+      selected={selected.key}
+      onSelect={(row: TreeRow) => {
+        selected = { key: row.key, selection: row.selection };
       }} />
     <section class="emma-setup-panel">
-      {#if world !== undefined && chosen !== undefined}
-        <ModulePanel {world} entry={chosen} {runBy} />
+      {#if selection.kind === 'module'}
+        <ModulePanel detail={moduleDetail(overview, selection.module, selection.world)} />
+      {:else if selection.kind === 'system'}
+        <SystemPanel detail={systemDetail(overview, selection.system)} />
+      {:else if selection.kind === 'systems' || selection.kind === 'modules' || selection.kind === 'group'}
+        <GroupPanel detail={groupDetail(overview, selection)} />
       {:else if world !== undefined}
         <WorldPanel {world} />
       {:else}

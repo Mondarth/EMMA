@@ -2,12 +2,12 @@ import { describe, expect, test } from 'vitest';
 
 import type { RecordState } from '../../../src/foundry/records';
 import { buildOverview } from '../../../src/lib/overview';
-import { installation, record, recorded } from '../../mocks/fixtures';
+import { installation, installedModule, record, recorded } from '../../mocks/fixtures';
 
 const MODULES = [
-  { id: 'lib', title: 'Library', version: '1.0.0' },
-  { id: 'app', title: 'App', version: '2.0.0' },
-  { id: 'idle', title: 'Idle', version: '1.0.0' },
+  installedModule('lib', 'Library', '1.0.0'),
+  installedModule('app', 'App', '2.0.0', { requires: ['lib'] }),
+  installedModule('idle', 'Idle', '1.0.0', { systems: ['dnd5e'] }),
 ];
 
 /**
@@ -131,6 +131,7 @@ describe('buildOverview', () => {
     );
 
     expect(overview.core).toBe('14.368');
+    expect(overview.systems.map(({ id }) => id)).toEqual(['dnd5e', 'pf2e']);
     expect(overview.modules).toEqual([
       { module: MODULES[0], worlds: ['a', 'b'] },
       { module: MODULES[1], worlds: [] },

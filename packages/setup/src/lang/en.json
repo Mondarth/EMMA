@@ -8,7 +8,10 @@
   },
   "Tree": {
     "Label": "Installation",
-    "Root": "Foundry VTT {version}"
+    "Root": "Foundry VTT {version}",
+    "Systems": "Game systems",
+    "Modules": "Modules",
+    "Universal": "Universal"
   },
   "Status": {
     "matches": "Matches its record",
@@ -53,7 +56,25 @@
     "LastRan": "Last ran with",
     "Installed": "Installed",
     "NotInstalled": "Not installed",
-    "RunBy": "Run by"
+    "RunBy": "Run by",
+    "Systems": "Game systems",
+    "AnySystem": "Any",
+    "Requires": "Requires",
+    "RequiredBy": "Required by",
+    "RunByNone": "No recorded world runs this module."
   },
-  "Refused": "EMMA manages packages on this screen. To let Foundry install and update them, open EMMA from the menu and say so there."
+  "Refused": "EMMA manages packages on this screen. To let Foundry install and update them, open EMMA from the menu and say so there.",
+  "System": {
+    "Modules": "Modules for it",
+    "Worlds": "Worlds",
+    "NoWorlds": "No world uses this game system."
+  },
+  "Group": {
+    "WorldCount": "{count} worlds",
+    "ModuleCount": "{count} modules",
+    "ModulesNote": "{count} modules installed, by the game systems they are for. A module for several systems is in each of them.",
+    "UniversalNote": "Modules that name no game system, for use with any.",
+    "SystemNote": "Modules that name {title} among the game systems they are for.",
+    "SystemMissingNote": "Modules that name {title} among the game systems they are for. {title} is not installed."
+  }
 }

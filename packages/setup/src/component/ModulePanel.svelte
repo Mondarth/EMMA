@@ -1,40 +1,87 @@
 <!--
-  The panel for a module a world runs: the version the world last ran with, the version installed, and the other
-  recorded worlds that run it.
+  The panel for a module, wherever the tree shows it: the version installed, and the version a world last ran with if it
+  shows under one; the game systems it is for; the modules it requires, and those that require it; and the recorded
+  worlds that run it.
 -->
 <script lang="ts">
+  import type { ModuleDetail, RelatedPackage } from '../lib/details';
   import { format, localize } from '../lib/i18n';
-  import type { WorldModule, WorldOverview } from '../lib/overview';
 
   interface Props {
-    world: WorldOverview;
-    entry: WorldModule;
-    /** The titles of the worlds whose records say they run the module. */
-    runBy: readonly string[];
+    detail: ModuleDetail;
   }
 
-  let { world, entry, runBy }: Props = $props();
+  let { detail }: Props = $props();
 </script>
 
-<h2>{entry.title}</h2>
-<p>{format('ModuleInfo.InWorld', { world: world.world.title })}</p>
-
-<dl>
-  <dt>{localize('ModuleInfo.LastRan')}</dt>
-  <dd>{entry.recorded}</dd>
-  <dt>{localize('ModuleInfo.Installed')}</dt>
-  <dd class={['emma-status', `emma-status-${entry.status}`]}>
-    {entry.installed ?? localize('ModuleInfo.NotInstalled')}
-  </dd>
-</dl>
-
-<section aria-labelledby="emma-setup-run-by">
-  <h3 id="emma-setup-run-by">{localize('ModuleInfo.RunBy')}</h3>
+{#snippet packages(list: readonly RelatedPackage[])}
   <ul>
-    {#each runBy as title, index (index)}
+    {#each list as related (related.id)}
+      <li>
+        {related.title}
+        {#if !related.installed}
+          <span class="emma-status-missing">{localize('ModuleInfo.NotInstalled')}</span>
+        {/if}
+      </li>
+    {/each}
+  </ul>
+{/snippet}
+
+{#snippet titles(list: readonly string[])}
+  <ul>
+    {#each list as title, index (index)}
       <li>{title}</li>
     {/each}
   </ul>
+{/snippet}
+
+<h2>{detail.title}</h2>
+{#if detail.world !== undefined}
+  <p>{format('ModuleInfo.InWorld', { world: detail.world.world.title })}</p>
+{/if}
+
+<dl>
+  {#if detail.run !== undefined}
+    <dt>{localize('ModuleInfo.LastRan')}</dt>
+    <dd>{detail.run.recorded}</dd>
+  {/if}
+  <dt>{localize('ModuleInfo.Installed')}</dt>
+  <dd class={['emma-status', `emma-status-${detail.status}`]}>
+    {detail.installed?.version ?? localize('ModuleInfo.NotInstalled')}
+  </dd>
+  {#if detail.installed !== undefined}
+    <dt>{localize('ModuleInfo.Systems')}</dt>
+    <dd>
+      {#if detail.systems.length === 0}
+        {localize('ModuleInfo.AnySystem')}
+      {:else}
+        {@render packages(detail.systems)}
+      {/if}
+    </dd>
+  {/if}
+</dl>
+
+{#if detail.requires.length > 0}
+  <section aria-labelledby="emma-setup-requires">
+    <h3 id="emma-setup-requires">{localize('ModuleInfo.Requires')}</h3>
+    {@render packages(detail.requires)}
+  </section>
+{/if}
+
+{#if detail.requiredBy.length > 0}
+  <section aria-labelledby="emma-setup-required-by">
+    <h3 id="emma-setup-required-by">{localize('ModuleInfo.RequiredBy')}</h3>
+    {@render titles(detail.requiredBy)}
+  </section>
+{/if}
+
+<section aria-labelledby="emma-setup-run-by">
+  <h3 id="emma-setup-run-by">{localize('ModuleInfo.RunBy')}</h3>
+  {#if detail.runBy.length === 0}
+    <p class="emma-note">{localize('ModuleInfo.RunByNone')}</p>
+  {:else}
+    {@render titles(detail.runBy)}
+  {/if}
 </section>
 
 <style>
@@ -50,6 +97,16 @@
 
   dd {
     margin: 0;
+  }
+
+  dd ul {
+    margin: 0;
+    padding-left: 1rem;
+  }
+
+  .emma-note {
+    font-size: 0.9em;
+    opacity: 0.85;
   }
 
   .emma-status-same {

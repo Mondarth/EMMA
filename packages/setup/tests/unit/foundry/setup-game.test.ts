@@ -63,10 +63,38 @@ describe('readInstallation', () => {
         { id: 'b', title: 'Beta', system: 'pf2e' },
       ],
       modules: [
-        { id: 'y', title: 'Zed', version: '1.0.0' },
-        { id: 'z', title: 'Zed', version: '2.0.0' },
+        { id: 'y', title: 'Zed', version: '1.0.0', systems: [], requires: [] },
+        { id: 'z', title: 'Zed', version: '2.0.0', systems: [], requires: [] },
       ],
       systems: [{ id: 'dnd5e', title: 'D&D 5e', version: '5.3.3' }],
     });
+  });
+
+  test("reads the game systems each module is for and the modules it requires, from Foundry's sets", () => {
+    const { game } = installSetupMocks({
+      modules: [
+        {
+          id: 'app',
+          relationships: {
+            systems: new Set([{ id: 'dnd5e', type: 'system' }, { id: 'pf2e' }]),
+            requires: new Set([
+              { id: 'lib', type: 'module' },
+              { id: 'lib', type: 'module' },
+              { id: 'old' },
+              { id: 'dnd5e', type: 'system' },
+              { id: 'app', type: 'module' },
+              { type: 'module' },
+              null,
+            ]),
+          },
+        },
+        { id: 'loose', relationships: { systems: 'dnd5e', requires: undefined } },
+      ],
+    });
+
+    expect(readInstallation(game as never).modules).toEqual([
+      { id: 'app', title: 'app', version: '1.0.0', systems: ['dnd5e', 'pf2e'], requires: ['lib', 'old'] },
+      { id: 'loose', title: 'loose', version: '1.0.0', systems: [], requires: [] },
+    ]);
   });
 });

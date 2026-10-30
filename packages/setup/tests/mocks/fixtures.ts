@@ -1,7 +1,7 @@
 import type { WorldRecord } from '@mondarth/emma-core/world-record';
 
 import type { RecordState } from '../../src/foundry/records';
-import type { Installation } from '../../src/foundry/setup-game';
+import type { InstalledModule, Installation } from '../../src/foundry/setup-game';
 
 /**
  * A world record.
@@ -44,4 +44,21 @@ export function installation(change: Partial<Installation> = {}): Installation {
     systems: [{ id: 'dnd5e', title: 'D&D 5e', version: '5.3.3' }],
     ...change,
   };
+}
+
+/**
+ * An installed module.
+ * @param id - Its ID
+ * @param title - Its title
+ * @param version - Its version
+ * @param related - The game systems it is for and the modules it requires, if any
+ * @returns The module
+ */
+export function installedModule(
+  id: string,
+  title: string,
+  version: string,
+  related: Partial<Pick<InstalledModule, 'systems' | 'requires'>> = {},
+): InstalledModule {
+  return { id, title, version, systems: [], requires: [], ...related };
 }

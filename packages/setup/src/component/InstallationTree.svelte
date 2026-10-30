@@ -1,28 +1,29 @@
 <!--
-  The installation tree: the root, the worlds, and the modules each world's record says it runs. TreeSelection follows
-  the keyboard, as in a file browser, so the panel beside it shows the row the keyboard is on.
+  The installation tree (see lib/tree.ts). The selection follows the keyboard, as in a file browser, so the panel beside
+  it shows the row the keyboard is on. As a module may show in many places, the selection is a row's key.
 -->
 <script lang="ts">
   import { tick } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
 
-  import { format, localize } from '../lib/i18n';
+  import { localize } from '../lib/i18n';
   import type { Overview } from '../lib/overview';
-  import type { TreeSelection, TreeRow } from '../lib/tree';
-  import { keyOf, moveFor, ROOT, visibleRows } from '../lib/tree';
+  import type { TreeRow } from '../lib/tree';
+  import { INITIALLY_EXPANDED, moveFor, visibleRows } from '../lib/tree';
 
   interface Props {
     overview: Overview;
-    selection: TreeSelection;
-    onSelect: (selection: TreeSelection) => void;
+    /** The key of the row selected. */
+    selected: string;
+    onSelect: (row: TreeRow) => void;
   }
 
-  let { overview, selection, onSelect }: Props = $props();
+  let { overview, selected, onSelect }: Props = $props();
 
-  /** The rows expanded: at first the root, so the worlds show. */
-  const expanded = new SvelteSet<string>([ROOT]);
+  const expanded = new SvelteSet<string>(INITIALLY_EXPANDED);
   const rows = $derived(visibleRows(overview, expanded));
-  const selected = $derived(keyOf(selection));
+  // The keyboard's row: the selected row while it shows, or else the first, so that the tree can always be reached.
+  const current = $derived(rows.some(({ key }) => key === selected) ? selected : (rows[0]?.key ?? ''));
 
   let tree = $state<HTMLElement>();
 
@@ -31,7 +32,7 @@
    * @param row - The row
    */
   async function focusRow(row: TreeRow): Promise<void> {
-    onSelect(row.selection);
+    onSelect(row);
     await tick();
     tree?.querySelector<HTMLElement>(`[data-key="${CSS.escape(row.key)}"]`)?.focus();
   }
@@ -50,7 +51,7 @@
    * @param event - The key
    */
   function onKeydown(event: KeyboardEvent): void {
-    const move = moveFor(rows, selected, expanded, event.key);
+    const move = moveFor(rows, current, expanded, event.key);
     if (move === undefined) return;
     event.preventDefault();
     if (move.kind === 'expand') expanded.add(move.key);
@@ -68,7 +69,7 @@
    */
   function onClick(event: MouseEvent, row: TreeRow): void {
     if (event.target instanceof Element && event.target.closest('.emma-tree-toggle') !== null) toggle(row.key);
-    onSelect(row.selection);
+    onSelect(row);
   }
 
   /**
@@ -78,7 +79,7 @@
    */
   function statusText(row: TreeRow): string | undefined {
     if (row.status === undefined) return undefined;
-    return localize(row.level === 2 ? `Status.${row.status}` : `Module.${row.status}`);
+    return localize(row.status.kind === 'world' ? `Status.${row.status.value}` : `Module.${row.status.value}`);
   }
 </script>
 
@@ -92,7 +93,7 @@
       aria-level={row.level}
       aria-selected={row.key === selected}
       aria-expanded={row.expandable ? expanded.has(row.key) : undefined}
-      tabindex={row.key === selected ? 0 : -1}
+      tabindex={row.key === current ? 0 : -1}
       style:--emma-depth={row.level - 1}
       onclick={event => {
         onClick(event, row);
@@ -105,14 +106,12 @@
       {:else}
         <span class="emma-tree-toggle"></span>
       {/if}
-      <span class="emma-tree-title">
-        {row.level === 1 ? format('Tree.Root', { version: overview.core }) : row.title}
-      </span>
-      {#if row.level === 3}
+      <span class="emma-tree-title">{row.title}</span>
+      {#if row.version !== undefined}
         <span class="emma-tree-version">{row.version}</span>
       {/if}
       {#if status !== undefined}
-        <span class={['emma-status', `emma-status-${row.status ?? ''}`]}>{status}</span>
+        <span class={['emma-status', `emma-status-${row.status?.value ?? ''}`]}>{status}</span>
       {/if}
     </li>
   {/each}

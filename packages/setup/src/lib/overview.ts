@@ -5,7 +5,7 @@
 import type { WorldRecord } from '@mondarth/emma-core/world-record';
 
 import type { RecordState } from '../foundry/records';
-import type { InstalledPackage, InstalledWorld, Installation } from '../foundry/setup-game';
+import type { InstalledModule, InstalledPackage, InstalledWorld, Installation } from '../foundry/setup-game';
 
 /**
  * How a world's record compares with what is installed now:
@@ -55,7 +55,7 @@ export interface WorldOverview {
 
 /** An installed module, with the worlds whose records say they run it. */
 export interface ModuleUse {
-  readonly module: InstalledPackage;
+  readonly module: InstalledModule;
   /** The IDs of the worlds, in the order of {@link Overview.worlds}. */
   readonly worlds: readonly string[];
 }
@@ -80,7 +80,10 @@ export interface Summary {
 /** Everything EMMA shows on the setup screen. */
 export interface Overview {
   readonly core: string;
+  /** The installed game systems, sorted by title. */
+  readonly systems: readonly InstalledPackage[];
   readonly worlds: readonly WorldOverview[];
+  /** The installed modules, sorted by title. */
   readonly modules: readonly ModuleUse[];
   readonly summary: Summary;
 }
@@ -101,7 +104,13 @@ export function buildOverview(installation: Installation, records: ReadonlyMap<s
     module: installed,
     worlds: worlds.filter(({ modules: run }) => run.some(({ id }) => id === installed.id)).map(({ world }) => world.id),
   }));
-  return { core: installation.core, worlds, modules: uses, summary: summarise(worlds, uses, systems) };
+  return {
+    core: installation.core,
+    systems: installation.systems,
+    worlds,
+    modules: uses,
+    summary: summarise(worlds, uses, systems),
+  };
 }
 
 /**
@@ -197,7 +206,7 @@ function summarise(
  * @param b.title - Its title
  * @returns The order
  */
-function byTitle(a: { id: string; title: string }, b: { id: string; title: string }): number {
+export function byTitle(a: { id: string; title: string }, b: { id: string; title: string }): number {
   const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
   return collator.compare(a.title, b.title) || collator.compare(a.id, b.id);
 }

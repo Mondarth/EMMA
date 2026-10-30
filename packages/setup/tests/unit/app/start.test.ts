@@ -69,7 +69,7 @@ describe('startEmmaSetup', () => {
     menu.querySelector('button')?.click();
 
     const box = await screen.findByRole('checkbox', { name: 'Let Foundry install and update packages here' });
-    expect(screen.getByRole('treeitem', { name: /World/ })).toBeInTheDocument();
+    expect(screen.getByRole('treeitem', { name: /Game systems/ })).toBeInTheDocument();
     await userEvent.click(box);
 
     expect(document.body).not.toHaveClass(GUARDED_CLASS);
