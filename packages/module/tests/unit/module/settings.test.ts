@@ -21,7 +21,7 @@ import {
   setView,
   versionLookup,
 } from '@module/settings';
-import { obscure } from '@module/lib/obscure';
+import { obscure } from '@mondarth/emma-core/obscure';
 import { drawerFields } from '@module/state/drawer-fields.svelte';
 import { badgeChecks, setBadgeChecks } from '@module/state/badge-checks.svelte';
 import { ignoredModules } from '@module/state/hypothetical-ignored.svelte';

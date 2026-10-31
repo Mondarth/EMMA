@@ -7,6 +7,18 @@
  * docs/developers/default-proxy.md.
  */
 
+/**
+ * The web APIs this uses. Every place EMMA runs has them, a Foundry world, the setup screen and Node alike, but this
+ * package is compiled without the browser's or Node's declarations, so that nothing else of either creeps in.
+ */
+interface WebText {
+  readonly crypto: { getRandomValues<T extends Uint8Array>(array: T): T };
+  readonly TextEncoder: new () => { encode(text: string): Uint8Array };
+  readonly TextDecoder: new () => { decode(bytes: Uint8Array): string };
+}
+
+const web = globalThis as unknown as WebText;
+
 /** Each chunk of the text, as its pad and its bytes masked by the pad. */
 export type Obscured = readonly (readonly [pad: readonly number[], masked: readonly number[]])[];
 
@@ -19,7 +31,7 @@ const CHUNKS = 4;
  * @returns The bytes
  */
 function randomBytes(count: number): Uint8Array {
-  return crypto.getRandomValues(new Uint8Array(count));
+  return web.crypto.getRandomValues(new Uint8Array(count));
 }
 
 /**
@@ -28,7 +40,7 @@ function randomBytes(count: number): Uint8Array {
  * @returns Its chunks, each with its pad
  */
 export function obscure(text: string): Obscured {
-  const bytes = new TextEncoder().encode(text);
+  const bytes = new web.TextEncoder().encode(text);
   const chunks = Math.min(CHUNKS, bytes.length);
   const size = Math.ceil(bytes.length / chunks);
   return Array.from({ length: chunks }, (_, index) => {
@@ -47,5 +59,5 @@ export function obscure(text: string): Obscured {
 export function reveal(obscured: Obscured): string {
   // Each pad is as long as its chunk.
   const bytes = obscured.flatMap(([pad, masked]) => masked.map((byte, at) => byte ^ (pad[at] as number)));
-  return new TextDecoder().decode(new Uint8Array(bytes));
+  return new web.TextDecoder().decode(new Uint8Array(bytes));
 }

@@ -145,6 +145,40 @@ be.
 Every row with rows under it opens and closes, from its triangle or from the keyboard: the arrow keys move up and down,
 and open and close a row, and Home and End go to the first and last row. **Read again** reads the installation afresh.
 
+### Updates
+
+As soon as EMMA has read the installation, it looks for newer versions of the installed game systems and modules. The
+footer says how many it found. Each package with an update has an upward arrow in a circle to the left of its rows in
+the tree.
+
+EMMA offers a package only versions that are safe for every world that uses it, as Foundry installs one version of a
+package for all of them:
+
+- For each world with a record, EMMA works out the best setup of the installed Foundry VTT, the world's game system and
+  the modules its record says are active, each moved up to the newest version that works with the others. A package is
+  offered the newest version that every world using it can take. If EMMA finds no working setup for a world, nothing
+  that world uses is offered an update, and the footer says so.
+- A package no world with a record uses, such as a module that no world has active, is offered its newest version that
+  the installed Foundry VTT can run.
+
+Foundry VTT itself is not offered an update yet.
+
+**Update** in the footer turns Update mode on. Each row that shows a package's installed version then offers its
+versions in a list, from the newest offered down to the installed one. Choosing a version other than the installed
+one opens the **Update plan** below the tree and the panel, the full width of the window, listing each package
+chosen with its installed and chosen versions. **Clear choices** takes them all back, and choosing the installed
+version takes back one. Turning Update mode off hides the lists and the plan, and keeps the choices for when it is
+turned on again. Installing the plan is to come.
+
+The handle between the tree and the panel, and the one above the update plan, resize them, by dragging or from the
+keyboard: the arrow keys move a handle, and Home and End to its limits. Each panel keeps its share as the window is
+resized, and the browser remembers the sizes.
+
+EMMA finds versions in EMMA's package catalogue first, which holds every release of the packages it knows, with the
+Foundry VTT versions each works with. For packages the catalogue does not hold, EMMA reads the manifest each package
+declares, and GitHub's and GitLab's lists of releases. A browser cannot read the manifests attached to GitHub releases,
+so a version found only in such a list says nothing of the Foundry VTT versions it works with, and is not offered.
+
 ### Worlds without a record
 
 EMMA learns which modules a world runs from the record EMMA keeps in the world's folder (see
@@ -154,13 +188,17 @@ record cannot be read is marked **Record unreadable**; opening it with EMMA acti
 
 ## Privacy
 
-The extension sends nothing anywhere. It reads the setup screen of the servers you allow it on, and the world records
-in their worlds' folders, through the server's own pages. It keeps the list of servers you activated, and the choice of
-whether EMMA opens by itself on each, in your browser.
+The extension reads the setup screen of the servers you allow it on, and the world records in their worlds' folders,
+through the server's own pages. It keeps the list of servers you activated, the choice of whether EMMA opens by itself
+on each, and the sizes of EMMA's panels, in your browser.
+
+To find updates, EMMA sends the IDs of the installed game systems and modules to EMMA's package catalogue, with a key
+that says the request comes from EMMA, and asks GitHub, GitLab and the sites the packages' manifests are on for their
+releases. It sends nothing about your worlds, your server or you.
 
 ## Limitations of the alpha
 
-- EMMA only shows the installation on the setup screen. Checking worlds for compatibility, and installing or updating
-  packages from EMMA, are to come.
+- EMMA shows the installation and finds updates for it, but does not install them yet, nor update Foundry VTT
+  itself.
 - EMMA disables Foundry's package buttons only in a browser where the extension is installed and has opened EMMA. It
   cannot stop installs from other browsers.

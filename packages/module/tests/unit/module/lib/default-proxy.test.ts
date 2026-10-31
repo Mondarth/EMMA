@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import { defaultProxy } from '@module/lib/default-proxy';
-import { obscure } from '@module/lib/obscure';
+import { obscure } from '@mondarth/emma-core/obscure';
 
 describe('defaultProxy', () => {
   test('is none in a build without one, as every test build is', () => {

@@ -148,6 +148,7 @@ describe('visibleRows', () => {
       selection: { kind: 'module', module: 'lib', world: 'a' },
       title: 'Library',
       version: '1.0.0',
+      installed: true,
       expandable: false,
       parent: app,
     });

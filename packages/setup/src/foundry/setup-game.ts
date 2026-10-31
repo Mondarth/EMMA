@@ -5,6 +5,8 @@
  * Checked on Foundry 14.368: the setup screen's `game.view` is `"setup"`, and `game.worlds`, `game.modules` and
  * `game.systems` are collections of the installed packages, as `foundry.packages` instances. A module's
  * `relationships.systems` and `relationships.requires` are sets of the packages it relates to, each with its `id`.
+ * Each package's `toObject()` gives its manifest as Foundry read it, and `manifest` the URL it declares; `game.release`
+ * gives the Foundry build's `generation` and `channel`.
  */
 
 /** An installed package, as EMMA shows it. */
@@ -39,6 +41,35 @@ export interface Installation {
   readonly systems: readonly InstalledPackage[];
 }
 
+/** The Foundry build the server runs. */
+export interface CoreBuild {
+  /** Such as `14.368`. */
+  readonly version: string;
+  readonly generation: number;
+  /** Such as `stable`, as Foundry names it. */
+  readonly channel: string;
+}
+
+/** An installed package's manifest, as Foundry read it. */
+export interface PackageManifest {
+  readonly type: 'module' | 'system';
+  readonly id: string;
+  readonly version: string;
+  /** The manifest, as plain data. */
+  readonly json: unknown;
+  /** Where Foundry read it from, such as `modules/<id>/module.json`. */
+  readonly origin: string;
+  /** The manifest URL it declares, if any: where newer versions are found. */
+  readonly manifest?: string;
+}
+
+/** What the installed packages' manifests say, to look up their releases with. */
+export interface InstalledManifests {
+  readonly core: CoreBuild;
+  /** The installed systems' and modules' manifests; those Foundry could not give are left out. */
+  readonly manifests: readonly PackageManifest[];
+}
+
 /** A request the setup screen sends its server, such as `{ action: "installPackage", … }`. */
 export interface SetupRequest {
   readonly action?: unknown;
@@ -49,6 +80,8 @@ export interface SetupRequest {
 export interface SetupGame {
   readonly view: 'setup';
   readonly version: string;
+  /** The Foundry build; read with care, as Foundry's types do not describe it here. */
+  readonly release?: unknown;
   readonly worlds: Iterable<unknown>;
   readonly modules: Iterable<unknown>;
   readonly systems: Iterable<unknown>;
@@ -92,6 +125,60 @@ export function readInstallation(game: SetupGame): Installation {
     worlds: sorted(Array.from(game.worlds, toWorld)),
     modules: sorted(Array.from(game.modules, toModule)),
     systems: sorted(Array.from(game.systems, toPackage)),
+  };
+}
+
+/**
+ * Read the installed packages' manifests, and the Foundry build.
+ * @param game - The setup screen's `game`
+ * @returns The manifests
+ */
+export function readManifests(game: SetupGame): InstalledManifests {
+  return {
+    core: coreBuild(game),
+    manifests: [
+      ...Array.from(game.systems, pkg => toManifest(pkg, 'system')),
+      ...Array.from(game.modules, pkg => toManifest(pkg, 'module')),
+    ].filter(manifest => manifest !== undefined),
+  };
+}
+
+/**
+ * The Foundry build, from `game.release`; a stable build of the version's generation if Foundry does not say.
+ * @param game - The setup screen's `game`
+ * @returns The build
+ */
+function coreBuild(game: SetupGame): CoreBuild {
+  const release = (typeof game.release === 'object' && game.release !== null ? game.release : {}) as Record<
+    string,
+    unknown
+  >;
+  const { generation, channel } = release;
+  return {
+    version: game.version,
+    generation: typeof generation === 'number' ? generation : Number.parseInt(game.version, 10),
+    channel: typeof channel === 'string' ? channel : 'stable',
+  };
+}
+
+/**
+ * An installed package's manifest.
+ * @param pkg - A package from the setup screen's `game.systems` or `game.modules`
+ * @param type - Which
+ * @returns The manifest, or `undefined` if Foundry cannot give it, or it lacks an ID or version
+ */
+function toManifest(pkg: unknown, type: 'module' | 'system'): PackageManifest | undefined {
+  if (typeof pkg !== 'object' || pkg === null) return undefined;
+  const { id, version, manifest, toObject } = pkg as Record<string, unknown>;
+  if (typeof id !== 'string' || typeof version !== 'string' || typeof toObject !== 'function') return undefined;
+  const json: unknown = (toObject as () => unknown).call(pkg);
+  return {
+    type,
+    id,
+    version,
+    json,
+    origin: `${type}s/${id}/${type}.json`,
+    ...(typeof manifest === 'string' && manifest !== '' && { manifest }),
   };
 }
 

@@ -1,8 +1,10 @@
 /**
- * What the setup screen's EMMA window shows: the installation as last read, and whether EMMA guards Foundry's own
- * package buttons. Reactive, with Svelte 5 runes, so the window follows any change.
+ * What the setup screen's EMMA window shows: the installation as last read, its updates, and whether EMMA guards
+ * Foundry's own package buttons. Reactive, with Svelte 5 runes, so the window follows any change.
  */
 import type { Overview } from '../lib/overview';
+import type { UpdateSearch } from '../lib/updates';
+import { UpdateState } from './update-state.svelte';
 
 /** How the state reads the installation and keeps the guard's setting. */
 export interface SetupStateOptions {
@@ -12,6 +14,8 @@ export interface SetupStateOptions {
   readonly guardOn: boolean;
   /** Keep the guard's setting, and show it on the screen. */
   readonly onGuardChange: (on: boolean) => void;
+  /** Search for the updates of the installation, each time it is read. */
+  readonly findUpdates: (overview: Overview) => Promise<UpdateSearch>;
 }
 
 /** What the window shows. */
@@ -24,6 +28,8 @@ export class SetupState {
   failed = $state(false);
   /** Whether EMMA guards Foundry's own Install, Update and Update All buttons. */
   guardOn = $state(true);
+  /** The installation's updates, searched for each time it is read. */
+  readonly updates: UpdateState;
 
   readonly #options: SetupStateOptions;
 
@@ -33,17 +39,21 @@ export class SetupState {
   constructor(options: SetupStateOptions) {
     this.#options = options;
     this.guardOn = options.guardOn;
+    this.updates = new UpdateState(options.findUpdates);
   }
 
   /**
-   * Read the installation afresh. A failure is kept in {@link failed}, never thrown.
-   * @returns Once read, or failed
+   * Read the installation afresh, then search for its updates in the background. A failure is kept in {@link failed},
+   * or in the updates' status, never thrown.
+   * @returns Once read, or failed; the search may still be going on
    */
   async refresh(): Promise<void> {
     this.loading = true;
     try {
-      this.overview = await this.#options.load();
+      const overview = await this.#options.load();
+      this.overview = overview;
       this.failed = false;
+      void this.updates.searchFor(overview);
     } catch {
       this.failed = true;
     } finally {

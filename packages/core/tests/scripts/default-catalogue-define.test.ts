@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'vitest';
 
-import { reveal } from '@module/lib/obscure';
-import type { Obscured } from '@module/lib/obscure';
-import { defaultCatalogueDefine } from '../../../scripts/build/default-catalogue';
+import { defaultCatalogueDefine } from '../../scripts/default-catalogue-define.ts';
+import type { Obscured } from '../../src/obscure.ts';
+import { reveal } from '../../src/obscure.ts';
 
 const CATALOGUE_URL = 'https://catalogue.example.test/';
 const KEY = 'k3y-0123456789abcdef';

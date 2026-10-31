@@ -5,7 +5,8 @@
  * `fvtt-types/configuration` (`SettingConfig`, `FlagConfig`, `ModuleConfig`, `Hooks.HookConfig`).
  * @see https://github.com/League-of-Foundry-Developers/foundry-vtt-types
  */
-import type { Obscured } from '@module/lib/obscure';
+import type { BuiltCatalogue } from '@mondarth/emma-core/default-catalogue';
+import type { Obscured } from '@mondarth/emma-core/obscure';
 
 declare module 'fvtt-types/configuration' {
   /** Everything EMMA runs is started from the `init` hook, so the parts of `game` set up by then can be assumed. */
@@ -36,9 +37,9 @@ declare global {
   const __EMMA_DEFAULT_PROXY__: { readonly url: Obscured; readonly key: Obscured } | null;
   /**
    * The default package catalogue a release is built with, obscured, or `null` for a build without one. Set by Vite's
-   * `define` from `scripts/build/default-catalogue.ts`; read only through `defaultCatalogue()`.
+   * `define` from `@mondarth/emma-core/default-catalogue-define`; read only through `defaultCatalogue()`.
    */
-  const __EMMA_DEFAULT_CATALOGUE__: { readonly url: Obscured; readonly key: Obscured } | null;
+  const __EMMA_DEFAULT_CATALOGUE__: BuiltCatalogue;
 }
 
 export {};

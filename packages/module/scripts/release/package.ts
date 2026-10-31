@@ -10,7 +10,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { filesHolding } from '../build/default-proxy.ts';
+import { filesHolding } from '@mondarth/emma-core/files-holding';
 
 /** The module's package, `packages/module`. */
 const ROOT = path.resolve(import.meta.dirname, '../..');

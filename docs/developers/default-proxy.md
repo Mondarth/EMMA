@@ -33,10 +33,11 @@ The release workflow sets two values in the environment of the release build:
 : A repository secret: the API key.
 
 `scripts/build/default-proxy.ts` gives both to Vite's `define` as `__EMMA_DEFAULT_PROXY__`, obscured by
-`src/module/lib/obscure.ts`: each is split into chunks, and each chunk masked by random bytes of its own, so neither the
-key nor any long run of it is in the bundle as text. The pads are new with every build. It is not encryption, as the
-pads ship beside the chunks; it keeps the key out of casual sight, and out of a search of the code. EMMA reveals it
-when it uses it, with `defaultProxy()` (`src/module/lib/default-proxy.ts`).
+`packages/core/src/obscure.ts`, which the module shares with the EMMA extension: each is split into chunks, and each
+chunk masked by random bytes of its own, so neither the key nor any long run of it is in the bundle as text. The pads
+are new with every build. It is not encryption, as the pads ship beside the chunks; it keeps the key out of casual
+sight, and out of a search of the code. EMMA reveals it when it uses it, with `defaultProxy()`
+(`src/module/lib/default-proxy.ts`).
 
 The build stops when only one of the two is set, or when the URL is not `https` or has no `{url}`. After building, the
 release refuses to package a bundle that holds the key in plain text anywhere. Development, CI and test builds have
@@ -68,13 +69,17 @@ it alone, and the proxy finds the rest, or everything when the catalogue cannot 
 
 - **Only with the default proxy.** `versionLookup()` (`src/module/settings.ts`) gives the catalogue in the `default`
   mode only: a GM who chose their own proxy, or none, never contacts it, and its key goes only to it.
+- **Always, in the EMMA extension.** On the setup screen there are no proxy settings yet, so the EMMA extension asks
+  the catalogue whenever it is built in (`packages/setup/src/foundry/releases.ts`), then GitHub's and GitLab's release
+  lists and the manifests the packages declare, directly.
 - **Directly, not through the proxy.** The catalogue sends CORS headers, so the browser asks it itself, with its key in
   `X-API-Key` and `EMMA/<version>` in `X-Catalogue-Client`.
 - **Built in the same way as the proxy:** `EMMA_DEFAULT_CATALOGUE_URL` (a repository variable, the catalogue's
   `https` URL) and `EMMA_DEFAULT_CATALOGUE_KEY` (a secret) become `__EMMA_DEFAULT_CATALOGUE__`, obscured, through
-  `scripts/build/default-catalogue.ts`, and EMMA reveals them with `defaultCatalogue()`
-  (`src/module/lib/default-catalogue.ts`). The build stops for half a pair, or a URL that is not `https`, and the
-  release refuses a bundle that holds the key in plain text.
+  `packages/core/scripts/default-catalogue-define.ts`, and EMMA reveals them with `defaultCatalogue()`
+  (`src/module/lib/default-catalogue.ts`, through `packages/core/src/default-catalogue.ts`). The EMMA extension is built
+  with them in the same way, in the browser extension's release step. The build stops for half a pair, or a URL that is
+  not `https`, and both releases refuse a bundle that holds the key in plain text.
 - **What protects it** is what protects the proxy: the key only says which client is asking, the data is public, and
   the catalogue serves nothing else.
 - **Rotating its key** is as for the proxy's: the catalogue's `API_KEYS` is a list too, so add the new key there,

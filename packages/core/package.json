@@ -5,7 +5,11 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./world-record": "./src/world-record.ts"
+    "./world-record": "./src/world-record.ts",
+    "./obscure": "./src/obscure.ts",
+    "./default-catalogue": "./src/default-catalogue.ts",
+    "./default-catalogue-define": "./scripts/default-catalogue-define.ts",
+    "./files-holding": "./scripts/files-holding.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",

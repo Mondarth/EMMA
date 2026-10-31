@@ -4,7 +4,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { APP_ID, closeEmmaSetup, openEmmaSetup } from '../../../src/app/emma-setup-app';
 import { SetupState } from '../../../src/app/setup-state.svelte';
 import { buildOverview } from '../../../src/lib/overview';
-import { installation } from '../../mocks/fixtures';
+import { installation, noUpdates } from '../../mocks/fixtures';
 
 /**
  * What the window shows: an installation with nothing in it.
@@ -12,7 +12,7 @@ import { installation } from '../../mocks/fixtures';
  */
 function setUp() {
   const load = vi.fn(() => Promise.resolve(buildOverview(installation(), new Map())));
-  return { setup: new SetupState({ load, guardOn: true, onGuardChange: vi.fn() }), load };
+  return { setup: new SetupState({ load, guardOn: true, onGuardChange: vi.fn(), findUpdates: noUpdates }), load };
 }
 
 afterEach(async () => {

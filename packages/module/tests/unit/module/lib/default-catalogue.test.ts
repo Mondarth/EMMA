@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import { defaultCatalogue } from '@module/lib/default-catalogue';
-import { obscure } from '@module/lib/obscure';
+import { obscure } from '@mondarth/emma-core/obscure';
 
 describe('defaultCatalogue', () => {
   test('is none in a build without one, as every test build is', () => {

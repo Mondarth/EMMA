@@ -80,6 +80,8 @@ export interface PackageData {
   version?: string | undefined;
   /** A module's relationships, as Foundry gives them: sets of the packages related. */
   relationships?: { systems?: unknown; requires?: unknown } | undefined;
+  /** The manifest URL it declares. */
+  manifest?: string | undefined;
 }
 
 /** A world as `game.worlds` holds it. */
@@ -93,6 +95,8 @@ export interface WorldData {
 export interface SetupMockOptions {
   /** The Foundry version. Defaults to `14.368`. */
   core?: string;
+  /** What `game.release` holds; a stable build of Foundry 14 by default. */
+  release?: unknown;
   worlds?: WorldData[];
   modules?: PackageData[];
   systems?: PackageData[];
@@ -108,6 +112,12 @@ export interface SetupMockOptions {
  */
 export function installSetupMocks(options: SetupMockOptions = {}) {
   const { core = '14.368', worlds = [], modules = [], systems = [], records = {} } = options;
+  const release = 'release' in options ? options.release : { generation: 14, channel: 'stable' };
+  // A package as Foundry has it: its data, and its manifest as plain data from `toObject()`.
+  const packaged = (pkg: PackageData) => {
+    const data = { title: pkg.id, version: '1.0.0', ...pkg };
+    return { ...data, toObject: () => ({ id: data.id, title: data.title, version: data.version }) };
+  };
   // The user data folder, by path, as the server serves it.
   const files = new Map<string, string>(
     Object.entries(records).map(([id, record]) => [
@@ -119,11 +129,12 @@ export function installSetupMocks(options: SetupMockOptions = {}) {
   const game = {
     view: 'setup',
     version: core,
+    release,
     worlds: new CollectionMock<unknown>(
       worlds.map(world => [world.id, { title: world.id, system: 'dnd5e', ...world }]),
     ),
-    modules: new CollectionMock<unknown>(modules.map(pkg => [pkg.id, { title: pkg.id, version: '1.0.0', ...pkg }])),
-    systems: new CollectionMock<unknown>(systems.map(pkg => [pkg.id, { title: pkg.id, version: '1.0.0', ...pkg }])),
+    modules: new CollectionMock<unknown>(modules.map(pkg => [pkg.id, packaged(pkg)])),
+    systems: new CollectionMock<unknown>(systems.map(pkg => [pkg.id, packaged(pkg)])),
     post,
   };
 

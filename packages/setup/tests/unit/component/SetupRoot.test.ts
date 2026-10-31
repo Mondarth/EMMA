@@ -6,7 +6,7 @@ import { SetupState } from '../../../src/app/setup-state.svelte';
 import SetupRoot from '../../../src/component/SetupRoot.svelte';
 import type { RecordState } from '../../../src/foundry/records';
 import { buildOverview } from '../../../src/lib/overview';
-import { installation, installedModule, record, recorded } from '../../mocks/fixtures';
+import { installation, installedModule, noUpdates, record, recorded } from '../../mocks/fixtures';
 
 const OVERVIEW = buildOverview(
   installation({
@@ -47,7 +47,12 @@ const OVERVIEW = buildOverview(
  */
 async function setUp({ guardOn = true } = {}) {
   const onGuardChange = vi.fn();
-  const setup = new SetupState({ load: () => Promise.resolve(OVERVIEW), guardOn, onGuardChange });
+  const setup = new SetupState({
+    load: () => Promise.resolve(OVERVIEW),
+    guardOn,
+    onGuardChange,
+    findUpdates: noUpdates,
+  });
   await setup.refresh();
   render(SetupRoot, { setup });
   return { setup, onGuardChange, user: userEvent.setup() };
@@ -87,6 +92,7 @@ describe('SetupRoot', () => {
       load: () => Promise.reject(new Error('offline')),
       guardOn: true,
       onGuardChange: vi.fn(),
+      findUpdates: noUpdates,
     });
     render(SetupRoot, { setup });
     expect(screen.getByRole('status')).toHaveTextContent("Reading the worlds' records…");

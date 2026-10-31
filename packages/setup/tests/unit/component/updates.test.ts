@@ -1,0 +1,212 @@
+import { fireEvent, render, screen, within } from '@testing-library/svelte';
+import userEvent from '@testing-library/user-event';
+import { afterEach, describe, expect, test, vi } from 'vitest';
+
+import { SetupState } from '../../../src/app/setup-state.svelte';
+import SetupRoot from '../../../src/component/SetupRoot.svelte';
+import { LAYOUT_KEY } from '../../../src/foundry/preferences';
+import { buildOverview } from '../../../src/lib/overview';
+import type { PackageUpdate, UpdateSearch } from '../../../src/lib/updates';
+import { installation, installedModule, record, recorded } from '../../mocks/fixtures';
+
+const OVERVIEW = buildOverview(
+  installation({
+    worlds: [{ id: 'a', title: 'Alpha', system: 'dnd5e' }],
+    modules: [installedModule('lib', 'Library', '1.0.0')],
+  }),
+  new Map([['a', recorded(record('a', { modules: [{ id: 'lib', title: 'Library', version: '1.0.0' }] }))]]),
+);
+
+const UPDATES: readonly PackageUpdate[] = [
+  { key: 'system:dnd5e', installed: '5.3.3', newest: '5.4.0', versions: ['5.4.0', '5.3.3'] },
+  { key: 'module:lib', installed: '1.0.0', newest: '2.0.0', versions: ['2.0.0', '1.5.0', '1.0.0'] },
+];
+
+/**
+ * Render EMMA's window content, with the installation read and its updates searched for.
+ * @param find - The search for updates; finding {@link UPDATES} by default
+ * @returns The state and a user to act with
+ */
+async function setUp(
+  find: () => Promise<UpdateSearch> = () =>
+    Promise.resolve({ updates: new Map(UPDATES.map(update => [update.key, update])), unresolved: [] }),
+) {
+  const setup = new SetupState({
+    load: () => Promise.resolve(OVERVIEW),
+    guardOn: true,
+    onGuardChange: vi.fn(),
+    findUpdates: find,
+  });
+  await setup.refresh();
+  render(SetupRoot, { setup });
+  // The search runs after the installation is read.
+  await vi.waitFor(() => {
+    expect(setup.updates.status).not.toBe('searching');
+  });
+  return { setup, user: userEvent.setup() };
+}
+
+/**
+ * A row of the tree, by its name.
+ * @param name - The name
+ * @returns The row
+ */
+const row = (name: RegExp) => screen.getByRole('treeitem', { name });
+
+afterEach(() => {
+  localStorage.clear();
+});
+
+describe('updates in the window', () => {
+  test('marks each package with an update, and says how many there are', async () => {
+    await setUp();
+
+    expect(screen.getByRole('status')).toHaveTextContent('Updates available: 2');
+    expect(row(/^Update available D&D 5e 5\.3\.3/)).toBeInTheDocument();
+    expect(row(/^Foundry VTT/)).not.toHaveTextContent('Update available');
+    expect(screen.getByRole('button', { name: 'Update' })).toBeEnabled();
+  });
+
+  test('offers the versions in Update mode, and plans the ones chosen below the tree and the panel', async () => {
+    const { user } = await setUp();
+    expect(screen.queryByRole('combobox')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Update' }));
+    expect(screen.getByRole('button', { name: 'Update' })).toHaveAttribute('aria-pressed', 'true');
+    const system = screen.getByRole('combobox', { name: 'Version of D&D 5e' });
+    expect(
+      within(system)
+        .getAllByRole('option')
+        .map(option => option.textContent.trim()),
+    ).toEqual(['5.4.0', '5.3.3 (installed)']);
+    // Only a row that shows the installed version offers them: under a world, the version it last ran with shows.
+    await user.click(within(row(/^Update available D&D 5e/)).getByText('D&D 5e'));
+    await user.keyboard('{ArrowRight}{ArrowRight}{ArrowRight}');
+    expect(row(/^Alpha/)).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getAllByRole('treeitem', { name: /^Update available D&D 5e/ })).toHaveLength(2);
+    expect(screen.getAllByRole('combobox')).toHaveLength(1);
+    expect(screen.queryByRole('region', { name: 'Update plan' })).toBeNull();
+
+    await user.selectOptions(system, '5.4.0');
+    const plan = screen.getByRole('region', { name: 'Update plan' });
+    expect(
+      within(plan)
+        .getAllByRole('row')
+        .map(item => Array.from(item.querySelectorAll('th, td'), cell => cell.textContent.trim())),
+    ).toEqual([
+      ['Package', 'Installed', 'Chosen'],
+      ['D&D 5e', '5.3.3', '5.4.0'],
+    ]);
+    expect(screen.getByRole('separator', { name: 'Resize the update plan' })).toBeInTheDocument();
+
+    await user.click(within(plan).getByRole('button', { name: 'Clear choices' }));
+    expect(screen.queryByRole('region', { name: 'Update plan' })).toBeNull();
+    expect(system).toHaveValue('5.3.3');
+
+    await user.selectOptions(system, '5.4.0');
+    await user.click(screen.getByRole('button', { name: 'Update' }));
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Update plan' })).toBeNull();
+  });
+
+  test("leaves the tree's keys to the version list while it has the keyboard", async () => {
+    const { user } = await setUp();
+    await user.click(screen.getByRole('button', { name: 'Update' }));
+    const system = screen.getByRole('combobox', { name: 'Version of D&D 5e' });
+
+    system.focus();
+    await user.keyboard('{End}');
+
+    expect(system).toHaveFocus();
+  });
+
+  test.each([
+    ['finds none', () => Promise.resolve({ updates: new Map(), unresolved: [] }), 'No updates found'],
+    ['fails', () => Promise.reject(new Error('offline')), 'Could not look for updates'],
+    [
+      'finds no setup for a world',
+      () => Promise.resolve({ updates: new Map(), unresolved: ['a'] }),
+      'EMMA found no working setup for 1 recorded worlds',
+    ],
+  ] as const)('says so when the search %s, and offers no Update mode', async (_label, find, text) => {
+    await setUp(find);
+
+    expect(screen.getByRole('status')).toHaveTextContent(text);
+    expect(screen.getByRole('button', { name: 'Update' })).toBeDisabled();
+  });
+
+  test('says it is looking while the search goes on', async () => {
+    const setup = new SetupState({
+      load: () => Promise.resolve(OVERVIEW),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: () => new Promise(() => undefined),
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+
+    expect(screen.getByRole('status')).toHaveTextContent('Looking for updates…');
+  });
+});
+
+describe("the panels' sizes", () => {
+  test('change from the keyboard, within their limits, and are kept', async () => {
+    const { user } = await setUp();
+    const tree = screen.getByRole('separator', { name: 'Resize the installation tree' });
+    expect(tree).toHaveAttribute('aria-valuenow', '40');
+
+    tree.focus();
+    await user.keyboard('{ArrowRight}');
+    expect(tree).toHaveAttribute('aria-valuenow', '42');
+    await user.keyboard('{ArrowLeft}{ArrowLeft}');
+    expect(tree).toHaveAttribute('aria-valuenow', '38');
+    await user.keyboard('{End}');
+    expect(tree).toHaveAttribute('aria-valuenow', '85');
+    await user.keyboard('{Home}{a}');
+    expect(tree).toHaveAttribute('aria-valuenow', '15');
+    expect(JSON.parse(localStorage.getItem(LAYOUT_KEY) ?? '{}')).toMatchObject({ tree: 0.15 });
+
+    await user.click(screen.getByRole('button', { name: 'Update' }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Version of D&D 5e' }), '5.4.0');
+    const plan = screen.getByRole('separator', { name: 'Resize the update plan' });
+    plan.focus();
+    // The plan is below its handle, so moving the handle up grows it.
+    await user.keyboard('{ArrowUp}');
+    expect(plan).toHaveAttribute('aria-valuenow', '37');
+    await user.keyboard('{ArrowDown}{ArrowDown}');
+    expect(plan).toHaveAttribute('aria-valuenow', '33');
+  });
+
+  test('follow the pointer while it drags a handle', async () => {
+    await setUp();
+    const tree = screen.getByRole('separator', { name: 'Resize the installation tree' });
+    const rect = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue(DOMRect.fromRect({ x: 100, y: 0, width: 1000, height: 500 }));
+
+    // Moving without dragging does nothing.
+    await fireEvent.pointerMove(tree, { clientX: 600, pointerId: 1 });
+    expect(tree).toHaveAttribute('aria-valuenow', '40');
+
+    await fireEvent.pointerDown(tree, { clientX: 500, pointerId: 1 });
+    await fireEvent.pointerMove(tree, { clientX: 600, pointerId: 1 });
+    expect(tree).toHaveAttribute('aria-valuenow', '50');
+    await fireEvent.pointerMove(tree, { clientX: 1100, pointerId: 1 });
+    expect(tree).toHaveAttribute('aria-valuenow', '85');
+
+    // Nothing to measure against, as while the window is hidden.
+    rect.mockReturnValue(DOMRect.fromRect({ x: 0, y: 0, width: 0, height: 0 }));
+    await fireEvent.pointerMove(tree, { clientX: 300, pointerId: 1 });
+    expect(tree).toHaveAttribute('aria-valuenow', '85');
+
+    await fireEvent.pointerUp(tree, { pointerId: 1 });
+    rect.mockReturnValue(DOMRect.fromRect({ x: 100, y: 0, width: 1000, height: 500 }));
+    await fireEvent.pointerMove(tree, { clientX: 300, pointerId: 1 });
+    expect(tree).toHaveAttribute('aria-valuenow', '85');
+
+    await fireEvent.pointerDown(tree, { clientX: 500, pointerId: 1 });
+    await fireEvent.pointerCancel(tree, { pointerId: 1 });
+    await fireEvent.pointerMove(tree, { clientX: 300, pointerId: 1 });
+    expect(tree).toHaveAttribute('aria-valuenow', '85');
+  });
+});
