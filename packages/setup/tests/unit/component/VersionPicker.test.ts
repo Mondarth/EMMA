@@ -146,6 +146,31 @@ describe('VersionPicker', () => {
     expect(onChoose).not.toHaveBeenCalled();
   });
 
+  test('shows a version other choices stand in the way of locked, and refuses it', async () => {
+    const onChoose = vi.fn();
+    const locked: VersionOption = {
+      ...option('3.0.0'),
+      conflict: { remove: [{ title: 'Kit', version: '2.0.0' }], explanation: [] },
+    };
+    render(VersionPicker, {
+      title: 'Dice',
+      chosen: option('2.0.0'),
+      versions: () => [locked, option('1.0.0')],
+      installed: '1.0.0',
+      onChoose,
+    });
+    await userEvent.click(screen.getByRole('button', { name: CHOOSE }));
+    const [first] = screen.getAllByRole('option');
+
+    expect(first).toHaveAttribute('aria-disabled', 'true');
+    expect(first).toHaveClass('locked');
+    expect(first).toHaveTextContent('Not with what is chosen');
+    await userEvent.click(first as HTMLElement);
+    await userEvent.keyboard('{Enter}');
+    expect(onChoose).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: CHOOSE })).toHaveAttribute('aria-expanded', 'true');
+  });
+
   test('marks the version under the pointer', async () => {
     renderPicker();
     await userEvent.click(screen.getByRole('button', { name: CHOOSE }));

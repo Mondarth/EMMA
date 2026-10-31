@@ -1,6 +1,7 @@
 <!--
   A version list, as the EMMA module's (its component/VersionPicker.svelte): a button showing the version chosen in its
-  badge, which opens the other versions, each in its own badge, newest first. The installed version is marked so.
+  badge, which opens the other versions, each in its own badge, newest first. The installed version is marked so, and
+  one that other choices stand in the way of is shown, locked, but cannot be chosen.
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
@@ -112,6 +113,8 @@
    */
   function choose(index: number): void {
     const option = options[index];
+    // A locked version stays in the list, for the panel to say what stands in its way.
+    if (option?.conflict !== undefined) return;
     hide(true);
     if (option !== undefined) onChoose(option.version);
   }
@@ -170,6 +173,10 @@
   {#if option.version === installed}
     <span class="emma-version-installed">{localize('Update.Installed')}</span>
   {/if}
+  {#if option.conflict !== undefined}
+    <i class="fa-solid fa-lock emma-version-lock" title={localize('Update.Locked')} aria-hidden="true"></i>
+    <span class="emma-version-text">{localize('Update.Locked')}</span>
+  {/if}
 {/snippet}
 
 <!-- Clicks and keys in the list stay in it, as the list's own handlers stop keys: in the DOM it sits inside the row. -->
@@ -203,7 +210,8 @@
         id={optionId(index)}
         role="option"
         aria-selected={index === active}
-        class={{ active: index === active }}
+        aria-disabled={option.conflict !== undefined}
+        class={{ active: index === active, locked: option.conflict !== undefined }}
         onclick={() => {
           choose(index);
         }}
@@ -280,6 +288,25 @@
     cursor: default;
     opacity: 0.8;
     font-style: italic;
+  }
+
+  .emma-version-popup li.locked {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  .emma-version-lock {
+    color: var(--color-level-error, #e55);
+  }
+
+  /* Read by screen readers, which do not see the icon's title, but not shown. */
+  .emma-version-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .emma-version-popup li.active {

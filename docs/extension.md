@@ -194,7 +194,8 @@ the keyboard or the pointer is on: its badge and Foundry's explanation, what it 
 Foundry builds it runs on, the packages it requires, the game systems it runs in, and those it conflicts with), and for
 a package more than one recorded world uses, how it fares in each. Once a version is chosen, the panel keeps explaining it, under **<version> update**.
 A list offers only the versions that work with what is chosen already, and the panel says what else choosing one would
-change. Choosing a version brings in whatever else it needs, from the fewest changes that work: a world's other packages
+change. A version that other choices in the plan stand in the way of is listed too, locked: it cannot be chosen, and the
+panel says which choices to take out of the plan for it, and why. A version chosen is never changed to suit another. Choosing a version brings in whatever else it needs, from the fewest changes that work: a world's other packages
 stay as they are where they can, and Foundry VTT moves only as far as it must. Choosing a version other than the installed one opens the **Update plan** below the tree and the panel, the full width of the window, listing each package that
 changes with its installed and new versions, and, for one a choice brings in, which choice needs it. **Clear choices**
 takes them all back, and choosing the installed version takes back one, with what it brought in. Turning Update mode off hides the lists and the plan, and keeps the choices for when it is

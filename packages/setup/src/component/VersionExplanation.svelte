@@ -35,6 +35,21 @@
 <section class="emma-explanation" aria-labelledby="emma-setup-explained" aria-live="polite">
   <h3 id="emma-setup-explained">{heading}</h3>
   <p><VersionBadge version={option.version} badge={option.badge} unlisted={option.unlisted === true} /></p>
+  {#if option.conflict !== undefined}
+    <p class="emma-explanation-conflict">
+      {format('Update.TakeOut', {
+        choices: option.conflict.remove.map(choice => format('Update.Choice', choice)).join(', '),
+      })}
+    </p>
+    {#if option.conflict.explanation.length > 0}
+      <p>{localize('Update.Why')}</p>
+      <ul class="emma-explanation-lines">
+        {#each option.conflict.explanation as line, index (index)}
+          <li>{line}</li>
+        {/each}
+      </ul>
+    {/if}
+  {/if}
   {#if option.needs !== undefined}
     <p>{localize('Update.Needs')}</p>
     <ul class="emma-explanation-lines">
@@ -69,6 +84,10 @@
 </section>
 
 <style>
+  .emma-explanation-conflict {
+    color: var(--color-level-error, #e55);
+  }
+
   .emma-explanation-lines {
     margin: 0.2rem 0;
     padding-left: 1.2rem;

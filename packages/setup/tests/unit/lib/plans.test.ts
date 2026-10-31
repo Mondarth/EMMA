@@ -277,6 +277,38 @@ describe('toldOfWorld', () => {
 });
 
 describe('a version chosen of a package no recorded world runs', () => {
+  test('never overrides a version chosen to meet what it needs, but explains why they cannot go together', async () => {
+    const plans = planner(
+      [
+        ['lib', '1.0.0'],
+        ['kit', '1.0.0'],
+      ],
+      { a: [['lib', '1.0.0']] },
+      [
+        ...DND,
+        release('module:lib', '1.0.0'),
+        release('module:lib', '1.5.0'),
+        release('module:lib', '2.0.0'),
+        release('module:kit', '1.0.0'),
+        release('module:kit', '2.0.0', { requires: { lib: { minimum: '2.0.0' } } }),
+      ],
+    );
+
+    await expect(plans.complete(picks(['module:kit', '2.0.0']))).resolves.toMatchObject({
+      ok: true,
+      versions: new Map([
+        ['module:lib', '2.0.0'],
+        ['module:kit', '2.0.0'],
+      ]),
+    });
+    const both = await plans.complete(picks(['module:kit', '2.0.0'], ['module:lib', '1.5.0']));
+    expect(both).toMatchObject({ ok: false });
+    expect(!both.ok && both.explanation).toEqual([
+      'Because KIT 2.0.0 depends on LIB 2.0.0 or later and the plan has KIT 2.0.0, LIB 2.0.0 or later is needed.',
+      'So, because the plan has LIB 1.5.0, the plan cannot keep working. (1)',
+    ]);
+  });
+
   test('keeps the build found when no older one between it and the installed one works', async () => {
     const plans = planner([['late', '1.0.0']], {}, [
       ...DND,

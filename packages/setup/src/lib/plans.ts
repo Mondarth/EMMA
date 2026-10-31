@@ -349,11 +349,22 @@ export function createPlanner(inputs: PlannerInputs): Planner {
         const preferred = [...installed]
           .filter(([other]) => other !== key && other !== CORE)
           .map(([other, from]) => ({ package: other, version: pins.get(other) ?? from }));
-        const resolution = await setupFor({
+        const requirements = {
           require: [{ package: key }],
           pins: [{ package: key, version }, ...(pinned === undefined ? [] : [{ package: CORE, version: pinned }])],
           prefer: [...(pinned === undefined ? [{ package: CORE, version: core }] : []), ...preferred],
-        });
+        };
+        let resolution = await setupFor(requirements);
+        // A version chosen is never moved to meet what this one needs: found otherwise, it is pinned, to say why not.
+        const moved = resolution.ok
+          ? [resolution.setup.system, ...resolution.setup.modules].flatMap(release => {
+              const chosen = picks.get(packageKey(release.package));
+              return chosen === undefined || sameVersion(chosen, release.version)
+                ? []
+                : [{ package: packageKey(release.package), version: chosen }];
+            })
+          : [];
+        if (moved.length > 0) resolution = await setupFor({ ...requirements, pins: [...requirements.pins, ...moved] });
         if (!resolution.ok) return { ok: false, explanation: explained(resolution, localize('Explain.Plan')) };
         note(CORE, resolution.setup.core);
         for (const release of [resolution.setup.system, ...resolution.setup.modules]) {

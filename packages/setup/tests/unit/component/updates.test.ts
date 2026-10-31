@@ -330,13 +330,22 @@ describe('updates in the window', () => {
       ['Library', '1.0.0', '2.0.0 needed by D&D 5e 5.4.0'],
     ]);
 
-    // The library's versions for D&D 5e 5.3 no longer work with what is chosen.
+    // The library's versions for D&D 5e 5.3 no longer work with what is chosen: listed, locked, saying what is in the way.
     await user.click(within(row(/Universal/)).getByText('Universal'));
     await user.keyboard('{ArrowRight}');
     await openList(user, 'Version of Library: 2.0.0');
     const list = screen.getByRole('listbox', { name: 'Versions of Library' });
-    expect(within(list).queryAllByRole('option')).toEqual([]);
-    expect(list).toHaveTextContent('No other version works with what is chosen.');
+    const locked = within(list).getAllByRole('option');
+    expect(locked.map(item => item.textContent.trim().split(/\s+/)[0])).toEqual(['1.5.0', '1.0.0']);
+    for (const item of locked) expect(item).toHaveAttribute('aria-disabled', 'true');
+    expect(locked[0]).toHaveTextContent('Not with what is chosen');
+    const why = screen.getByRole('region', { name: '1.5.0 update' });
+    expect(why).toHaveTextContent('The plan cannot take it as it is: to choose it, take D&D 5e 5.4.0 out of the plan.');
+    expect(why).toHaveTextContent('Why:');
+    // Choosing it is refused, and the list stays open on it.
+    await user.keyboard('{Enter}');
+    expect(list.closest('[popover]')).toHaveAttribute('data-popover-open');
+    expect(screen.getByRole('button', { name: 'Version of Library: 2.0.0' })).toBeInTheDocument();
     await user.keyboard('{Escape}');
 
     // Taking the choice back takes what it needed back too.
