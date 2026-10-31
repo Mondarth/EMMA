@@ -9,6 +9,7 @@ import { SETUP_KIT_API } from '@mondarth/emma-core/setup-kit';
 import {
   AVAILABILITY,
   CORE,
+  check,
   coreAvailability,
   isNewerVersion,
   isUnavailable,
@@ -30,12 +31,15 @@ import {
   sourceSet,
 } from '@mondarth/fvtt-resolver/sources';
 
+import { releaseBadge } from './module/adapters/badges';
+
 /** The kit. */
 const kit: SetupKit = {
   api: SETUP_KIT_API,
   resolver: {
     AVAILABILITY,
     CORE,
+    check,
     coreAvailability,
     isNewerVersion,
     isUnavailable,
@@ -56,6 +60,7 @@ const kit: SetupKit = {
     proxiedFetch,
     sourceSet,
   },
+  badges: { releaseBadge },
 };
 
 export default kit;

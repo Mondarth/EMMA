@@ -3,17 +3,20 @@
   it shows the row the keyboard is on. As a module may show in many places, the selection is a row's key.
 
   A package with an update on offer has an arrow to the left of each of its rows, and so has a collapsed row that hides
-  one, fainter. In Update mode, each row that shows its installed version offers its versions in a list instead.
+  one, fainter. In Update mode, each row that shows its installed version offers its versions in a list instead, each in
+  the colour of EMMA's badge for it, as the EMMA module's version lists are.
 -->
 <script lang="ts">
   import { tick } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
 
   import type { UpdateState } from '../app/update-state.svelte';
-  import { format, localize } from '../lib/i18n';
+  import { localize } from '../lib/i18n';
   import type { Overview } from '../lib/overview';
   import type { TreeRow } from '../lib/tree';
   import { INITIALLY_EXPANDED, moveFor, packageOf, visibleRows } from '../lib/tree';
+
+  import VersionPicker from './VersionPicker.svelte';
 
   interface Props {
     overview: Overview;
@@ -127,25 +130,14 @@
       {/if}
       <span class="emma-tree-title">{row.title}</span>
       {#if updates?.on === true && update !== undefined && key !== undefined && row.installed === true}
-        {@const chosen = updates.chosenOf(key)}
-        <select
-          class="emma-tree-choice"
-          class:emma-tree-chosen={chosen !== update.installed}
-          aria-label={format('Update.Choose', { title: row.title })}
-          value={chosen}
-          onchange={event => {
-            updates.choose(key, event.currentTarget.value);
-          }}
-          onkeydown={event => {
-            // The list's own keys, not the tree's.
-            event.stopPropagation();
-          }}>
-          {#each update.versions as version (version)}
-            <option value={version}>
-              {version === update.installed ? format('Update.InstalledVersion', { version }) : version}
-            </option>
-          {/each}
-        </select>
+        <VersionPicker
+          title={row.title}
+          chosen={updates.optionOf(key, updates.chosenOf(key) ?? update.installed)}
+          versions={() => update.versions.map(version => updates.optionOf(key, version))}
+          installed={update.installed}
+          onChoose={(version: string) => {
+            updates.choose(key, version);
+          }} />
       {:else if row.version !== undefined}
         <span class="emma-tree-version">{row.version}</span>
       {/if}
@@ -197,20 +189,6 @@
 
   .emma-tree-hidden {
     opacity: 0.6;
-  }
-
-  .emma-tree-choice {
-    flex: none;
-    width: auto;
-    max-width: 8rem;
-    height: auto;
-    font-family: var(--font-mono, monospace);
-    font-size: 0.85em;
-  }
-
-  .emma-tree-chosen {
-    font-weight: bold;
-    color: var(--color-level-info, #5af);
   }
 
   .emma-visually-hidden {

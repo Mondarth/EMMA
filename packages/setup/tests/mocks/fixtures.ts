@@ -1,10 +1,10 @@
-import type { Compatibility, Release } from '@mondarth/fvtt-resolver';
+import type { Compatibility, PackageKey, Release } from '@mondarth/fvtt-resolver';
 
 import type { WorldRecord } from '@mondarth/emma-core/world-record';
 
 import type { RecordState } from '../../src/foundry/records';
 import type { InstalledModule, Installation } from '../../src/foundry/setup-game';
-import type { UpdateSearch } from '../../src/lib/updates';
+import type { UpdateSearch, VersionOption } from '../../src/lib/updates';
 
 /**
  * A world record.
@@ -110,7 +110,17 @@ export function release(ref: `${'module' | 'system'}:${string}`, version: string
  * @returns What it found
  */
 export function noUpdates(): Promise<UpdateSearch> {
-  return Promise.resolve({ updates: new Map(), unresolved: [] });
+  return Promise.resolve({ updates: new Map(), unresolved: [], judge: unjudged });
+}
+
+/**
+ * Badge no version.
+ * @param _key - The package
+ * @param version - The version
+ * @returns The version, without a badge
+ */
+export function unjudged(_key: PackageKey, version: string): VersionOption {
+  return { version, badge: null };
 }
 
 /**

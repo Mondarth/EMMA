@@ -38,6 +38,7 @@ async function search(
   );
   return findUpdates({
     resolver: KIT.resolver,
+    badges: KIT.badges,
     overview,
     universe: { core: [CORE], releases },
     load: () => Promise.resolve([]),
@@ -167,6 +168,7 @@ describe('findUpdates', () => {
 
     const found = await findUpdates({
       resolver: KIT.resolver,
+      badges: KIT.badges,
       overview,
       universe: { core: [CORE], releases: [...DND, release('module:app', '1.0.0'), listed] },
       load,
@@ -174,5 +176,100 @@ describe('findUpdates', () => {
 
     expect(found.updates.get('module:app')).toMatchObject({ newest: '2.0.0' });
     expect(load).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('the badges of the versions on offer', () => {
+  /**
+   * No version chosen, so each package is at its installed version.
+   * @returns No version
+   */
+  const none = () => undefined;
+
+  const RELEASES = [
+    ...DND,
+    release('module:app', '1.0.0', { requires: { lib: {} } }),
+    release('module:app', '2.0.0', { requires: { lib: { minimum: '2.0.0' } } }),
+    release('module:lib', '1.0.0'),
+    release('module:lib', '2.0.0'),
+    release('module:lone', '1.0.0'),
+    release('module:lone', '2.0.0', { core: { minimum: '13', verified: '13' } }),
+    release('module:lone', '3.0.0', { unlisted: true }),
+  ];
+
+  test('judge a version in the setup of a world that uses it, with the others at the versions chosen', async () => {
+    const { judge } = await search(
+      [
+        ['app', '1.0.0'],
+        ['lib', '1.0.0'],
+      ],
+      {
+        a: [
+          ['app', '1.0.0'],
+          ['lib', '1.0.0'],
+        ],
+      },
+      RELEASES,
+    );
+
+    // As installed, the library is too old for the app's 2.0.0.
+    expect(judge('module:app', '2.0.0', none).badge).toMatchObject({ type: 'error' });
+    expect(judge('module:app', '2.0.0', key => (key === 'module:lib' ? '2.0.0' : undefined))).toEqual({
+      version: '2.0.0',
+      badge: expect.objectContaining({
+        type: 'success',
+        text: '1 in system:dnd5e, module:app, module:lib',
+      }) as unknown,
+    });
+    expect(judge('system:dnd5e', '5.3.3', none).badge).toMatchObject({ type: 'success' });
+  });
+
+  test('keep the worst of the worlds that use it, saying which', async () => {
+    const { judge } = await search(
+      [
+        ['app', '1.0.0'],
+        ['lib', '1.0.0'],
+      ],
+      {
+        a: [
+          ['app', '1.0.0'],
+          ['lib', '1.0.0'],
+        ],
+        // Runs the app without the library it requires.
+        b: [['app', '1.0.0']],
+      },
+      RELEASES,
+    );
+
+    const { badge } = judge('module:app', '1.0.0', none);
+    expect(badge?.type).toBe('error');
+    expect(badge?.text).toMatch(/As in b, the world that uses it where it fits least\.$/);
+    expect(badge?.tooltip).toMatch(/<br>As in b, /);
+    // Only world a runs the library, so there is no other world to name.
+    expect(judge('module:lib', '1.0.0', none).badge?.text).not.toMatch(/As in/);
+  });
+
+  test('judge a package no recorded world uses by the Foundry build alone, and say which are unlisted', async () => {
+    const { judge } = await search([['lone', '1.0.0']], {}, RELEASES);
+
+    expect(judge('module:lone', '1.0.0', none).badge).toMatchObject({ type: 'success', text: '1 in module:lone' });
+    expect(judge('module:lone', '2.0.0', none).badge?.type).toBe('warning');
+    const unlisted = judge('module:lone', '3.0.0', none);
+    expect(unlisted).toMatchObject({ unlisted: true, badge: { type: 'success' } });
+    expect(unlisted.badge?.tooltip).toMatch(/<br>Not on Foundry&#39;s package listing/);
+    expect(unlisted.badge?.text).toMatch(/Not on Foundry's package listing/);
+    // A version not found has nothing to judge.
+    expect(judge('module:lone', '9.0.0', none)).toEqual({ version: '9.0.0', badge: null });
+  });
+
+  test('give no badge to a version that declares no core compatibility, even unlisted', async () => {
+    const { judge } = await search([['lone', '1.0.0']], {}, [
+      ...RELEASES,
+      release('module:lone', '4.0.0', { core: {} }),
+      release('module:lone', '5.0.0', { core: {}, unlisted: true }),
+    ]);
+
+    expect(judge('module:lone', '4.0.0', none)).toEqual({ version: '4.0.0', badge: null });
+    expect(judge('module:lone', '5.0.0', none)).toEqual({ version: '5.0.0', unlisted: true, badge: null });
   });
 });

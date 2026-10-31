@@ -8,8 +8,8 @@ import { LAYOUT_KEY } from '../../../src/foundry/preferences';
 import type { KitProblem } from '../../../src/foundry/setup-kit';
 import { EXTENSION_RELEASES, KitUnavailable } from '../../../src/foundry/setup-kit';
 import { buildOverview } from '../../../src/lib/overview';
-import type { PackageUpdate, UpdateSearch } from '../../../src/lib/updates';
-import { installation, installedModule, noInstall, record, recorded } from '../../mocks/fixtures';
+import type { PackageUpdate, UpdateSearch, VersionJudge } from '../../../src/lib/updates';
+import { installation, installedModule, noInstall, record, recorded, unjudged } from '../../mocks/fixtures';
 
 const OVERVIEW = buildOverview(
   installation({
@@ -25,13 +25,27 @@ const UPDATES: readonly PackageUpdate[] = [
 ];
 
 /**
+ * Badge D&D 5e 5.4.0 as unverified while the library is at 1.0.0, and verified once 2.0.0 is chosen; every other
+ * version as verified.
+ * @param key - The package
+ * @param version - The version
+ * @param chosen - The versions chosen
+ * @returns The version, with its badge
+ */
+const judge: VersionJudge = (key, version, chosen) => {
+  const type =
+    key === 'system:dnd5e' && version === '5.4.0' && chosen('module:lib') !== '2.0.0' ? 'warning' : 'success';
+  return { version, badge: { type, icon: 'fa-solid fa-code-branch', tooltip: `<b>${type}</b>`, text: type } };
+};
+
+/**
  * Render EMMA's window content, with the installation read and its updates searched for.
  * @param find - The search for updates; finding {@link UPDATES} by default
  * @returns The state and a user to act with
  */
 async function setUp(
   find: () => Promise<UpdateSearch> = () =>
-    Promise.resolve({ updates: new Map(UPDATES.map(update => [update.key, update])), unresolved: [] }),
+    Promise.resolve({ updates: new Map(UPDATES.map(update => [update.key, update])), unresolved: [], judge }),
 ) {
   const setup = new SetupState({
     load: () => Promise.resolve(OVERVIEW),
@@ -88,27 +102,39 @@ describe('updates in the window', () => {
     expect(row(/Foundry VTT/)).toHaveTextContent(/^Updates in the rows under it/);
   });
 
-  test('offers the versions in Update mode, and plans the ones chosen below the tree and the panel', async () => {
+  test('offers the versions in Update mode, each in its badge, and plans the ones chosen below the tree', async () => {
     const { user } = await setUp();
-    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Version of/ })).toBeNull();
 
     await user.click(screen.getByRole('button', { name: 'Update' }));
     expect(screen.getByRole('button', { name: 'Update' })).toHaveAttribute('aria-pressed', 'true');
-    const system = screen.getByRole('combobox', { name: 'Version of D&D 5e' });
-    expect(
-      within(system)
-        .getAllByRole('option')
-        .map(option => option.textContent.trim()),
-    ).toEqual(['5.4.0', '5.3.3 (installed)']);
+    const system = screen.getByRole('button', { name: 'Version of D&D 5e: 5.3.3' });
+    expect(system).toHaveAttribute('aria-haspopup', 'listbox');
+    expect(system.querySelector('.emma-badge.success')).toHaveTextContent('5.3.3');
+    expect(system.querySelector('.emma-badge')).toHaveAttribute('data-tooltip-html', '<b>success</b>');
+    expect(system).toHaveTextContent('Installed');
+
+    await user.click(system);
+    const list = screen.getByRole('listbox', { name: 'Versions of D&D 5e' });
+    // The installed version, shown on the button, is left out.
+    const options = within(list).getAllByRole('option');
+    expect(options.map(option => option.textContent.trim().split(/\s+/)[0])).toEqual(['5.4.0']);
+    expect(options[0]?.querySelector('.emma-badge')).toHaveClass('warning');
+    // Choosing a version does not select the row the list is on.
+    const selected = screen.getByRole('treeitem', { selected: true });
+    if (options[0] !== undefined) await user.click(options[0]);
+    expect(screen.getByRole('treeitem', { selected: true })).toBe(selected);
+    const chosen = screen.getByRole('button', { name: 'Version of D&D 5e: 5.4.0' });
+    expect(chosen.querySelector('.emma-badge.warning')).toHaveTextContent('5.4.0');
+    expect(chosen).not.toHaveTextContent('Installed');
+
     // Only a row that shows the installed version offers them: under a world, the version it last ran with shows.
     await user.click(within(row(/^Update available D&D 5e/)).getByText('D&D 5e'));
     await user.keyboard('{ArrowRight}{ArrowRight}{ArrowRight}');
     expect(row(/^Alpha/)).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getAllByRole('treeitem', { name: /^Update available D&D 5e/ })).toHaveLength(2);
-    expect(screen.getAllByRole('combobox')).toHaveLength(1);
-    expect(screen.queryByRole('region', { name: 'Update plan' })).toBeNull();
+    expect(screen.getAllByRole('button', { name: /^Version of/ })).toHaveLength(1);
 
-    await user.selectOptions(system, '5.4.0');
     const plan = screen.getByRole('region', { name: 'Update plan' });
     expect(
       within(plan)
@@ -122,31 +148,46 @@ describe('updates in the window', () => {
 
     await user.click(within(plan).getByRole('button', { name: 'Clear choices' }));
     expect(screen.queryByRole('region', { name: 'Update plan' })).toBeNull();
-    expect(system).toHaveValue('5.3.3');
+    expect(screen.getByRole('button', { name: 'Version of D&D 5e: 5.3.3' })).toBeInTheDocument();
 
-    await user.selectOptions(system, '5.4.0');
     await user.click(screen.getByRole('button', { name: 'Update' }));
-    expect(screen.queryByRole('combobox')).toBeNull();
-    expect(screen.queryByRole('region', { name: 'Update plan' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Version of/ })).toBeNull();
+  });
+
+  test('badges each version with the other packages at the versions chosen', async () => {
+    const { user } = await setUp();
+    await user.click(screen.getByRole('button', { name: 'Update' }));
+    await user.click(within(row(/Universal/)).getByText('Universal'));
+    await user.keyboard('{ArrowRight}');
+
+    await user.click(screen.getByRole('button', { name: 'Version of Library: 1.0.0' }));
+    await user.click(screen.getByRole('option', { name: /^2\.0\.0/ }));
+    await user.click(screen.getByRole('button', { name: 'Version of D&D 5e: 5.3.3' }));
+
+    const list = screen.getByRole('listbox', { name: 'Versions of D&D 5e' });
+    expect(within(list).getByRole('option').querySelector('.emma-badge')).toHaveClass('success');
   });
 
   test("leaves the tree's keys to the version list while it has the keyboard", async () => {
     const { user } = await setUp();
     await user.click(screen.getByRole('button', { name: 'Update' }));
-    const system = screen.getByRole('combobox', { name: 'Version of D&D 5e' });
+    await user.click(screen.getByRole('button', { name: 'Version of D&D 5e: 5.3.3' }));
+    const list = screen.getByRole('listbox', { name: 'Versions of D&D 5e' });
+    expect(list).toHaveFocus();
 
-    system.focus();
     await user.keyboard('{End}');
+    expect(list).toHaveFocus();
 
-    expect(system).toHaveFocus();
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('button', { name: 'Version of D&D 5e: 5.3.3' })).toHaveFocus();
   });
 
   test.each([
-    ['finds none', () => Promise.resolve({ updates: new Map(), unresolved: [] }), 'No updates found'],
+    ['finds none', () => Promise.resolve({ updates: new Map(), unresolved: [], judge: unjudged }), 'No updates found'],
     ['fails', () => Promise.reject(new Error('offline')), 'Could not look for updates'],
     [
       'finds no setup for a world',
-      () => Promise.resolve({ updates: new Map(), unresolved: ['a'] }),
+      () => Promise.resolve({ updates: new Map(), unresolved: ['a'], judge: unjudged }),
       'EMMA found no working setup for 1 recorded worlds',
     ],
   ] as const)('says so when the search %s, and offers no Update mode', async (_label, find, text) => {
@@ -260,7 +301,8 @@ describe("the panels' sizes", () => {
     expect(JSON.parse(localStorage.getItem(LAYOUT_KEY) ?? '{}')).toMatchObject({ tree: 0.15 });
 
     await user.click(screen.getByRole('button', { name: 'Update' }));
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Version of D&D 5e' }), '5.4.0');
+    await user.click(screen.getByRole('button', { name: 'Version of D&D 5e: 5.3.3' }));
+    await user.click(screen.getByRole('option', { name: /^5\.4\.0/ }));
     const plan = screen.getByRole('separator', { name: 'Resize the update plan' });
     plan.focus();
     // The plan is below its handle, so moving the handle up grows it.

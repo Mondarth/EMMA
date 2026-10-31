@@ -1,7 +1,7 @@
 /**
  * The setup kit: the code the EMMA extension on the setup screen takes from the installed EMMA module, rather than
- * carry its own copy. So far, `@mondarth/fvtt-resolver` and its release sources, which the module has anyway. The module
- * builds it as `dist/emma-setup-kit.js`, an ES module, and names it in its manifest's `flags` (see
+ * carry its own copy: `@mondarth/fvtt-resolver` and its release sources, which the module has anyway, and how the module
+ * badges a version, so that both judge versions alike. The module builds it as `dist/emma-setup-kit.js`, an ES module, and names it in its manifest's `flags` (see
  * {@link SetupKitFlag}), so that the EMMA extension can tell whether it fits before it imports anything.
  *
  * The kit's API version, `<major>.<minor>`, is what each side was built with ({@link SETUP_KIT_API}). The minor goes up
@@ -31,6 +31,7 @@ export type KitResolver = Pick<
   typeof Resolver,
   | 'CORE'
   | 'AVAILABILITY'
+  | 'check'
   | 'coreAvailability'
   | 'isNewerVersion'
   | 'isUnavailable'
@@ -55,12 +56,37 @@ export type KitSources = Pick<
   | 'sourceSet'
 >;
 
+/** A version's badge, as the EMMA module shows it: Foundry's colours, icon and explanation. */
+export interface KitBadge {
+  /** The badge's colour: `success` (verified), `neutral`, `warning` or `error`. */
+  readonly type: 'success' | 'warning' | 'neutral' | 'error';
+  /** Font Awesome classes for the badge's icon. */
+  readonly icon: string;
+  /** Foundry's explanation, as HTML for a tooltip; the tooltip manager cleans it before showing it. */
+  readonly tooltip: string;
+  /** The same explanation as plain text, for screen readers. */
+  readonly text: string;
+}
+
+/** What the kit gives of how the EMMA module badges a version. */
+export interface KitBadges {
+  /**
+   * The badge of a release with the verdict EMMA's checks give it, rather than the one Foundry would: Foundry's own
+   * `getVersionBadge`, given that verdict, so the colours and the explanation are Foundry's. Needs Foundry's client.
+   * @param checked - What checking found of the release
+   * @param setup - What checking found of every package in the same setup, to name those the release does not suit
+   * @returns The badge, or `null` if Foundry gives none
+   */
+  readonly releaseBadge: (checked: Resolver.ReleaseCheck, setup: readonly Resolver.ReleaseCheck[]) => KitBadge | null;
+}
+
 /** The kit: the default export of `dist/emma-setup-kit.js`. */
 export interface SetupKit {
   /** The kit's API version, which the EMMA extension checks again once it has imported it. */
   readonly api: string;
   readonly resolver: KitResolver;
   readonly sources: KitSources;
+  readonly badges: KitBadges;
 }
 
 /**

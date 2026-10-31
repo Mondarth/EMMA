@@ -24,6 +24,10 @@ const LIB: PackageUpdate = { key: 'module:lib', installed: '1.0.0', newest: '1.1
 const finding = (...updates: PackageUpdate[]): UpdateSearch => ({
   updates: new Map(updates.map(update => [update.key, update])),
   unresolved: [],
+  judge: (key, version, chosen) => ({
+    version,
+    badge: { type: 'success', icon: '', tooltip: '', text: `${key} ${version} with ${chosen('module:lib') ?? 'none'}` },
+  }),
 });
 
 describe('UpdateState', () => {
@@ -39,6 +43,16 @@ describe('UpdateState', () => {
     expect(updates.updateOf('module:app')).toBe(APP);
     expect(updates.updateOf('module:other')).toBeUndefined();
     expect(updates.chosenOf('module:app')).toBe('1.0.0');
+  });
+
+  test('badges a version with the other packages at the versions chosen, or none before a search', async () => {
+    const updates = new UpdateState(() => Promise.resolve(finding(APP, LIB)));
+    expect(updates.optionOf('module:app', '2.0.0')).toEqual({ version: '2.0.0', badge: null });
+    await updates.searchFor(OVERVIEW);
+
+    expect(updates.optionOf('module:app', '2.0.0').badge?.text).toBe('module:app 2.0.0 with 1.0.0');
+    updates.choose('module:lib', '1.1.0');
+    expect(updates.optionOf('module:app', '2.0.0').badge?.text).toBe('module:app 2.0.0 with 1.1.0');
   });
 
   test('keeps a failure rather than throwing it', async () => {
