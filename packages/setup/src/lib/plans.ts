@@ -11,7 +11,9 @@
  * - a world without a record keeps its game system as it is, and the Foundry build must still run it;
  * - where worlds that share a package, or Foundry VTT itself, settle on different versions, the newest is pinned, as some
  *   world needs it, and every world is found again, until they agree or one has no setup;
- * - a version chosen of a package no recorded world uses must run on the Foundry build, which it moves up if need be.
+ * - a version chosen of a package no recorded world uses has a setup of its own: it, with the game system it runs in and
+ *   the packages it requires, the plan's versions preferred and else the installed ones, so that what it needs is
+ *   brought in, and the worlds that use that brought in with it.
  *
  * The resolver is the one the setup kit gives. Its loading of releases is kept for the next completion. Its words explain
  * what a version needs, and why a set of choices cannot be completed, naming the installed packages by their titles.
@@ -29,7 +31,7 @@ import type {
 
 import type { KitResolver } from '@mondarth/emma-core/setup-kit';
 
-import { format } from './i18n';
+import { format, localize } from './i18n';
 import type { Overview } from './overview';
 import type { WorldUses } from './setups';
 import { newerIn, newestFirst, runsOn, usedBy } from './setups';
@@ -198,6 +200,7 @@ export function createPlanner(inputs: PlannerInputs): Planner {
     const uses = usedBy(resolver, world);
     return uses === undefined ? [] : [{ id: world.world.id, title: world.world.title, uses }];
   });
+  const usedByRecorded = new Set(recorded.flatMap(({ uses }) => [uses.system, ...uses.modules].map(({ key }) => key)));
   const unrecorded = overview.worlds.flatMap(({ world, record, system }) =>
     record !== undefined || system === undefined
       ? []
@@ -302,13 +305,15 @@ export function createPlanner(inputs: PlannerInputs): Planner {
    */
   async function completeAt(picks: ReadonlyMap<PackageKey, string>): Promise<Completion> {
     const pins = new Map(picks);
-    for (const world of unrecorded) {
-      const chosen = pins.get(world.system);
-      if (chosen !== undefined && !sameVersion(chosen, world.version)) {
-        return { ok: false, hold: { reason: 'unrecorded', world: { id: world.id, title: world.title } } };
-      }
-    }
+    // The packages chosen that no recorded world uses, each set up on its own.
+    const alone = [...picks.keys()].filter(key => key !== CORE && !usedByRecorded.has(key));
     for (let round = 0; round < MAX_ROUNDS; round++) {
+      for (const world of unrecorded) {
+        const chosen = pins.get(world.system);
+        if (chosen !== undefined && !sameVersion(chosen, world.version)) {
+          return { ok: false, hold: { reason: 'unrecorded', world: { id: world.id, title: world.title } } };
+        }
+      }
       const found = new Map<PackageKey, Set<string>>();
       const note = (key: PackageKey, version: string): void => {
         found.set(key, (found.get(key) ?? new Set()).add(version));
@@ -335,6 +340,25 @@ export function createPlanner(inputs: PlannerInputs): Planner {
         const hold: UpdateHold = { reason: 'unrecorded', world: { id: world.id, title: world.title } };
         if (!resolution.ok) return { ok: false, hold, explanation: explained(resolution, world.title) };
         note(CORE, resolution.setup.core);
+        note(world.system, world.version);
+      }
+      for (const key of alone) {
+        const version = pins.get(key) ?? picks.get(key) ?? '';
+        const pinned = pins.get(CORE);
+        // Preferred rather than pinned, as a pin would bring a package in that the version does not need.
+        const preferred = [...installed]
+          .filter(([other]) => other !== key && other !== CORE)
+          .map(([other, from]) => ({ package: other, version: pins.get(other) ?? from }));
+        const resolution = await setupFor({
+          require: [{ package: key }],
+          pins: [{ package: key, version }, ...(pinned === undefined ? [] : [{ package: CORE, version: pinned }])],
+          prefer: [...(pinned === undefined ? [{ package: CORE, version: core }] : []), ...preferred],
+        });
+        if (!resolution.ok) return { ok: false, explanation: explained(resolution, localize('Explain.Plan')) };
+        note(CORE, resolution.setup.core);
+        for (const release of [resolution.setup.system, ...resolution.setup.modules]) {
+          note(packageKey(release.package), release.version);
+        }
       }
 
       // Where the worlds disagree, some world needs the newest.
@@ -349,18 +373,6 @@ export function createPlanner(inputs: PlannerInputs): Planner {
       if (!settled) continue;
 
       const build = [...(found.get(CORE) ?? [])][0] ?? pins.get(CORE) ?? core;
-      // A version chosen of a package no recorded world uses must run on the build.
-      for (const [key, version] of picks) {
-        if (key === CORE || found.has(key)) continue;
-        const release = releaseOf(key, version);
-        if (release === undefined) return { ok: false };
-        if (runsOn(resolver, release, build, universe)) continue;
-        const needed = [...builds()].reverse().find(candidate => runsOn(resolver, release, candidate, universe));
-        if (needed === undefined || pins.has(CORE)) return { ok: false };
-        pins.set(CORE, needed);
-        settled = false;
-      }
-      if (!settled) continue;
 
       const versions = new Map<PackageKey, string>();
       const change = (key: PackageKey, version: string): void => {

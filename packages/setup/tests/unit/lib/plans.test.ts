@@ -198,10 +198,19 @@ describe('createPlanner', () => {
       ]),
     });
     // No build runs it, nor a version not found.
-    await expect(plans.complete(picks(['module:idle', '3.0.0']))).resolves.toEqual({ ok: false });
-    await expect(plans.complete(picks(['module:idle', '9.0.0']))).resolves.toEqual({ ok: false });
+    await expect(plans.complete(picks(['module:idle', '3.0.0']))).resolves.toEqual({
+      ok: false,
+      explanation: [
+        'Because IDLE 3.0.0 depends on Foundry VTT 15 or later and no version of Foundry VTT 15 or later is available, ' +
+          'IDLE 3.0.0 cannot be used.',
+        'So, because the plan has IDLE 3.0.0, the plan cannot keep working. (1)',
+      ],
+    });
+    await expect(plans.complete(picks(['module:idle', '9.0.0']))).resolves.toMatchObject({ ok: false });
     // Nor one the build chosen does not run.
-    await expect(plans.complete(picks(['core', '14.368'], ['module:idle', '2.0.0']))).resolves.toEqual({ ok: false });
+    await expect(plans.complete(picks(['core', '14.368'], ['module:idle', '2.0.0']))).resolves.toMatchObject({
+      ok: false,
+    });
   });
 
   test('plans the choices first, then what each needs, saying which', async () => {
@@ -264,5 +273,58 @@ describe('toldOfWorld', () => {
     expect(told.pin('D&D 5e 6.0.6')).toBe('the plan has D&D 5e 6.0.6');
     expect(told.failed).toBe('Alpha cannot keep working');
     expect(told.none).toBe(KIT.resolver.englishMessages.none);
+  });
+});
+
+describe('a version chosen of a package no recorded world runs', () => {
+  test('keeps the build found when no older one between it and the installed one works', async () => {
+    const plans = planner([['late', '1.0.0']], {}, [
+      ...DND,
+      release('module:late', '1.0.0'),
+      release('module:late', '2.0.0', { core: { minimum: '14.370', verified: '14' } }),
+    ]);
+
+    const completion = await plans.complete(picks(['module:late', '2.0.0']));
+
+    expect(completion.ok && completion.versions.get('core')).toBe('14.370');
+  });
+
+  test('takes Foundry VTT as chosen in an installation without worlds', async () => {
+    const plans = planner([], {}, DND);
+
+    await expect(plans.complete(picks(['core', '14.369']))).resolves.toEqual({
+      ok: true,
+      versions: new Map([['core', '14.369']]),
+    });
+    await expect(plans.complete(picks())).resolves.toEqual({ ok: true, versions: new Map() });
+  });
+
+  test('brings in what it requires, and the system it runs in, with what the worlds that use those need', async () => {
+    const plans = planner(
+      [
+        ['midi', '1.0.0'],
+        ['cat', '0.1.3'],
+      ],
+      { a: [['midi', '1.0.0']] },
+      [
+        ...DND,
+        ...MIDI,
+        release('module:cat', '0.1.3', { systems: { dnd5e: { minimum: '6.0.0' } } }),
+        release('module:cat', '0.1.6', {
+          systems: { dnd5e: { minimum: '6.0.0' } },
+          requires: { midi: { minimum: '2.0.0' } },
+        }),
+      ],
+    );
+
+    await expect(plans.complete(picks(['module:cat', '0.1.6']))).resolves.toEqual({
+      ok: true,
+      versions: new Map([
+        ['core', '14.369'],
+        ['system:dnd5e', '6.0.6'],
+        ['module:midi', '2.0.0'],
+        ['module:cat', '0.1.6'],
+      ]),
+    });
   });
 });
