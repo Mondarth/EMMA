@@ -433,7 +433,7 @@ describe('updates of Foundry VTT itself', () => {
     expect(alone.updates.has('core')).toBe(false);
   });
 
-  test('block a version only a newer build runs, saying which, rather than offer it', async () => {
+  test('offer a version only a newer build runs, bringing that build in', async () => {
     const found = await search(
       [['lib', '1.0.0']],
       { a: [['lib', '1.0.0']] },
@@ -447,11 +447,40 @@ describe('updates of Foundry VTT itself', () => {
       CORES,
     );
 
+    expect(found.updates.get('module:lib')).toMatchObject({ newest: '2.0.0' });
+    expect(found.blocked.has('module:lib')).toBe(false);
+    await expect(found.planner.complete(new Map([['module:lib', '2.0.0']]))).resolves.toEqual({
+      ok: true,
+      versions: new Map([
+        ['core', '14.369'],
+        ['module:lib', '2.0.0'],
+      ]),
+    });
+  });
+
+  test('block a version only a newer build runs that some world cannot take, saying which build and world', async () => {
+    const found = await search(
+      [
+        ['lib', '1.0.0'],
+        ['old', '1.0.0'],
+      ],
+      { a: [['lib', '1.0.0']], b: [['old', '1.0.0']] },
+      [
+        ...DND,
+        release('module:lib', '1.0.0'),
+        release('module:lib', '2.0.0', { core: { minimum: '14.369', verified: '14' } }),
+        release('module:old', '1.0.0', { core: { minimum: '14', verified: '14', maximum: '14.368' } }),
+      ],
+      undefined,
+      [],
+      CORES,
+    );
+
     expect(found.updates.has('module:lib')).toBe(false);
     expect(found.blocked.get('module:lib')).toEqual({
       key: 'module:lib',
       newest: '2.0.0',
-      holds: [],
+      holds: [{ reason: 'inconsistent', world: { id: 'b', title: 'b' } }],
       needsCore: '14.369',
     });
   });

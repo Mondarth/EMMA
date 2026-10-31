@@ -1,6 +1,8 @@
 /**
- * The EMMA extension's updates: what the last search found, whether Update mode is on, and the versions the user has
- * chosen in it. Reactive, with Svelte 5 runes, so the window follows any change.
+ * The EMMA extension's updates: what the last search found, whether Update mode is on, the versions the user has chosen
+ * in it, and the plan they make: those versions, with every other change they need (see `lib/plans.ts`). A version is
+ * offered only if the plan can take it, and choosing it brings in what it needs. Reactive, with Svelte 5 runes, so the
+ * window follows any change.
  */
 import type { PackageKey } from '@mondarth/fvtt-resolver';
 import { SvelteMap } from 'svelte/reactivity';
@@ -8,6 +10,8 @@ import { SvelteMap } from 'svelte/reactivity';
 import type { KitProblem } from '../foundry/setup-kit';
 import { KitUnavailable } from '../foundry/setup-kit';
 import type { Overview } from '../lib/overview';
+import type { PlanEntry } from '../lib/plans';
+import { keepChoices, withChoice } from '../lib/plans';
 import type { BlockedUpdate, PackageUpdate, UpdateSearch, VersionOption } from '../lib/updates';
 
 /**
@@ -16,11 +20,13 @@ import type { BlockedUpdate, PackageUpdate, UpdateSearch, VersionOption } from '
  */
 export type UpdateStatus = 'idle' | 'searching' | 'found' | 'failed' | 'unavailable';
 
-/** A version chosen that differs from the one installed. */
+/** A change in the plan: a version chosen, or one a version chosen needs. */
 export interface UpdateChoice {
   readonly key: PackageKey;
   readonly installed: string;
   readonly chosen: string;
+  /** The version chosen that needs it, by its package's title; none for a version chosen. */
+  readonly by?: { readonly title: string; readonly version: string };
 }
 
 /** A version a package's panel explains: one the user is looking at in its list, or else the one chosen. */
@@ -43,19 +49,29 @@ export class UpdateState {
   on = $state(false);
   /** The version the user is looking at in a package's list, while it is open. */
   preview = $state.raw<{ readonly key: PackageKey; readonly version: string } | null>(null);
+  /** The plan: the versions chosen, and what they need. */
+  plan = $state.raw<readonly PlanEntry[]>([]);
+  /** Whether a choice is being planned. */
+  planning = $state(false);
 
-  /** The versions chosen that differ from the installed ones, by package key. */
-  readonly #chosen = new SvelteMap<PackageKey, string>();
+  /** The versions chosen, by package key, in the order they were chosen. */
+  readonly #picks = new SvelteMap<PackageKey, string>();
+  /** The versions last listed for a package, badged as the plan would have them, by `<key>@<version>`. */
+  #listed = $state.raw<Readonly<Record<string, VersionOption>>>({});
   readonly #find: (overview: Overview) => Promise<UpdateSearch>;
   /** Counts the searches, so that only the latest one's answer is kept. */
   #searches = 0;
 
-  /** The versions chosen that differ from the installed ones, in the order they were chosen. */
+  /** The changes in the plan: the versions chosen, in the order they were chosen, then what they need. */
   readonly choices: readonly UpdateChoice[] = $derived(
-    [...this.#chosen].flatMap(([key, chosen]) => {
-      const update = this.updateOf(key);
-      return update === undefined ? [] : [{ key, installed: update.installed, chosen }];
-    }),
+    this.plan.map(({ key, installed, version, by }) => ({
+      key,
+      installed,
+      chosen: version,
+      ...(by !== undefined && {
+        by: { title: this.search?.planner.titleOf(by.package) ?? by.package, version: by.version },
+      }),
+    })),
   );
 
   /**
@@ -81,15 +97,21 @@ export class UpdateState {
       this.search = found;
       this.problem = null;
       this.status = 'found';
-      for (const [key, version] of this.#chosen) {
-        if (found.updates.get(key)?.versions.includes(version) !== true) this.#chosen.delete(key);
-      }
+      this.#listed = {};
+      // The choices are kept that the new search still offers, and planned again.
+      const picks = keepChoices(this.#picks, (key, version) => found.planner.candidates(key).includes(version));
+      const plan = picks.size === 0 ? [] : await found.planner.plan(picks);
+      if (search !== this.#searches) return;
+      this.#picks.clear();
+      for (const [key, version] of plan === undefined ? [] : picks) this.#picks.set(key, version);
+      this.plan = plan ?? [];
     } catch (error) {
       if (search !== this.#searches) return;
       if (error instanceof KitUnavailable) {
         this.search = null;
         this.problem = error.problem;
-        this.#chosen.clear();
+        this.#picks.clear();
+        this.plan = [];
         this.on = false;
         this.status = 'unavailable';
       } else {
@@ -117,12 +139,12 @@ export class UpdateState {
   }
 
   /**
-   * The version chosen of a package.
+   * The version of a package in the plan.
    * @param key - The package's key
-   * @returns The version chosen, or the installed one if none is
+   * @returns The version chosen, or needed, or else the installed one if it has an update
    */
   chosenOf(key: PackageKey): string | undefined {
-    return this.#chosen.get(key) ?? this.updateOf(key)?.installed;
+    return this.plan.find(entry => entry.key === key)?.version ?? this.updateOf(key)?.installed;
   }
 
   /**
@@ -155,27 +177,83 @@ export class UpdateState {
     if (update === undefined) return undefined;
     const { installed } = update;
     if (this.preview?.key === key) {
-      return { option: this.optionOf(key, this.preview.version), installed, previewing: true };
+      const { version } = this.preview;
+      const option = this.#listed[`${key}@${version}`] ?? this.optionOf(key, version);
+      return { option, installed, previewing: true };
     }
-    const chosen = this.#chosen.get(key);
+    const chosen = this.plan.find(entry => entry.key === key)?.version;
     return chosen === undefined ? undefined : { option: this.optionOf(key, chosen), installed, previewing: false };
   }
 
   /**
-   * Choose a version of a package; choosing the installed one takes the choice back.
+   * The versions chosen, with one package at a version: choosing a package's installed version takes back the choice
+   * of it, and is kept as a choice only of a package that the plan needs otherwise.
    * @param key - The package's key
-   * @param version - One of the versions its update offers
+   * @param version - The version
+   * @returns The versions chosen
    */
-  choose(key: PackageKey, version: string): void {
-    const update = this.updateOf(key);
-    if (update === undefined || !update.versions.includes(version)) return;
-    if (version === update.installed) this.#chosen.delete(key);
-    else this.#chosen.set(key, version);
+  #picksWith(key: PackageKey, version: string): ReadonlyMap<PackageKey, string> {
+    const takeBack = version === this.updateOf(key)?.installed && this.#picks.has(key);
+    return withChoice(this.#picks, key, takeBack ? null : version);
+  }
+
+  /**
+   * The versions of a package that may be chosen, with what is chosen already: those the plan can take, each badged as
+   * the plan would have it, saying what else it would change. The installed one is among them if the plan can go
+   * without it.
+   * @param key - The package's key
+   * @returns The versions, newest first
+   */
+  async optionsFor(key: PackageKey): Promise<readonly VersionOption[]> {
+    const search = this.search;
+    const installed = this.updateOf(key)?.installed;
+    if (search === null || installed === undefined) return [];
+    const { planner } = search;
+    const options: VersionOption[] = [];
+    for (const version of [...planner.candidates(key), installed]) {
+      const completion = await planner.complete(this.#picksWith(key, version));
+      if (!completion.ok) continue;
+      const option = search.judge(key, version, other => completion.versions.get(other));
+      const brings = [...completion.versions]
+        .filter(([other, to]) => other !== key && this.chosenOf(other) !== to)
+        .map(([other, to]) => ({ title: planner.titleOf(other), version: to }));
+      options.push(brings.length === 0 ? option : { ...option, brings });
+    }
+    if (search === this.search) {
+      this.#listed = Object.fromEntries(options.map(option => [`${key}@${option.version}`, option]));
+    }
+    return options;
+  }
+
+  /**
+   * Choose a version of a package, with whatever it needs; choosing the installed one takes the choice back.
+   * @param key - The package's key
+   * @param version - One of the versions {@link optionsFor} gives
+   * @returns Whether the plan could take it, and so it is chosen
+   */
+  async choose(key: PackageKey, version: string): Promise<boolean> {
+    const search = this.search;
+    const installed = this.updateOf(key)?.installed;
+    if (search === null || installed === undefined) return false;
+    if (version !== installed && !search.planner.candidates(key).includes(version)) return false;
+    const picks = this.#picksWith(key, version);
+    this.planning = true;
+    try {
+      const plan = await search.planner.plan(picks);
+      if (plan === undefined || search !== this.search) return false;
+      this.#picks.clear();
+      for (const [picked, to] of picks) this.#picks.set(picked, to);
+      this.plan = plan;
+      return true;
+    } finally {
+      this.planning = false;
+    }
   }
 
   /** Take back every choice. */
   clear(): void {
-    this.#chosen.clear();
+    this.#picks.clear();
+    this.plan = [];
   }
 
   /**
