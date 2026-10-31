@@ -182,7 +182,7 @@ without the proxy, Foundry VTT is not offered an update.
 A version that needs other packages to change with it, or a newer Foundry VTT, is still offered if they can all change
 together and every world that uses them keeps working: dnd5e 6, say, with the newer modules a world runs that need it,
 and the Foundry build those need. If there is no such set, it is not offered, and its red arrow's panel says which world
-cannot take it, or which build it needs.
+cannot take it, or which build it needs, and why, step by step, in the words of EMMA's resolver.
 
 **Update** in the footer turns Update mode on. Each row that shows a package's installed version then offers its
 versions in a list, from the newest offered down to the installed one, which is marked so. Each version is in the
@@ -190,8 +190,9 @@ colour of EMMA's badge for it, as in the EMMA module's version lists: EMMA's che
 recorded world that uses the package, with the other packages at the versions chosen. The badge is the worst of those
 worlds', and its tooltip names that world when more than one uses the package. A package no recorded world uses is
 judged by the Foundry build alone. Opening a list selects its row, and the panel beside the tree explains the version
-the keyboard or the pointer is on: its badge and Foundry's explanation, and for a package more than one recorded world
-uses, how it fares in each. Once a version is chosen, the panel keeps explaining it, under **<version> update**.
+the keyboard or the pointer is on: its badge and Foundry's explanation, what it needs as its manifest declares it (the
+Foundry builds it runs on, the packages it requires, the game systems it runs in, and those it conflicts with), and for
+a package more than one recorded world uses, how it fares in each. Once a version is chosen, the panel keeps explaining it, under **<version> update**.
 A list offers only the versions that work with what is chosen already, and the panel says what else choosing one would
 change. Choosing a version brings in whatever else it needs, from the fewest changes that work: a world's other packages
 stay as they are where they can, and Foundry VTT moves only as far as it must. Choosing a version other than the installed one opens the **Update plan** below the tree and the panel, the full width of the window, listing each package that

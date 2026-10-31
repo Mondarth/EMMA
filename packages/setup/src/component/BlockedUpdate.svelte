@@ -28,6 +28,14 @@
   {#if blocked.needsCore !== undefined}
     <p>{format('Update.NeedsCore', { core: blocked.needsCore })}</p>
   {/if}
+  {#if blocked.explanation !== undefined}
+    <p>{localize('Update.Why')}</p>
+    <ol class="emma-blocked-why">
+      {#each blocked.explanation as line, index (index)}
+        <li>{line}</li>
+      {/each}
+    </ol>
+  {/if}
   {#if blocked.holds.length > 0}
     <ul>
       {#each blocked.holds as hold (hold.world.id)}
@@ -38,6 +46,11 @@
 </section>
 
 <style>
+  .emma-blocked-why {
+    padding-left: 1.2rem;
+    list-style: none;
+  }
+
   .emma-blocked h3 i {
     color: var(--color-level-error, #e55);
   }

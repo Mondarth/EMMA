@@ -74,6 +74,12 @@
     "NoWorlds": "No world uses this game system.",
     "RanWith": "last ran with {version}"
   },
+  "Explain": {
+    "Runs": "{world} runs {package}",
+    "Needs": "{world} needs {package}",
+    "Installed": "the plan has {package}",
+    "Fails": "{world} cannot keep working"
+  },
   "Update": {
     "Mode": "Update",
     "ModeHint": "Choose newer versions of the packages that have them. EMMA offers the newest version that works in every recorded world that uses the package.",
@@ -95,6 +101,8 @@
     "Explained": "{version} update",
     "Checking": "Checking which versions work with what is chosen…",
     "NoneFit": "No other version works with what is chosen.",
+    "Needs": "It needs:",
+    "Why": "Why:",
     "Brings": "Choosing it also changes:",
     "BringsItem": "{title} to {version}",
     "NeededBy": "needed by {title} {version}",

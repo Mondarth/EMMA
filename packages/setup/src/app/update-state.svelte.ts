@@ -154,7 +154,23 @@ export class UpdateState {
    * @returns The version, with its badge; none before the search has found anything
    */
   optionOf(key: PackageKey, version: string): VersionOption {
-    return this.search?.judge(key, version, other => this.chosenOf(other)) ?? { version, badge: null };
+    const search = this.search;
+    if (search === null) return { version, badge: null };
+    return this.#withNeeds(
+      key,
+      search.judge(key, version, other => this.chosenOf(other)),
+    );
+  }
+
+  /**
+   * A version, with what it needs, as its manifest declares it.
+   * @param key - The package's key
+   * @param option - The version, badged
+   * @returns The version, with what it needs if anything
+   */
+  #withNeeds(key: PackageKey, option: VersionOption): VersionOption {
+    const needs = this.search?.planner.needsOf(key, option.version) ?? [];
+    return needs.length === 0 ? option : { ...option, needs };
   }
 
   /**
@@ -213,7 +229,10 @@ export class UpdateState {
     for (const version of [...planner.candidates(key), installed]) {
       const completion = await planner.complete(this.#picksWith(key, version));
       if (!completion.ok) continue;
-      const option = search.judge(key, version, other => completion.versions.get(other));
+      const option = this.#withNeeds(
+        key,
+        search.judge(key, version, other => completion.versions.get(other)),
+      );
       const brings = [...completion.versions]
         .filter(([other, to]) => other !== key && this.chosenOf(other) !== to)
         .map(([other, to]) => ({ title: planner.titleOf(other), version: to }));

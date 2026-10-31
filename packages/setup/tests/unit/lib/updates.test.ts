@@ -202,7 +202,7 @@ describe('the badges of the versions on offer', () => {
   ];
 
   test('judge a version in the setup of a world that uses it, with the others at the versions chosen', async () => {
-    const { judge } = await search(
+    const found = await search(
       [
         ['app', '1.0.0'],
         ['lib', '1.0.0'],
@@ -215,10 +215,11 @@ describe('the badges of the versions on offer', () => {
       },
       RELEASES,
     );
+    const { judge } = found;
 
     // As installed, the library is too old for the app's 2.0.0.
     expect(judge('module:app', '2.0.0', none).badge).toMatchObject({ type: 'error' });
-    expect(judge('module:app', '2.0.0', key => (key === 'module:lib' ? '2.0.0' : undefined))).toEqual({
+    expect(judge('module:app', '2.0.0', key => (key === 'module:lib' ? '2.0.0' : undefined))).toMatchObject({
       version: '2.0.0',
       badge: expect.objectContaining({
         type: 'success',
@@ -226,6 +227,11 @@ describe('the badges of the versions on offer', () => {
       }) as unknown,
     });
     expect(judge('system:dnd5e', '5.3.3', none).badge).toMatchObject({ type: 'success' });
+    // What the version needs, as its manifest declares it.
+    expect(found.planner.needsOf('module:app', '2.0.0')).toEqual([
+      'app 2.0.0 depends on Foundry VTT 14 or later',
+      'app 2.0.0 depends on lib 2.0.0 or later',
+    ]);
   });
 
   test('keep the worst of the worlds that use it, saying which', async () => {
@@ -313,7 +319,7 @@ describe('the updates EMMA cannot offer', () => {
     );
 
     expect(found.updates.get('module:lib')).toMatchObject({ newest: '2.0.0' });
-    expect(found.blocked.get('module:lib')).toEqual({
+    expect(found.blocked.get('module:lib')).toMatchObject({
       key: 'module:lib',
       newest: '3.0.0',
       holds: [{ reason: 'inconsistent', world: { id: 'a', title: 'a' } }],
@@ -329,7 +335,10 @@ describe('the updates EMMA cannot offer', () => {
     ]);
 
     expect(found.unresolved).toEqual(['a']);
-    expect(found.blocked.get('module:app')).toEqual({
+    expect(found.blocked.get('module:app')?.explanation).toContain(
+      'Because app 2.0.0 depends on gone and no version of gone is available, app 2.0.0 cannot be used.',
+    );
+    expect(found.blocked.get('module:app')).toMatchObject({
       key: 'module:app',
       newest: '2.0.0',
       holds: [{ reason: 'unresolved', world: { id: 'a', title: 'a' } }],
@@ -384,7 +393,7 @@ describe('updates of Foundry VTT itself', () => {
       newest: '14.369',
       versions: ['14.369', '14.368'],
     });
-    expect(found.blocked.get('core')).toEqual({
+    expect(found.blocked.get('core')).toMatchObject({
       key: 'core',
       newest: '14.370',
       holds: [{ reason: 'inconsistent', world: { id: 'a', title: 'a' } }],
@@ -477,7 +486,7 @@ describe('updates of Foundry VTT itself', () => {
     );
 
     expect(found.updates.has('module:lib')).toBe(false);
-    expect(found.blocked.get('module:lib')).toEqual({
+    expect(found.blocked.get('module:lib')).toMatchObject({
       key: 'module:lib',
       newest: '2.0.0',
       holds: [{ reason: 'inconsistent', world: { id: 'b', title: 'b' } }],

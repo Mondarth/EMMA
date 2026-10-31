@@ -132,6 +132,7 @@ describe('updates in the window', () => {
             { reason: 'inconsistent', world: { id: 'a', title: 'Alpha' } },
             { reason: 'unrecorded', world: { id: 'b', title: 'Beta' } },
           ],
+          explanation: ['Because Old runs only in D&D 5e 5, Alpha cannot keep working. (1)'],
         },
         { key: 'module:lib', newest: '3.0.0', holds: [{ reason: 'unresolved', world: { id: 'a', title: 'Alpha' } }] },
       ),
@@ -148,12 +149,13 @@ describe('updates in the window', () => {
 
     await user.click(within(system).getByText('D&D 5e'));
     const panel = screen.getByRole('region', { name: 'Not offered: 6.0.6' });
-    expect(panel).toHaveTextContent('EMMA cannot make every world that uses it consistent with this update.');
+    expect(panel).toHaveTextContent('EMMA cannot make every world that uses it consistent with this update. Why:');
     expect(
       within(panel)
         .getAllByRole('listitem')
         .map(item => item.textContent.trim()),
     ).toEqual([
+      'Because Old runs only in D&D 5e 5, Alpha cannot keep working. (1)',
       'In Alpha, the other packages it runs cannot all work with it.',
       'Beta has no EMMA record, so EMMA cannot tell whether the modules it runs would work with it.',
     ]);
@@ -310,9 +312,9 @@ describe('updates in the window', () => {
     await user.click(screen.getByRole('button', { name: 'Update' }));
 
     await openList(user, 'Version of D&D 5e: 5.3.3');
-    expect(screen.getByRole('region', { name: '5.4.0 update' })).toHaveTextContent(
-      'Choosing it also changes: Library to 2.0.0',
-    );
+    const looked = screen.getByRole('region', { name: '5.4.0 update' });
+    expect(looked).toHaveTextContent('It needs: D&D 5e 5.4.0 depends on Foundry VTT 14 or later');
+    expect(looked).toHaveTextContent('Choosing it also changes: Library to 2.0.0');
     await user.click(screen.getByRole('option', { name: /^5\.4\.0/ }));
     await vi.waitFor(() => {
       expect(screen.getByRole('region', { name: 'Update plan' })).toBeInTheDocument();
