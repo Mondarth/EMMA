@@ -9,6 +9,8 @@
     "./obscure": "./src/obscure.ts",
     "./default-catalogue": "./src/default-catalogue.ts",
     "./default-catalogue-define": "./scripts/default-catalogue-define.ts",
+    "./default-proxy": "./src/default-proxy.ts",
+    "./default-proxy-define": "./scripts/default-proxy-define.ts",
     "./files-holding": "./scripts/files-holding.ts"
   },
   "scripts": {

@@ -1,24 +1,17 @@
 /**
- * The version lookup proxy EMMA uses unless a GM sets their own: built into a release from the
- * `EMMA_DEFAULT_PROXY_URL` and `EMMA_DEFAULT_PROXY_KEY` it is built with, obscured (see `scripts/build/default-proxy.ts`).
- * Development, CI and test builds have none.
+ * The version lookup proxy EMMA uses unless a GM sets their own: built into a release, obscured (see
+ * `@mondarth/emma-core/default-proxy`). Development, CI and test builds have none.
  */
-import type { Obscured } from '@mondarth/emma-core/obscure';
-import { reveal } from '@mondarth/emma-core/obscure';
+import type { BuiltProxy, DefaultProxy } from '@mondarth/emma-core/default-proxy';
+import { revealProxy } from '@mondarth/emma-core/default-proxy';
 
-/** The default proxy: its URL template, containing `{url}`, and the API key it asks for. */
-export interface DefaultProxy {
-  readonly url: string;
-  readonly key: string;
-}
+export type { DefaultProxy };
 
 /**
  * The default proxy this build has.
  * @param built - What the build put in, obscured; this build's own unless given
  * @returns The proxy, or `null` for a build without one
  */
-export function defaultProxy(
-  built: { readonly url: Obscured; readonly key: Obscured } | null = __EMMA_DEFAULT_PROXY__,
-): DefaultProxy | null {
-  return built === null ? null : { url: reveal(built.url), key: reveal(built.key) };
+export function defaultProxy(built: BuiltProxy = __EMMA_DEFAULT_PROXY__): DefaultProxy | null {
+  return revealProxy(built);
 }
