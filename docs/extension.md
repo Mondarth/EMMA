@@ -112,7 +112,7 @@ Foundry VTT
 ```
 
 - **The root**, Foundry VTT and its version: a summary of the worlds (how many, by game system, and how their records
-  compare with what is installed) and of the modules (how many, and how many a recorded world runs).
+  compare with what is installed) and of the modules (how many, and how many are active in a recorded world).
 - **Game systems**: each installed system, with its version marked **Installed**, and the worlds that use it; then any
   system a world uses that is not installed, marked **Not installed**. Only one version of a system is installed at a
   time. Each world shows how its record compares with what is installed now:
@@ -133,13 +133,13 @@ A game system's panel gives the version installed, how many modules are for it, 
 the version it last ran with; under a world, also the version that world last ran with.
 
 So a module may show in many places. Its panel is the same wherever it is selected: the version installed, the game
-systems it is for, the modules it requires and those that require it, and the recorded worlds that run it; under a
+systems it is for, the modules it requires and those that require it, and the recorded worlds it is active in; under a
 world, also the version that world last ran with.
 
 A world's record lists the modules it ran with last time. If a module it runs has been updated since, and the new
-version requires a module the world did not run, **Run by** still lists the world, with a note that it will need that
+version requires a module the world did not run, **Active in** still lists the world, with a note that it will need that
 module when next run, and which updated modules require it. The world's panel lists the modules it will need, under
-**Will need when next run**, and the root's summary counts them as run by a recorded world, saying how many only will
+**Will need when next run**, and the root's summary counts them as active in a recorded world, saying how many only will
 be.
 
 Every row with rows under it opens and closes, from its triangle or from the keyboard: the arrow keys move up and down,

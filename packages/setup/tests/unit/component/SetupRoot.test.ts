@@ -116,8 +116,8 @@ describe('SetupRoot', () => {
     expect(within(worlds).getByText('D&D 5e: 3')).toBeInTheDocument();
     expect(within(worlds).getByText(/has not been opened with EMMA 0\.9/)).toBeInTheDocument();
     const modules = screen.getByRole('region', { name: 'Modules' });
-    expect(within(modules).getByText('Run by a recorded world').nextElementSibling).toHaveTextContent('1');
-    expect(within(modules).getByText('Run by no recorded world').nextElementSibling).toHaveTextContent('1');
+    expect(within(modules).getByText('Active in a recorded world').nextElementSibling).toHaveTextContent('1');
+    expect(within(modules).getByText('Active in no recorded world').nextElementSibling).toHaveTextContent('1');
   });
 
   test('lets Foundry manage packages again, and back', async () => {
@@ -175,7 +175,7 @@ describe('SetupRoot', () => {
     expect(screen.getByText('Game system').nextElementSibling).toHaveTextContent('pf2e');
   });
 
-  test('shows a module a world runs, and the worlds that run it', async () => {
+  test('shows a module a world runs, and the worlds it is active in', async () => {
     const { user } = await setUp();
     await toggle(user, /^D&D 5e/);
     await user.click(screen.getByRole('treeitem', { name: /Alpha/ }));
@@ -187,7 +187,7 @@ describe('SetupRoot', () => {
     expect(screen.getByText('In Alpha')).toBeInTheDocument();
     expect(screen.getByText('Installed', { selector: 'dt' }).nextElementSibling).toHaveTextContent('1.1.0');
     expect(screen.getByText('Last ran with').nextElementSibling).toHaveTextContent('1.0.0');
-    expect(items('Run by')).toEqual(['Alpha', 'Delta']);
+    expect(items('Active in')).toEqual(['Alpha', 'Delta']);
     expect(items('Required by')).toEqual(['Idle']);
 
     await user.click(screen.getByRole('treeitem', { name: /Gone/ }));
@@ -206,7 +206,7 @@ describe('SetupRoot', () => {
     expect(screen.queryByText(/^In /)).toBeNull();
     expect(screen.getByText('Game systems', { selector: 'dt' }).nextElementSibling).toHaveTextContent('D&D 5e');
     expect(items('Requires')).toEqual(['Library']);
-    expect(screen.getByText('No recorded world runs this module.')).toBeInTheDocument();
+    expect(screen.getByText('Not active in any recorded world.')).toBeInTheDocument();
   });
 
   test('shows a game system: its version, its worlds, and how many modules are for it', async () => {

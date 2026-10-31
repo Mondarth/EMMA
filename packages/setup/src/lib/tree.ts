@@ -212,7 +212,7 @@ function runNode(entry: WorldModule, world: string, modules: ReadonlyMap<string,
 
 /**
  * An installed module, as the modules' groups show it, with the modules it requires.
- * @param use - The module, with the worlds that run it
+ * @param use - The module, with the worlds it is active in
  * @param modules - The installed modules, by ID
  * @returns Its node
  */

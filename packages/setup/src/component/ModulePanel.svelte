@@ -1,7 +1,7 @@
 <!--
   The panel for a module, wherever the tree shows it: the version installed, and the version a world last ran with if it
   shows under one; the game systems it is for; the modules it requires, and those that require it; and the recorded
-  worlds that run it, or will need it when next run as what they run now requires it.
+  worlds it is active in, or that will need it when next run as what they run now requires it.
 -->
 <script lang="ts">
   import type { ModuleDetail, RelatedPackage } from '../lib/details';
@@ -75,13 +75,13 @@
   </section>
 {/if}
 
-<section aria-labelledby="emma-setup-run-by">
-  <h3 id="emma-setup-run-by">{localize('ModuleInfo.RunBy')}</h3>
-  {#if detail.runBy.length === 0}
-    <p class="emma-note">{localize('ModuleInfo.RunByNone')}</p>
+<section aria-labelledby="emma-setup-active-in">
+  <h3 id="emma-setup-active-in">{localize('ModuleInfo.ActiveIn')}</h3>
+  {#if detail.activeIn.length === 0}
+    <p class="emma-note">{localize('ModuleInfo.ActiveInNone')}</p>
   {:else}
     <ul>
-      {#each detail.runBy as world, index (index)}
+      {#each detail.activeIn as world, index (index)}
         <li>
           {world.title}
           {#if world.needed !== undefined}

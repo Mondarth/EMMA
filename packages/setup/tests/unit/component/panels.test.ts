@@ -75,8 +75,8 @@ describe('ModulePanel', () => {
   test('says a world will need a module when next run, as a module it runs now requires it', () => {
     render(ModulePanel, { detail: moduleDetail(NEME, 'lib-wrapper') });
 
-    const runBy = screen.getByRole('region', { name: 'Run by' });
-    expect(within(runBy).getByRole('listitem')).toHaveTextContent(
+    const activeIn = screen.getByRole('region', { name: 'Active in' });
+    expect(within(activeIn).getByRole('listitem')).toHaveTextContent(
       'Neme Will need it when next run: it is now required by EMMA, updated since the world last ran.',
     );
   });
@@ -110,10 +110,10 @@ describe('WorldPanel, when a module a world will need is not installed', () => {
 });
 
 describe('RootPanel', () => {
-  test('counts the modules a world will need when next run as run by it, and says so', () => {
+  test('counts the modules a world will need when next run as active in it, and says so', () => {
     render(RootPanel, { overview: NEME, guardOn: true, onGuardChange: () => undefined });
 
-    expect(screen.getByText('Run by a recorded world').nextElementSibling).toHaveTextContent('2');
+    expect(screen.getByText('Active in a recorded world').nextElementSibling).toHaveTextContent('2');
     expect(screen.getByText(/^Of those, 1 only when next run/)).toBeInTheDocument();
   });
 });

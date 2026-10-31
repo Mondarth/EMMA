@@ -83,7 +83,7 @@ describe('moduleDetail', () => {
         { id: 'lib', title: 'Library', installed: true },
       ],
       requiredBy: [],
-      runBy: [{ title: 'Alpha' }],
+      activeIn: [{ title: 'Alpha' }],
     });
   });
 
@@ -98,7 +98,7 @@ describe('moduleDetail', () => {
       systems: [],
       requires: [],
       requiredBy: ['App'],
-      runBy: [{ title: 'Alpha', needed: ['App'] }],
+      activeIn: [{ title: 'Alpha', needed: ['App'] }],
     });
   });
 
@@ -128,9 +128,9 @@ describe('moduleDetail', () => {
       ]),
     );
 
-    expect(moduleDetail(overview, 'lib').runBy).toEqual([{ title: 'Alpha', needed: ['App', 'Tool'] }]);
-    expect(moduleDetail(overview, 'base').runBy).toEqual([{ title: 'Alpha', needed: ['App', 'Tool'] }]);
-    expect(moduleDetail(overview, 'tool').runBy).toEqual([{ title: 'Alpha' }]);
+    expect(moduleDetail(overview, 'lib').activeIn).toEqual([{ title: 'Alpha', needed: ['App', 'Tool'] }]);
+    expect(moduleDetail(overview, 'base').activeIn).toEqual([{ title: 'Alpha', needed: ['App', 'Tool'] }]);
+    expect(moduleDetail(overview, 'tool').activeIn).toEqual([{ title: 'Alpha' }]);
   });
 
   test('gives a module that is not installed, under a world that does not run it', () => {
