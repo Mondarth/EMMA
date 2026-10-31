@@ -129,6 +129,7 @@
             <RootPanel
               {overview}
               guardOn={setup.guardOn}
+              blocked={updates.blockedOf('core')}
               onGuardChange={(on: boolean) => {
                 setup.setGuardOn(on);
               }} />

@@ -45,6 +45,7 @@ export type KitResolver = Pick<
 export type KitSources = Pick<
   typeof Sources,
   | 'catalogueSource'
+  | 'foundryCoreReleases'
   | 'foundryIndexSource'
   | 'githubSource'
   | 'gitlabSource'

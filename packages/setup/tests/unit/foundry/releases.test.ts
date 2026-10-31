@@ -25,8 +25,8 @@ function moduleManifest(id: string, version: string, manifest?: string): Package
 }
 
 /**
- * A fetch that answers some URLs with JSON, and every other with a 404.
- * @param answers - The JSON for each URL
+ * A fetch that answers some URLs with JSON, or with text for a string, and every other with a 404.
+ * @param answers - The JSON or the text for each URL
  * @returns The fetch, a spy
  */
 function answering(answers: Readonly<Record<string, unknown>>) {
@@ -36,7 +36,9 @@ function answering(answers: Readonly<Record<string, unknown>>) {
     return Promise.resolve(
       body === undefined
         ? new Response('Not found', { status: 404 })
-        : new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } }),
+        : typeof body === 'string'
+          ? new Response(body, { headers: { 'Content-Type': 'text/html' } })
+          : new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } }),
     );
   });
 }
@@ -187,5 +189,63 @@ describe('lookUpReleases', () => {
       expect(headers.get('X-API-Key')).toBe('proxy-k3y');
       expect(headers.has('X-EMMA-Version')).toBe(false);
     }
+  });
+
+  describe("Foundry's builds", () => {
+    const PROXY = { url: 'https://proxy.example.test/?url={url}', key: 'proxy-k3y' };
+    const proxied = (target: string) => `https://proxy.example.test/?url=${encodeURIComponent(target)}`;
+    const NOTES = 'https://foundryvtt.com/releases/';
+    const PAGE = [
+      '<a href="/releases/14.370">Release 14.370</a><span class="release-tag testing">',
+      '<a href="/releases/14.369">Release 14.369</a><span class="release-tag stable">',
+      '<a href="/releases/14.368">Release 14.368</a><span class="release-tag stable">',
+    ].join('');
+
+    test('are read from the release notes through the proxy, keeping a release only a newer one runs', async () => {
+      const url = 'https://packages.example.test/lib/module.json';
+      const send = answering({
+        [proxied(NOTES)]: PAGE,
+        [proxied(url)]: { id: 'lib', title: 'Lib', version: '2.0.0', compatibility: { minimum: '14.369' } },
+      });
+
+      // A kit of its own, so that no other test's builds are kept for it.
+      const found = await lookUpReleases(
+        { core: CORE, manifests: [moduleManifest('lib', '1.0.0', url)] },
+        { kit: { ...KIT }, catalogue: null, proxy: PROXY, fetch: send },
+      );
+
+      expect(found.universe.core).toEqual([
+        CORE,
+        { version: '14.370', generation: 14, channel: 'testing' },
+        { version: '14.369', generation: 14, channel: 'stable' },
+      ]);
+      expect(found.universe.releases.map(({ version }) => version).sort()).toEqual(['1.0.0', '2.0.0']);
+      expect(found.unreached).not.toContain('core');
+    });
+
+    test('are the installed one alone when the release notes cannot be read, saying so', async () => {
+      const found = await lookUpReleases(
+        { core: CORE, manifests: [moduleManifest('lib', '1.0.0')] },
+        { kit: { ...KIT }, catalogue: null, proxy: PROXY, fetch: answering({}) },
+      );
+
+      expect(found.universe.core).toEqual([CORE]);
+      expect(found.unreached).toContain('core');
+    });
+
+    test('are not asked for without the proxy', async () => {
+      const send = answering({});
+
+      const found = await lookUpReleases(
+        { core: CORE, manifests: [moduleManifest('lib', '1.0.0')] },
+        { kit: { ...KIT }, catalogue: null, proxy: null, fetch: send },
+      );
+
+      expect(found.universe.core).toEqual([CORE]);
+      expect(found.unreached).toEqual([]);
+      expect(send.mock.calls.map(([input]) => String(input instanceof Request ? input.url : input))).not.toContain(
+        NOTES,
+      );
+    });
   });
 });

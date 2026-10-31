@@ -25,6 +25,9 @@
     {format('Update.BlockedTitle', { version: blocked.newest })}
   </h3>
   <p>{localize('Update.BlockedWhy')}</p>
+  {#if blocked.needsCore !== undefined}
+    <p>{format('Update.NeedsCore', { core: blocked.needsCore })}</p>
+  {/if}
   {#if blocked.holds.length > 0}
     <ul>
       {#each blocked.holds as hold (hold.world.id)}
