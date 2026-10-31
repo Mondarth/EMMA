@@ -7,8 +7,13 @@
  *   and the modules its record says are active, each free to move up to a newer version, never down;
  * - a package that recorded worlds use is offered the newest version all of them accept: the lowest of their bests. A
  *   world no setup is found for accepts only what is installed;
- * - a package no recorded world uses, such as a module active in no recorded world, or a system only worlds without a
- *   record use, is offered its newest version that the installed Foundry build can run.
+ * - a game system a world without a record uses is offered no update, as EMMA cannot tell whether that world's modules
+ *   would work with one;
+ * - a package no recorded world uses, such as a module active in no recorded world, is offered its newest version that
+ *   the installed Foundry build can run.
+ *
+ * A newer version the installed Foundry build can run that is not offered is blocked, with the worlds that hold it back
+ * and why, so that EMMA can say so rather than leave it unseen.
  *
  * The Foundry build itself is kept. Each version offered is badged as the EMMA module's hypothetical mode badges it, with
  * EMMA's verdict rather than Foundry's: in each recorded world that uses the package, with the other packages at the
@@ -57,10 +62,33 @@ export type VersionJudge = (
   chosen: (key: PackageKey) => string | undefined,
 ) => VersionOption;
 
+/**
+ * Why a world holds a package's update back:
+ * - `unrecorded`: the world has no record, so which modules it runs, and whether they would work, is not known;
+ * - `unresolved`: no working setup was found for the world at all, so nothing it uses moves;
+ * - `inconsistent`: the world's other packages cannot all work with the newer version.
+ */
+export interface UpdateHold {
+  readonly reason: 'unrecorded' | 'unresolved' | 'inconsistent';
+  /** The world's ID and title. */
+  readonly world: { readonly id: string; readonly title: string };
+}
+
+/** An installed package with a newer version that EMMA cannot offer. */
+export interface BlockedUpdate {
+  readonly key: PackageKey;
+  /** The newest version the installed Foundry build can run, which is not offered. */
+  readonly newest: string;
+  /** The worlds that hold it back, in the order of the installation's worlds. */
+  readonly holds: readonly UpdateHold[];
+}
+
 /** What the search found. */
 export interface UpdateSearch {
   /** The installed packages with newer versions on offer, by package key. */
   readonly updates: ReadonlyMap<PackageKey, PackageUpdate>;
+  /** The installed packages with a newer version EMMA cannot offer, by package key; some may have an update too. */
+  readonly blocked: ReadonlyMap<PackageKey, BlockedUpdate>;
   /** The IDs of the recorded worlds no setup was found for, so that nothing they use is offered an update. */
   readonly unresolved: readonly string[];
   /** Badges the versions on offer. */
@@ -114,15 +142,23 @@ export async function findUpdates(inputs: UpdateInputs): Promise<UpdateSearch> {
   });
   let universe = atLeastInstalled(inputs.universe);
 
-  // The best version each world that uses a package accepts.
-  const accepted = new Map<PackageKey, string[]>();
-  const accept = (key: PackageKey, version: string): void => {
-    accepted.set(key, [...(accepted.get(key) ?? []), version]);
+  // The best version each world that uses a package accepts, and why, should it be less than the newest.
+  const accepted = new Map<PackageKey, { version: string; hold: UpdateHold }[]>();
+  const accept = (key: PackageKey, version: string, hold: UpdateHold): void => {
+    accepted.set(key, [...(accepted.get(key) ?? []), { version, hold }]);
   };
   const unresolved: string[] = [];
   for (const world of overview.worlds) {
+    const { id, title } = world.world;
     const uses = usedBy(resolver, world);
-    if (uses === undefined) continue;
+    if (uses === undefined) {
+      // Without a record, only the world's system is known: it stays as it is.
+      if (world.record === undefined && world.system !== undefined) {
+        const key = packageKey({ type: 'system', id: world.system.id });
+        accept(key, world.system.version, { reason: 'unrecorded', world: { id, title } });
+      }
+      continue;
+    }
     const used = [uses.system, ...uses.modules].map(({ key }) => key);
     const rounds = await resolveInRounds(
       universe,
@@ -135,17 +171,18 @@ export async function findUpdates(inputs: UpdateInputs): Promise<UpdateSearch> {
     const { resolution } = rounds;
     if (resolution.ok) {
       for (const release of [resolution.setup.system, ...resolution.setup.modules])
-        accept(packageKey(release.package), release.version);
+        accept(packageKey(release.package), release.version, { reason: 'inconsistent', world: { id, title } });
     } else {
-      unresolved.push(world.world.id);
+      unresolved.push(id);
       for (const key of used) {
         const version = installed.get(key);
-        if (version !== undefined) accept(key, version);
+        if (version !== undefined) accept(key, version, { reason: 'unresolved', world: { id, title } });
       }
     }
   }
 
   const updates = new Map<PackageKey, PackageUpdate>();
+  const blocked = new Map<PackageKey, BlockedUpdate>();
   for (const [key, version] of installed) {
     const choosable = newestFirst(
       resolver,
@@ -154,7 +191,18 @@ export async function findUpdates(inputs: UpdateInputs): Promise<UpdateSearch> {
       ),
     );
     const bests = accepted.get(key);
-    const newest = bests === undefined ? choosable[0] : oldest(resolver, bests);
+    const newest =
+      bests === undefined
+        ? choosable[0]
+        : oldest(
+            resolver,
+            bests.map(({ version: best }) => best),
+          );
+    const available = choosable[0];
+    if (available !== undefined && newer(available, newest ?? version) && newer(available, version)) {
+      const holds = (bests ?? []).filter(({ version: best }) => newer(available, best)).map(({ hold }) => hold);
+      blocked.set(key, { key, newest: available, holds });
+    }
     if (newest === undefined || !newer(newest, version)) continue;
     // The newest offered is a release the resolver chose, which may be one not offered on its own, such as an unlisted
     // version when no listed one fits.
@@ -162,7 +210,7 @@ export async function findUpdates(inputs: UpdateInputs): Promise<UpdateSearch> {
     const versions = unique(resolver, [newest, ...between, version]);
     updates.set(key, { key, installed: version, newest, versions });
   }
-  return { updates, unresolved, judge: judgeIn({ resolver, badges, overview, universe }) };
+  return { updates, blocked, unresolved, judge: judgeIn({ resolver, badges, overview, universe }) };
 }
 
 /** A package a world uses, at its installed version. */

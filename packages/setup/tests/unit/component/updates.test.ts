@@ -8,7 +8,7 @@ import { LAYOUT_KEY } from '../../../src/foundry/preferences';
 import type { KitProblem } from '../../../src/foundry/setup-kit';
 import { EXTENSION_RELEASES, KitUnavailable } from '../../../src/foundry/setup-kit';
 import { buildOverview } from '../../../src/lib/overview';
-import type { PackageUpdate, UpdateSearch, VersionJudge } from '../../../src/lib/updates';
+import type { BlockedUpdate, PackageUpdate, UpdateSearch, VersionJudge } from '../../../src/lib/updates';
 import { installation, installedModule, noInstall, record, recorded, unjudged } from '../../mocks/fixtures';
 
 const OVERVIEW = buildOverview(
@@ -23,6 +23,21 @@ const UPDATES: readonly PackageUpdate[] = [
   { key: 'system:dnd5e', installed: '5.3.3', newest: '5.4.0', versions: ['5.4.0', '5.3.3'] },
   { key: 'module:lib', installed: '1.0.0', newest: '2.0.0', versions: ['2.0.0', '1.5.0', '1.0.0'] },
 ];
+
+/**
+ * A search that finds {@link UPDATES}, and some updates EMMA cannot offer.
+ * @param blocks - The updates EMMA cannot offer
+ * @returns The search
+ */
+const findingBlocked =
+  (...blocks: BlockedUpdate[]): (() => Promise<UpdateSearch>) =>
+  () =>
+    Promise.resolve({
+      updates: new Map(UPDATES.map(update => [update.key, update])),
+      blocked: new Map(blocks.map(block => [block.key, block])),
+      unresolved: [],
+      judge,
+    });
 
 /**
  * Badge D&D 5e 5.4.0 as unverified while the library is at 1.0.0, and verified once 2.0.0 is chosen; every other
@@ -43,10 +58,7 @@ const judge: VersionJudge = (key, version, chosen) => {
  * @param find - The search for updates; finding {@link UPDATES} by default
  * @returns The state and a user to act with
  */
-async function setUp(
-  find: () => Promise<UpdateSearch> = () =>
-    Promise.resolve({ updates: new Map(UPDATES.map(update => [update.key, update])), unresolved: [], judge }),
-) {
+async function setUp(find: () => Promise<UpdateSearch> = findingBlocked()) {
   const setup = new SetupState({
     load: () => Promise.resolve(OVERVIEW),
     guardOn: true,
@@ -82,6 +94,56 @@ describe('updates in the window', () => {
     expect(row(/^Update available D&D 5e 5\.3\.3/)).toBeInTheDocument();
     expect(row(/^Foundry VTT/)).not.toHaveTextContent('Update available');
     expect(screen.getByRole('button', { name: 'Update' })).toBeEnabled();
+  });
+
+  test('marks a package with a newer version EMMA cannot offer in red, and says why in its panel', async () => {
+    const { user } = await setUp(
+      findingBlocked(
+        {
+          key: 'system:dnd5e',
+          newest: '6.0.6',
+          holds: [
+            { reason: 'inconsistent', world: { id: 'a', title: 'Alpha' } },
+            { reason: 'unrecorded', world: { id: 'b', title: 'Beta' } },
+          ],
+        },
+        { key: 'module:lib', newest: '3.0.0', holds: [{ reason: 'unresolved', world: { id: 'a', title: 'Alpha' } }] },
+      ),
+    );
+
+    // Beside the blue arrow of the update that is offered.
+    const system = row(/D&D 5e 5\.3\.3/);
+    expect(system).toHaveTextContent(/^Update available Newer version EMMA cannot offer D&D 5e/);
+    expect(system.querySelector('.emma-tree-blocked .fa-circle-up')).not.toHaveClass('emma-tree-hidden');
+    // Fainter on a collapsed row that hides one, and on none that does not.
+    expect(row(/Universal/)).toHaveTextContent(/Newer versions EMMA cannot offer in the rows under it/);
+    expect(row(/^Update available Newer version EMMA cannot offer D&D 5e/)).toBeInTheDocument();
+    expect(row(/^Game systems/)).not.toHaveTextContent('cannot offer');
+
+    await user.click(within(system).getByText('D&D 5e'));
+    const panel = screen.getByRole('region', { name: 'Not offered: 6.0.6' });
+    expect(panel).toHaveTextContent('EMMA cannot make every world that uses it consistent with this update.');
+    expect(
+      within(panel)
+        .getAllByRole('listitem')
+        .map(item => item.textContent.trim()),
+    ).toEqual([
+      'In Alpha, the other packages it runs cannot all work with it.',
+      'Beta has no EMMA record, so EMMA cannot tell whether the modules it runs would work with it.',
+    ]);
+
+    await user.click(within(row(/Universal/)).getByText('Universal'));
+    await user.keyboard('{ArrowRight}');
+    await user.click(within(row(/Library 1\.0\.0/)).getByText('Library'));
+    expect(screen.getByRole('region', { name: 'Not offered: 3.0.0' })).toHaveTextContent(
+      'EMMA found no working setup for Alpha, so nothing it uses is updated.',
+    );
+  });
+
+  test('gives no column to red arrows while nothing is blocked', async () => {
+    await setUp();
+
+    expect(document.querySelector('.emma-tree-blocked')).toBeNull();
   });
 
   test('marks a collapsed row that hides an update, until it is expanded', async () => {
@@ -183,11 +245,15 @@ describe('updates in the window', () => {
   });
 
   test.each([
-    ['finds none', () => Promise.resolve({ updates: new Map(), unresolved: [], judge: unjudged }), 'No updates found'],
+    [
+      'finds none',
+      () => Promise.resolve({ updates: new Map(), blocked: new Map(), unresolved: [], judge: unjudged }),
+      'No updates found',
+    ],
     ['fails', () => Promise.reject(new Error('offline')), 'Could not look for updates'],
     [
       'finds no setup for a world',
-      () => Promise.resolve({ updates: new Map(), unresolved: ['a'], judge: unjudged }),
+      () => Promise.resolve({ updates: new Map(), blocked: new Map(), unresolved: ['a'], judge: unjudged }),
       'EMMA found no working setup for 1 recorded worlds',
     ],
   ] as const)('says so when the search %s, and offers no Update mode', async (_label, find, text) => {

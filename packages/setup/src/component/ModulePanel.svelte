@@ -5,13 +5,18 @@
 -->
 <script lang="ts">
   import type { ModuleDetail, RelatedPackage } from '../lib/details';
+  import type { BlockedUpdate as Blocked } from '../lib/updates';
+
+  import BlockedUpdate from './BlockedUpdate.svelte';
   import { format, localize } from '../lib/i18n';
 
   interface Props {
     detail: ModuleDetail;
+    /** A newer version EMMA cannot offer, if there is one. */
+    blocked?: Blocked | undefined;
   }
 
-  let { detail }: Props = $props();
+  let { detail, blocked }: Props = $props();
 </script>
 
 {#snippet packages(list: readonly RelatedPackage[])}
@@ -60,6 +65,10 @@
     </dd>
   {/if}
 </dl>
+
+{#if blocked !== undefined}
+  <BlockedUpdate {blocked} />
+{/if}
 
 {#if detail.requires.length > 0}
   <section aria-labelledby="emma-setup-requires">

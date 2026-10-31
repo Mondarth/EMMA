@@ -4,13 +4,18 @@
 -->
 <script lang="ts">
   import type { SystemDetail } from '../lib/details';
+  import type { BlockedUpdate as Blocked } from '../lib/updates';
+
+  import BlockedUpdate from './BlockedUpdate.svelte';
   import { format, localize } from '../lib/i18n';
 
   interface Props {
     detail: SystemDetail;
+    /** A newer version EMMA cannot offer, if there is one. */
+    blocked?: Blocked | undefined;
   }
 
-  let { detail }: Props = $props();
+  let { detail, blocked }: Props = $props();
 </script>
 
 <h2>{detail.title}</h2>
@@ -30,6 +35,10 @@
   <dt>{localize('System.Modules')}</dt>
   <dd>{detail.modules}</dd>
 </dl>
+
+{#if blocked !== undefined}
+  <BlockedUpdate {blocked} />
+{/if}
 
 <section aria-labelledby="emma-setup-system-worlds">
   <h3 id="emma-setup-system-worlds">{localize('System.Worlds')}</h3>

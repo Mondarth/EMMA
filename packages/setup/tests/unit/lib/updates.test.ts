@@ -15,6 +15,7 @@ const CORE = { version: '14.368', generation: 14, channel: 'stable' } as const;
  * @param records - The worlds' records, by world ID; each world uses D&D 5e
  * @param releases - Every release found, the installed ones among them
  * @param systems - The installed systems, each as `[id, version]`
+ * @param unrecorded - The IDs of worlds without a record, which use D&D 5e too
  * @returns What the search found
  */
 async function search(
@@ -22,10 +23,11 @@ async function search(
   records: Readonly<Record<string, readonly (readonly [string, string])[]>>,
   releases: readonly Release[],
   systems: readonly (readonly [string, string])[] = [['dnd5e', '5.3.3']],
+  unrecorded: readonly string[] = [],
 ) {
   const overview = buildOverview(
     installation({
-      worlds: [...Object.keys(records), 'unrecorded'].map(id => ({ id, title: id, system: 'dnd5e' })),
+      worlds: [...Object.keys(records), ...unrecorded].map(id => ({ id, title: id, system: 'dnd5e' })),
       modules: modules.map(([id, version]) => installedModule(id, id, version)),
       systems: systems.map(([id, version]) => ({ id, title: id, version })),
     }),
@@ -271,5 +273,74 @@ describe('the badges of the versions on offer', () => {
 
     expect(judge('module:lone', '4.0.0', none)).toEqual({ version: '4.0.0', badge: null });
     expect(judge('module:lone', '5.0.0', none)).toEqual({ version: '5.0.0', unlisted: true, badge: null });
+  });
+});
+
+describe('the updates EMMA cannot offer', () => {
+  test('hold back the system of a world without a record, saying so', async () => {
+    const found = await search([], {}, [...DND, release('system:dnd5e', '6.0.6')], undefined, ['unrecorded']);
+
+    expect(found.updates.has('system:dnd5e')).toBe(false);
+    expect(found.blocked.get('system:dnd5e')).toEqual({
+      key: 'system:dnd5e',
+      newest: '6.0.6',
+      holds: [{ reason: 'unrecorded', world: { id: 'unrecorded', title: 'unrecorded' } }],
+    });
+  });
+
+  test('name the worlds whose other packages cannot work with the newest, beside the update they can take', async () => {
+    const found = await search(
+      [
+        ['app', '1.0.0'],
+        ['lib', '1.0.0'],
+      ],
+      {
+        a: [
+          ['app', '1.0.0'],
+          ['lib', '1.0.0'],
+        ],
+        b: [['lib', '1.0.0']],
+      },
+      [
+        ...DND,
+        release('module:app', '1.0.0', { requires: { lib: { maximum: '2.0.0' } } }),
+        release('module:lib', '1.0.0'),
+        release('module:lib', '2.0.0'),
+        release('module:lib', '3.0.0'),
+      ],
+    );
+
+    expect(found.updates.get('module:lib')).toMatchObject({ newest: '2.0.0' });
+    expect(found.blocked.get('module:lib')).toEqual({
+      key: 'module:lib',
+      newest: '3.0.0',
+      holds: [{ reason: 'inconsistent', world: { id: 'a', title: 'a' } }],
+    });
+    expect(found.blocked.has('module:app')).toBe(false);
+  });
+
+  test('hold back everything a world uses that no setup is found for', async () => {
+    const found = await search([['app', '1.0.0']], { a: [['app', '1.0.0']] }, [
+      ...DND,
+      release('module:app', '1.0.0', { requires: { gone: {} } }),
+      release('module:app', '2.0.0', { requires: { gone: {} } }),
+    ]);
+
+    expect(found.unresolved).toEqual(['a']);
+    expect(found.blocked.get('module:app')).toEqual({
+      key: 'module:app',
+      newest: '2.0.0',
+      holds: [{ reason: 'unresolved', world: { id: 'a', title: 'a' } }],
+    });
+  });
+
+  test('leave out a version the Foundry build cannot run', async () => {
+    const found = await search([['lib', '1.0.0']], {}, [
+      ...DND,
+      release('module:lib', '1.0.0'),
+      release('module:lib', '2.0.0', { core: { minimum: '15' } }),
+    ]);
+
+    expect(found.blocked.size).toBe(0);
   });
 });

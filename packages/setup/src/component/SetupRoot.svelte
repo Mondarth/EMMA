@@ -114,9 +114,13 @@
           }} />
         <section class="emma-setup-panel">
           {#if selection.kind === 'module'}
-            <ModulePanel detail={moduleDetail(overview, selection.module, selection.world)} />
+            <ModulePanel
+              detail={moduleDetail(overview, selection.module, selection.world)}
+              blocked={updates.blockedOf(`module:${selection.module}`)} />
           {:else if selection.kind === 'system'}
-            <SystemPanel detail={systemDetail(overview, selection.system, selection.world)} />
+            <SystemPanel
+              detail={systemDetail(overview, selection.system, selection.world)}
+              blocked={updates.blockedOf(`system:${selection.system}`)} />
           {:else if selection.kind === 'systems' || selection.kind === 'modules' || selection.kind === 'group'}
             <GroupPanel detail={groupDetail(overview, selection)} />
           {:else if world !== undefined}

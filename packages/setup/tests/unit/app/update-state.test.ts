@@ -23,6 +23,7 @@ const LIB: PackageUpdate = { key: 'module:lib', installed: '1.0.0', newest: '1.1
  */
 const finding = (...updates: PackageUpdate[]): UpdateSearch => ({
   updates: new Map(updates.map(update => [update.key, update])),
+  blocked: new Map(),
   unresolved: [],
   judge: (key, version, chosen) => ({
     version,
@@ -43,6 +44,18 @@ describe('UpdateState', () => {
     expect(updates.updateOf('module:app')).toBe(APP);
     expect(updates.updateOf('module:other')).toBeUndefined();
     expect(updates.chosenOf('module:app')).toBe('1.0.0');
+  });
+
+  test('gives the newer version of a package EMMA cannot offer, once found', async () => {
+    const blocked = { key: 'module:app', newest: '3.0.0', holds: [] };
+    const updates = new UpdateState(() =>
+      Promise.resolve({ ...finding(APP), blocked: new Map([['module:app', blocked]]) }),
+    );
+    expect(updates.blockedOf('module:app')).toBeUndefined();
+    await updates.searchFor(OVERVIEW);
+
+    expect(updates.blockedOf('module:app')).toBe(blocked);
+    expect(updates.blockedOf('module:lib')).toBeUndefined();
   });
 
   test('badges a version with the other packages at the versions chosen, or none before a search', async () => {

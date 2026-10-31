@@ -148,8 +148,10 @@ and open and close a row, and Home and End go to the first and last row. **Read 
 ### Updates
 
 As soon as EMMA has read the installation, it looks for newer versions of the installed game systems and modules. The
-footer says how many it found. Each package with an update has an upward arrow in a circle to the left of its rows in
-the tree, and a closed row with such a package anywhere under it has a fainter one, so no update is hidden.
+footer says how many it found. Each package with an update has a blue upward arrow in a circle to the left of its rows
+in the tree. A package with a newer version that EMMA cannot offer has a red one beside it, and its panel says which
+version, and which worlds hold it back and why: EMMA cannot make every world that uses the package consistent with it. A
+closed row with either kind of package anywhere under it has the same arrow, fainter, so nothing is hidden.
 
 Looking for updates needs the EMMA module installed, as the extension uses the module's own code to work them out.
 Without it, the footer says so and offers **Install the EMMA module**, which installs it from its published manifest,
@@ -165,6 +167,8 @@ package for all of them:
   the modules its record says are active, each moved up to the newest version that works with the others. A package is
   offered the newest version that every world using it can take. If EMMA finds no working setup for a world, nothing
   that world uses is offered an update, and the footer says so.
+- The game system of a world without a record is not offered an update, as EMMA cannot tell whether the modules the
+  world runs would work with one.
 - A package no world with a record uses, such as a module that no world has active, is offered its newest version that
   the installed Foundry VTT can run.
 
