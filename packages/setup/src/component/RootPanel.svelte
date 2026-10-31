@@ -5,14 +5,19 @@
 <script lang="ts">
   import { format, localize } from '../lib/i18n';
   import type { Overview, WorldStatus } from '../lib/overview';
+  import type { BlockedUpdate as Blocked } from '../lib/updates';
+
+  import BlockedUpdate from './BlockedUpdate.svelte';
 
   interface Props {
     overview: Overview;
     guardOn: boolean;
     onGuardChange: (on: boolean) => void;
+    /** A newer Foundry build EMMA cannot offer, if there is one. */
+    blocked?: Blocked | undefined;
   }
 
-  let { overview, guardOn, onGuardChange }: Props = $props();
+  let { overview, guardOn, onGuardChange, blocked }: Props = $props();
 
   const STATUSES: readonly WorldStatus[] = ['matches', 'differs', 'unrecorded', 'unreadable'];
   const worlds = $derived(overview.summary.worlds);
@@ -20,6 +25,10 @@
 </script>
 
 <h2>{format('Root.Heading', { version: overview.core })}</h2>
+
+{#if blocked !== undefined}
+  <BlockedUpdate {blocked} />
+{/if}
 
 <section aria-labelledby="emma-setup-worlds">
   <h3 id="emma-setup-worlds">{localize('Root.Worlds')}</h3>

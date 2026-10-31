@@ -172,7 +172,15 @@ package for all of them:
 - A package no world with a record uses, such as a module that no world has active, is offered its newest version that
   the installed Foundry VTT can run.
 
-Foundry VTT itself is not offered an update yet.
+Foundry VTT itself is offered an update too, on the tree's root row: the newest stable build that every world with a
+record can take, with its game system and modules free to move up as well. A world without a record holds Foundry VTT
+to the builds its installed game system runs on, and a world for which EMMA finds no working setup holds it where it
+is. Its versions are coloured by how well the recorded worlds' packages fit each build, naming those that will not work
+with it and those not verified with it. Foundry's builds come from its release notes, which only EMMA's proxy can read;
+without the proxy, Foundry VTT is not offered an update.
+
+The other packages are offered versions for the installed Foundry VTT. A newer version that needs a newer build is not
+offered yet: its red arrow's panel says which build it needs.
 
 **Update** in the footer turns Update mode on. Each row that shows a package's installed version then offers its
 versions in a list, from the newest offered down to the installed one, which is marked so. Each version is in the

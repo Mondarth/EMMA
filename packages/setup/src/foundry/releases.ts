@@ -6,7 +6,8 @@
  * The setup screen is an ordinary page, so the browser reads only what sends CORS headers: the catalogue, GitHub's and
  * GitLab's release lists, and manifests on sites that send them. Foundry's package listing and the manifests attached
  * to GitHub releases send none, so they are asked only through EMMA's proxy, when the EMMA extension is built with it;
- * without it, they are not asked at all. The Foundry build is kept as it is either way.
+ * without it, they are not asked at all. So are Foundry's own builds, from its release notes: without the proxy, only
+ * the installed build is known, so it is kept as it is.
  *
  * The resolver and its sources are the ones the setup kit gives, from the installed EMMA module (see
  * `@mondarth/emma-core/setup-kit`).
@@ -31,7 +32,10 @@ export interface ReleaseLookup {
    * universe, so they stay as they are.
    */
   readonly unavailable: ReadonlySet<PackageKey>;
-  /** The packages whose releases could not all be listed, so may have newer versions not found. */
+  /**
+   * The packages whose releases could not all be listed, so may have newer versions not found; `core` among them when
+   * Foundry's builds could not be read.
+   */
   readonly unreached: readonly PackageKey[];
 }
 
@@ -141,9 +145,10 @@ function coreRelease(build: CoreBuild): CoreRelease {
  */
 export async function lookUpReleases(installed: InstalledManifests, options: LookupOptions): Promise<ReleaseLookup> {
   const { kit, catalogue, proxy, clientVersion = null } = options;
-  const { packageKey, sameVersion } = kit.resolver;
+  const { CORE, packageKey, sameVersion } = kit.resolver;
   const {
     catalogueSource,
+    foundryCoreReleases,
     foundryIndexSource,
     githubSource,
     gitlabSource,
@@ -175,6 +180,13 @@ export async function lookUpReleases(installed: InstalledManifests, options: Loo
     type: manifest.type,
   }));
   const local = localSource(manifests);
+  // Foundry's builds, from its release notes, which only the proxy can read. They come first, as the sources leave out
+  // a release that needs a newer build than any they are given.
+  const cores = proxy === null ? undefined : await foundryCoreReleases(http);
+  const builds = [
+    core,
+    ...(cores?.ok === true ? cores.value.filter(({ version }) => !sameVersion(version, core.version)) : []),
+  ];
   const set = sourceSet({
     // The installed releases come first, as they are loaded with everything their manifests declare, and then the
     // manifests the packages declare, which give their newest versions loaded too. Foundry's package listing, through
@@ -188,8 +200,7 @@ export async function lookUpReleases(installed: InstalledManifests, options: Loo
       gitlabSource(http),
     ],
     http,
-    // Only the installed build, which is kept as it is.
-    core: [core],
+    core: builds,
     manifests: Object.fromEntries(
       installed.manifests.flatMap(({ type, id, manifest }) =>
         manifest === undefined ? [] : [[packageKey({ type, id }), [manifest]]],
@@ -228,9 +239,9 @@ export async function lookUpReleases(installed: InstalledManifests, options: Loo
       .map(gap => gap.package),
   );
   return {
-    universe: { core: [core], releases: [...releases, ...missing.flat()] },
+    universe: { core: builds, releases: [...releases, ...missing.flat()] },
     load: needs => set.load(needs),
     unavailable,
-    unreached: refs.map(packageKey).filter(key => failed.has(key)),
+    unreached: [...refs.map(packageKey).filter(key => failed.has(key)), ...(cores?.ok === false ? [CORE] : [])],
   };
 }

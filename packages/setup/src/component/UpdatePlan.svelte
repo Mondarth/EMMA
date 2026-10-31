@@ -19,6 +19,7 @@
   /** The installed packages' titles, by package key. */
   const titles = $derived(
     new Map<string, string>([
+      ['core', localize('Tree.Root')],
       ...overview.systems.map(({ id, title }) => [`system:${id}`, title] as const),
       ...overview.modules.map(({ module: { id, title } }) => [`module:${id}`, title] as const),
     ]),

@@ -20,6 +20,7 @@ import {
 } from '@mondarth/fvtt-resolver';
 import {
   catalogueSource,
+  foundryCoreReleases,
   foundryIndexSource,
   githubSource,
   gitlabSource,
@@ -50,6 +51,7 @@ const kit: SetupKit = {
   },
   sources: {
     catalogueSource,
+    foundryCoreReleases,
     foundryIndexSource,
     githubSource,
     gitlabSource,
