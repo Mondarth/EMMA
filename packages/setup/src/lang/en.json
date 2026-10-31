@@ -89,7 +89,14 @@
     "Package": "Package",
     "Installed": "Installed",
     "Chosen": "Chosen",
-    "Clear": "Clear choices"
+    "Clear": "Clear choices",
+    "NeedsModule": "Finding updates needs the EMMA module installed.",
+    "ModuleTooOld": "Finding updates needs a newer EMMA module than {version}.",
+    "ExtensionTooOld": "EMMA module {version} needs a newer browser extension to find updates.",
+    "InstallModule": "Install the EMMA module",
+    "UpdateModule": "Update the EMMA module",
+    "Installing": "Installing the EMMA module…",
+    "UpdateExtension": "Get the newest browser extension"
   },
   "Layout": {
     "Tree": "Resize the installation tree",

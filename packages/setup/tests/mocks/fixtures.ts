@@ -112,3 +112,11 @@ export function release(ref: `${'module' | 'system'}:${string}`, version: string
 export function noUpdates(): Promise<UpdateSearch> {
   return Promise.resolve({ updates: new Map(), unresolved: [] });
 }
+
+/**
+ * An install of the EMMA module that does nothing.
+ * @returns Once done
+ */
+export function noInstall(): Promise<void> {
+  return Promise.resolve();
+}

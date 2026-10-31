@@ -82,6 +82,8 @@ export interface PackageData {
   relationships?: { systems?: unknown; requires?: unknown } | undefined;
   /** The manifest URL it declares. */
   manifest?: string | undefined;
+  /** Its manifest's flags, as the EMMA module names its setup kit in. */
+  flags?: unknown;
 }
 
 /** A world as `game.worlds` holds it. */
@@ -116,7 +118,10 @@ export function installSetupMocks(options: SetupMockOptions = {}) {
   // A package as Foundry has it: its data, and its manifest as plain data from `toObject()`.
   const packaged = (pkg: PackageData) => {
     const data = { title: pkg.id, version: '1.0.0', ...pkg };
-    return { ...data, toObject: () => ({ id: data.id, title: data.title, version: data.version }) };
+    return {
+      ...data,
+      toObject: () => ({ id: data.id, title: data.title, version: data.version, flags: data.flags ?? {} }),
+    };
   };
   // The user data folder, by path, as the server serves it.
   const files = new Map<string, string>(

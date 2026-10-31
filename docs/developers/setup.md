@@ -90,6 +90,10 @@ The server reads `hostname` and `ports.base` from `.pdt/mount.json`, as the modu
 { "hostname": "my-dev-box", "ports": { "base": 30000, "dev": 31002, "setup": 31003 } }
 ```
 
+Finding updates needs the EMMA module installed in that Foundry, with its setup kit built: `pnpm build` in
+`packages/module` builds both into `dist/`, which the development Foundry loads (see {doc}`architecture`). Rebuild it
+after changing `src/setup-kit.ts` and read the installation again.
+
 A development build has no package catalogue or version lookup proxy, so it finds fewer updates (see
 {doc}`default-proxy`). To try the EMMA extension with them, start the server with `EMMA_DEFAULT_CATALOGUE_URL` and
 `EMMA_DEFAULT_CATALOGUE_KEY` set to a catalogue of your own, and `EMMA_DEFAULT_PROXY_URL` and `EMMA_DEFAULT_PROXY_KEY`

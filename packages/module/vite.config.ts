@@ -133,7 +133,7 @@ export default defineConfig(({ mode }) => {
       unstubGlobals: true,
       coverage: {
         provider: 'v8',
-        include: ['index.ts', 'module/**/*.ts', 'component/**/*.svelte'],
+        include: ['index.ts', 'setup-kit.ts', 'module/**/*.ts', 'component/**/*.svelte'],
         reportsDirectory: '../coverage',
         reporter: ['text', 'html', 'lcov'],
         // Ratchet these upward as coverage improves; never lower them to make a change pass. Branches stay below 100

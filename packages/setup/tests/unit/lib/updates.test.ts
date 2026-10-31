@@ -5,6 +5,7 @@ import type { RecordState } from '../../../src/foundry/records';
 import { buildOverview } from '../../../src/lib/overview';
 import { findUpdates } from '../../../src/lib/updates';
 import { installation, installedModule, record, recorded, release } from '../../mocks/fixtures';
+import { KIT } from '../../mocks/kit';
 
 const CORE = { version: '14.368', generation: 14, channel: 'stable' } as const;
 
@@ -35,7 +36,12 @@ async function search(
       ]),
     ),
   );
-  return findUpdates({ overview, universe: { core: [CORE], releases }, load: () => Promise.resolve([]) });
+  return findUpdates({
+    resolver: KIT.resolver,
+    overview,
+    universe: { core: [CORE], releases },
+    load: () => Promise.resolve([]),
+  });
 }
 
 const DND = [release('system:dnd5e', '5.3.3')];
@@ -160,6 +166,7 @@ describe('findUpdates', () => {
     );
 
     const found = await findUpdates({
+      resolver: KIT.resolver,
       overview,
       universe: { core: [CORE], releases: [...DND, release('module:app', '1.0.0'), listed] },
       load,

@@ -17,5 +17,5 @@
     // The scripts run under Node, which strips the types and needs the `.ts` extensions in their imports.
     "allowImportingTsExtensions": true
   },
-  "include": ["vite.config.ts", "scripts/**/*.ts"]
+  "include": ["vite.config.ts", "vite.kit.config.ts", "scripts/**/*.ts"]
 }

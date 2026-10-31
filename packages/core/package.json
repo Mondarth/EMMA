@@ -11,11 +11,15 @@
     "./default-catalogue-define": "./scripts/default-catalogue-define.ts",
     "./default-proxy": "./src/default-proxy.ts",
     "./default-proxy-define": "./scripts/default-proxy-define.ts",
-    "./files-holding": "./scripts/files-holding.ts"
+    "./files-holding": "./scripts/files-holding.ts",
+    "./setup-kit": "./src/setup-kit.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
     "test": "vitest --run",
     "test:coverage": "vitest --run --coverage"
+  },
+  "dependencies": {
+    "@mondarth/fvtt-resolver": "0.8.0"
   }
 }

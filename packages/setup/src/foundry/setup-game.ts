@@ -87,6 +87,19 @@ export interface SetupGame {
   readonly systems: Iterable<unknown>;
   /** Sends a request to the server; every package installation and update goes through it. */
   post: (request: SetupRequest, options?: object) => Promise<unknown>;
+  /** Installs a package, or updates it, through {@link post}; the package installed, once it is. */
+  installPackage?: (options: PackageInstall) => Promise<unknown>;
+  /** Asks the user whether to install a package's missing dependencies, and installs those chosen. */
+  installDependencies?: (pkg: unknown) => Promise<unknown>;
+}
+
+/** What `game.installPackage` is given. */
+export interface PackageInstall {
+  readonly type: 'module' | 'system';
+  readonly id: string;
+  readonly manifest: string;
+  /** Whether Foundry asks the user about the package's dependencies after it, by itself. */
+  readonly dependencies?: boolean;
 }
 
 /**

@@ -5,9 +5,11 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { SetupState } from '../../../src/app/setup-state.svelte';
 import SetupRoot from '../../../src/component/SetupRoot.svelte';
 import { LAYOUT_KEY } from '../../../src/foundry/preferences';
+import type { KitProblem } from '../../../src/foundry/setup-kit';
+import { EXTENSION_RELEASES, KitUnavailable } from '../../../src/foundry/setup-kit';
 import { buildOverview } from '../../../src/lib/overview';
 import type { PackageUpdate, UpdateSearch } from '../../../src/lib/updates';
-import { installation, installedModule, record, recorded } from '../../mocks/fixtures';
+import { installation, installedModule, noInstall, record, recorded } from '../../mocks/fixtures';
 
 const OVERVIEW = buildOverview(
   installation({
@@ -36,6 +38,7 @@ async function setUp(
     guardOn: true,
     onGuardChange: vi.fn(),
     findUpdates: find,
+    installModule: noInstall,
   });
   await setup.refresh();
   render(SetupRoot, { setup });
@@ -141,11 +144,83 @@ describe('updates in the window', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: () => new Promise(() => undefined),
+      installModule: noInstall,
     });
     await setup.refresh();
     render(SetupRoot, { setup });
 
     expect(screen.getByRole('status')).toHaveTextContent('Looking for updates…');
+  });
+});
+
+describe('without an EMMA module whose setup kit fits', () => {
+  /**
+   * Render EMMA's window content, with the search for updates unable to be made.
+   * @param problem - Why
+   * @param installModule - The install of the EMMA module
+   * @returns The state and a user to act with
+   */
+  async function unavailable(problem: KitProblem, installModule: () => Promise<void> = noInstall) {
+    const setup = new SetupState({
+      load: () => Promise.resolve(OVERVIEW),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: () => Promise.reject(new KitUnavailable(problem)),
+      installModule,
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    await vi.waitFor(() => {
+      expect(setup.updates.status).toBe('unavailable');
+    });
+    return { setup, user: userEvent.setup() };
+  }
+
+  test('offers to install the module, which it does, and then searches again', async () => {
+    let finish = (): void => undefined;
+    const installModule = vi.fn(
+      () =>
+        new Promise<void>(resolve => {
+          finish = resolve;
+        }),
+    );
+    const { user } = await unavailable({ reason: 'missing' }, installModule);
+    expect(screen.getByRole('status')).toHaveTextContent('Finding updates needs the EMMA module installed.');
+    expect(screen.getByRole('button', { name: 'Update' })).toBeDisabled();
+    // The tree works without it.
+    expect(screen.getByRole('tree')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Install the EMMA module' }));
+
+    expect(installModule).toHaveBeenCalledOnce();
+    expect(screen.getByRole('status')).toHaveTextContent('Installing the EMMA module…');
+    expect(screen.getByRole('button', { name: 'Install the EMMA module' })).toBeDisabled();
+    finish();
+    await vi.waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Install the EMMA module' })).toBeEnabled();
+    });
+  });
+
+  test('offers to update a module too old', async () => {
+    const installModule = vi.fn(noInstall);
+    const { user } = await unavailable({ reason: 'module-too-old', version: '0.9.0' }, installModule);
+
+    expect(screen.getByRole('status')).toHaveTextContent('Finding updates needs a newer EMMA module than 0.9.0.');
+    await user.click(screen.getByRole('button', { name: 'Update the EMMA module' }));
+    expect(installModule).toHaveBeenCalledOnce();
+  });
+
+  test('points to the newest browser extension when the module is newer than it', async () => {
+    await unavailable({ reason: 'extension-too-old', version: '2.0.0' });
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'EMMA module 2.0.0 needs a newer browser extension to find updates.',
+    );
+    expect(screen.getByRole('link', { name: 'Get the newest browser extension' })).toHaveAttribute(
+      'href',
+      EXTENSION_RELEASES,
+    );
+    expect(screen.queryByRole('button', { name: /EMMA module/ })).not.toBeInTheDocument();
   });
 });
 

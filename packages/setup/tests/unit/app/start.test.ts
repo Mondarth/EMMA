@@ -6,7 +6,17 @@ import { closeEmmaSetup } from '../../../src/app/emma-setup-app';
 import { startEmmaSetup, waitForSetup } from '../../../src/app/start';
 import { GUARDED_CLASS } from '../../../src/foundry/guard';
 import { GUARD_KEY } from '../../../src/foundry/preferences';
+import { SETUP_KIT_API } from '@mondarth/emma-core/setup-kit';
+
+import type * as SetupKitModule from '../../../src/foundry/setup-kit';
 import { installSetupMocks } from '../../mocks/foundry';
+import { KIT } from '../../mocks/kit';
+
+// The browser imports the kit from the server, which the tests have none of.
+vi.mock('../../../src/foundry/setup-kit', async importOriginal => ({
+  ...(await importOriginal<typeof SetupKitModule>()),
+  loadKit: vi.fn(() => Promise.resolve(KIT)),
+}));
 
 const STARTED = Symbol.for('mondarth-emma.setup');
 
@@ -100,5 +110,34 @@ describe('startEmmaSetup', () => {
 
     installSetupMocks();
     await expect(startEmmaSetup()).resolves.toBe(true);
+  });
+
+  test('finds updates with the kit of the installed EMMA module', async () => {
+    installSetupMocks({
+      modules: [{ id: 'mondarth-emma', flags: { setupKit: { api: SETUP_KIT_API, path: 'dist/emma-setup-kit.js' } } }],
+    });
+    const menu = showMenu();
+    await startEmmaSetup();
+
+    menu.querySelector('button')?.click();
+
+    expect(await screen.findByText('No updates found')).toBeInTheDocument();
+  });
+
+  test('installs the EMMA module from its prompt, through the guard', async () => {
+    const { game, post, ui } = installSetupMocks();
+    const installPackage = vi.fn(() => game.post({ action: 'installPackage', id: 'mondarth-emma' }));
+    Object.assign(game, { installPackage });
+    const menu = showMenu();
+    await startEmmaSetup();
+    menu.querySelector('button')?.click();
+
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Install the EMMA module' }));
+
+    await vi.waitFor(() => {
+      expect(installPackage).toHaveBeenCalledOnce();
+    });
+    expect(post).toHaveBeenCalledOnce();
+    expect(ui.notifications.info).not.toHaveBeenCalled();
   });
 });
