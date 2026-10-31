@@ -47,7 +47,7 @@
       {#if selection.kind === 'module'}
         <ModulePanel detail={moduleDetail(overview, selection.module, selection.world)} />
       {:else if selection.kind === 'system'}
-        <SystemPanel detail={systemDetail(overview, selection.system)} />
+        <SystemPanel detail={systemDetail(overview, selection.system, selection.world)} />
       {:else if selection.kind === 'systems' || selection.kind === 'modules' || selection.kind === 'group'}
         <GroupPanel detail={groupDetail(overview, selection)} />
       {:else if world !== undefined}

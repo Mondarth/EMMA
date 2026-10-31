@@ -49,7 +49,7 @@ describe('InstallationTree', () => {
     setUp();
 
     expect(screen.getByRole('tree', { name: 'Installation' })).toBeInTheDocument();
-    expect(rows()).toEqual(['Foundry VTT 14.368', 'Game systems', 'D&D 5e 5.3.3', 'Modules', 'Universal']);
+    expect(rows()).toEqual(['Foundry VTT 14.368', 'Game systems', 'D&D 5e 5.3.3 Installed', 'Modules', 'Universal']);
     expect(row(/Foundry/)).toHaveAttribute('aria-expanded', 'true');
     expect(row(/Foundry/)).toHaveAttribute('aria-level', '1');
     expect(row(/D&D 5e/)).toHaveAttribute('aria-expanded', 'false');
@@ -71,7 +71,12 @@ describe('InstallationTree', () => {
 
     await user.keyboard('{ArrowRight}{ArrowRight}');
     expect(rows()).toContain('Library 1.0.0 Installed');
+    // The world's game system comes first, then its modules.
     await user.keyboard('{ArrowRight}');
+    expect(onSelect).toHaveBeenLastCalledWith(
+      expect.objectContaining({ selection: { kind: 'system', system: 'dnd5e', world: 'a' } }),
+    );
+    await user.keyboard('{ArrowDown}');
     expect(row(/Library/)).toHaveFocus();
     expect(row(/Library/)).toHaveAttribute('aria-selected', 'true');
 

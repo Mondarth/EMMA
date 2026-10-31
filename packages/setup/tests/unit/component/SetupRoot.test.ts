@@ -185,13 +185,13 @@ describe('SetupRoot', () => {
 
     expect(screen.getByRole('heading', { name: 'Library' })).toBeInTheDocument();
     expect(screen.getByText('In Alpha')).toBeInTheDocument();
-    expect(screen.getByText('Installed').nextElementSibling).toHaveTextContent('1.1.0');
+    expect(screen.getByText('Installed', { selector: 'dt' }).nextElementSibling).toHaveTextContent('1.1.0');
     expect(screen.getByText('Last ran with').nextElementSibling).toHaveTextContent('1.0.0');
     expect(items('Run by')).toEqual(['Alpha', 'Delta']);
     expect(items('Required by')).toEqual(['Idle']);
 
     await user.click(screen.getByRole('treeitem', { name: /Gone/ }));
-    expect(screen.getByText('Installed').nextElementSibling).toHaveTextContent('Not installed');
+    expect(screen.getByText('Installed', { selector: 'dt' }).nextElementSibling).toHaveTextContent('Not installed');
     expect(screen.queryByText('Game systems', { selector: 'dt' })).toBeNull();
   });
 
@@ -214,12 +214,16 @@ describe('SetupRoot', () => {
 
     await user.click(row(/^D&D 5e/));
     expect(screen.getByRole('heading', { name: 'D&D 5e' })).toBeInTheDocument();
-    expect(screen.getByText('Installed').nextElementSibling).toHaveTextContent('5.3.3');
+    expect(screen.getByText('Installed', { selector: 'dt' }).nextElementSibling).toHaveTextContent('5.3.3');
     expect(screen.getByText('Modules for it').nextElementSibling).toHaveTextContent('1');
-    expect(items('Worlds')).toEqual(['Alpha', 'Gamma', 'Delta']);
+    expect(items('Worlds')).toEqual([
+      'Alpha last ran with 5.3.3 Installed',
+      'Gamma',
+      'Delta last ran with 5.3.3 Installed',
+    ]);
 
     await user.click(row(/^pf2e/));
-    expect(screen.getByText('Installed').nextElementSibling).toHaveTextContent('Not installed');
+    expect(screen.getByText('Installed', { selector: 'dt' }).nextElementSibling).toHaveTextContent('Not installed');
   });
 
   test('shows what the groups hold', async () => {

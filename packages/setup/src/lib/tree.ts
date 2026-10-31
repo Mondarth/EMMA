@@ -2,7 +2,8 @@
  * The installation tree, as the EMMA extension's standard mode shows it:
  *
  * - the root, Foundry VTT itself;
- *   - the game systems, each with the worlds that use it, and under each world the modules its record says it runs;
+ *   - the game systems, each with the worlds that use it, and under each world the system and the modules its record
+ *     says it last ran with;
  *   - the modules, grouped by the game systems they are for: first those for any system, then those for each system.
  *
  * A module that requires others has them under it, wherever it shows, so a module may show many times. Every row with
@@ -17,7 +18,8 @@ export type TreeSelection =
   | { readonly kind: 'root' }
   /** The game systems, and the worlds under them. */
   | { readonly kind: 'systems' }
-  | { readonly kind: 'system'; readonly system: string }
+  /** A game system, shown under a world if `world` is given. */
+  | { readonly kind: 'system'; readonly system: string; readonly world?: string }
   | { readonly kind: 'world'; readonly world: string }
   /** The modules, grouped by game system. */
   | { readonly kind: 'modules' }
@@ -123,6 +125,8 @@ function rootNode(overview: Overview): TreeNode {
   };
 }
 
+/** The status of a package that is installed. */
+const INSTALLED: RowStatus = { kind: 'package', value: 'same' };
 /** The status of a package that is not installed. */
 const MISSING: RowStatus = { kind: 'package', value: 'missing' };
 
@@ -138,7 +142,7 @@ function systemNodes(overview: Overview, modules: ReadonlyMap<string, ModuleUse>
     .filter(id => !installed.has(id))
     .map(id => ({ id, title: id }))
     .sort(byTitle);
-  const node = (id: string, title: string, shown: { version: string } | { status: RowStatus }): TreeNode => ({
+  const node = (id: string, title: string, shown: { version?: string; status: RowStatus }): TreeNode => ({
     segment: `system:${id}`,
     selection: { kind: 'system', system: id },
     title,
@@ -146,25 +150,45 @@ function systemNodes(overview: Overview, modules: ReadonlyMap<string, ModuleUse>
     children: () => overview.worlds.filter(({ world }) => world.system === id).map(world => worldNode(world, modules)),
   });
   return [
-    ...overview.systems.map(({ id, title, version }) => node(id, title, { version })),
+    ...overview.systems.map(({ id, title, version }) => node(id, title, { version, status: INSTALLED })),
     ...missing.map(({ id }) => node(id, id, { status: MISSING })),
   ];
 }
 
 /**
- * A world, with the modules its record says it runs.
+ * A world, with the game system and the modules its record says it last ran with.
  * @param overview - The world
  * @param modules - The installed modules, by ID
  * @returns Its node
  */
 function worldNode(overview: WorldOverview, modules: ReadonlyMap<string, ModuleUse>): TreeNode {
-  const { world, status } = overview;
+  const { world, status, ranSystem } = overview;
   return {
     segment: `world:${world.id}`,
     selection: { kind: 'world', world: world.id },
     title: world.title,
     status: { kind: 'world', value: status },
-    children: () => overview.modules.map(entry => runNode(entry, world.id, modules)),
+    children: () => [
+      ...(ranSystem === undefined ? [] : [ranSystemNode(ranSystem, world.id)]),
+      ...overview.modules.map(entry => runNode(entry, world.id, modules)),
+    ],
+  };
+}
+
+/**
+ * The game system a world last ran with, at the version its record gives.
+ * @param entry - The system, as the world's record gives it
+ * @param world - The world's ID
+ * @returns Its node
+ */
+function ranSystemNode(entry: WorldModule, world: string): TreeNode {
+  return {
+    segment: `system:${entry.id}`,
+    selection: { kind: 'system', system: entry.id, world },
+    title: entry.title,
+    version: entry.recorded,
+    status: { kind: 'package', value: entry.status },
+    children: () => [],
   };
 }
 

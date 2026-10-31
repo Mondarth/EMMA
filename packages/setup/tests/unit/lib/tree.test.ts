@@ -94,16 +94,28 @@ describe('visibleRows', () => {
     expect(rows[7]).toMatchObject({ title: 'pf2e', status: { kind: 'package', value: 'missing' } });
   });
 
-  test('shows the worlds under their game system, and under each world the modules its record says it runs', () => {
+  test('shows the worlds under their game system, and under each world what its record says it last ran with', () => {
     const rows = visibleRows(OVERVIEW, new Set([ROOT, SYSTEMS, DND, WORLD_A]));
 
-    expect(keys(rows).slice(2, 7)).toEqual([
+    expect(keys(rows).slice(2, 8)).toEqual([
       DND,
       WORLD_A,
+      `${WORLD_A}/system:dnd5e`,
       `${WORLD_A}/module:app`,
       `${WORLD_A}/module:old`,
       `${DND}/world:b`,
     ]);
+    expect(rowOf(rows, DND)).toMatchObject({ version: '5.3.3', status: { kind: 'package', value: 'same' } });
+    expect(rowOf(rows, `${WORLD_A}/system:dnd5e`)).toEqual({
+      key: `${WORLD_A}/system:dnd5e`,
+      level: 5,
+      selection: { kind: 'system', system: 'dnd5e', world: 'a' },
+      title: 'D&D 5e',
+      version: '5.3.3',
+      status: { kind: 'package', value: 'same' },
+      expandable: false,
+      parent: WORLD_A,
+    });
     expect(rowOf(rows, WORLD_A)).toMatchObject({ status: { kind: 'world', value: 'differs' }, expandable: true });
     expect(rowOf(rows, `${DND}/world:b`)).toMatchObject({
       status: { kind: 'world', value: 'unrecorded' },

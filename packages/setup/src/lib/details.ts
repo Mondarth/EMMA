@@ -16,13 +16,27 @@ export interface RelatedPackage {
   readonly installed: boolean;
 }
 
-/** A game system, with the worlds that use it and the modules for it. */
+/** A world that uses a game system. */
+export interface SystemWorld {
+  readonly title: string;
+  /** The system as the world's record says it last ran with it, if it has a record. */
+  readonly ran?: WorldModule;
+}
+
+/** A game system, wherever the tree shows it, with the worlds that use it and the modules for it. */
 export interface SystemDetail {
   readonly id: string;
+  readonly title: string;
   /** The system, if it is installed. */
   readonly installed?: InstalledPackage;
-  /** The titles of the worlds that use it. */
-  readonly worlds: readonly string[];
+  /** The world it shows under, if it shows under one. */
+  readonly world?: WorldOverview;
+  /** The system as that world's record gives it. */
+  readonly ran?: WorldModule;
+  /** How it compares with what the world last ran with, or with what is installed. */
+  readonly status: ModuleStatus;
+  /** The worlds that use it. */
+  readonly worlds: readonly SystemWorld[];
   /** How many installed modules are for it. */
   readonly modules: number;
 }
@@ -63,14 +77,23 @@ export interface ModuleDetail {
  * A game system's detail.
  * @param overview - The installation
  * @param id - The system's ID
+ * @param worldId - The world it shows under, if any
  * @returns The detail
  */
-export function systemDetail(overview: Overview, id: string): SystemDetail {
+export function systemDetail(overview: Overview, id: string, worldId?: string): SystemDetail {
   const installed = overview.systems.find(system => system.id === id);
+  const world = overview.worlds.find(({ world: { id: candidate } }) => candidate === worldId);
+  const ran = world?.ranSystem?.id === id ? world.ranSystem : undefined;
   return {
     id,
+    title: installed?.title ?? ran?.title ?? id,
     ...(installed !== undefined && { installed }),
-    worlds: overview.worlds.filter(({ world }) => world.system === id).map(({ world }) => world.title),
+    ...(world !== undefined && { world }),
+    ...(ran !== undefined && { ran }),
+    status: ran?.status ?? (installed === undefined ? 'missing' : 'same'),
+    worlds: overview.worlds
+      .filter(({ world: { system } }) => system === id)
+      .map(({ world: { title }, ranSystem }) => ({ title, ...(ranSystem?.id === id && { ran: ranSystem }) })),
     modules: overview.modules.filter(({ module: pkg }) => pkg.systems.includes(id)).length,
   };
 }
@@ -146,7 +169,7 @@ export function groupDetail(overview: Overview, selection: GroupSelection): Grou
         items: ids.map(id => {
           const system = systemDetail(overview, id);
           return {
-            title: system.installed?.title ?? id,
+            title: system.title,
             detail: format('Group.WorldCount', { count: system.worlds.length }),
           };
         }),

@@ -34,6 +34,7 @@
     "Used": "Run by a recorded world",
     "Unused": "Run by no recorded world",
     "UnusedNote": "Worlds without a record may run some of them.",
+    "PendingNote": "Of those, {count} only when next run: modules the worlds run now require them, updated since the worlds last ran.",
     "UnrecordedNote": "A world without a record has not been opened with EMMA 0.9 or later active. Open it once, with EMMA active, and EMMA records its setup. Until then EMMA cannot tell which modules it runs.",
     "Guard": "Let Foundry install and update packages here",
     "GuardHint": "While this is off, Foundry's Install, Update and Update All buttons on this screen are disabled, so that packages do not change behind EMMA's back."
@@ -49,6 +50,8 @@
     "PackageChange": "{title}: last ran with {recorded}, {installed} installed",
     "PackageGone": "{title}: last ran with {recorded}, not installed",
     "Unrecorded": "This world has no record: it has not been opened with EMMA 0.9 or later active. Open it once, with EMMA active, and EMMA records its setup.",
+    "Needs": "Will need when next run",
+    "Need": "{title}: now required by {modules}, updated since the world last ran",
     "Unreadable": "EMMA cannot read this world's record. Open the world once, with EMMA active, to record its setup again."
   },
   "ModuleInfo": {
@@ -68,7 +71,8 @@
   "System": {
     "Modules": "Modules for it",
     "Worlds": "Worlds",
-    "NoWorlds": "No world uses this game system."
+    "NoWorlds": "No world uses this game system.",
+    "RanWith": "last ran with {version}"
   },
   "Group": {
     "WorldCount": "{count} worlds",

@@ -56,6 +56,9 @@
     <dt>{localize('Root.Unused')}</dt>
     <dd>{modules.unused}</dd>
   </dl>
+  {#if modules.pending > 0}
+    <p class="emma-note">{format('Root.PendingNote', { count: modules.pending })}</p>
+  {/if}
   {#if worlds.byStatus.unrecorded > 0}
     <p class="emma-note">{localize('Root.UnusedNote')}</p>
   {/if}

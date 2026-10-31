@@ -1,5 +1,6 @@
 <!--
-  The panel for a world: its game system, what its record says it last ran with, and what has changed since.
+  The panel for a world: its game system, what its record says it last ran with, what has changed since, and the modules
+  it will need when next run that it did not run then.
 -->
 <script lang="ts">
   import { format, localize } from '../lib/i18n';
@@ -72,6 +73,22 @@
   </section>
 {/if}
 
+{#if world.needs.length > 0}
+  <section aria-labelledby="emma-setup-needs">
+    <h3 id="emma-setup-needs">{localize('World.Needs')}</h3>
+    <ul>
+      {#each world.needs as need (need.id)}
+        <li>
+          {format('World.Need', { title: need.title, modules: new Intl.ListFormat(undefined).format(need.by) })}
+          {#if !need.installed}
+            <span class="emma-status-missing">{localize('ModuleInfo.NotInstalled')}</span>
+          {/if}
+        </li>
+      {/each}
+    </ul>
+  </section>
+{/if}
+
 <style>
   dl {
     display: grid;
@@ -101,7 +118,8 @@
     color: var(--color-level-warning, #ec3);
   }
 
-  .emma-status-unreadable {
+  .emma-status-unreadable,
+  .emma-status-missing {
     color: var(--color-level-error, #e55);
   }
 </style>

@@ -24,14 +24,42 @@ describe('systemDetail', () => {
   test('gives an installed system, the worlds that use it and how many modules are for it', () => {
     expect(systemDetail(OVERVIEW, 'dnd5e')).toEqual({
       id: 'dnd5e',
+      title: 'D&D 5e',
       installed: { id: 'dnd5e', title: 'D&D 5e', version: '5.3.3' },
-      worlds: ['Alpha', 'Beta'],
+      status: 'same',
+      worlds: [
+        {
+          title: 'Alpha',
+          ran: { id: 'dnd5e', title: 'D&D 5e', recorded: '5.3.3', installed: '5.3.3', status: 'same' },
+        },
+        { title: 'Beta' },
+      ],
       modules: 1,
     });
   });
 
   test('gives a system that is not installed', () => {
-    expect(systemDetail(OVERVIEW, 'swade')).toEqual({ id: 'swade', worlds: ['Savage'], modules: 0 });
+    expect(systemDetail(OVERVIEW, 'swade')).toEqual({
+      id: 'swade',
+      title: 'swade',
+      status: 'missing',
+      worlds: [{ title: 'Savage' }],
+      modules: 0,
+    });
+  });
+
+  test('gives a system under a world that last ran with another version', () => {
+    const overview = buildOverview(
+      installation({ worlds: [{ id: 'a', title: 'Alpha', system: 'dnd5e' }] }),
+      new Map([['a', recorded(record('a', { system: { id: 'dnd5e', title: 'D&D 5e', version: '4.0.0' } }))]]),
+    );
+
+    expect(systemDetail(overview, 'dnd5e', 'a')).toMatchObject({
+      world: { world: { id: 'a' } },
+      ran: { recorded: '4.0.0', installed: '5.3.3' },
+      status: 'other',
+      worlds: [{ title: 'Alpha', ran: { status: 'other' } }],
+    });
   });
 });
 
