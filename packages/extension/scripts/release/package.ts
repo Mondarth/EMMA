@@ -2,8 +2,8 @@
 
 /**
  * Prepare a release of the browser extension: stamp the version into its `package.json`, which its manifests take it
- * from, build it for each browser, check the Firefox build and that EMMA's catalogue and proxy keys are not in either
- * build in plain text, and package both builds into `releases/`:
+ * from, build it for each browser with EMMA's catalogue and proxy, which it refuses to release without, check the
+ * Firefox build and that their keys are not in either build in plain text, and package both builds into `releases/`:
  *
  * - the Chromium build, zipped, for loading unpacked;
  * - the Firefox build, signed by Mozilla as an unlisted add-on when `AMO_JWT_ISSUER` and `AMO_JWT_SECRET` hold an API
@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { filesHolding } from '@mondarth/emma-core/files-holding';
+import { requireReleaseDefaults } from '@mondarth/emma-core/release-defaults';
 
 /** The extension's package, `packages/extension`. */
 const ROOT = path.resolve(import.meta.dirname, '../..');
@@ -120,6 +121,8 @@ if (!releaseVersion || !/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(releaseVersion)
   process.exit(1);
 }
 
+// Before anything changes: a build without them succeeds, and the release would have no catalogue or proxy.
+requireReleaseDefaults(process.env);
 stampVersion(releaseVersion);
 build();
 for (const created of createPackages(releaseVersion)) console.log(`Created ${path.relative(ROOT, created)}`);

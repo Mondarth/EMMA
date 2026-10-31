@@ -103,10 +103,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           # The default version lookup proxy, built into the release obscured (docs/developers/default-proxy.md).
-          # Without them, the release has no default proxy.
+          # Required: the release stops without them, rather than ship without a default proxy.
           EMMA_DEFAULT_PROXY_URL: ${{ vars.EMMA_DEFAULT_PROXY_URL }}
           EMMA_DEFAULT_PROXY_KEY: ${{ secrets.EMMA_DEFAULT_PROXY_KEY }}
-          # The default package catalogue, likewise; without them, the release has none.
+          # The default package catalogue, likewise, and as required.
           EMMA_DEFAULT_CATALOGUE_URL: ${{ vars.EMMA_DEFAULT_CATALOGUE_URL }}
           EMMA_DEFAULT_CATALOGUE_KEY: ${{ secrets.EMMA_DEFAULT_CATALOGUE_KEY }}
           GIT_AUTHOR_NAME: ${{ steps.identity.outputs.name }}
@@ -126,8 +126,7 @@ jobs:
           AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
           AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
           # EMMA's package catalogue and version lookup proxy, built into the EMMA extension obscured, as into the
-          # module; without them, the extension has neither, and looks up releases only from GitHub, GitLab and the
-          # manifests a browser may read.
+          # module, and as required: the release stops without them.
           EMMA_DEFAULT_CATALOGUE_URL: ${{ vars.EMMA_DEFAULT_CATALOGUE_URL }}
           EMMA_DEFAULT_CATALOGUE_KEY: ${{ secrets.EMMA_DEFAULT_CATALOGUE_KEY }}
           EMMA_DEFAULT_PROXY_URL: ${{ vars.EMMA_DEFAULT_PROXY_URL }}
