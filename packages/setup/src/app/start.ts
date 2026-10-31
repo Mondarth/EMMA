@@ -8,9 +8,13 @@ import { keepMenuButton } from '../foundry/menu-button';
 import { readGuardOn, writeGuardOn } from '../foundry/preferences';
 import { readRecords } from '../foundry/records';
 import type { SetupGame } from '../foundry/setup-game';
-import { readInstallation, setupGame } from '../foundry/setup-game';
+import { readInstallation, readManifests, setupGame } from '../foundry/setup-game';
+import { revealCatalogue } from '@mondarth/emma-core/default-catalogue';
+
+import { lookUpReleases } from '../foundry/releases';
 import { localize } from '../lib/i18n';
 import { buildOverview } from '../lib/overview';
+import { findUpdates } from '../lib/updates';
 import { openEmmaSetup } from './emma-setup-app';
 import { SetupState } from './setup-state.svelte';
 
@@ -59,6 +63,12 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
     load: async () => {
       const installation = readInstallation(game);
       return buildOverview(installation, await readRecords(installation.worlds.map(({ id }) => id)));
+    },
+    findUpdates: async overview => {
+      const { universe, load } = await lookUpReleases(readManifests(game), {
+        catalogue: revealCatalogue(__EMMA_DEFAULT_CATALOGUE__),
+      });
+      return findUpdates({ overview, universe, load });
     },
     guardOn: readGuardOn(),
     onGuardChange: on => {

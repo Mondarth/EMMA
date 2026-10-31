@@ -1,24 +1,30 @@
 <!--
   The installation tree (see lib/tree.ts). The selection follows the keyboard, as in a file browser, so the panel beside
   it shows the row the keyboard is on. As a module may show in many places, the selection is a row's key.
+
+  A package with an update on offer has an arrow to the left of each of its rows. In Update mode, each row that shows
+  its installed version offers its versions in a list instead.
 -->
 <script lang="ts">
   import { tick } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
 
-  import { localize } from '../lib/i18n';
+  import type { UpdateState } from '../app/update-state.svelte';
+  import { format, localize } from '../lib/i18n';
   import type { Overview } from '../lib/overview';
   import type { TreeRow } from '../lib/tree';
-  import { INITIALLY_EXPANDED, moveFor, visibleRows } from '../lib/tree';
+  import { INITIALLY_EXPANDED, moveFor, packageOf, visibleRows } from '../lib/tree';
 
   interface Props {
     overview: Overview;
     /** The key of the row selected. */
     selected: string;
     onSelect: (row: TreeRow) => void;
+    /** The updates on offer, and the versions chosen; none until they are searched for. */
+    updates?: UpdateState | undefined;
   }
 
-  let { overview, selected, onSelect }: Props = $props();
+  let { overview, selected, onSelect, updates }: Props = $props();
 
   const expanded = new SvelteSet<string>(INITIALLY_EXPANDED);
   const rows = $derived(visibleRows(overview, expanded));
@@ -86,6 +92,8 @@
 <ul class="emma-tree" role="tree" aria-label={localize('Tree.Label')} bind:this={tree}>
   {#each rows as row (row.key)}
     {@const status = statusText(row)}
+    {@const key = packageOf(row.selection)}
+    {@const update = key === undefined ? undefined : updates?.updateOf(key)}
     <li
       role="treeitem"
       class="emma-tree-row"
@@ -99,6 +107,12 @@
         onClick(event, row);
       }}
       onkeydown={onKeydown}>
+      <span class="emma-tree-update">
+        {#if update !== undefined}
+          <i class="fa-solid fa-circle-up" title={localize('Update.Available')} aria-hidden="true"></i>
+          <span class="emma-visually-hidden">{localize('Update.Available')}</span>
+        {/if}
+      </span>
       {#if row.expandable}
         <i
           class={['emma-tree-toggle', 'fa-solid', expanded.has(row.key) ? 'fa-caret-down' : 'fa-caret-right']}
@@ -107,7 +121,27 @@
         <span class="emma-tree-toggle"></span>
       {/if}
       <span class="emma-tree-title">{row.title}</span>
-      {#if row.version !== undefined}
+      {#if updates?.on === true && update !== undefined && key !== undefined && row.installed === true}
+        {@const chosen = updates.chosenOf(key)}
+        <select
+          class="emma-tree-choice"
+          class:emma-tree-chosen={chosen !== update.installed}
+          aria-label={format('Update.Choose', { title: row.title })}
+          value={chosen}
+          onchange={event => {
+            updates.choose(key, event.currentTarget.value);
+          }}
+          onkeydown={event => {
+            // The list's own keys, not the tree's.
+            event.stopPropagation();
+          }}>
+          {#each update.versions as version (version)}
+            <option value={version}>
+              {version === update.installed ? format('Update.InstalledVersion', { version }) : version}
+            </option>
+          {/each}
+        </select>
+      {:else if row.version !== undefined}
         <span class="emma-tree-version">{row.version}</span>
       {/if}
       {#if status !== undefined}
@@ -145,14 +179,43 @@
     outline-offset: -2px;
   }
 
-  .emma-tree-toggle {
+  .emma-tree-toggle,
+  .emma-tree-update {
     width: 0.8rem;
     flex: none;
     text-align: center;
   }
 
+  .emma-tree-update {
+    color: var(--color-level-info, #5af);
+  }
+
+  .emma-tree-choice {
+    flex: none;
+    width: auto;
+    max-width: 8rem;
+    height: auto;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.85em;
+  }
+
+  .emma-tree-chosen {
+    font-weight: bold;
+    color: var(--color-level-info, #5af);
+  }
+
+  .emma-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
   .emma-tree-title {
-    flex: 1;
+    flex: 1 1 auto;
+    min-width: 4rem;
     overflow: hidden;
     text-overflow: ellipsis;
   }

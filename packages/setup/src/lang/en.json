@@ -74,6 +74,27 @@
     "NoWorlds": "No world uses this game system.",
     "RanWith": "last ran with {version}"
   },
+  "Update": {
+    "Mode": "Update",
+    "ModeHint": "Choose newer versions of the packages that have them. EMMA offers the newest version that works in every recorded world that uses the package.",
+    "Searching": "Looking for updates…",
+    "Found": "Updates available: {count}",
+    "None": "No updates found",
+    "Failed": "Could not look for updates",
+    "Unresolved": "EMMA found no working setup for {count} recorded worlds, so nothing they use is offered an update.",
+    "Available": "Update available",
+    "Choose": "Version of {title}",
+    "InstalledVersion": "{version} (installed)",
+    "Plan": "Update plan",
+    "Package": "Package",
+    "Installed": "Installed",
+    "Chosen": "Chosen",
+    "Clear": "Clear choices"
+  },
+  "Layout": {
+    "Tree": "Resize the installation tree",
+    "Plan": "Resize the update plan"
+  },
   "Group": {
     "WorldCount": "{count} worlds",
     "ModuleCount": "{count} modules",

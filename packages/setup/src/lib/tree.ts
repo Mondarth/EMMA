@@ -42,6 +42,8 @@ export interface TreeRow {
   readonly title: string;
   /** The version shown beside the title, if any. */
   readonly version?: string;
+  /** Whether that version is the one installed, rather than the one a world last ran with. */
+  readonly installed?: true;
   readonly status?: RowStatus;
   /** Whether the row has rows under it. */
   readonly expandable: boolean;
@@ -66,6 +68,8 @@ interface TreeNode {
   readonly selection: TreeSelection;
   readonly title: string;
   readonly version?: string;
+  /** Whether the version is the one installed. */
+  readonly installed?: true;
   readonly status?: RowStatus;
   readonly children: () => readonly TreeNode[];
 }
@@ -87,6 +91,7 @@ export function visibleRows(overview: Overview, expanded: ReadonlySet<string>): 
       selection: node.selection,
       title: node.title,
       ...(node.version !== undefined && { version: node.version }),
+      ...(node.installed && { installed: true }),
       ...(node.status !== undefined && { status: node.status }),
       expandable: children.length > 0,
       ...(parent !== undefined && { parent }),
@@ -142,7 +147,11 @@ function systemNodes(overview: Overview, modules: ReadonlyMap<string, ModuleUse>
     .filter(id => !installed.has(id))
     .map(id => ({ id, title: id }))
     .sort(byTitle);
-  const node = (id: string, title: string, shown: { version?: string; status: RowStatus }): TreeNode => ({
+  const node = (
+    id: string,
+    title: string,
+    shown: { version?: string; installed?: true; status: RowStatus },
+  ): TreeNode => ({
     segment: `system:${id}`,
     selection: { kind: 'system', system: id },
     title,
@@ -150,7 +159,9 @@ function systemNodes(overview: Overview, modules: ReadonlyMap<string, ModuleUse>
     children: () => overview.worlds.filter(({ world }) => world.system === id).map(world => worldNode(world, modules)),
   });
   return [
-    ...overview.systems.map(({ id, title, version }) => node(id, title, { version, status: INSTALLED })),
+    ...overview.systems.map(({ id, title, version }) =>
+      node(id, title, { version, installed: true, status: INSTALLED }),
+    ),
     ...missing.map(({ id }) => node(id, id, { status: MISSING })),
   ];
 }
@@ -223,6 +234,7 @@ function installedNode(use: ModuleUse, modules: ReadonlyMap<string, ModuleUse>):
     selection: { kind: 'module', module: id },
     title,
     version,
+    installed: true,
     children: () => requirementNodes([id], undefined, modules),
   };
 }
@@ -250,7 +262,7 @@ function requirementNodes(
         segment: `module:${id}`,
         selection: { kind: 'module', module: id, ...(world !== undefined && { world }) },
         title,
-        ...(installed === undefined ? { status: MISSING } : { version: installed.version }),
+        ...(installed === undefined ? { status: MISSING } : { version: installed.version, installed: true }),
         children: () => requirementNodes([id, ...path], world, modules),
       };
     });
@@ -286,6 +298,17 @@ function groupNodes(overview: Overview, modules: ReadonlyMap<string, ModuleUse>)
     },
     ...groups,
   ];
+}
+
+/**
+ * The package a row shows, as the resolver names it.
+ * @param selection - The row's selection
+ * @returns `system:<id>` or `module:<id>`, or `undefined` for a row that shows no package
+ */
+export function packageOf(selection: TreeSelection): string | undefined {
+  if (selection.kind === 'system') return `system:${selection.system}`;
+  if (selection.kind === 'module') return `module:${selection.module}`;
+  return undefined;
 }
 
 /** Where a key moves the keyboard's row, or how it changes what is expanded. */

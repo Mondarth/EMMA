@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from 'vitest';
 
 import { SetupState } from '../../../src/app/setup-state.svelte';
 import { buildOverview } from '../../../src/lib/overview';
-import { installation } from '../../mocks/fixtures';
+import { installation, noUpdates } from '../../mocks/fixtures';
 
 const OVERVIEW = buildOverview(installation(), new Map());
 
@@ -18,6 +18,7 @@ describe('SetupState', () => {
         }),
       guardOn: true,
       onGuardChange: vi.fn(),
+      findUpdates: noUpdates,
     });
 
     const reading = setup.refresh();
@@ -33,7 +34,7 @@ describe('SetupState', () => {
   test('keeps a failure rather than throwing it, and clears it on the next reading', async () => {
     const load = vi.fn<() => Promise<typeof OVERVIEW>>().mockRejectedValueOnce(new Error('offline'));
     load.mockResolvedValueOnce(OVERVIEW);
-    const setup = new SetupState({ load, guardOn: true, onGuardChange: vi.fn() });
+    const setup = new SetupState({ load, guardOn: true, onGuardChange: vi.fn(), findUpdates: noUpdates });
 
     await setup.refresh();
     expect(setup.failed).toBe(true);
@@ -45,7 +46,12 @@ describe('SetupState', () => {
 
   test('starts with the guard as kept, and passes each switch on', () => {
     const onGuardChange = vi.fn();
-    const setup = new SetupState({ load: () => Promise.resolve(OVERVIEW), guardOn: false, onGuardChange });
+    const setup = new SetupState({
+      load: () => Promise.resolve(OVERVIEW),
+      guardOn: false,
+      onGuardChange,
+      findUpdates: noUpdates,
+    });
     expect(setup.guardOn).toBe(false);
 
     setup.setGuardOn(true);

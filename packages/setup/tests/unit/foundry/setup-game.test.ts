@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 
-import { isSetupGame, readInstallation, setupGame } from '../../../src/foundry/setup-game';
+import { isSetupGame, readInstallation, readManifests, setupGame } from '../../../src/foundry/setup-game';
 import { installSetupMocks } from '../../mocks/foundry';
 
 describe('isSetupGame', () => {
@@ -96,5 +96,48 @@ describe('readInstallation', () => {
       { id: 'app', title: 'app', version: '1.0.0', systems: ['dnd5e', 'pf2e'], requires: ['lib', 'old'] },
       { id: 'loose', title: 'loose', version: '1.0.0', systems: [], requires: [] },
     ]);
+  });
+});
+
+describe('readManifests', () => {
+  test("reads each installed package's manifest and manifest URL, and the Foundry build", () => {
+    const { game } = installSetupMocks({
+      core: '14.370',
+      release: { generation: 14, channel: 'testing' },
+      modules: [
+        { id: 'app', version: '2.0.0', manifest: 'https://packages.example.test/app/module.json' },
+        { id: 'n', version: undefined },
+      ],
+      systems: [{ id: 'dnd5e', version: '5.3.3', manifest: '' }],
+    });
+    game.modules.set('broken', null);
+    game.modules.set('flat', { id: 'flat', version: '1.0.0' });
+
+    expect(readManifests(game as never)).toEqual({
+      core: { version: '14.370', generation: 14, channel: 'testing' },
+      manifests: [
+        {
+          type: 'system',
+          id: 'dnd5e',
+          version: '5.3.3',
+          json: { id: 'dnd5e', title: 'dnd5e', version: '5.3.3' },
+          origin: 'systems/dnd5e/system.json',
+        },
+        {
+          type: 'module',
+          id: 'app',
+          version: '2.0.0',
+          json: { id: 'app', title: 'app', version: '2.0.0' },
+          origin: 'modules/app/module.json',
+          manifest: 'https://packages.example.test/app/module.json',
+        },
+      ],
+    });
+  });
+
+  test("takes a stable build of the version's generation when Foundry does not say", () => {
+    const { game } = installSetupMocks({ core: '15.001', release: undefined });
+
+    expect(readManifests(game as never).core).toEqual({ version: '15.001', generation: 15, channel: 'stable' });
   });
 });
