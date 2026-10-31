@@ -33,6 +33,16 @@ export interface WorldModule {
   readonly status: ModuleStatus;
 }
 
+/**
+ * A module a world's record does not say it runs, but that the world will need when next run, as modules it runs require
+ * it as they are installed now: typically because one was updated since and the new version requires more.
+ */
+export interface WorldNeed {
+  readonly id: string;
+  /** The titles of the modules the world runs that now require it, directly or through others it does not run yet. */
+  readonly by: readonly string[];
+}
+
 /** Something installed that is not as the world last ran with it. */
 export type Difference =
   | { readonly kind: 'core'; readonly recorded: string; readonly installed: string }
@@ -49,6 +59,8 @@ export interface WorldOverview {
   readonly record?: WorldRecord;
   /** The modules the record says the world runs, sorted by title. Empty without a record. */
   readonly modules: readonly WorldModule[];
+  /** The modules the world will need when next run that its record does not say it runs. Empty without a record. */
+  readonly needs: readonly WorldNeed[];
   /** What is not installed as the world last ran with it. */
   readonly differences: readonly Difference[];
 }
@@ -126,13 +138,19 @@ function worldOverview(
   world: InstalledWorld,
   state: RecordState,
   core: string,
-  modules: ReadonlyMap<string, InstalledPackage>,
+  modules: ReadonlyMap<string, InstalledModule>,
   systems: ReadonlyMap<string, InstalledPackage>,
 ): WorldOverview {
   const installedSystem = systems.get(world.system);
   const base = { world, ...(installedSystem !== undefined && { system: installedSystem }) };
   if (state.kind !== 'recorded') {
-    return { ...base, status: state.kind === 'none' ? 'unrecorded' : 'unreadable', modules: [], differences: [] };
+    return {
+      ...base,
+      status: state.kind === 'none' ? 'unrecorded' : 'unreadable',
+      modules: [],
+      needs: [],
+      differences: [],
+    };
   }
   const { record } = state;
   const run = record.modules
@@ -164,7 +182,38 @@ function worldOverview(
     });
   }
 
-  return { ...base, status: differences.length === 0 ? 'matches' : 'differs', record, modules: run, differences };
+  return {
+    ...base,
+    status: differences.length === 0 ? 'matches' : 'differs',
+    record,
+    modules: run,
+    needs: needsOf(run, modules),
+    differences,
+  };
+}
+
+/**
+ * The modules a world will need when next run that its record does not say it runs: those the modules it runs require
+ * as installed now, and those they require in turn.
+ * @param run - The modules the world's record says it runs, sorted by title
+ * @param modules - The installed modules, by ID
+ * @returns The modules it will need, each with the titles of the modules it runs that require it
+ */
+function needsOf(run: readonly WorldModule[], modules: ReadonlyMap<string, InstalledModule>): WorldNeed[] {
+  const recorded = new Set(run.map(({ id }) => id));
+  const needs = new Map<string, string[]>();
+  for (const entry of run) {
+    const seen = new Set([entry.id]);
+    const pending = [...(modules.get(entry.id)?.requires ?? [])];
+    for (let id = pending.shift(); id !== undefined; id = pending.shift()) {
+      // A module the world runs is already accounted for, with what it requires.
+      if (seen.has(id) || recorded.has(id)) continue;
+      seen.add(id);
+      needs.set(id, [...(needs.get(id) ?? []), entry.title]);
+      pending.push(...(modules.get(id)?.requires ?? []));
+    }
+  }
+  return [...needs].map(([id, by]) => ({ id, by }));
 }
 
 /**

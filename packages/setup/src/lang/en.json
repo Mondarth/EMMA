@@ -61,7 +61,8 @@
     "AnySystem": "Any",
     "Requires": "Requires",
     "RequiredBy": "Required by",
-    "RunByNone": "No recorded world runs this module."
+    "RunByNone": "No recorded world runs this module.",
+    "NeededNext": "Will need it when next run: it is now required by {modules}, updated since the world last ran."
   },
   "Refused": "EMMA manages packages on this screen. To let Foundry install and update them, open EMMA from the menu and say so there.",
   "System": {

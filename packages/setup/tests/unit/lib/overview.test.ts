@@ -40,6 +40,7 @@ describe('buildOverview', () => {
         { id: 'app', title: 'App', recorded: '2.0.0', installed: '2.0.0', status: 'same' },
         { id: 'lib', title: 'Library', recorded: '1.0.0', installed: '1.0.0', status: 'same' },
       ],
+      needs: [],
       differences: [],
     });
   });
@@ -103,6 +104,7 @@ describe('buildOverview', () => {
       system: { id: 'dnd5e', title: 'D&D 5e', version: '5.3.3' },
       status,
       modules: [],
+      needs: [],
       differences: [],
     });
   });

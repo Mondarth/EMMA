@@ -55,7 +55,7 @@ describe('moduleDetail', () => {
         { id: 'lib', title: 'Library', installed: true },
       ],
       requiredBy: [],
-      runBy: ['Alpha'],
+      runBy: [{ title: 'Alpha' }],
     });
   });
 
@@ -70,8 +70,39 @@ describe('moduleDetail', () => {
       systems: [],
       requires: [],
       requiredBy: ['App'],
-      runBy: [],
+      runBy: [{ title: 'Alpha', needed: ['App'] }],
     });
+  });
+
+  test('gives the worlds that will need a module when next run, as what they run now requires it', () => {
+    const overview = buildOverview(
+      installation({
+        worlds: [{ id: 'a', title: 'Alpha', system: 'dnd5e' }],
+        modules: [
+          installedModule('app', 'App', '2.0.0', { requires: ['lib'] }),
+          installedModule('lib', 'Library', '2.0.0', { requires: ['base'] }),
+          installedModule('base', 'Base', '1.0.0'),
+          installedModule('tool', 'Tool', '3.0.0', { requires: ['lib'] }),
+        ],
+      }),
+      new Map([
+        [
+          'a',
+          recorded(
+            record('a', {
+              modules: [
+                { id: 'app', title: 'App', version: '1.0.0' },
+                { id: 'tool', title: 'Tool', version: '2.0.0' },
+              ],
+            }),
+          ),
+        ],
+      ]),
+    );
+
+    expect(moduleDetail(overview, 'lib').runBy).toEqual([{ title: 'Alpha', needed: ['App', 'Tool'] }]);
+    expect(moduleDetail(overview, 'base').runBy).toEqual([{ title: 'Alpha', needed: ['App', 'Tool'] }]);
+    expect(moduleDetail(overview, 'tool').runBy).toEqual([{ title: 'Alpha' }]);
   });
 
   test('gives a module that is not installed, under a world that does not run it', () => {

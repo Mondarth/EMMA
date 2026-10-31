@@ -130,6 +130,10 @@ So a module may show in many places. Its panel is the same wherever it is select
 systems it is for, the modules it requires and those that require it, and the recorded worlds that run it; under a
 world, also the version that world last ran with.
 
+A world's record lists the modules it ran with last time. If a module it runs has been updated since, and the new
+version requires a module the world did not run, **Run by** still lists the world, with a note that it will need that
+module when next run, and which updated modules require it.
+
 Every row with rows under it opens and closes, from its triangle or from the keyboard: the arrow keys move up and down,
 and open and close a row, and Home and End go to the first and last row. **Read again** reads the installation afresh.
 

@@ -1,7 +1,7 @@
 <!--
   The panel for a module, wherever the tree shows it: the version installed, and the version a world last ran with if it
   shows under one; the game systems it is for; the modules it requires, and those that require it; and the recorded
-  worlds that run it.
+  worlds that run it, or will need it when next run as what they run now requires it.
 -->
 <script lang="ts">
   import type { ModuleDetail, RelatedPackage } from '../lib/details';
@@ -80,7 +80,18 @@
   {#if detail.runBy.length === 0}
     <p class="emma-note">{localize('ModuleInfo.RunByNone')}</p>
   {:else}
-    {@render titles(detail.runBy)}
+    <ul>
+      {#each detail.runBy as world, index (index)}
+        <li>
+          {world.title}
+          {#if world.needed !== undefined}
+            <p class="emma-note">
+              {format('ModuleInfo.NeededNext', { modules: new Intl.ListFormat(undefined).format(world.needed) })}
+            </p>
+          {/if}
+        </li>
+      {/each}
+    </ul>
   {/if}
 </section>
 

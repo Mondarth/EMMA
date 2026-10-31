@@ -27,6 +27,16 @@ export interface SystemDetail {
   readonly modules: number;
 }
 
+/** A world that runs a module, or will when next run. */
+export interface RunBy {
+  readonly title: string;
+  /**
+   * If the world's record does not say it runs the module, but it will need it when next run: the titles of the modules
+   * it runs that now require it.
+   */
+  readonly needed?: readonly string[];
+}
+
 /** A module, wherever the tree shows it. */
 export interface ModuleDetail {
   readonly id: string;
@@ -45,8 +55,8 @@ export interface ModuleDetail {
   readonly requires: readonly RelatedPackage[];
   /** The titles of the installed modules that require it. */
   readonly requiredBy: readonly string[];
-  /** The titles of the worlds whose records say they run it. */
-  readonly runBy: readonly string[];
+  /** The worlds whose records say they run it, or that will need it when next run. */
+  readonly runBy: readonly RunBy[];
 }
 
 /**
@@ -97,9 +107,11 @@ export function moduleDetail(overview: Overview, id: string, worldId?: string): 
     requiredBy: overview.modules
       .filter(({ module: pkg }) => pkg.requires.includes(id))
       .map(({ module: pkg }) => pkg.title),
-    runBy: overview.worlds
-      .filter(({ modules: running }) => running.some(entry => entry.id === id))
-      .map(({ world: { title } }) => title),
+    runBy: overview.worlds.flatMap(({ world: { title }, modules: running, needs }): RunBy[] => {
+      if (running.some(entry => entry.id === id)) return [{ title }];
+      const need = needs.find(candidate => candidate.id === id);
+      return need === undefined ? [] : [{ title, needed: need.by }];
+    }),
   };
 }
 
