@@ -8,7 +8,7 @@ import { SvelteMap } from 'svelte/reactivity';
 import type { KitProblem } from '../foundry/setup-kit';
 import { KitUnavailable } from '../foundry/setup-kit';
 import type { Overview } from '../lib/overview';
-import type { PackageUpdate, UpdateSearch } from '../lib/updates';
+import type { PackageUpdate, UpdateSearch, VersionOption } from '../lib/updates';
 
 /**
  * Where the search for updates is: `unavailable` when it cannot be made, as without an EMMA module whose setup kit
@@ -103,6 +103,16 @@ export class UpdateState {
    */
   chosenOf(key: PackageKey): string | undefined {
     return this.#chosen.get(key) ?? this.updateOf(key)?.installed;
+  }
+
+  /**
+   * A version of a package, badged as the EMMA module badges it, with the other packages at the versions chosen.
+   * @param key - The package's key
+   * @param version - The version
+   * @returns The version, with its badge; none before the search has found anything
+   */
+  optionOf(key: PackageKey, version: string): VersionOption {
+    return this.search?.judge(key, version, other => this.chosenOf(other)) ?? { version, badge: null };
   }
 
   /**

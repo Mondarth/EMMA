@@ -79,7 +79,7 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
         proxy: revealProxy(__EMMA_DEFAULT_PROXY__),
         clientVersion: __EMMA_EXTENSION_VERSION__,
       });
-      return findUpdates({ resolver: kit.resolver, overview, universe, load });
+      return findUpdates({ resolver: kit.resolver, badges: kit.badges, overview, universe, load });
     },
     installModule: async () => {
       if (placed.guard !== undefined) await installEmma(game, placed.guard);

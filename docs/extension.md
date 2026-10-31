@@ -171,8 +171,11 @@ package for all of them:
 Foundry VTT itself is not offered an update yet.
 
 **Update** in the footer turns Update mode on. Each row that shows a package's installed version then offers its
-versions in a list, from the newest offered down to the installed one. Choosing a version other than the installed
-one opens the **Update plan** below the tree and the panel, the full width of the window, listing each package
+versions in a list, from the newest offered down to the installed one, which is marked so. Each version is in the
+colour of EMMA's badge for it, as in the EMMA module's version lists: EMMA's checks judge it, not Foundry's, in each
+recorded world that uses the package, with the other packages at the versions chosen. The badge is the worst of those
+worlds', and its tooltip names that world when more than one uses the package. A package no recorded world uses is
+judged by the Foundry build alone. Choosing a version other than the installed one opens the **Update plan** below the tree and the panel, the full width of the window, listing each package
 chosen with its installed and chosen versions. **Clear choices** takes them all back, and choosing the installed
 version takes back one. Turning Update mode off hides the lists and the plan, and keeps the choices for when it is
 turned on again. Installing the plan is to come.

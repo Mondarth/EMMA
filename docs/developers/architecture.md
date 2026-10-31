@@ -121,7 +121,9 @@ module:
   (`src/obscure.ts`, `src/default-catalogue.ts`, `src/default-proxy.ts`), with what builds them in and checks a
   release for their keys in plain text, which run under Node (`scripts/`); and the setup kit's API
   (`src/setup-kit.ts`). The setup kit is the code the EMMA extension imports from the installed module, rather than
-  carry its own copy: the resolver and its sources. The module builds it as `dist/emma-setup-kit.js`
+  carry its own copy: the resolver and its sources, and how the module badges a version
+  (`src/module/adapters/badges.ts`), so the extension's version lists are coloured as the module's are. It holds no
+  catalogue or proxy: each bundle builds in its own. The module builds it as `dist/emma-setup-kit.js`
   (`src/setup-kit.ts`, `vite.kit.config.ts`) and names it, with its API version `<major>.<minor>`, in its manifest's
   `flags.setupKit`; the EMMA extension checks that version against the one it was built with (`kitFit`) before it
   imports the kit, and again after. Raise the minor when the kit gives more, and the major when it gives less or

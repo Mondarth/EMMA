@@ -10,12 +10,18 @@
  * - a package no recorded world uses, such as a module active in no recorded world, or a system only worlds without a
  *   record use, is offered its newest version that the installed Foundry build can run.
  *
- * The Foundry build itself is kept. Pure but for the resolver's loading. The resolver is the one the setup kit gives,
- * from the installed EMMA module (see `@mondarth/emma-core/setup-kit`).
+ * The Foundry build itself is kept. Each version offered is badged as the EMMA module's hypothetical mode badges it, with
+ * EMMA's verdict rather than Foundry's: in each recorded world that uses the package, with the other packages at the
+ * versions chosen, keeping the worst; a package no recorded world uses, by the Foundry build alone.
+ *
+ * Pure but for the resolver's loading, and the badges, which are Foundry's. The resolver and the badges are the ones the
+ * setup kit gives, from the installed EMMA module (see `@mondarth/emma-core/setup-kit`).
  */
-import type { PackageKey, Policy, Release, Universe } from '@mondarth/fvtt-resolver';
+import type { PackageKey, Policy, Release, ReleaseCheck, SetupSpec, Universe } from '@mondarth/fvtt-resolver';
 
-import type { KitResolver } from '@mondarth/emma-core/setup-kit';
+import type { KitBadge, KitBadges, KitResolver } from '@mondarth/emma-core/setup-kit';
+
+import { format, localize } from './i18n';
 
 import type { Overview } from './overview';
 
@@ -29,18 +35,44 @@ export interface PackageUpdate {
   readonly versions: readonly string[];
 }
 
+/** A version of a package, with EMMA's badge for it. */
+export interface VersionOption {
+  readonly version: string;
+  /** The badge, or `null` for none, as for a release not found. */
+  readonly badge: KitBadge | null;
+  /** Whether the version is not on Foundry's package listing; the badge's tooltip and text say so already. */
+  readonly unlisted?: true;
+}
+
+/**
+ * Badge a version of a package.
+ * @param key - The package
+ * @param version - The version
+ * @param chosen - The version chosen of each package, the installed one if none is
+ * @returns The version, with its badge
+ */
+export type VersionJudge = (
+  key: PackageKey,
+  version: string,
+  chosen: (key: PackageKey) => string | undefined,
+) => VersionOption;
+
 /** What the search found. */
 export interface UpdateSearch {
   /** The installed packages with newer versions on offer, by package key. */
   readonly updates: ReadonlyMap<PackageKey, PackageUpdate>;
   /** The IDs of the recorded worlds no setup was found for, so that nothing they use is offered an update. */
   readonly unresolved: readonly string[];
+  /** Badges the versions on offer. */
+  readonly judge: VersionJudge;
 }
 
 /** What the search works on. */
 export interface UpdateInputs {
   /** The resolver, from the setup kit. */
   readonly resolver: KitResolver;
+  /** How the EMMA module badges a version, from the setup kit. */
+  readonly badges: KitBadges;
   readonly overview: Overview;
   /** The installed Foundry build, and every release found of the installed systems and modules. */
   readonly universe: Universe;
@@ -65,7 +97,7 @@ const BEST_VERSIONS_POLICY: Partial<Policy> = {
  * @returns The updates, and the worlds no setup was found for
  */
 export async function findUpdates(inputs: UpdateInputs): Promise<UpdateSearch> {
-  const { resolver, overview, load } = inputs;
+  const { resolver, badges, overview, load } = inputs;
   const { CORE, packageKey, resolveInRounds } = resolver;
   const newer = newerIn(resolver);
   const installed = new Map<PackageKey, string>([
@@ -89,13 +121,9 @@ export async function findUpdates(inputs: UpdateInputs): Promise<UpdateSearch> {
   };
   const unresolved: string[] = [];
   for (const world of overview.worlds) {
-    if (world.record === undefined || world.system === undefined) continue;
-    const used = [
-      packageKey({ type: 'system', id: world.system.id }),
-      ...world.modules
-        .filter(({ installed: version }) => version !== undefined)
-        .map(({ id }) => packageKey({ type: 'module', id })),
-    ];
+    const uses = usedBy(resolver, world);
+    if (uses === undefined) continue;
+    const used = [uses.system, ...uses.modules].map(({ key }) => key);
     const rounds = await resolveInRounds(
       universe,
       { require: used.map(key => ({ package: key })), pins: [{ package: CORE, version: overview.core }] },
@@ -134,7 +162,127 @@ export async function findUpdates(inputs: UpdateInputs): Promise<UpdateSearch> {
     const versions = unique(resolver, [newest, ...between, version]);
     updates.set(key, { key, installed: version, newest, versions });
   }
-  return { updates, unresolved };
+  return { updates, unresolved, judge: judgeIn({ resolver, badges, overview, universe }) };
+}
+
+/** A package a world uses, at its installed version. */
+interface Use {
+  readonly key: PackageKey;
+  readonly installed: string;
+}
+
+/** The packages a world uses. */
+interface WorldUses {
+  readonly system: Use;
+  readonly modules: readonly Use[];
+}
+
+/**
+ * What a world uses, as its record says: its game system, then the installed modules it runs.
+ * @param resolver - The resolver
+ * @param world - The world
+ * @returns Its packages, or `undefined` for a world without a record, or whose system is not installed
+ */
+function usedBy(resolver: KitResolver, world: Overview['worlds'][number]): WorldUses | undefined {
+  if (world.record === undefined || world.system === undefined) return undefined;
+  const { packageKey } = resolver;
+  return {
+    system: { key: packageKey({ type: 'system', id: world.system.id }), installed: world.system.version },
+    modules: world.modules.flatMap(({ id, installed }) =>
+      installed === undefined ? [] : [{ key: packageKey({ type: 'module', id }), installed }],
+    ),
+  };
+}
+
+/** How badly each colour of badge fits, worst last; a version with no badge fits, as in the EMMA module. */
+const MISFIT: readonly KitBadge['type'][] = ['success', 'neutral', 'warning', 'error'];
+
+/**
+ * Badge the versions of the installed packages, as the EMMA module's hypothetical mode does.
+ * @param inputs - The resolver and the badges, the installation, and every release found
+ * @param inputs.resolver - The resolver
+ * @param inputs.badges - How the EMMA module badges a version
+ * @param inputs.overview - The installation
+ * @param inputs.universe - Every release found, as the search left it
+ * @returns The judge
+ */
+function judgeIn(inputs: {
+  resolver: KitResolver;
+  badges: KitBadges;
+  overview: Overview;
+  universe: Universe;
+}): VersionJudge {
+  const { resolver, badges, overview, universe } = inputs;
+  const { AVAILABILITY, check, coreAvailability, packageKey, sameVersion } = resolver;
+  const misfit = (badge: KitBadge | null) => (badge === null ? 0 : MISFIT.indexOf(badge.type));
+  const worlds = overview.worlds.flatMap(world => {
+    const uses = usedBy(resolver, world);
+    return uses === undefined ? [] : [{ title: world.world.title, uses }];
+  });
+  const releaseOf = (key: PackageKey, version: string) =>
+    universe.releases.find(release => packageKey(release.package) === key && sameVersion(release.version, version));
+
+  return (key, version, chosen) => {
+    const release = releaseOf(key, version);
+    if (release === undefined) return { version, badge: null };
+    const users = worlds.filter(({ uses }) => [uses.system, ...uses.modules].some(use => use.key === key));
+    let badge: KitBadge | null;
+    if (users.length === 0) {
+      // No recorded world says what it would run with: the Foundry build alone judges it.
+      const availability = coreAvailability(
+        { ...release.compatibility, ...release.listing },
+        overview.core,
+        universe.core,
+      );
+      const checked: ReleaseCheck = { release, availability, broken: [], missed: [], advisories: [] };
+      badge = availability === AVAILABILITY.UNKNOWN ? null : badges.releaseBadge(checked, [checked]);
+    } else {
+      // In each world that uses it, with everything else at the version chosen; the worst, saying where.
+      const at = (use: Use) => ({
+        package: use.key,
+        version: use.key === key ? version : (chosen(use.key) ?? use.installed),
+      });
+      const judged = users.map(({ title, uses }) => {
+        const setup: SetupSpec = { core: overview.core, system: at(uses.system), modules: uses.modules.map(at) };
+        const { releases } = check(universe, setup);
+        const found = releases.find(({ release: candidate }) => packageKey(candidate.package) === key);
+        return { title, badge: found === undefined ? null : badges.releaseBadge(found, releases) };
+      });
+      const worst = judged.reduce((found, next) => (misfit(next.badge) > misfit(found.badge) ? next : found));
+      badge =
+        users.length > 1 && worst.badge !== null
+          ? withNote(worst.badge, format('Update.JudgedIn', { world: worst.title }))
+          : worst.badge;
+    }
+    if (release.unlisted !== true) return { version, badge };
+    return { version, unlisted: true, badge: badge === null ? null : withNote(badge, localize('Update.Unlisted')) };
+  };
+}
+
+/**
+ * A badge, with a line added to its tooltip and text.
+ * @param badge - The badge
+ * @param note - The line, as plain text
+ * @returns The badge, with the line
+ */
+function withNote(badge: KitBadge, note: string): KitBadge {
+  return { ...badge, tooltip: `${badge.tooltip}<br>${escapeHtml(note)}`, text: `${badge.text} ${note}` };
+}
+
+/**
+ * Text, escaped to show as it is in HTML.
+ * @param text - The text
+ * @returns The HTML
+ */
+function escapeHtml(text: string): string {
+  const entities: Readonly<Record<string, string>> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  };
+  return text.replace(/[&<>"']/g, char => entities[char] ?? char);
 }
 
 /**
