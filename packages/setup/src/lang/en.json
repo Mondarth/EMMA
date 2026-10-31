@@ -78,7 +78,8 @@
     "Runs": "{world} runs {package}",
     "Needs": "{world} needs {package}",
     "Installed": "the plan has {package}",
-    "Fails": "{world} cannot keep working"
+    "Fails": "{world} cannot keep working",
+    "Plan": "the plan"
   },
   "Update": {
     "Mode": "Update",
