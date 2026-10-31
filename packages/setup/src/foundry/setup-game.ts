@@ -3,7 +3,8 @@
  * which Foundry's types do not describe. Everything else works on the plain values returned here.
  *
  * Checked on Foundry 14.368: the setup screen's `game.view` is `"setup"`, and `game.worlds`, `game.modules` and
- * `game.systems` are collections of the installed packages.
+ * `game.systems` are collections of the installed packages, as `foundry.packages` instances. A module's
+ * `relationships.systems` and `relationships.requires` are sets of the packages it relates to, each with its `id`.
  */
 
 /** An installed package, as EMMA shows it. */
@@ -11,6 +12,14 @@ export interface InstalledPackage {
   readonly id: string;
   readonly title: string;
   readonly version: string;
+}
+
+/** An installed module, with what its manifest says it needs. */
+export interface InstalledModule extends InstalledPackage {
+  /** The IDs of the game systems it is for; empty if it is for any system. */
+  readonly systems: readonly string[];
+  /** The IDs of the modules it requires. */
+  readonly requires: readonly string[];
 }
 
 /** An installed world. Unlike a module or a system, a world need not have a version. */
@@ -26,7 +35,7 @@ export interface Installation {
   /** The Foundry version, such as `14.368`. */
   readonly core: string;
   readonly worlds: readonly InstalledWorld[];
-  readonly modules: readonly InstalledPackage[];
+  readonly modules: readonly InstalledModule[];
   readonly systems: readonly InstalledPackage[];
 }
 
@@ -81,7 +90,7 @@ export function readInstallation(game: SetupGame): Installation {
   return {
     core: game.version,
     worlds: sorted(Array.from(game.worlds, toWorld)),
-    modules: sorted(Array.from(game.modules, toPackage)),
+    modules: sorted(Array.from(game.modules, toModule)),
     systems: sorted(Array.from(game.systems, toPackage)),
   };
 }
@@ -110,6 +119,40 @@ function toPackage(pkg: unknown): InstalledPackage | undefined {
   return typeof id === 'string' && typeof title === 'string' && typeof version === 'string'
     ? { id, title, version }
     : undefined;
+}
+
+/**
+ * Describe an installed module.
+ * @param pkg - A module from the setup screen's `game.modules`
+ * @returns The module, or `undefined` if it lacks an ID, title or version
+ */
+function toModule(pkg: unknown): InstalledModule | undefined {
+  const described = toPackage(pkg);
+  if (described === undefined) return undefined;
+  const { relationships } = pkg as { relationships?: { systems?: unknown; requires?: unknown } };
+  return {
+    ...described,
+    systems: relatedIds(relationships?.systems),
+    // A module requires other modules: a system it needs is given by `systems`.
+    requires: relatedIds(relationships?.requires, 'module').filter(id => id !== described.id),
+  };
+}
+
+/**
+ * The IDs of the packages a relationship names.
+ * @param related - The relationship, a set of packages
+ * @param type - The type of package to keep, if the relationship says; any type if not given
+ * @returns The IDs, each once, in their order
+ */
+function relatedIds(related: unknown, type?: string): string[] {
+  if (!isIterable(related)) return [];
+  const ids = new Set<string>();
+  for (const entry of related) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const { id, type: kind } = entry as Record<string, unknown>;
+    if (typeof id === 'string' && (type === undefined || kind === undefined || kind === type)) ids.add(id);
+  }
+  return [...ids];
 }
 
 /**

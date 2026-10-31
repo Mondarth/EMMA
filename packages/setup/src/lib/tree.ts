@@ -1,26 +1,48 @@
 /**
- * The installation tree: the root, the worlds under it, and under each world the modules its record says it runs.
- * Pure: which rows are showing, and where the keyboard moves between them.
+ * The installation tree, as the EMMA extension's standard mode shows it:
+ *
+ * - the root, Foundry VTT itself;
+ *   - the game systems, each with the worlds that use it, and under each world the system and the modules its record
+ *     says it last ran with;
+ *   - the modules, grouped by the game systems they are for: first those for any system, then those for each system.
+ *
+ * A module that requires others has them under it, wherever it shows, so a module may show many times. Every row with
+ * rows under it can be expanded and collapsed. Pure: which rows are showing, and where the keyboard moves between them.
  */
-import type { ModuleStatus, Overview, WorldStatus } from './overview';
+import { format, localize } from './i18n';
+import type { ModuleStatus, ModuleUse, Overview, WorldModule, WorldOverview, WorldStatus } from './overview';
+import { byTitle } from './overview';
 
 /** What is selected in the tree, and so shown in the panel beside it. */
 export type TreeSelection =
   | { readonly kind: 'root' }
+  /** The game systems, and the worlds under them. */
+  | { readonly kind: 'systems' }
+  /** A game system, shown under a world if `world` is given. */
+  | { readonly kind: 'system'; readonly system: string; readonly world?: string }
   | { readonly kind: 'world'; readonly world: string }
-  | { readonly kind: 'module'; readonly world: string; readonly module: string };
+  /** The modules, grouped by game system. */
+  | { readonly kind: 'modules' }
+  /** The modules for one game system, or for any system if `system` is not given. */
+  | { readonly kind: 'group'; readonly system?: string }
+  /** A module, shown under a world if `world` is given. */
+  | { readonly kind: 'module'; readonly module: string; readonly world?: string };
+
+/** The status shown beside a row: a world's, or a package's. */
+export type RowStatus =
+  { readonly kind: 'world'; readonly value: WorldStatus } | { readonly kind: 'package'; readonly value: ModuleStatus };
 
 /** A row of the tree. */
 export interface TreeRow {
-  /** Unique within the tree; also the key of a row that can be expanded. */
+  /** The path to the row, from the root: unique within the tree, and the key of a row that can be expanded. */
   readonly key: string;
-  /** 1 for the root, 2 for a world, 3 for a module. */
-  readonly level: 1 | 2 | 3;
+  /** 1 for the root, and one more for each row it is under. */
+  readonly level: number;
   readonly selection: TreeSelection;
   readonly title: string;
   /** The version shown beside the title, if any. */
   readonly version?: string;
-  readonly status?: WorldStatus | ModuleStatus;
+  readonly status?: RowStatus;
   /** Whether the row has rows under it. */
   readonly expandable: boolean;
   /** The key of the row it is under, if any. */
@@ -29,21 +51,23 @@ export interface TreeRow {
 
 /** The root row's key. */
 export const ROOT = 'root';
+/** The game systems' row's key. */
+export const SYSTEMS = `${ROOT}/systems`;
+/** The modules' row's key. */
+export const MODULES = `${ROOT}/modules`;
 
-/**
- * The key of a selection's row.
- * @param selection - The selection
- * @returns Its row's key
- */
-export function keyOf(selection: TreeSelection): string {
-  switch (selection.kind) {
-    case 'root':
-      return ROOT;
-    case 'world':
-      return `world:${selection.world}`;
-    case 'module':
-      return `module:${selection.world}:${selection.module}`;
-  }
+/** The rows expanded when the tree first shows: the root, and the game systems and the modules under it. */
+export const INITIALLY_EXPANDED: readonly string[] = [ROOT, SYSTEMS, MODULES];
+
+/** A row, and how to find the rows under it, which are only worked out while it shows. */
+interface TreeNode {
+  /** The row's part of its key. */
+  readonly segment: string;
+  readonly selection: TreeSelection;
+  readonly title: string;
+  readonly version?: string;
+  readonly status?: RowStatus;
+  readonly children: () => readonly TreeNode[];
 }
 
 /**
@@ -53,30 +77,215 @@ export function keyOf(selection: TreeSelection): string {
  * @returns The rows, in order
  */
 export function visibleRows(overview: Overview, expanded: ReadonlySet<string>): TreeRow[] {
-  const rows: TreeRow[] = [
-    { key: ROOT, level: 1, selection: { kind: 'root' }, title: '', version: overview.core, expandable: true },
-  ];
-  if (!expanded.has(ROOT)) return rows;
-  for (const { world, status, modules } of overview.worlds) {
-    const selection: TreeSelection = { kind: 'world', world: world.id };
-    const key = keyOf(selection);
-    rows.push({ key, level: 2, selection, title: world.title, status, expandable: modules.length > 0, parent: ROOT });
-    if (!expanded.has(key)) continue;
-    for (const entry of modules) {
-      const moduleSelection: TreeSelection = { kind: 'module', world: world.id, module: entry.id };
-      rows.push({
-        key: keyOf(moduleSelection),
-        level: 3,
-        selection: moduleSelection,
-        title: entry.title,
-        version: entry.recorded,
-        status: entry.status,
-        expandable: false,
-        parent: key,
-      });
-    }
-  }
+  const rows: TreeRow[] = [];
+  const visit = (node: TreeNode, level: number, parent?: string): void => {
+    const key = parent === undefined ? node.segment : `${parent}/${node.segment}`;
+    const children = node.children();
+    rows.push({
+      key,
+      level,
+      selection: node.selection,
+      title: node.title,
+      ...(node.version !== undefined && { version: node.version }),
+      ...(node.status !== undefined && { status: node.status }),
+      expandable: children.length > 0,
+      ...(parent !== undefined && { parent }),
+    });
+    if (!expanded.has(key)) return;
+    for (const child of children) visit(child, level + 1, key);
+  };
+  visit(rootNode(overview), 1);
   return rows;
+}
+
+/**
+ * The root: Foundry VTT, with the game systems and the modules under it.
+ * @param overview - The installation
+ * @returns The root's node
+ */
+function rootNode(overview: Overview): TreeNode {
+  const modules = new Map(overview.modules.map(use => [use.module.id, use]));
+  const systems: TreeNode = {
+    segment: 'systems',
+    selection: { kind: 'systems' },
+    title: localize('Tree.Systems'),
+    children: () => systemNodes(overview, modules),
+  };
+  const grouped: TreeNode = {
+    segment: 'modules',
+    selection: { kind: 'modules' },
+    title: localize('Tree.Modules'),
+    children: () => groupNodes(overview, modules),
+  };
+  return {
+    segment: ROOT,
+    selection: { kind: 'root' },
+    title: format('Tree.Root', { version: overview.core }),
+    children: () => [systems, grouped],
+  };
+}
+
+/** The status of a package that is installed. */
+const INSTALLED: RowStatus = { kind: 'package', value: 'same' };
+/** The status of a package that is not installed. */
+const MISSING: RowStatus = { kind: 'package', value: 'missing' };
+
+/**
+ * The game systems: those installed, then any that a world uses but is not installed.
+ * @param overview - The installation
+ * @param modules - The installed modules, by ID
+ * @returns Their nodes
+ */
+function systemNodes(overview: Overview, modules: ReadonlyMap<string, ModuleUse>): TreeNode[] {
+  const installed = new Set(overview.systems.map(({ id }) => id));
+  const missing = [...new Set(overview.worlds.map(({ world }) => world.system))]
+    .filter(id => !installed.has(id))
+    .map(id => ({ id, title: id }))
+    .sort(byTitle);
+  const node = (id: string, title: string, shown: { version?: string; status: RowStatus }): TreeNode => ({
+    segment: `system:${id}`,
+    selection: { kind: 'system', system: id },
+    title,
+    ...shown,
+    children: () => overview.worlds.filter(({ world }) => world.system === id).map(world => worldNode(world, modules)),
+  });
+  return [
+    ...overview.systems.map(({ id, title, version }) => node(id, title, { version, status: INSTALLED })),
+    ...missing.map(({ id }) => node(id, id, { status: MISSING })),
+  ];
+}
+
+/**
+ * A world, with the game system and the modules its record says it last ran with.
+ * @param overview - The world
+ * @param modules - The installed modules, by ID
+ * @returns Its node
+ */
+function worldNode(overview: WorldOverview, modules: ReadonlyMap<string, ModuleUse>): TreeNode {
+  const { world, status, ranSystem } = overview;
+  return {
+    segment: `world:${world.id}`,
+    selection: { kind: 'world', world: world.id },
+    title: world.title,
+    status: { kind: 'world', value: status },
+    children: () => [
+      ...(ranSystem === undefined ? [] : [ranSystemNode(ranSystem, world.id)]),
+      ...overview.modules.map(entry => runNode(entry, world.id, modules)),
+    ],
+  };
+}
+
+/**
+ * The game system a world last ran with, at the version its record gives.
+ * @param entry - The system, as the world's record gives it
+ * @param world - The world's ID
+ * @returns Its node
+ */
+function ranSystemNode(entry: WorldModule, world: string): TreeNode {
+  return {
+    segment: `system:${entry.id}`,
+    selection: { kind: 'system', system: entry.id, world },
+    title: entry.title,
+    version: entry.recorded,
+    status: { kind: 'package', value: entry.status },
+    children: () => [],
+  };
+}
+
+/**
+ * A module a world runs, at the version its record gives, with the modules it requires.
+ * @param entry - The module, as the world's record gives it
+ * @param world - The world's ID
+ * @param modules - The installed modules, by ID
+ * @returns Its node
+ */
+function runNode(entry: WorldModule, world: string, modules: ReadonlyMap<string, ModuleUse>): TreeNode {
+  return {
+    segment: `module:${entry.id}`,
+    selection: { kind: 'module', module: entry.id, world },
+    title: entry.title,
+    version: entry.recorded,
+    status: { kind: 'package', value: entry.status },
+    children: () => requirementNodes([entry.id], world, modules),
+  };
+}
+
+/**
+ * An installed module, as the modules' groups show it, with the modules it requires.
+ * @param use - The module, with the worlds it is active in
+ * @param modules - The installed modules, by ID
+ * @returns Its node
+ */
+function installedNode(use: ModuleUse, modules: ReadonlyMap<string, ModuleUse>): TreeNode {
+  const { id, title, version } = use.module;
+  return {
+    segment: `module:${id}`,
+    selection: { kind: 'module', module: id },
+    title,
+    version,
+    children: () => requirementNodes([id], undefined, modules),
+  };
+}
+
+/**
+ * The modules a module requires, by title, each as installed, with the modules it requires in turn.
+ * @param path - The IDs of the module, first, and of the modules it is under, none of which shows again under it
+ * @param world - The world it is under, if any
+ * @param modules - The installed modules, by ID
+ * @returns Their nodes; none if the module is not installed, as only its manifest says what it requires
+ */
+function requirementNodes(
+  path: readonly [string, ...string[]],
+  world: string | undefined,
+  modules: ReadonlyMap<string, ModuleUse>,
+): TreeNode[] {
+  const requires = modules.get(path[0])?.module.requires ?? [];
+  return requires
+    .filter(required => !path.includes(required))
+    .map(required => ({ id: required, title: modules.get(required)?.module.title ?? required }))
+    .sort(byTitle)
+    .map(({ id, title }): TreeNode => {
+      const installed = modules.get(id)?.module;
+      return {
+        segment: `module:${id}`,
+        selection: { kind: 'module', module: id, ...(world !== undefined && { world }) },
+        title,
+        ...(installed === undefined ? { status: MISSING } : { version: installed.version }),
+        children: () => requirementNodes([id, ...path], world, modules),
+      };
+    });
+}
+
+/**
+ * The modules, grouped: those for any game system, then those for each system, by the system's title.
+ * @param overview - The installation
+ * @param modules - The installed modules, by ID
+ * @returns The groups' nodes, leaving out any without modules
+ */
+function groupNodes(overview: Overview, modules: ReadonlyMap<string, ModuleUse>): TreeNode[] {
+  const titles = new Map(overview.systems.map(({ id, title }) => [id, title]));
+  const universal = overview.modules.filter(({ module: pkg }) => pkg.systems.length === 0);
+  const systems = [...new Set(overview.modules.flatMap(({ module: pkg }) => pkg.systems))]
+    .map(id => ({ id, title: titles.get(id) ?? id }))
+    .sort(byTitle);
+  const groups: TreeNode[] = systems.map(({ id, title }) => ({
+    segment: `system:${id}`,
+    selection: { kind: 'group', system: id },
+    title,
+    ...(!titles.has(id) && { status: MISSING }),
+    children: () =>
+      overview.modules.filter(({ module: pkg }) => pkg.systems.includes(id)).map(use => installedNode(use, modules)),
+  }));
+  if (universal.length === 0) return groups;
+  return [
+    {
+      segment: 'universal',
+      selection: { kind: 'group' },
+      title: localize('Tree.Universal'),
+      children: () => universal.map(use => installedNode(use, modules)),
+    },
+    ...groups,
+  ];
 }
 
 /** Where a key moves the keyboard's row, or how it changes what is expanded. */

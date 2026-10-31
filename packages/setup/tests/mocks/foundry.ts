@@ -78,6 +78,8 @@ export interface PackageData {
   id: string;
   title?: string | undefined;
   version?: string | undefined;
+  /** A module's relationships, as Foundry gives them: sets of the packages related. */
+  relationships?: { systems?: unknown; requires?: unknown } | undefined;
 }
 
 /** A world as `game.worlds` holds it. */

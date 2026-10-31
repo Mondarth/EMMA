@@ -5,7 +5,7 @@
 import type { WorldRecord } from '@mondarth/emma-core/world-record';
 
 import type { RecordState } from '../foundry/records';
-import type { InstalledPackage, InstalledWorld, Installation } from '../foundry/setup-game';
+import type { InstalledModule, InstalledPackage, InstalledWorld, Installation } from '../foundry/setup-game';
 
 /**
  * How a world's record compares with what is installed now:
@@ -22,7 +22,7 @@ export type WorldStatus = 'matches' | 'differs' | 'unrecorded' | 'unreadable';
  */
 export type ModuleStatus = 'same' | 'other' | 'missing';
 
-/** A module a world's record says it runs. */
+/** A package a world's record says it runs: a module, or the game system. */
 export interface WorldModule {
   readonly id: string;
   readonly title: string;
@@ -31,6 +31,19 @@ export interface WorldModule {
   /** The version installed now, if it is installed. */
   readonly installed?: string;
   readonly status: ModuleStatus;
+}
+
+/**
+ * A module a world's record does not say it runs, but that the world will need when next run, as modules it runs require
+ * it as they are installed now: typically because one was updated since and the new version requires more.
+ */
+export interface WorldNeed {
+  readonly id: string;
+  /** Its title if it is installed, or else its ID. */
+  readonly title: string;
+  readonly installed: boolean;
+  /** The titles of the modules the world runs that now require it, directly or through others it does not run yet. */
+  readonly by: readonly string[];
 }
 
 /** Something installed that is not as the world last ran with it. */
@@ -47,17 +60,23 @@ export interface WorldOverview {
   readonly status: WorldStatus;
   /** The world's record, if it has one EMMA can read. */
   readonly record?: WorldRecord;
+  /** The game system the record says the world last ran with, compared with what is installed, if it has a record. */
+  readonly ranSystem?: WorldModule;
   /** The modules the record says the world runs, sorted by title. Empty without a record. */
   readonly modules: readonly WorldModule[];
+  /** The modules the world will need when next run that its record does not say it runs. Empty without a record. */
+  readonly needs: readonly WorldNeed[];
   /** What is not installed as the world last ran with it. */
   readonly differences: readonly Difference[];
 }
 
-/** An installed module, with the worlds whose records say they run it. */
+/** An installed module, with the worlds whose records say they run it, or that will need it when next run. */
 export interface ModuleUse {
-  readonly module: InstalledPackage;
+  readonly module: InstalledModule;
   /** The IDs of the worlds, in the order of {@link Overview.worlds}. */
   readonly worlds: readonly string[];
+  /** The IDs of those of the worlds that only will need it when next run (see {@link WorldNeed}). */
+  readonly needed: readonly string[];
 }
 
 /** A summary of the installation, for the root of the tree. */
@@ -70,8 +89,10 @@ export interface Summary {
   };
   readonly modules: {
     readonly total: number;
-    /** How many installed modules a recorded world runs. */
+    /** How many installed modules a recorded world runs, or will need when next run. */
     readonly used: number;
+    /** How many of those only will be needed when next run, by every recorded world that uses them. */
+    readonly pending: number;
     /** How many installed modules no recorded world runs. Worlds without a record may run them. */
     readonly unused: number;
   };
@@ -80,7 +101,10 @@ export interface Summary {
 /** Everything EMMA shows on the setup screen. */
 export interface Overview {
   readonly core: string;
+  /** The installed game systems, sorted by title. */
+  readonly systems: readonly InstalledPackage[];
   readonly worlds: readonly WorldOverview[];
+  /** The installed modules, sorted by title. */
   readonly modules: readonly ModuleUse[];
   readonly summary: Summary;
 }
@@ -97,11 +121,22 @@ export function buildOverview(installation: Installation, records: ReadonlyMap<s
   const worlds = installation.worlds.map(world =>
     worldOverview(world, records.get(world.id) ?? { kind: 'none' }, installation.core, modules, systems),
   );
-  const uses = installation.modules.map(installed => ({
-    module: installed,
-    worlds: worlds.filter(({ modules: run }) => run.some(({ id }) => id === installed.id)).map(({ world }) => world.id),
-  }));
-  return { core: installation.core, worlds, modules: uses, summary: summarise(worlds, uses, systems) };
+  const uses = installation.modules.map((installed): ModuleUse => {
+    const runs = (world: WorldOverview): boolean => world.modules.some(({ id }) => id === installed.id);
+    const needs = (world: WorldOverview): boolean => world.needs.some(({ id }) => id === installed.id);
+    return {
+      module: installed,
+      worlds: worlds.filter(world => runs(world) || needs(world)).map(({ world }) => world.id),
+      needed: worlds.filter(needs).map(({ world }) => world.id),
+    };
+  });
+  return {
+    core: installation.core,
+    systems: installation.systems,
+    worlds,
+    modules: uses,
+    summary: summarise(worlds, uses, systems),
+  };
 }
 
 /**
@@ -117,32 +152,32 @@ function worldOverview(
   world: InstalledWorld,
   state: RecordState,
   core: string,
-  modules: ReadonlyMap<string, InstalledPackage>,
+  modules: ReadonlyMap<string, InstalledModule>,
   systems: ReadonlyMap<string, InstalledPackage>,
 ): WorldOverview {
   const installedSystem = systems.get(world.system);
   const base = { world, ...(installedSystem !== undefined && { system: installedSystem }) };
   if (state.kind !== 'recorded') {
-    return { ...base, status: state.kind === 'none' ? 'unrecorded' : 'unreadable', modules: [], differences: [] };
+    return {
+      ...base,
+      status: state.kind === 'none' ? 'unrecorded' : 'unreadable',
+      modules: [],
+      needs: [],
+      differences: [],
+    };
   }
   const { record } = state;
-  const run = record.modules
-    .map(({ id, title, version }): WorldModule => {
-      const installed = modules.get(id)?.version;
-      const status = installed === undefined ? 'missing' : installed === version ? 'same' : 'other';
-      return { id, title, recorded: version, ...(installed !== undefined && { installed }), status };
-    })
-    .sort(byTitle);
+  const ranSystem = compared(record.system, systems);
+  const run = record.modules.map(entry => compared(entry, modules)).sort(byTitle);
 
   const differences: Difference[] = [];
   if (record.core !== core) differences.push({ kind: 'core', recorded: record.core, installed: core });
-  const system = systems.get(record.system.id)?.version;
-  if (system !== record.system.version) {
+  if (ranSystem.status !== 'same') {
     differences.push({
       kind: 'system',
-      title: record.system.title,
-      recorded: record.system.version,
-      ...(system !== undefined && { installed: system }),
+      title: ranSystem.title,
+      recorded: ranSystem.recorded,
+      ...(ranSystem.installed !== undefined && { installed: ranSystem.installed }),
     });
   }
   for (const entry of run) {
@@ -155,7 +190,60 @@ function worldOverview(
     });
   }
 
-  return { ...base, status: differences.length === 0 ? 'matches' : 'differs', record, modules: run, differences };
+  return {
+    ...base,
+    status: differences.length === 0 ? 'matches' : 'differs',
+    record,
+    ranSystem,
+    modules: run,
+    needs: needsOf(run, modules),
+    differences,
+  };
+}
+
+/**
+ * Compare a package as a world's record gives it with what is installed.
+ * @param recorded - The package as the record gives it
+ * @param recorded.id - Its ID
+ * @param recorded.title - Its title
+ * @param recorded.version - The version the world last ran with
+ * @param installed - The installed packages of its kind, by ID
+ * @returns The comparison
+ */
+function compared(
+  { id, title, version }: { id: string; title: string; version: string },
+  installed: ReadonlyMap<string, InstalledPackage>,
+): WorldModule {
+  const now = installed.get(id)?.version;
+  const status = now === undefined ? 'missing' : now === version ? 'same' : 'other';
+  return { id, title, recorded: version, ...(now !== undefined && { installed: now }), status };
+}
+
+/**
+ * The modules a world will need when next run that its record does not say it runs: those the modules it runs require
+ * as installed now, and those they require in turn.
+ * @param run - The modules the world's record says it runs, sorted by title
+ * @param modules - The installed modules, by ID
+ * @returns The modules it will need, each with the titles of the modules it runs that require it
+ */
+function needsOf(run: readonly WorldModule[], modules: ReadonlyMap<string, InstalledModule>): WorldNeed[] {
+  const recorded = new Set(run.map(({ id }) => id));
+  const needs = new Map<string, string[]>();
+  for (const entry of run) {
+    const seen = new Set([entry.id]);
+    const pending = [...(modules.get(entry.id)?.requires ?? [])];
+    for (let id = pending.shift(); id !== undefined; id = pending.shift()) {
+      // A module the world runs is already accounted for, with what it requires.
+      if (seen.has(id) || recorded.has(id)) continue;
+      seen.add(id);
+      needs.set(id, [...(needs.get(id) ?? []), entry.title]);
+      pending.push(...(modules.get(id)?.requires ?? []));
+    }
+  }
+  return [...needs].map(([id, by]) => {
+    const installed = modules.get(id);
+    return { id, title: installed?.title ?? id, installed: installed !== undefined, by };
+  });
 }
 
 /**
@@ -174,7 +262,8 @@ function summarise(
   for (const { world } of worlds) bySystem.set(world.system, (bySystem.get(world.system) ?? 0) + 1);
   const byStatus: Record<WorldStatus, number> = { matches: 0, differs: 0, unrecorded: 0, unreadable: 0 };
   for (const { status } of worlds) byStatus[status] += 1;
-  const used = uses.filter(({ worlds: running }) => running.length > 0).length;
+  const used = uses.filter(({ worlds: running }) => running.length > 0);
+  const pending = used.filter(({ worlds: running, needed }) => needed.length === running.length).length;
   return {
     worlds: {
       total: worlds.length,
@@ -183,7 +272,7 @@ function summarise(
         .sort((a, b) => b.count - a.count || byTitle(a, b)),
       byStatus,
     },
-    modules: { total: uses.length, used, unused: uses.length - used },
+    modules: { total: uses.length, used: used.length, pending, unused: uses.length - used.length },
   };
 }
 
@@ -197,7 +286,7 @@ function summarise(
  * @param b.title - Its title
  * @returns The order
  */
-function byTitle(a: { id: string; title: string }, b: { id: string; title: string }): number {
+export function byTitle(a: { id: string; title: string }, b: { id: string; title: string }): number {
   const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
   return collator.compare(a.title, b.title) || collator.compare(a.id, b.id);
 }

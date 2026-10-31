@@ -91,20 +91,59 @@ here**. The browser remembers the choice for that server.
 
 ### The installation tree
 
-EMMA's window shows the installation as a tree, and beside it what is selected in it:
+EMMA's window shows the installation as a tree, and beside it what is selected in it. The tree is in two halves, the
+game systems with the worlds that use them, and the modules:
+
+```text
+Foundry VTT
+  Game systems
+    D&D 5e
+      World 1
+        the game system and the modules World 1 last ran with
+      World 2
+        the game system and the modules World 2 last ran with
+    Pathfinder 2e
+      World 3 …
+  Modules
+    Universal
+      the modules for any game system
+    D&D 5e
+      the modules for D&D 5e
+```
 
 - **The root**, Foundry VTT and its version: a summary of the worlds (how many, by game system, and how their records
-  compare with what is installed) and of the modules (how many, and how many a recorded world runs).
-- **Each world**, with how its record compares with what is installed now:
+  compare with what is installed) and of the modules (how many, and how many are active in a recorded world).
+- **Game systems**: each installed system, with its version marked **Installed**, and the worlds that use it; then any
+  system a world uses that is not installed, marked **Not installed**. Only one version of a system is installed at a
+  time. Each world shows how its record compares with what is installed now:
   - **Matches its record**: Foundry, the game system and every module are installed at the versions the world last ran
     with.
   - **Changed since it last ran**: something has been updated or uninstalled since. The world's panel lists what.
   - **No record**, or **Record unreadable**: see below.
-- **Under each world**, the modules it runs, with the version it last ran with and whether that version is installed,
-  another version is, or none is. A module's panel lists the other recorded worlds that run it.
+- **Under each world**, first its game system, then the modules it runs, each with the version the world last ran with
+  and whether that version is **Installed**, **Another version installed**, or **Not installed**. So a world that last
+  ran with an older version of its system, or with a system since uninstalled, says so. A world without a record shows
+  nothing under it, as EMMA cannot tell what it last ran with.
+- **Modules**: every installed module, grouped by the game systems its manifest names. **Universal** holds the modules
+  that name none, for use with any system. A module for several systems is in each of their groups.
+- **Under each module**, wherever it shows, the modules it requires, and under those the modules they require in turn.
+  A requirement that is not installed is marked **Not installed**.
 
-The tree is driven from the keyboard too: the arrow keys move up and down, and open and close a world, and Home and End
-go to the first and last row. **Read again** reads the installation afresh.
+A game system's panel gives the version installed, how many modules are for it, and the worlds that use it, each with
+the version it last ran with; under a world, also the version that world last ran with.
+
+So a module may show in many places. Its panel is the same wherever it is selected: the version installed, the game
+systems it is for, the modules it requires and those that require it, and the recorded worlds it is active in; under a
+world, also the version that world last ran with.
+
+A world's record lists the modules it ran with last time. If a module it runs has been updated since, and the new
+version requires a module the world did not run, **Active in** still lists the world, with a note that it will need that
+module when next run, and which updated modules require it. The world's panel lists the modules it will need, under
+**Will need when next run**, and the root's summary counts them as active in a recorded world, saying how many only will
+be.
+
+Every row with rows under it opens and closes, from its triangle or from the keyboard: the arrow keys move up and down,
+and open and close a row, and Home and End go to the first and last row. **Read again** reads the installation afresh.
 
 ### Worlds without a record
 

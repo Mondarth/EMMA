@@ -60,6 +60,33 @@ The compose file in `.foundryvtt/` runs the pinned Foundry VTT release (`VERSION
    Set the `PDT_MOUNT_CONFIG` environment variable to read the settings from a different file; a relative path is
    resolved from the root of the repository.
 
+## Working on the EMMA extension
+
+The **EMMA extension** is EMMA on Foundry VTT's setup screen, as the browser extension brings it in
+(`packages/setup`); "the browser extension" is the extension itself (`packages/extension`). The EMMA extension can be
+worked on without the browser extension: its own development server passes a local Foundry VTT through, and adds the
+EMMA extension's source to the setup page.
+
+1. Start Foundry VTT, as above, and return it to the setup screen if a world is running.
+2. Start the EMMA extension's development server:
+
+   ```sh
+   pnpm dev:setup
+   ```
+
+3. Open <http://localhost:31003/setup> rather than port 30000, and the EMMA button in the setup screen's menu. Each
+   change to `packages/setup/src/` reloads the page.
+
+The server reads `hostname` and `ports.base` from `.pdt/mount.json`, as the module's does, and its own port from
+`ports.setup`:
+
+```json
+{ "hostname": "my-dev-box", "ports": { "base": 30000, "dev": 31002, "setup": 31003 } }
+```
+
+Do not have the browser extension active for the development server's address as well: the EMMA extension starts once
+on a page, so the one that starts first would win.
+
 ## The module manifest
 
 `module.json` was filled in when the project was generated. Review:

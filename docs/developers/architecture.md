@@ -128,7 +128,10 @@ module:
   `renderSetupMenu` hook; and `guard.ts`, the fragile part, stops clicks on the Install, Update and Update All buttons
   in the capture phase and wraps `game.post` to refuse `installPackage`. libWrapper is a module, not loaded on the
   setup screen, so the guard wraps `game.post` itself. `src/lib/overview.ts` compares each world's record with what is
-  installed and summarises the installation; `src/lib/tree.ts` gives the tree's rows and keyboard moves. The window,
+  installed and summarises the installation; `src/lib/tree.ts` gives the tree's rows and keyboard moves, working out the
+  rows under a row only while it shows, as a module's requirements nest; `src/lib/details.ts` gives what the panel
+  beside the tree shows for a system, a module or a group. As a module shows in many places, a row's key is its path
+  from the root, and the window keeps the selected row's key. The window,
   `EmmaSetupApp`, is an `ApplicationV2`, as on the module, mounting `SetupRoot`. Its text is its own
   (`src/lang/en.json`), as Foundry's translations on the setup screen do not include EMMA's.
 
