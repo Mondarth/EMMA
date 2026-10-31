@@ -110,7 +110,7 @@ export function release(ref: `${'module' | 'system'}:${string}`, version: string
  * @returns What it found
  */
 export function noUpdates(): Promise<UpdateSearch> {
-  return Promise.resolve({ updates: new Map(), unresolved: [], judge: unjudged });
+  return Promise.resolve({ updates: new Map(), blocked: new Map(), unresolved: [], judge: unjudged });
 }
 
 /**

@@ -2,8 +2,8 @@
   The installation tree (see lib/tree.ts). The selection follows the keyboard, as in a file browser, so the panel beside
   it shows the row the keyboard is on. As a module may show in many places, the selection is a row's key.
 
-  A package with an update on offer has an arrow to the left of each of its rows, and so has a collapsed row that hides
-  one, fainter. In Update mode, each row that shows its installed version offers its versions in a list instead, each in
+  A package with an update on offer has a blue arrow to the left of each of its rows, and one with a newer version EMMA
+  cannot offer a red one beside it; a collapsed row that hides either has the same arrow, fainter. In Update mode, each row that shows its installed version offers its versions in a list instead, each in
   the colour of EMMA's badge for it, as the EMMA module's version lists are.
 -->
 <script lang="ts">
@@ -28,6 +28,19 @@
   }
 
   let { overview, selected, onSelect, updates }: Props = $props();
+
+  // A column for the red arrows only once there are any, so that the tree is no wider without.
+  const anyBlocked = $derived((updates?.search?.blocked.size ?? 0) > 0);
+
+  /**
+   * Whether any of some packages has an update on offer, or a newer version blocked.
+   * @param keys - The packages
+   * @param has - Whether a package has it
+   * @returns `true` if any has
+   */
+  function anyOf(keys: ReadonlySet<string> | undefined, has: (key: string) => boolean): boolean {
+    return [...(keys ?? [])].some(has);
+  }
 
   const expanded = new SvelteSet<string>(INITIALLY_EXPANDED);
   const rows = $derived(visibleRows(overview, expanded));
@@ -92,13 +105,19 @@
   }
 </script>
 
+{#snippet arrow(text: string, faint: boolean)}
+  <i class={['fa-solid', 'fa-circle-up', { 'emma-tree-hidden': faint }]} title={localize(text)} aria-hidden="true"></i>
+  <span class="emma-visually-hidden">{localize(text)}</span>
+{/snippet}
+
 <ul class="emma-tree" role="tree" aria-label={localize('Tree.Label')} bind:this={tree}>
   {#each rows as row (row.key)}
     {@const status = statusText(row)}
     {@const key = packageOf(row.selection)}
     {@const update = key === undefined ? undefined : updates?.updateOf(key)}
-    {@const hidden =
-      updates !== undefined && [...(row.hides ?? [])].some(under => updates.updateOf(under) !== undefined)}
+    {@const blocked = key !== undefined && updates?.blockedOf(key) !== undefined}
+    {@const hidden = updates !== undefined && anyOf(row.hides, under => updates.updateOf(under) !== undefined)}
+    {@const hiddenBlocked = updates !== undefined && anyOf(row.hides, under => updates.blockedOf(under) !== undefined)}
     <li
       role="treeitem"
       class="emma-tree-row"
@@ -114,13 +133,20 @@
       onkeydown={onKeydown}>
       <span class="emma-tree-update">
         {#if update !== undefined}
-          <i class="fa-solid fa-circle-up" title={localize('Update.Available')} aria-hidden="true"></i>
-          <span class="emma-visually-hidden">{localize('Update.Available')}</span>
+          {@render arrow('Update.Available', false)}
         {:else if hidden}
-          <i class="fa-solid fa-circle-up emma-tree-hidden" title={localize('Update.Hidden')} aria-hidden="true"></i>
-          <span class="emma-visually-hidden">{localize('Update.Hidden')}</span>
+          {@render arrow('Update.Hidden', true)}
         {/if}
       </span>
+      {#if anyBlocked}
+        <span class="emma-tree-update emma-tree-blocked">
+          {#if blocked}
+            {@render arrow('Update.Blocked', false)}
+          {:else if hiddenBlocked}
+            {@render arrow('Update.HiddenBlocked', true)}
+          {/if}
+        </span>
+      {/if}
       {#if row.expandable}
         <i
           class={['emma-tree-toggle', 'fa-solid', expanded.has(row.key) ? 'fa-caret-down' : 'fa-caret-right']}
@@ -185,6 +211,10 @@
 
   .emma-tree-update {
     color: var(--color-level-info, #5af);
+  }
+
+  .emma-tree-blocked {
+    color: var(--color-level-error, #e55);
   }
 
   .emma-tree-hidden {

@@ -8,7 +8,7 @@ import { SvelteMap } from 'svelte/reactivity';
 import type { KitProblem } from '../foundry/setup-kit';
 import { KitUnavailable } from '../foundry/setup-kit';
 import type { Overview } from '../lib/overview';
-import type { PackageUpdate, UpdateSearch, VersionOption } from '../lib/updates';
+import type { BlockedUpdate, PackageUpdate, UpdateSearch, VersionOption } from '../lib/updates';
 
 /**
  * Where the search for updates is: `unavailable` when it cannot be made, as without an EMMA module whose setup kit
@@ -94,6 +94,15 @@ export class UpdateState {
    */
   updateOf(key: PackageKey): PackageUpdate | undefined {
     return this.search?.updates.get(key);
+  }
+
+  /**
+   * The newer version of a package that EMMA cannot offer, and why.
+   * @param key - The package's key
+   * @returns The blocked update, or `undefined` if there is none
+   */
+  blockedOf(key: PackageKey): BlockedUpdate | undefined {
+    return this.search?.blocked.get(key);
   }
 
   /**
