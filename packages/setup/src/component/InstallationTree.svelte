@@ -2,8 +2,8 @@
   The installation tree (see lib/tree.ts). The selection follows the keyboard, as in a file browser, so the panel beside
   it shows the row the keyboard is on. As a module may show in many places, the selection is a row's key.
 
-  A package with an update on offer has an arrow to the left of each of its rows. In Update mode, each row that shows
-  its installed version offers its versions in a list instead.
+  A package with an update on offer has an arrow to the left of each of its rows, and so has a collapsed row that hides
+  one, fainter. In Update mode, each row that shows its installed version offers its versions in a list instead.
 -->
 <script lang="ts">
   import { tick } from 'svelte';
@@ -94,6 +94,8 @@
     {@const status = statusText(row)}
     {@const key = packageOf(row.selection)}
     {@const update = key === undefined ? undefined : updates?.updateOf(key)}
+    {@const hidden =
+      updates !== undefined && [...(row.hides ?? [])].some(under => updates.updateOf(under) !== undefined)}
     <li
       role="treeitem"
       class="emma-tree-row"
@@ -111,6 +113,9 @@
         {#if update !== undefined}
           <i class="fa-solid fa-circle-up" title={localize('Update.Available')} aria-hidden="true"></i>
           <span class="emma-visually-hidden">{localize('Update.Available')}</span>
+        {:else if hidden}
+          <i class="fa-solid fa-circle-up emma-tree-hidden" title={localize('Update.Hidden')} aria-hidden="true"></i>
+          <span class="emma-visually-hidden">{localize('Update.Hidden')}</span>
         {/if}
       </span>
       {#if row.expandable}
@@ -188,6 +193,10 @@
 
   .emma-tree-update {
     color: var(--color-level-info, #5af);
+  }
+
+  .emma-tree-hidden {
+    opacity: 0.6;
   }
 
   .emma-tree-choice {

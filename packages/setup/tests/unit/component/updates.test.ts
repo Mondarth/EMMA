@@ -70,6 +70,24 @@ describe('updates in the window', () => {
     expect(screen.getByRole('button', { name: 'Update' })).toBeEnabled();
   });
 
+  test('marks a collapsed row that hides an update, until it is expanded', async () => {
+    const { user } = await setUp();
+    const universal = row(/Universal/);
+    expect(universal).toHaveTextContent(/^Updates in the rows under it/);
+    expect(row(/^Game systems/)).not.toHaveTextContent('Updates in the rows under it');
+
+    await user.click(within(universal).getByText('Universal'));
+    await user.keyboard('{ArrowRight}');
+
+    expect(universal).toHaveAttribute('aria-expanded', 'true');
+    expect(universal).not.toHaveTextContent('Updates in the rows under it');
+    expect(row(/^Update available Library/)).toBeInTheDocument();
+
+    await user.click(within(row(/^Foundry VTT/)).getByText(/Foundry VTT/));
+    await user.keyboard('{ArrowLeft}');
+    expect(row(/Foundry VTT/)).toHaveTextContent(/^Updates in the rows under it/);
+  });
+
   test('offers the versions in Update mode, and plans the ones chosen below the tree and the panel', async () => {
     const { user } = await setUp();
     expect(screen.queryByRole('combobox')).toBeNull();
