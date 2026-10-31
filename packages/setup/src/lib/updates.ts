@@ -57,6 +57,14 @@ export interface VersionOption {
   readonly badge: KitBadge | null;
   /** Whether the version is not on Foundry's package listing; the badge's tooltip and text say so already. */
   readonly unlisted?: true;
+  /**
+   * Why the plan cannot take the version as it is: the choices in it that would have to be taken out, by title, and why,
+   * in the resolver's words. Such a version cannot be chosen until they are.
+   */
+  readonly conflict?: {
+    readonly remove: readonly { readonly title: string; readonly version: string }[];
+    readonly explanation: readonly string[];
+  };
   /** What the version needs, as its manifest declares it, one sentence to a line. */
   readonly needs?: readonly string[];
   /** What else choosing it would change, beyond what is chosen already: each package by its title, at its version. */

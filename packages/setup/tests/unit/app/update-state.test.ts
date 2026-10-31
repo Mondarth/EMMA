@@ -128,6 +128,32 @@ describe('UpdateState', () => {
     expect(updates.explainedOf('module:app')?.option).toBe(options[1]);
   });
 
+  test('lists a version other choices stand in the way of, naming them, and leaves out one none does', async () => {
+    const planner = alone(APP, LIB);
+    vi.spyOn(planner, 'complete').mockImplementation(picks =>
+      Promise.resolve(
+        // App 1.5.0 cannot go with Library 1.1.0; App 2.0.0 cannot be had at all.
+        (picks.get('module:app') === '1.5.0' && picks.get('module:lib') === '1.1.0') ||
+          picks.get('module:app') === '2.0.0'
+          ? { ok: false, explanation: ['Because of the library.'] }
+          : { ok: true, versions: new Map(picks) },
+      ),
+    );
+    const updates = new UpdateState(() => Promise.resolve({ ...finding(APP, LIB), planner }));
+    await updates.searchFor(OVERVIEW);
+    await updates.choose('module:lib', '1.1.0');
+
+    const options = await updates.optionsFor('module:app');
+
+    expect(options.map(({ version }) => version)).toEqual(['1.5.0', '1.0.0']);
+    expect(options[0]?.conflict).toEqual({
+      remove: [{ title: 'module:lib', version: '1.1.0' }],
+      explanation: ['Because of the library.'],
+    });
+    expect(options[0]?.badge?.text).toBe('module:app 1.5.0 with 1.1.0');
+    expect(options[1]).not.toHaveProperty('conflict');
+  });
+
   test('plans the choices again for a new search, dropping them if it cannot, and keeps only the latest', async () => {
     const planner = alone(APP, LIB);
     const answers: ((search: UpdateSearch) => void)[] = [];

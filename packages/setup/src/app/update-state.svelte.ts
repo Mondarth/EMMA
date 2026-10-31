@@ -216,7 +216,8 @@ export class UpdateState {
   /**
    * The versions of a package that may be chosen, with what is chosen already: those the plan can take, each badged as
    * the plan would have it, saying what else it would change. The installed one is among them if the plan can go
-   * without it.
+   * without it. A version the plan cannot take only because of other choices in it is among them too, but cannot be
+   * chosen until those are taken out (see {@link VersionOption.conflict}); one no change to the plan would let in is not.
    * @param key - The package's key
    * @returns The versions, newest first
    */
@@ -227,8 +228,25 @@ export class UpdateState {
     const { planner } = search;
     const options: VersionOption[] = [];
     for (const version of [...planner.candidates(key), installed]) {
-      const completion = await planner.complete(this.#picksWith(key, version));
-      if (!completion.ok) continue;
+      const picks = this.#picksWith(key, version);
+      const completion = await planner.complete(picks);
+      if (!completion.ok) {
+        // The choices that stand in its way: each of those without which it could be had.
+        const remove: { title: string; version: string }[] = [];
+        for (const [other, to] of picks) {
+          if (other === key) continue;
+          if ((await planner.complete(withChoice(picks, other, null))).ok) {
+            remove.push({ title: planner.titleOf(other), version: to });
+          }
+        }
+        if (remove.length === 0) continue;
+        const locked = this.#withNeeds(
+          key,
+          search.judge(key, version, other => this.chosenOf(other)),
+        );
+        options.push({ ...locked, conflict: { remove, explanation: completion.explanation ?? [] } });
+        continue;
+      }
       const option = this.#withNeeds(
         key,
         search.judge(key, version, other => completion.versions.get(other)),
