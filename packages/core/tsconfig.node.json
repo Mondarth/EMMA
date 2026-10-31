@@ -1,5 +1,5 @@
 {
-  // The Vitest configuration, which runs under Node.
+  // What runs under Node: the Vitest configuration, and the build scripts with their tests.
   "compilerOptions": {
     "module": "esnext",
     "moduleResolution": "bundler",
@@ -8,8 +8,9 @@
     "types": ["node"],
     "strict": true,
     "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["vite.config.ts"]
+  "include": ["vite.config.ts", "scripts/**/*.ts", "tests/scripts/**/*.ts"]
 }

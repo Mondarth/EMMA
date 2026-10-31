@@ -1,10 +1,8 @@
 /**
- * Builds the default package catalogue into a release, as the default proxy is (see `default-proxy.ts`). The release
- * workflow sets `EMMA_DEFAULT_CATALOGUE_URL` (a repository variable) and `EMMA_DEFAULT_CATALOGUE_KEY` (a secret); Vite
- * puts them, obscured, in `__EMMA_DEFAULT_CATALOGUE__`. A build with neither, as for development and CI, has no
- * default catalogue. See docs/developers/default-proxy.md.
+ * Builds EMMA's package catalogue into a bundle, as `__EMMA_DEFAULT_CATALOGUE__` (see `src/default-catalogue.ts`): run by
+ * the Vite configurations of the module and the EMMA extension, under Node.
  */
-import { obscure } from '../../src/module/lib/obscure.ts';
+import { obscure } from '../src/obscure.ts';
 
 /**
  * The value of `__EMMA_DEFAULT_CATALOGUE__` for a build.

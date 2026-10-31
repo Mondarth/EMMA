@@ -3,8 +3,8 @@
  * `EMMA_DEFAULT_PROXY_URL` and `EMMA_DEFAULT_PROXY_KEY` it is built with, obscured (see `scripts/build/default-proxy.ts`).
  * Development, CI and test builds have none.
  */
-import type { Obscured } from './obscure';
-import { reveal } from './obscure';
+import type { Obscured } from '@mondarth/emma-core/obscure';
+import { reveal } from '@mondarth/emma-core/obscure';
 
 /** The default proxy: its URL template, containing `{url}`, and the API key it asks for. */
 export interface DefaultProxy {

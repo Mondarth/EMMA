@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { obscure } from '../../src/module/lib/obscure.ts';
+import { obscure } from '@mondarth/emma-core/obscure';
 
 /**
  * The value of `__EMMA_DEFAULT_PROXY__` for a build.

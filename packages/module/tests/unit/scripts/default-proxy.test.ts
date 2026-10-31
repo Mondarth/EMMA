@@ -4,8 +4,8 @@ import path from 'node:path';
 
 import { afterEach, describe, expect, test } from 'vitest';
 
-import { reveal } from '@module/lib/obscure';
-import type { Obscured } from '@module/lib/obscure';
+import { reveal } from '@mondarth/emma-core/obscure';
+import type { Obscured } from '@mondarth/emma-core/obscure';
 import { defaultProxyDefine, filesHolding } from '../../../scripts/build/default-proxy';
 
 const PROXY_URL = 'https://packages.example.test/?url={url}';
