@@ -58,6 +58,27 @@ describe('UpdateState', () => {
     expect(updates.blockedOf('module:lib')).toBeUndefined();
   });
 
+  test('explains the version looked at in a list, or else the one chosen, of a package with an update', async () => {
+    const updates = new UpdateState(() => Promise.resolve(finding(APP, LIB)));
+    await updates.searchFor(OVERVIEW);
+    expect(updates.explainedOf('module:app')).toBeUndefined();
+    expect(updates.explainedOf('module:other')).toBeUndefined();
+
+    updates.choose('module:app', '1.5.0');
+    expect(updates.explainedOf('module:app')).toMatchObject({
+      option: { version: '1.5.0' },
+      installed: '1.0.0',
+      previewing: false,
+    });
+    updates.setPreview('module:app', '2.0.0');
+    expect(updates.explainedOf('module:app')).toMatchObject({ option: { version: '2.0.0' }, previewing: true });
+    // Another list closing leaves this one's alone.
+    updates.setPreview('module:lib', null);
+    expect(updates.explainedOf('module:app')?.previewing).toBe(true);
+    updates.setPreview('module:app', null);
+    expect(updates.explainedOf('module:app')).toMatchObject({ option: { version: '1.5.0' }, previewing: false });
+  });
+
   test('badges a version with the other packages at the versions chosen, or none before a search', async () => {
     const updates = new UpdateState(() => Promise.resolve(finding(APP, LIB)));
     expect(updates.optionOf('module:app', '2.0.0')).toEqual({ version: '2.0.0', badge: null });

@@ -163,6 +163,13 @@
           installed={update.installed}
           onChoose={(version: string) => {
             updates.choose(key, version);
+          }}
+          onOpen={() => {
+            // The panel beside the tree explains the versions looked at.
+            onSelect(row);
+          }}
+          onPreview={(version: string | null) => {
+            updates.setPreview(key, version);
           }} />
       {:else if row.version !== undefined}
         <span class="emma-tree-version">{row.version}</span>

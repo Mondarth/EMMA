@@ -3,19 +3,23 @@
   if it shows under one; the worlds that use it, each with the version it last ran with; and how many modules are for it.
 -->
 <script lang="ts">
+  import type { ExplainedVersion } from '../app/update-state.svelte';
   import type { SystemDetail } from '../lib/details';
   import type { BlockedUpdate as Blocked } from '../lib/updates';
 
   import BlockedUpdate from './BlockedUpdate.svelte';
+  import VersionExplanation from './VersionExplanation.svelte';
   import { format, localize } from '../lib/i18n';
 
   interface Props {
     detail: SystemDetail;
     /** A newer version EMMA cannot offer, if there is one. */
     blocked?: Blocked | undefined;
+    /** The version looked at in its list, or chosen, to explain, if any. */
+    explained?: ExplainedVersion | undefined;
   }
 
-  let { detail, blocked }: Props = $props();
+  let { detail, blocked, explained }: Props = $props();
 </script>
 
 <h2>{detail.title}</h2>
@@ -35,6 +39,10 @@
   <dt>{localize('System.Modules')}</dt>
   <dd>{detail.modules}</dd>
 </dl>
+
+{#if explained !== undefined}
+  <VersionExplanation {explained} />
+{/if}
 
 {#if blocked !== undefined}
   <BlockedUpdate {blocked} />

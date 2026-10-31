@@ -187,7 +187,10 @@ versions in a list, from the newest offered down to the installed one, which is 
 colour of EMMA's badge for it, as in the EMMA module's version lists: EMMA's checks judge it, not Foundry's, in each
 recorded world that uses the package, with the other packages at the versions chosen. The badge is the worst of those
 worlds', and its tooltip names that world when more than one uses the package. A package no recorded world uses is
-judged by the Foundry build alone. Choosing a version other than the installed one opens the **Update plan** below the tree and the panel, the full width of the window, listing each package
+judged by the Foundry build alone. Opening a list selects its row, and the panel beside the tree explains the version
+the keyboard or the pointer is on: its badge and Foundry's explanation, and for a package more than one recorded world
+uses, how it fares in each. Once a version is chosen, the panel keeps explaining it, under **<version> update**.
+Choosing a version other than the installed one opens the **Update plan** below the tree and the panel, the full width of the window, listing each package
 chosen with its installed and chosen versions. **Clear choices** takes them all back, and choosing the installed
 version takes back one. Turning Update mode off hides the lists and the plan, and keeps the choices for when it is
 turned on again. Installing the plan is to come.

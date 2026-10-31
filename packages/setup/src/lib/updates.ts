@@ -53,6 +53,8 @@ export interface VersionOption {
   readonly badge: KitBadge | null;
   /** Whether the version is not on Foundry's package listing; the badge's tooltip and text say so already. */
   readonly unlisted?: true;
+  /** When more than one recorded world uses the package, the badge it has in each, of which {@link badge} is the worst. */
+  readonly worlds?: readonly { readonly title: string; readonly badge: KitBadge | null }[];
 }
 
 /**
@@ -395,6 +397,7 @@ function judgeIn(inputs: {
     if (release === undefined) return { version, badge: null };
     const users = worlds.filter(({ uses }) => [uses.system, ...uses.modules].some(use => use.key === key));
     let badge: KitBadge | null;
+    let perWorld: { title: string; badge: KitBadge | null }[] | undefined;
     if (users.length === 0) {
       // No recorded world says what it would run with: the Foundry build alone judges it.
       const availability = coreAvailability(
@@ -416,9 +419,16 @@ function judgeIn(inputs: {
         users.length > 1 && worst.badge !== null
           ? withNote(worst.badge, format('Update.JudgedIn', { world: worst.title }))
           : worst.badge;
+      if (users.length > 1) perWorld = judged;
     }
-    if (release.unlisted !== true) return { version, badge };
-    return { version, unlisted: true, badge: badge === null ? null : withNote(badge, localize('Update.Unlisted')) };
+    const each = perWorld === undefined ? {} : { worlds: perWorld };
+    if (release.unlisted !== true) return { version, badge, ...each };
+    return {
+      version,
+      unlisted: true,
+      badge: badge === null ? null : withNote(badge, localize('Update.Unlisted')),
+      ...each,
+    };
   };
 }
 
