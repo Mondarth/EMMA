@@ -36,7 +36,12 @@
     }
   ],
   "description": "Replaces the Foundry manage module app.",
-  "flags": {},
+  "flags": {
+    "setupKit": {
+      "api": "1.0",
+      "path": "dist/emma-setup-kit.js"
+    }
+  },
   "url": "https://github.com/Mondarth/EMMA",
   "readme": "https://github.com/Mondarth/EMMA/blob/main/README.md",
   "bugs": "https://github.com/Mondarth/EMMA/issues",

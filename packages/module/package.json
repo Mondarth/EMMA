@@ -6,7 +6,7 @@
   "type": "module",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "vite build",
+    "build": "vite build && vite build --config vite.kit.config.ts",
     "dev": "vite",
     "svelte-check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.test.json",
