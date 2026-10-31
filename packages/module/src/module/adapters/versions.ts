@@ -2,7 +2,8 @@
  * The only place EMMA looks up the versions of the packages in use, for hypothetical mode. It asks
  * `@mondarth/fvtt-resolver` for every release of the system and the active modules, then judges a version of a module
  * by checking the setup it would make, with the core, the system and the other modules' chosen versions. The verdict
- * becomes the badge Foundry's own `Module.getVersionBadge` gives it, so the colours and tooltips are Foundry's.
+ * becomes the badge Foundry's own `Module.getVersionBadge` gives it, so the colours and tooltips are Foundry's (see
+ * `badges.ts`).
  *
  * The core and the system may be chosen too. A version of either is judged by how well the setup it would make fits:
  * by the worst badge it would leave the system or an active module with.
@@ -22,14 +23,7 @@ import type {
   Release,
   SetupSpec,
 } from '@mondarth/fvtt-resolver';
-import {
-  check,
-  isNewerVersion,
-  isUnavailable,
-  normaliseManifest,
-  packageKey,
-  sameVersion,
-} from '@mondarth/fvtt-resolver';
+import { check, isNewerVersion, normaliseManifest, packageKey, sameVersion } from '@mondarth/fvtt-resolver';
 import type { Cache as SourceCache, LocalManifest, ReleaseSource } from '@mondarth/fvtt-resolver/sources';
 import {
   catalogueSource,
@@ -49,7 +43,7 @@ import { format, formatList, localize } from '@module/lib/i18n';
 
 import { explanationMessages } from './explanation';
 import type { VersionBadge } from './modules';
-import { toBadge } from './modules';
+import { releaseBadge } from './badges';
 import type { PlanEntry, SetupCheck, SetupSolve, UnavailableModule } from './report';
 import { checkReport, planReport, solveReport } from './report';
 
@@ -961,30 +955,6 @@ function modulesOf(checked: readonly ReleaseCheck[]): ReleaseCheck[] {
 }
 
 /**
- * The packages of a setup, as Foundry's badges look them up to name the dependencies and systems a release does not
- * suit. Foundry would otherwise look in the modules installed and in `game.systems`, which exists only on the Setup
- * screen, so naming an unsuitable system would throw inside a world.
- * @param setup - What checking found of every package in the setup
- * @returns The setup's modules and system, for `getVersionBadge`'s options
- */
-function packagesOf(setup: readonly ReleaseCheck[]): foundry.packages.ClientPackageMixin.GetVersionBadgeOptions {
-  const collected = <T>(type: 'module' | 'system') =>
-    new foundry.utils.Collection<T>(
-      setup
-        .filter(({ release }) => release.package.type === type)
-        .map(({ release: { package: pkg, version }, availability }) => [
-          pkg.id,
-          // A stand-in for the installed package: Foundry reads only its version and whether it is unavailable.
-          { id: pkg.id, version, unavailable: isUnavailable(availability) } as T,
-        ]),
-    );
-  return {
-    modules: collected<foundry.packages.Module>('module'),
-    systems: collected<foundry.packages.System>('system'),
-  };
-}
-
-/**
  * Whether a package's version is not on Foundry's package listing.
  * @param catalogue - The releases found
  * @param key - The package
@@ -1031,34 +1001,8 @@ function withListing(option: VersionOption, unlisted: boolean): VersionOption {
  * @returns The version and its badge
  */
 function optionOf(checked: ReleaseCheck, setup: readonly ReleaseCheck[]): VersionOption {
-  const { release, availability } = checked;
-  // Foundry reads only the IDs, types and bounds, to name the dependencies and systems a release does not suit.
-  const related = ({ package: { id }, compatibility, manifest, reason }: Relationship) => ({
-    id,
-    compatibility,
-    manifest,
-    reason,
-  });
-  const data: foundry.packages.Module.ManifestData = {
-    id: release.package.id,
-    title: release.package.id,
-    // Foundry reads it only to build the package; a version looked up is not installed, let alone active.
-    active: false,
-    version: release.version,
-    compatibility: release.compatibility,
-    relationships: {
-      requires: release.relationships.requires.map(relation => ({ ...related(relation), type: relation.package.type })),
-      systems: release.relationships.systems.map(relation => ({ ...related(relation), type: 'system' as const })),
-    },
-  };
-  // The resolver's verdicts are Foundry's availability codes, as in 14.368.
-  const code = availability as CONST.PACKAGE_AVAILABILITY_CODES;
-  const packages = packagesOf(setup);
-  const badge =
-    release.package.type === 'system'
-      ? foundry.packages.System.getVersionBadge(code, data as foundry.packages.System.ManifestData, packages)
-      : foundry.packages.Module.getVersionBadge(code, data, packages);
-  return withListing({ version: release.version, badge: toBadge(badge) }, release.unlisted === true);
+  const { release } = checked;
+  return withListing({ version: release.version, badge: releaseBadge(checked, setup) }, release.unlisted === true);
 }
 
 /** How badly each colour of badge fits, worst last; a package with no badge fits. */
