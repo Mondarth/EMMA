@@ -4,7 +4,7 @@
 -->
 <script lang="ts">
   import type { UpdateState } from '../app/update-state.svelte';
-  import { localize } from '../lib/i18n';
+  import { format, localize } from '../lib/i18n';
   import type { Overview } from '../lib/overview';
 
   interface Props {
@@ -51,7 +51,12 @@
         <tr>
           <th scope="row">{titles.get(choice.key) ?? choice.key}</th>
           <td>{choice.installed}</td>
-          <td>{choice.chosen}</td>
+          <td>
+            {choice.chosen}
+            {#if choice.by !== undefined}
+              <span class="emma-plan-needed">{format('Update.NeededBy', choice.by)}</span>
+            {/if}
+          </td>
         </tr>
       {/each}
     </tbody>
@@ -59,6 +64,12 @@
 </section>
 
 <style>
+  .emma-plan-needed {
+    font-size: 0.85em;
+    opacity: 0.8;
+    font-style: italic;
+  }
+
   .emma-update-plan {
     overflow: auto;
     padding: 0 0.5rem;

@@ -1,10 +1,10 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 
 import { UpdateState } from '../../../src/app/update-state.svelte';
 import { KitUnavailable } from '../../../src/foundry/setup-kit';
 import { buildOverview } from '../../../src/lib/overview';
 import type { PackageUpdate, UpdateSearch } from '../../../src/lib/updates';
-import { installation } from '../../mocks/fixtures';
+import { alone, installation } from '../../mocks/fixtures';
 
 const OVERVIEW = buildOverview(installation(), new Map());
 
@@ -29,6 +29,7 @@ const finding = (...updates: PackageUpdate[]): UpdateSearch => ({
     version,
     badge: { type: 'success', icon: '', tooltip: '', text: `${key} ${version} with ${chosen('module:lib') ?? 'none'}` },
   }),
+  planner: alone(...updates),
 });
 
 describe('UpdateState', () => {
@@ -64,7 +65,7 @@ describe('UpdateState', () => {
     expect(updates.explainedOf('module:app')).toBeUndefined();
     expect(updates.explainedOf('module:other')).toBeUndefined();
 
-    updates.choose('module:app', '1.5.0');
+    await updates.choose('module:app', '1.5.0');
     expect(updates.explainedOf('module:app')).toMatchObject({
       option: { version: '1.5.0' },
       installed: '1.0.0',
@@ -79,13 +80,104 @@ describe('UpdateState', () => {
     expect(updates.explainedOf('module:app')).toMatchObject({ option: { version: '1.5.0' }, previewing: false });
   });
 
+  test('plans each choice with what it needs, refusing one the planner cannot complete', async () => {
+    const planner = alone(APP, LIB);
+    const plan = vi.spyOn(planner, 'plan');
+    const updates = new UpdateState(() => Promise.resolve({ ...finding(APP, LIB), planner }));
+    await expect(updates.optionsFor('module:app')).resolves.toEqual([]);
+    await expect(updates.choose('module:app', '2.0.0')).resolves.toBe(false);
+    await updates.searchFor(OVERVIEW);
+
+    await expect(updates.choose('module:app', '2.0.0')).resolves.toBe(true);
+    expect(updates.choices).toEqual([{ key: 'module:app', installed: '1.0.0', chosen: '2.0.0' }]);
+    plan.mockResolvedValueOnce(undefined);
+    await expect(updates.choose('module:lib', '1.1.0')).resolves.toBe(false);
+    expect(updates.choices.map(({ key }) => key)).toEqual(['module:app']);
+    // Not one no search offers.
+    await expect(updates.choose('module:app', '9.0.0')).resolves.toBe(false);
+    await expect(updates.choose('module:other', '1.0.0')).resolves.toBe(false);
+  });
+
+  test('names the choice that needs a change in the plan, and lists versions as the plan would have them', async () => {
+    const planner = alone(APP, LIB);
+    vi.spyOn(planner, 'plan').mockResolvedValue([
+      { key: 'module:app', installed: '1.0.0', version: '2.0.0' },
+      { key: 'module:lib', installed: '1.0.0', version: '1.1.0', by: { package: 'module:app', version: '2.0.0' } },
+    ]);
+    vi.spyOn(planner, 'complete').mockImplementation(picks =>
+      Promise.resolve(
+        picks.get('module:app') === '1.5.0'
+          ? { ok: false }
+          : { ok: true, versions: new Map([...picks, ['module:lib', '1.1.0']]) },
+      ),
+    );
+    const updates = new UpdateState(() => Promise.resolve({ ...finding(APP, LIB), planner }));
+    await updates.searchFor(OVERVIEW);
+    await updates.choose('module:app', '2.0.0');
+
+    expect(updates.choices[1]).toEqual({
+      key: 'module:lib',
+      installed: '1.0.0',
+      chosen: '1.1.0',
+      by: { title: 'module:app', version: '2.0.0' },
+    });
+    expect(updates.chosenOf('module:lib')).toBe('1.1.0');
+    const options = await updates.optionsFor('module:app');
+    expect(options.map(({ version }) => version)).toEqual(['2.0.0', '1.0.0']);
+    updates.setPreview('module:app', '1.0.0');
+    expect(updates.explainedOf('module:app')?.option).toBe(options[1]);
+  });
+
+  test('plans the choices again for a new search, dropping them if it cannot, and keeps only the latest', async () => {
+    const planner = alone(APP, LIB);
+    const answers: ((search: UpdateSearch) => void)[] = [];
+    const updates = new UpdateState(
+      () =>
+        new Promise<UpdateSearch>(resolve => {
+          answers.push(resolve);
+        }),
+    );
+    const first = updates.searchFor(OVERVIEW);
+    answers[0]?.({ ...finding(APP, LIB), planner });
+    await first;
+    await updates.choose('module:app', '2.0.0');
+
+    // A search that plans them again, overtaken by another while it does.
+    let replan: (entries: undefined) => void = () => undefined;
+    const slow = alone(APP, LIB);
+    const slowPlan = vi.spyOn(slow, 'plan').mockReturnValue(
+      new Promise(resolve => {
+        replan = resolve;
+      }),
+    );
+    const second = updates.searchFor(OVERVIEW);
+    answers[1]?.({ ...finding(APP, LIB), planner: slow });
+    await vi.waitFor(() => {
+      expect(slowPlan).toHaveBeenCalled();
+    });
+    const third = updates.searchFor(OVERVIEW);
+    answers[2]?.({ ...finding(APP, LIB), planner });
+    await third;
+    replan(undefined);
+    await second;
+    expect(updates.choices.map(({ chosen }) => chosen)).toEqual(['2.0.0']);
+
+    // One that cannot plan them drops them.
+    const refuses = alone(APP, LIB);
+    vi.spyOn(refuses, 'plan').mockResolvedValue(undefined);
+    const fourth = updates.searchFor(OVERVIEW);
+    answers[3]?.({ ...finding(APP, LIB), planner: refuses });
+    await fourth;
+    expect(updates.choices).toEqual([]);
+  });
+
   test('badges a version with the other packages at the versions chosen, or none before a search', async () => {
     const updates = new UpdateState(() => Promise.resolve(finding(APP, LIB)));
     expect(updates.optionOf('module:app', '2.0.0')).toEqual({ version: '2.0.0', badge: null });
     await updates.searchFor(OVERVIEW);
 
     expect(updates.optionOf('module:app', '2.0.0').badge?.text).toBe('module:app 2.0.0 with 1.0.0');
-    updates.choose('module:lib', '1.1.0');
+    await updates.choose('module:lib', '1.1.0');
     expect(updates.optionOf('module:app', '2.0.0').badge?.text).toBe('module:app 2.0.0 with 1.1.0');
   });
 
@@ -130,11 +222,11 @@ describe('UpdateState', () => {
     const updates = new UpdateState(() => Promise.resolve(finding(APP, LIB)));
     await updates.searchFor(OVERVIEW);
 
-    updates.choose('module:lib', '1.1.0');
-    updates.choose('module:app', '1.5.0');
+    await updates.choose('module:lib', '1.1.0');
+    await updates.choose('module:app', '1.5.0');
     // Neither a version not offered, nor a package without an update.
-    updates.choose('module:app', '9.0.0');
-    updates.choose('module:other', '1.0.0');
+    await updates.choose('module:app', '9.0.0');
+    await updates.choose('module:other', '1.0.0');
 
     expect(updates.choices).toEqual([
       { key: 'module:lib', installed: '1.0.0', chosen: '1.1.0' },
@@ -142,7 +234,7 @@ describe('UpdateState', () => {
     ]);
     expect(updates.chosenOf('module:app')).toBe('1.5.0');
 
-    updates.choose('module:lib', '1.0.0');
+    await updates.choose('module:lib', '1.0.0');
     expect(updates.choices.map(({ key }) => key)).toEqual(['module:app']);
 
     updates.clear();
@@ -153,8 +245,8 @@ describe('UpdateState', () => {
     let found = finding(APP, LIB);
     const updates = new UpdateState(() => Promise.resolve(found));
     await updates.searchFor(OVERVIEW);
-    updates.choose('module:app', '2.0.0');
-    updates.choose('module:lib', '1.1.0');
+    await updates.choose('module:app', '2.0.0');
+    await updates.choose('module:lib', '1.1.0');
 
     found = finding({ ...APP, newest: '1.5.0', versions: ['1.5.0', '1.0.0'] }, LIB);
     await updates.searchFor(OVERVIEW);
@@ -166,7 +258,7 @@ describe('UpdateState', () => {
     const updates = new UpdateState(() => Promise.resolve(finding(APP)));
     await updates.searchFor(OVERVIEW);
     updates.setOn(true);
-    updates.choose('module:app', '2.0.0');
+    await updates.choose('module:app', '2.0.0');
 
     updates.setOn(false);
 
@@ -183,7 +275,7 @@ describe('UpdateState', () => {
     );
     await updates.searchFor(OVERVIEW);
     updates.setOn(true);
-    updates.choose('module:app', '2.0.0');
+    await updates.choose('module:app', '2.0.0');
 
     unavailable = true;
     await updates.searchFor(OVERVIEW);

@@ -4,7 +4,8 @@ import type { WorldRecord } from '@mondarth/emma-core/world-record';
 
 import type { RecordState } from '../../src/foundry/records';
 import type { InstalledModule, Installation } from '../../src/foundry/setup-game';
-import type { UpdateSearch, VersionOption } from '../../src/lib/updates';
+import type { Completion, Planner } from '../../src/lib/plans';
+import type { PackageUpdate, UpdateSearch, VersionOption } from '../../src/lib/updates';
 
 /**
  * A world record.
@@ -110,7 +111,37 @@ export function release(ref: `${'module' | 'system'}:${string}`, version: string
  * @returns What it found
  */
 export function noUpdates(): Promise<UpdateSearch> {
-  return Promise.resolve({ updates: new Map(), blocked: new Map(), unresolved: [], judge: unjudged });
+  return Promise.resolve({ updates: new Map(), blocked: new Map(), unresolved: [], judge: unjudged, planner: alone() });
+}
+
+/**
+ * A planner that plans the versions chosen alone, needing nothing else, offering the versions of some updates.
+ * @param updates - The updates
+ * @returns The planner, its titles the packages' keys
+ */
+export function alone(...updates: readonly PackageUpdate[]): Planner {
+  const installed = new Map(updates.map(update => [update.key, update.installed]));
+  const complete = (picks: ReadonlyMap<PackageKey, string>): Promise<Completion> =>
+    Promise.resolve({
+      ok: true,
+      versions: new Map([...picks].filter(([key, version]) => installed.get(key) !== version)),
+    });
+  return {
+    universe: { core: [], releases: [] },
+    complete,
+    async plan(picks) {
+      const completion = await complete(picks);
+      if (!completion.ok) return undefined;
+      return [...completion.versions].map(([key, version]) => ({
+        key,
+        installed: installed.get(key) ?? version,
+        version,
+      }));
+    },
+    candidates: key =>
+      updates.find(update => update.key === key)?.versions.filter(version => version !== installed.get(key)) ?? [],
+    titleOf: key => key,
+  };
 }
 
 /**

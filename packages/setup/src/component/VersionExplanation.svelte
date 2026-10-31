@@ -35,6 +35,14 @@
 <section class="emma-explanation" aria-labelledby="emma-setup-explained" aria-live="polite">
   <h3 id="emma-setup-explained">{heading}</h3>
   <p><VersionBadge version={option.version} badge={option.badge} unlisted={option.unlisted === true} /></p>
+  {#if option.brings !== undefined}
+    <p>{localize('Update.Brings')}</p>
+    <ul class="emma-explanation-brings">
+      {#each option.brings as brought, index (index)}
+        <li>{format('Update.BringsItem', brought)}</li>
+      {/each}
+    </ul>
+  {/if}
   {#if option.worlds !== undefined}
     <ul>
       {#each option.worlds as world, index (index)}

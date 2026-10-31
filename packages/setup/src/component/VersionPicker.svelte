@@ -16,10 +16,11 @@
     /** The version chosen, with its badge. */
     chosen: VersionOption;
     /**
-     * Every version of the package, newest first, the chosen one among them; read each time the list opens, as judging
-     * them takes time. The list leaves out the chosen version, which the button already shows.
+     * Every version of the package that may be chosen, newest first, the chosen one among them; read each time the list
+     * opens, as judging them takes time, and waited for if need be. The list leaves out the chosen version, which the
+     * button already shows.
      */
-    versions: () => readonly VersionOption[];
+    versions: () => readonly VersionOption[] | Promise<readonly VersionOption[]>;
     /** The version installed, which the list marks. */
     installed: string;
     /** Called with the version the user chooses. */
@@ -41,6 +42,10 @@
   let expanded = $state(false);
   let options: readonly VersionOption[] = $state.raw([]);
   let active = $state(0);
+  /** Whether the versions are still being worked out. */
+  let checking = $state(false);
+  /** Counts the times the list opens, so that only the latest versions are shown. */
+  let opened = 0;
 
   // The version looked at, for whoever explains it.
   $effect(() => {
@@ -66,8 +71,23 @@
    */
   function show(anchor: HTMLElement): void {
     onOpen?.();
-    options = versions().filter(({ version }) => version !== chosen.version);
+    const opening = ++opened;
+    const shown = chosen.version;
+    const keep = (list: readonly VersionOption[]) => list.filter(({ version }) => version !== shown);
+    const listed = versions();
     active = 0;
+    if (listed instanceof Promise) {
+      options = [];
+      checking = true;
+      void listed.then(list => {
+        if (opening !== opened) return;
+        options = keep(list);
+        checking = false;
+      });
+    } else {
+      options = keep(listed);
+      checking = false;
+    }
     // In the top layer, so the module list's scrolling cannot clip it; placed under the button by hand, as CSS anchor
     // positioning is not in every browser Foundry supports.
     const { left, bottom } = anchor.getBoundingClientRect();
@@ -103,7 +123,7 @@
   function onKeydown(event: KeyboardEvent): void {
     // Kept from the tree, whose own keys would otherwise act on the row behind the list.
     event.stopPropagation();
-    const last = options.length - 1;
+    const last = Math.max(options.length - 1, 0);
     const moves: Record<string, number> = {
       ArrowDown: Math.min(active + 1, last),
       ArrowUp: Math.max(active - 1, 0),
@@ -170,8 +190,14 @@
     role="listbox"
     tabindex="-1"
     aria-label={format('Update.Versions', { title })}
-    aria-activedescendant={expanded ? optionId(active) : undefined}
+    aria-activedescendant={expanded && options.length > 0 ? optionId(active) : undefined}
+    aria-busy={checking}
     onkeydown={onKeydown}>
+    {#if checking}
+      <li class="emma-version-note" role="presentation">{localize('Update.Checking')}</li>
+    {:else if options.length === 0}
+      <li class="emma-version-note" role="presentation">{localize('Update.NoneFit')}</li>
+    {/if}
     {#each options as option, index (option.version)}
       <li
         id={optionId(index)}
@@ -248,6 +274,12 @@
   .emma-version-installed {
     font-size: 0.8em;
     opacity: 0.8;
+  }
+
+  .emma-version-popup li.emma-version-note {
+    cursor: default;
+    opacity: 0.8;
+    font-style: italic;
   }
 
   .emma-version-popup li.active {

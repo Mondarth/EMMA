@@ -33,6 +33,10 @@ import type { PackageKey, Policy, Release, ReleaseCheck, SetupSpec, Universe } f
 import type { KitBadge, KitBadges, KitResolver } from '@mondarth/emma-core/setup-kit';
 
 import { format, localize } from './i18n';
+import type { Planner, UpdateHold } from './plans';
+import { createPlanner } from './plans';
+import type { Use, WorldUses } from './setups';
+import { newerIn, newestFirst, oldest, runsOn, unique, usedBy } from './setups';
 
 import type { Overview } from './overview';
 
@@ -53,6 +57,8 @@ export interface VersionOption {
   readonly badge: KitBadge | null;
   /** Whether the version is not on Foundry's package listing; the badge's tooltip and text say so already. */
   readonly unlisted?: true;
+  /** What else choosing it would change, beyond what is chosen already: each package by its title, at its version. */
+  readonly brings?: readonly { readonly title: string; readonly version: string }[];
   /** When more than one recorded world uses the package, the badge it has in each, of which {@link badge} is the worst. */
   readonly worlds?: readonly { readonly title: string; readonly badge: KitBadge | null }[];
 }
@@ -70,17 +76,7 @@ export type VersionJudge = (
   chosen: (key: PackageKey) => string | undefined,
 ) => VersionOption;
 
-/**
- * Why a world holds a package's update back:
- * - `unrecorded`: the world has no record, so which modules it runs, and whether they would work, is not known;
- * - `unresolved`: no working setup was found for the world at all, so nothing it uses moves;
- * - `inconsistent`: the world's other packages cannot all work with the newer version.
- */
-export interface UpdateHold {
-  readonly reason: 'unrecorded' | 'unresolved' | 'inconsistent';
-  /** The world's ID and title. */
-  readonly world: { readonly id: string; readonly title: string };
-}
+export type { UpdateHold } from './plans';
 
 /** An installed package, or Foundry VTT itself, with a newer version that EMMA cannot offer. */
 export interface BlockedUpdate {
@@ -103,6 +99,8 @@ export interface UpdateSearch {
   readonly unresolved: readonly string[];
   /** Badges the versions on offer. */
   readonly judge: VersionJudge;
+  /** Plans the versions chosen, with what they need. */
+  readonly planner: Planner;
 }
 
 /** What the search works on. */
@@ -271,36 +269,28 @@ export async function findUpdates(inputs: UpdateInputs): Promise<UpdateSearch> {
     const versions = unique(resolver, [newest, ...between, version]);
     updates.set(key, { key, installed: version, newest, versions });
   }
-  return { updates, blocked, unresolved, judge: judgeIn({ resolver, badges, overview, universe }) };
-}
-
-/** A package a world uses, at its installed version. */
-interface Use {
-  readonly key: PackageKey;
-  readonly installed: string;
-}
-
-/** The packages a world uses. */
-interface WorldUses {
-  readonly system: Use;
-  readonly modules: readonly Use[];
-}
-
-/**
- * What a world uses, as its record says: its game system, then the installed modules it runs.
- * @param resolver - The resolver
- * @param world - The world
- * @returns Its packages, or `undefined` for a world without a record, or whose system is not installed
- */
-function usedBy(resolver: KitResolver, world: Overview['worlds'][number]): WorldUses | undefined {
-  if (world.record === undefined || world.system === undefined) return undefined;
-  const { packageKey } = resolver;
-  return {
-    system: { key: packageKey({ type: 'system', id: world.system.id }), installed: world.system.version },
-    modules: world.modules.flatMap(({ id, installed }) =>
-      installed === undefined ? [] : [{ key: packageKey({ type: 'module', id }), installed }],
-    ),
-  };
+  // A newer version that is not offered on its own may be, with what it needs changed too.
+  const planner = createPlanner({ resolver, overview, universe, load, policy, coreTitle: localize('Tree.Root') });
+  for (const [key, block] of [...blocked]) {
+    const completion = await planner.complete(new Map([[key, block.newest]]));
+    if (completion.ok) {
+      const from = installed.get(key) ?? core;
+      const offered = updates.get(key)?.versions ?? [from];
+      updates.set(key, {
+        key,
+        installed: from,
+        newest: block.newest,
+        versions: unique(resolver, [block.newest, ...offered]),
+      });
+      blocked.delete(key);
+    } else if (
+      completion.hold !== undefined &&
+      !block.holds.some(({ world }) => world.id === completion.hold?.world.id)
+    ) {
+      blocked.set(key, { ...block, holds: [...block.holds, completion.hold] });
+    }
+  }
+  return { updates, blocked, unresolved, judge: judgeIn({ resolver, badges, overview, planner }), planner };
 }
 
 /** How badly each colour of badge fits, worst last; a version with no badge fits, as in the EMMA module. */
@@ -312,16 +302,16 @@ const MISFIT: readonly KitBadge['type'][] = ['success', 'neutral', 'warning', 'e
  * @param inputs.resolver - The resolver
  * @param inputs.badges - How the EMMA module badges a version
  * @param inputs.overview - The installation
- * @param inputs.universe - Every release found, as the search left it
+ * @param inputs.planner - The planner, for every release found, with those loaded since
  * @returns The judge
  */
 function judgeIn(inputs: {
   resolver: KitResolver;
   badges: KitBadges;
   overview: Overview;
-  universe: Universe;
+  planner: Planner;
 }): VersionJudge {
-  const { resolver, badges, overview, universe } = inputs;
+  const { resolver, badges, overview, planner } = inputs;
   const { AVAILABILITY, CORE, check, coreAvailability, packageKey, sameVersion } = resolver;
   const misfit = (badge: KitBadge | null) => (badge === null ? 0 : MISFIT.indexOf(badge.type));
   const worlds = overview.worlds.flatMap(world => {
@@ -333,7 +323,9 @@ function judgeIn(inputs: {
     ...overview.modules.map(({ module: { id, title } }) => [packageKey({ type: 'module', id }), title] as const),
   ]);
   const releaseOf = (key: PackageKey, version: string) =>
-    universe.releases.find(release => packageKey(release.package) === key && sameVersion(release.version, version));
+    planner.universe.releases.find(
+      release => packageKey(release.package) === key && sameVersion(release.version, version),
+    );
   /**
    * A world's setup, with one package at a version and everything else at the version chosen.
    * @param uses - What the world uses
@@ -365,7 +357,7 @@ function judgeIn(inputs: {
    */
   const coreOption = (version: string, chosen: (key: PackageKey) => string | undefined): VersionOption => {
     const judged = worlds.flatMap(({ uses }) => {
-      const { releases } = check(universe, setupOf(uses, CORE, version, chosen));
+      const { releases } = check(planner.universe, setupOf(uses, CORE, version, chosen));
       return releases.map(found => ({
         key: packageKey(found.release.package),
         badge: badges.releaseBadge(found, releases),
@@ -403,14 +395,14 @@ function judgeIn(inputs: {
       const availability = coreAvailability(
         { ...release.compatibility, ...release.listing },
         chosen(CORE) ?? overview.core,
-        universe.core,
+        planner.universe.core,
       );
       const checked: ReleaseCheck = { release, availability, broken: [], missed: [], advisories: [] };
       badge = availability === AVAILABILITY.UNKNOWN ? null : badges.releaseBadge(checked, [checked]);
     } else {
       // In each world that uses it, with everything else at the version chosen; the worst, saying where.
       const judged = users.map(({ title, uses }) => {
-        const { releases } = check(universe, setupOf(uses, key, version, chosen));
+        const { releases } = check(planner.universe, setupOf(uses, key, version, chosen));
         const found = releases.find(({ release: candidate }) => packageKey(candidate.package) === key);
         return { title, badge: found === undefined ? null : badges.releaseBadge(found, releases) };
       });
@@ -491,74 +483,4 @@ function laterBuild(
     if (build !== undefined) return { version, core: build };
   }
   return undefined;
-}
-
-/**
- * Whether a release may be offered on its own: one the Foundry build can run by the core compatibility it declares,
- * listed, and not a pre-release, as the resolver's policy has it.
- * @param resolver - The resolver
- * @param release - The release
- * @param core - The Foundry build
- * @param universe - The universe, for the builds known
- * @returns `true` if it may be offered
- */
-function runsOn(resolver: KitResolver, release: Release, core: string, universe: Universe): boolean {
-  const { AVAILABILITY, coreAvailability, isUnavailable, looksLikePrerelease } = resolver;
-  const availability = coreAvailability({ ...release.compatibility, ...release.listing }, core, universe.core);
-  return (
-    availability !== AVAILABILITY.UNKNOWN &&
-    !isUnavailable(availability) &&
-    release.unlisted !== true &&
-    !looksLikePrerelease(release.version)
-  );
-}
-
-/**
- * Some versions, newest first, each once.
- * @param resolver - The resolver
- * @param versions - The versions
- * @returns The versions, in order
- */
-function newestFirst(resolver: KitResolver, versions: readonly string[]): string[] {
-  const newer = newerIn(resolver);
-  return unique(
-    resolver,
-    [...versions].sort((a, b) => Number(newer(b, a)) - Number(newer(a, b))),
-  );
-}
-
-/**
- * The oldest of some versions.
- * @param resolver - The resolver
- * @param versions - The versions, at least one
- * @returns The oldest
- */
-function oldest(resolver: KitResolver, versions: readonly string[]): string | undefined {
-  const newer = newerIn(resolver);
-  return versions.reduce<string | undefined>(
-    (lowest, version) => (lowest === undefined || newer(lowest, version) ? version : lowest),
-    undefined,
-  );
-}
-
-/**
- * Some versions, each once, as the resolver counts `v1.0.0` and `1.0.0` as one.
- * @param resolver - The resolver
- * @param versions - The versions, in order
- * @returns The first of each
- */
-function unique(resolver: KitResolver, versions: readonly string[]): string[] {
-  return versions.filter(
-    (version, index) => versions.findIndex(other => resolver.sameVersion(other, version)) === index,
-  );
-}
-
-/**
- * Whether Foundry counts one version as newer than another, a leading `v` aside.
- * @param resolver - The resolver
- * @returns Whether its first version is newer than its second
- */
-function newerIn(resolver: KitResolver): (a: string, b: string) => boolean {
-  const unprefixed = (version: string) => version.replace(/^[vV](?=\d)/, '');
-  return (a, b) => resolver.isNewerVersion(unprefixed(a), unprefixed(b));
 }

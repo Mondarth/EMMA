@@ -179,8 +179,10 @@ is. Its versions are coloured by how well the recorded worlds' packages fit each
 with it and those not verified with it. Foundry's builds come from its release notes, which only EMMA's proxy can read;
 without the proxy, Foundry VTT is not offered an update.
 
-The other packages are offered versions for the installed Foundry VTT. A newer version that needs a newer build is not
-offered yet: its red arrow's panel says which build it needs.
+A version that needs other packages to change with it, or a newer Foundry VTT, is still offered if they can all change
+together and every world that uses them keeps working: dnd5e 6, say, with the newer modules a world runs that need it,
+and the Foundry build those need. If there is no such set, it is not offered, and its red arrow's panel says which world
+cannot take it, or which build it needs.
 
 **Update** in the footer turns Update mode on. Each row that shows a package's installed version then offers its
 versions in a list, from the newest offered down to the installed one, which is marked so. Each version is in the
@@ -190,9 +192,11 @@ worlds', and its tooltip names that world when more than one uses the package. A
 judged by the Foundry build alone. Opening a list selects its row, and the panel beside the tree explains the version
 the keyboard or the pointer is on: its badge and Foundry's explanation, and for a package more than one recorded world
 uses, how it fares in each. Once a version is chosen, the panel keeps explaining it, under **<version> update**.
-Choosing a version other than the installed one opens the **Update plan** below the tree and the panel, the full width of the window, listing each package
-chosen with its installed and chosen versions. **Clear choices** takes them all back, and choosing the installed
-version takes back one. Turning Update mode off hides the lists and the plan, and keeps the choices for when it is
+A list offers only the versions that work with what is chosen already, and the panel says what else choosing one would
+change. Choosing a version brings in whatever else it needs, from the fewest changes that work: a world's other packages
+stay as they are where they can, and Foundry VTT moves only as far as it must. Choosing a version other than the installed one opens the **Update plan** below the tree and the panel, the full width of the window, listing each package that
+changes with its installed and new versions, and, for one a choice brings in, which choice needs it. **Clear choices**
+takes them all back, and choosing the installed version takes back one, with what it brought in. Turning Update mode off hides the lists and the plan, and keeps the choices for when it is
 turned on again. Installing the plan is to come.
 
 The handle between the tree and the panel, and the one above the update plan, resize them, by dragging or from the

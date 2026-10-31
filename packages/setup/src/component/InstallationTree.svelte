@@ -159,10 +159,10 @@
         <VersionPicker
           title={row.title}
           chosen={updates.optionOf(key, updates.chosenOf(key) ?? update.installed)}
-          versions={() => update.versions.map(version => updates.optionOf(key, version))}
+          versions={() => updates.optionsFor(key)}
           installed={update.installed}
           onChoose={(version: string) => {
-            updates.choose(key, version);
+            void updates.choose(key, version);
           }}
           onOpen={() => {
             // The panel beside the tree explains the versions looked at.

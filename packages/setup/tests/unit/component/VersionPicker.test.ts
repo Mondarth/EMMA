@@ -106,6 +106,46 @@ describe('VersionPicker', () => {
     expect(onChoose).not.toHaveBeenCalled();
   });
 
+  test('waits for versions still being worked out, showing only the latest, or that none fits', async () => {
+    const answers: ((list: readonly VersionOption[]) => void)[] = [];
+    const onChoose = vi.fn();
+    render(VersionPicker, {
+      title: 'Dice',
+      chosen: option('2.0.0'),
+      versions: () =>
+        new Promise<readonly VersionOption[]>(resolve => {
+          answers.push(resolve);
+        }),
+      installed: '1.0.0',
+      onChoose,
+    });
+    const button = screen.getByRole('button', { name: CHOOSE });
+    await userEvent.click(button);
+    const listbox = screen.getByRole('listbox');
+    expect(listbox).toHaveAttribute('aria-busy', 'true');
+    expect(listbox).toHaveTextContent('Checking which versions work with what is chosen…');
+    expect(listbox).not.toHaveAttribute('aria-activedescendant');
+
+    // Opened again before the first answer: only the second counts.
+    await userEvent.click(button);
+    await userEvent.click(button);
+    answers[1]?.([option('1.0.0')]);
+    answers[0]?.(OPTIONS);
+    await vi.waitFor(() => {
+      expect(listbox).toHaveAttribute('aria-busy', 'false');
+    });
+    expect(screen.getAllByRole('option').map(item => item.textContent.trim().split(/\s+/)[0])).toEqual(['1.0.0']);
+
+    await userEvent.click(button);
+    await userEvent.click(button);
+    answers[2]?.([option('2.0.0')]);
+    await vi.waitFor(() => {
+      expect(listbox).toHaveTextContent('No other version works with what is chosen.');
+    });
+    await userEvent.keyboard('{ArrowDown}{Enter}');
+    expect(onChoose).not.toHaveBeenCalled();
+  });
+
   test('marks the version under the pointer', async () => {
     renderPicker();
     await userEvent.click(screen.getByRole('button', { name: CHOOSE }));
