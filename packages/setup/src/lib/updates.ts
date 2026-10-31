@@ -57,6 +57,8 @@ export interface VersionOption {
   readonly badge: KitBadge | null;
   /** Whether the version is not on Foundry's package listing; the badge's tooltip and text say so already. */
   readonly unlisted?: true;
+  /** What the version needs, as its manifest declares it, one sentence to a line. */
+  readonly needs?: readonly string[];
   /** What else choosing it would change, beyond what is chosen already: each package by its title, at its version. */
   readonly brings?: readonly { readonly title: string; readonly version: string }[];
   /** When more than one recorded world uses the package, the badge it has in each, of which {@link badge} is the worst. */
@@ -87,6 +89,8 @@ export interface BlockedUpdate {
   readonly holds: readonly UpdateHold[];
   /** The oldest Foundry build the newest version runs on, when that is newer than the installed one. */
   readonly needsCore?: string;
+  /** Why the newest version, with what it needs, cannot be had, in the resolver's words, one sentence to a line. */
+  readonly explanation?: readonly string[];
 }
 
 /** What the search found. */
@@ -283,11 +287,13 @@ export async function findUpdates(inputs: UpdateInputs): Promise<UpdateSearch> {
         versions: unique(resolver, [block.newest, ...offered]),
       });
       blocked.delete(key);
-    } else if (
-      completion.hold !== undefined &&
-      !block.holds.some(({ world }) => world.id === completion.hold?.world.id)
-    ) {
-      blocked.set(key, { ...block, holds: [...block.holds, completion.hold] });
+    } else {
+      const { hold, explanation = [] } = completion;
+      const holds =
+        hold === undefined || block.holds.some(({ world }) => world.id === hold.world.id)
+          ? block.holds
+          : [...block.holds, hold];
+      blocked.set(key, { ...block, holds, ...(explanation.length > 0 && { explanation }) });
     }
   }
   return { updates, blocked, unresolved, judge: judgeIn({ resolver, badges, overview, planner }), planner };

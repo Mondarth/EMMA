@@ -13,12 +13,23 @@
  *   world needs it, and every world is found again, until they agree or one has no setup;
  * - a version chosen of a package no recorded world uses must run on the Foundry build, which it moves up if need be.
  *
- * The resolver is the one the setup kit gives. Its loading of releases is kept for the next completion.
+ * The resolver is the one the setup kit gives. Its loading of releases is kept for the next completion. Its words explain
+ * what a version needs, and why a set of choices cannot be completed, naming the installed packages by their titles.
  */
-import type { PackageKey, PackageVersion, Policy, Release, Requirements, Universe } from '@mondarth/fvtt-resolver';
+import type {
+  ExplanationMessages,
+  PackageKey,
+  PackageVersion,
+  Policy,
+  Release,
+  Requirements,
+  Resolution,
+  Universe,
+} from '@mondarth/fvtt-resolver';
 
 import type { KitResolver } from '@mondarth/emma-core/setup-kit';
 
+import { format } from './i18n';
 import type { Overview } from './overview';
 import type { WorldUses } from './setups';
 import { newerIn, newestFirst, runsOn, usedBy } from './setups';
@@ -46,6 +57,8 @@ export type Completion =
       readonly ok: false;
       /** The world that cannot work with the choices, when one is to blame. */
       readonly hold?: UpdateHold;
+      /** Why that world's setup cannot be found, in the resolver's words, one sentence to a line. */
+      readonly explanation?: readonly string[];
     };
 
 /** A change in a plan. */
@@ -80,6 +93,14 @@ export interface Planner {
    * @returns The versions
    */
   candidates(key: PackageKey): readonly string[];
+  /**
+   * What a version of a package needs, as its manifest declares it: the Foundry builds it runs on, the packages it
+   * requires, the game systems it runs in, and those it conflicts with.
+   * @param key - The package
+   * @param version - The version
+   * @returns One sentence for each, in the resolver's words; none for a release not found, or for Foundry VTT
+   */
+  needsOf(key: PackageKey, version: string): readonly string[];
   /**
    * A package's title.
    * @param key - The package, or `core`
@@ -132,6 +153,23 @@ export function keepChoices(
   return new Map([...picks].filter(([key, version]) => keep(key, version)));
 }
 
+/**
+ * The resolver's words, told of a world rather than of the resolver's requirements, and of the versions in the plan
+ * rather than of the versions pinned.
+ * @param messages - The words
+ * @param world - The world's title
+ * @returns The words, told of the world
+ */
+export function toldOfWorld(messages: ExplanationMessages, world: string): ExplanationMessages {
+  return {
+    ...messages,
+    requirement: on => format('Explain.Runs', { world, package: on }),
+    requirementsNeed: needed => format('Explain.Needs', { world, package: needed }),
+    pin: on => format('Explain.Installed', { package: on }),
+    failed: format('Explain.Fails', { world }),
+  };
+}
+
 /** The most times the worlds are found again before choices are given up as not settling. */
 const MAX_ROUNDS = 8;
 
@@ -142,7 +180,8 @@ const MAX_ROUNDS = 8;
  */
 export function createPlanner(inputs: PlannerInputs): Planner {
   const { resolver, overview, load, policy } = inputs;
-  const { CORE, packageKey, resolveInRounds, sameVersion } = resolver;
+  const { CORE, chooseOrders, describeReason, explain, packageKey, releaseConstraints, resolveInRounds, sameVersion } =
+    resolver;
   const newer = newerIn(resolver);
   const core = overview.core;
   const installed = new Map<PackageKey, string>([
@@ -182,6 +221,25 @@ export function createPlanner(inputs: PlannerInputs): Planner {
     universe.releases.find(release => packageKey(release.package) === key && sameVersion(release.version, version));
   // The same choices are completed again as lists open and close.
   const completions = new Map<string, Promise<Completion>>();
+  // The resolver's words, naming the installed packages by their titles.
+  const messages: ExplanationMessages = {
+    ...resolver.englishMessages,
+    name: key => titles.get(key) ?? resolver.englishMessages.name(key),
+  };
+
+  /**
+   * Why a world's setup cannot be found, in the resolver's words, told of the world.
+   * @param resolution - The resolution that failed
+   * @param world - The world's title
+   * @returns One sentence to a line, a numbered one ending with its number; none if it only lacked releases
+   */
+  function explained(resolution: Exclude<Resolution, { ok: true }>, world: string): string[] {
+    return 'failure' in resolution
+      ? explain(resolution.failure, toldOfWorld(messages, world)).map(({ text, number }) =>
+          number === undefined ? text : `${text} (${String(number)})`,
+        )
+      : [];
+  }
 
   /**
    * Find a setup, keeping what was loaded.
@@ -258,7 +316,7 @@ export function createPlanner(inputs: PlannerInputs): Planner {
       for (const world of recorded) {
         const resolution = await setupFor(worldRequirements(world.uses, pins));
         const hold: UpdateHold = { reason: 'inconsistent', world: { id: world.id, title: world.title } };
-        if (!resolution.ok) return { ok: false, hold };
+        if (!resolution.ok) return { ok: false, hold, explanation: explained(resolution, world.title) };
         note(CORE, resolution.setup.core);
         for (const release of [resolution.setup.system, ...resolution.setup.modules]) {
           note(packageKey(release.package), release.version);
@@ -275,7 +333,7 @@ export function createPlanner(inputs: PlannerInputs): Planner {
           prefer: pinned === undefined ? [{ package: CORE, version: core }] : [],
         });
         const hold: UpdateHold = { reason: 'unrecorded', world: { id: world.id, title: world.title } };
-        if (!resolution.ok) return { ok: false, hold };
+        if (!resolution.ok) return { ok: false, hold, explanation: explained(resolution, world.title) };
         note(CORE, resolution.setup.core);
       }
 
@@ -373,6 +431,16 @@ export function createPlanner(inputs: PlannerInputs): Planner {
 
     titleOf(key) {
       return titles.get(key) ?? key;
+    },
+
+    needsOf(key, version) {
+      const release = key === CORE ? undefined : releaseOf(key, version);
+      if (release === undefined) return [];
+      const full = resolver.withDefaults(policy);
+      const orders = chooseOrders(universe, full);
+      return releaseConstraints(release, { orders, policy: full })
+        .filter(({ kind }) => kind === 'dependency' || kind === 'choice' || kind === 'exclusion')
+        .map(constraint => describeReason({ kind: 'constraint', constraint }, messages));
     },
   };
 }

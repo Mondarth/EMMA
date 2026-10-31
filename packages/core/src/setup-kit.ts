@@ -32,13 +32,19 @@ export type KitResolver = Pick<
   | 'CORE'
   | 'AVAILABILITY'
   | 'check'
+  | 'chooseOrders'
   | 'coreAvailability'
+  | 'describeReason'
+  | 'englishMessages'
+  | 'explain'
   | 'isNewerVersion'
   | 'isUnavailable'
   | 'looksLikePrerelease'
   | 'packageKey'
+  | 'releaseConstraints'
   | 'resolveInRounds'
   | 'sameVersion'
+  | 'withDefaults'
 >;
 
 /** What the kit gives of `@mondarth/fvtt-resolver/sources`. */

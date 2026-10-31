@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest';
 
 import type { RecordState } from '../../../src/foundry/records';
 import { buildOverview } from '../../../src/lib/overview';
-import { createPlanner, keepChoices, withChoice } from '../../../src/lib/plans';
+import { createPlanner, keepChoices, toldOfWorld, withChoice } from '../../../src/lib/plans';
 import { installation, installedModule, record, recorded, release } from '../../mocks/fixtures';
 import { KIT } from '../../mocks/kit';
 
@@ -100,10 +100,15 @@ describe('createPlanner', () => {
       release('module:stuck', '1.0.0', { systems: { dnd5e: { maximum: '5.9.99' } } }),
     ]);
 
-    await expect(plans.complete(picks(['system:dnd5e', '6.0.6']))).resolves.toEqual({
-      ok: false,
-      hold: { reason: 'inconsistent', world: { id: 'a', title: 'a' } },
-    });
+    const completion = await plans.complete(picks(['system:dnd5e', '6.0.6']));
+    expect(completion).toMatchObject({ ok: false, hold: { reason: 'inconsistent', world: { id: 'a', title: 'a' } } });
+    // In the resolver's words, told of the world and the plan.
+    expect(!completion.ok && completion.explanation).toEqual([
+      'Because D&D 5e 6.0.6 is the world’s system exactly when it is installed and STUCK 1.0.0 runs only in D&D 5e ' +
+        '5.9.99 or earlier, D&D 5e 6.0.6 cannot be used with STUCK 1.0.0.',
+      'And because no version of STUCK other than 1.0.0 is available, D&D 5e 6.0.6 cannot be used with STUCK.',
+      'So, because a runs STUCK and the plan has D&D 5e 6.0.6, a cannot keep working. (1)',
+    ]);
   });
 
   test('takes a package two worlds share to the version one needs, if the other can take it too', async () => {
@@ -154,7 +159,7 @@ describe('createPlanner', () => {
       },
       [...releases, release('module:old', '1.0.0', { requires: { lib: { maximum: '1.9.9' } } })],
     );
-    await expect(breaks.complete(picks(['module:app', '2.0.0']))).resolves.toEqual({
+    await expect(breaks.complete(picks(['module:app', '2.0.0']))).resolves.toMatchObject({
       ok: false,
       hold: { reason: 'inconsistent', world: { id: 'b', title: 'b' } },
     });
@@ -170,10 +175,10 @@ describe('createPlanner', () => {
     const plans = planner([['lib', '1.0.0']], {}, releases, ['u']);
     const hold = { reason: 'unrecorded', world: { id: 'u', title: 'u' } };
 
-    await expect(plans.complete(picks(['system:dnd5e', '6.0.6']))).resolves.toEqual({ ok: false, hold });
-    await expect(plans.complete(picks(['core', '14.369']))).resolves.toEqual({ ok: false, hold });
+    await expect(plans.complete(picks(['system:dnd5e', '6.0.6']))).resolves.toMatchObject({ ok: false, hold });
+    await expect(plans.complete(picks(['core', '14.369']))).resolves.toMatchObject({ ok: false, hold });
     // The library is in no recorded world, but needs a build world u's system does not run on.
-    await expect(plans.complete(picks(['module:lib', '2.0.0']))).resolves.toEqual({ ok: false, hold });
+    await expect(plans.complete(picks(['module:lib', '2.0.0']))).resolves.toMatchObject({ ok: false, hold });
     await expect(plans.complete(picks())).resolves.toEqual({ ok: true, versions: new Map() });
   });
 
@@ -226,6 +231,12 @@ describe('createPlanner', () => {
     expect(plans.titleOf('module:midi')).toBe('MIDI');
     expect(plans.titleOf('core')).toBe('Foundry VTT');
     expect(plans.titleOf('module:gone')).toBe('module:gone');
+    expect(plans.needsOf('module:midi', '2.0.0')).toEqual([
+      'MIDI 2.0.0 depends on Foundry VTT 14.369 or later',
+      'MIDI 2.0.0 runs only in D&D 5e 6.0.6 to 6.0.999',
+    ]);
+    expect(plans.needsOf('module:midi', '9.9.9')).toEqual([]);
+    expect(plans.needsOf('core', '14.369')).toEqual([]);
     expect(plans.universe.core).toBe(CORES);
   });
 });
@@ -241,5 +252,17 @@ describe('the choices', () => {
     expect([...withChoice(chosen, 'c', '4')].map(([key]) => key)).toEqual(['a', 'b', 'c']);
     expect([...withChoice(chosen, 'a', null)]).toEqual([['b', '2']]);
     expect([...keepChoices(chosen, key => key === 'b')]).toEqual([['b', '2']]);
+  });
+});
+
+describe('toldOfWorld', () => {
+  test('tells the resolver’s explanations of a world, and of the plan', () => {
+    const told = toldOfWorld(KIT.resolver.englishMessages, 'Alpha');
+
+    expect(told.requirement('Midi')).toBe('Alpha runs Midi');
+    expect(told.requirementsNeed('Midi 2 or later')).toBe('Alpha needs Midi 2 or later');
+    expect(told.pin('D&D 5e 6.0.6')).toBe('the plan has D&D 5e 6.0.6');
+    expect(told.failed).toBe('Alpha cannot keep working');
+    expect(told.none).toBe(KIT.resolver.englishMessages.none);
   });
 });
