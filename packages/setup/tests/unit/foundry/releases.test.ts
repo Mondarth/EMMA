@@ -29,7 +29,7 @@ function moduleManifest(id: string, version: string, manifest?: string): Package
  * @returns The fetch, a spy
  */
 function answering(answers: Readonly<Record<string, unknown>>) {
-  return vi.fn((input: RequestInfo | URL) => {
+  return vi.fn((input: RequestInfo | URL, _init?: RequestInit) => {
     const url = input instanceof Request ? input.url : input.toString();
     const body = answers[url];
     return Promise.resolve(
@@ -48,7 +48,7 @@ describe('lookUpReleases', () => {
       [url]: { id: 'app', title: 'App', version: '2.0.0', compatibility: { minimum: '14', verified: '14' } },
     });
 
-    const found = await lookUpReleases(installed, { catalogue: null, fetch: send });
+    const found = await lookUpReleases(installed, { catalogue: null, proxy: null, fetch: send });
 
     expect(found.universe.core).toEqual([{ version: '14.368', generation: 14, channel: 'stable' }]);
     expect(found.universe.releases.map(({ version }) => version).sort()).toEqual(['1.0.0', '2.0.0']);
@@ -62,7 +62,7 @@ describe('lookUpReleases', () => {
 
     const found = await lookUpReleases(
       { core: { ...CORE, channel: 'unheard-of' }, manifests: [moduleManifest('lib', '1.0.0', url)] },
-      { catalogue: null, fetch: send },
+      { catalogue: null, proxy: null, fetch: send },
     );
 
     expect(send.mock.calls.map(([input]) => (input instanceof Request ? input.url : input.toString()))).not.toContain(
@@ -77,7 +77,7 @@ describe('lookUpReleases', () => {
 
     const found = await lookUpReleases(
       { core: CORE, manifests: [moduleManifest('lib', '1.0.0')] },
-      { catalogue: { url: 'https://catalogue.example.test/', key: 'k3y' }, fetch: send },
+      { catalogue: { url: 'https://catalogue.example.test/', key: 'k3y' }, proxy: null, fetch: send },
     );
 
     expect(
@@ -118,7 +118,7 @@ describe('lookUpReleases', () => {
           { ...moduleManifest('broken', '1.0.0'), json: null },
         ],
       },
-      { catalogue: { url: 'https://catalogue.example.test/', key: 'k3y' }, fetch: send },
+      { catalogue: { url: 'https://catalogue.example.test/', key: 'k3y' }, proxy: null, fetch: send },
     );
 
     expect(found.universe.releases.map(({ package: { id }, version }) => `${id}@${version}`).sort()).toEqual([
@@ -127,5 +127,58 @@ describe('lookUpReleases', () => {
       'lib@2.0.0',
     ]);
     expect([...found.unavailable]).toEqual(['module:gone']);
+  });
+
+  test('fetches through the proxy, with its key and the version, but asks the catalogue directly', async () => {
+    const url = 'https://github.com/someone/lib/releases/latest/download/module.json';
+    const proxied = (target: string) => `https://proxy.example.test/?url=${encodeURIComponent(target)}`;
+    const send = answering({
+      [proxied(url)]: { id: 'lib', title: 'Lib', version: '2.0.0', compatibility: { minimum: '14', verified: '14' } },
+    });
+
+    const found = await lookUpReleases(
+      { core: CORE, manifests: [moduleManifest('lib', '1.0.0', url)] },
+      {
+        catalogue: { url: 'https://catalogue.example.test/', key: 'catalogue-k3y' },
+        proxy: { url: 'https://proxy.example.test/?url={url}', key: 'proxy-k3y' },
+        clientVersion: '0.2.0',
+        fetch: send,
+      },
+    );
+
+    expect(found.universe.releases.map(({ version }) => version).sort()).toEqual(['1.0.0', '2.0.0']);
+    const requests = send.mock.calls.map(([input, init]) => ({
+      url: input instanceof Request ? input.url : input.toString(),
+      headers: new Headers(init?.headers),
+    }));
+    const toProxy = requests.filter(({ url: sent }) => sent.startsWith('https://proxy.example.test/'));
+    const toCatalogue = requests.filter(({ url: sent }) => sent.startsWith('https://catalogue.example.test/'));
+    expect(toProxy.map(({ url: sent }) => sent)).toContain(proxied(url));
+    expect(toProxy.length + toCatalogue.length).toBe(requests.length);
+    for (const { headers } of toProxy) {
+      expect(headers.get('X-API-Key')).toBe('proxy-k3y');
+      expect(headers.get('X-EMMA-Version')).toBe('extension-0.2.0');
+    }
+    expect(toCatalogue).not.toHaveLength(0);
+    for (const { headers } of toCatalogue) {
+      expect(headers.get('X-API-Key')).toBe('catalogue-k3y');
+      expect(headers.get('X-Catalogue-Client')).toBe('EMMA-extension/0.2.0');
+    }
+  });
+
+  test('names no version to the proxy without one', async () => {
+    const send = answering({});
+
+    await lookUpReleases(
+      { core: CORE, manifests: [moduleManifest('lib', '1.0.0', 'https://packages.example.test/lib/module.json')] },
+      { catalogue: null, proxy: { url: 'https://proxy.example.test/?url={url}', key: 'proxy-k3y' }, fetch: send },
+    );
+
+    expect(send).toHaveBeenCalled();
+    for (const [, init] of send.mock.calls) {
+      const headers = new Headers(init?.headers);
+      expect(headers.get('X-API-Key')).toBe('proxy-k3y');
+      expect(headers.has('X-EMMA-Version')).toBe(false);
+    }
   });
 });

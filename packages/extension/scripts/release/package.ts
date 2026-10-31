@@ -2,8 +2,8 @@
 
 /**
  * Prepare a release of the browser extension: stamp the version into its `package.json`, which its manifests take it
- * from, build it for each browser, check the Firefox build and that EMMA's catalogue key is not in either build in
- * plain text, and package both builds into `releases/`:
+ * from, build it for each browser, check the Firefox build and that EMMA's catalogue and proxy keys are not in either
+ * build in plain text, and package both builds into `releases/`:
  *
  * - the Chromium build, zipped, for loading unpacked;
  * - the Firefox build, signed by Mozilla as an unlisted add-on when `AMO_JWT_ISSUER` and `AMO_JWT_SECRET` hold an API
@@ -38,19 +38,22 @@ function stampVersion(version: string): void {
 
 /**
  * Build the extension, and the setup screen's script it takes in, from a clean `dist/`, and lint the Firefox build.
- * Refuse a build that holds EMMA's catalogue key in plain text: it is only ever to be built in obscured.
+ * Refuse a build that holds EMMA's catalogue or proxy key in plain text: they are only ever to be built in obscured.
  */
 function build(): void {
   fs.rmSync(DIST, { recursive: true, force: true });
   // `<package>...` builds the package after the workspace packages it depends on.
   execFileSync('pnpm', ['--filter', '@mondarth/emma-extension...', 'run', 'build'], { cwd: ROOT, stdio: 'inherit' });
   execFileSync('pnpm', ['run', 'lint:firefox'], { cwd: ROOT, stdio: 'inherit' });
-  const key = process.env.EMMA_DEFAULT_CATALOGUE_KEY;
-  const leaks = key ? filesHolding(DIST, key) : [];
-  if (leaks.length > 0) {
-    throw new Error(
-      `The default catalogue's key is in plain text in: ${leaks.map(file => path.relative(ROOT, file)).join(', ')}`,
-    );
+  for (const [name, variable] of [
+    ["The default catalogue's key", 'EMMA_DEFAULT_CATALOGUE_KEY'],
+    ["The default proxy's key", 'EMMA_DEFAULT_PROXY_KEY'],
+  ] as const) {
+    const key = process.env[variable];
+    const leaks = key ? filesHolding(DIST, key) : [];
+    if (leaks.length > 0) {
+      throw new Error(`${name} is in plain text in: ${leaks.map(file => path.relative(ROOT, file)).join(', ')}`);
+    }
   }
 }
 

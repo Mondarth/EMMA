@@ -4,9 +4,9 @@
  * module's version lookup does (see `packages/module/src/module/adapters/versions.ts`).
  *
  * The setup screen is an ordinary page, so the browser reads only what sends CORS headers: the catalogue, GitHub's and
- * GitLab's release lists, and manifests on sites that send them. Foundry's package listing, its release notes and the
- * manifests attached to GitHub releases send none, so they are not asked; without a proxy, which the EMMA extension
- * does not have yet, no newer Foundry build is found.
+ * GitLab's release lists, and manifests on sites that send them. Foundry's package listing and the manifests attached
+ * to GitHub releases send none, so they are asked only through EMMA's proxy, when the EMMA extension is built with it;
+ * without it, they are not asked at all. The Foundry build is kept as it is either way.
  */
 import type { CoreChannel, CoreRelease, PackageKey, PackageRef, Release, Universe } from '@mondarth/fvtt-resolver';
 import { packageKey, sameVersion } from '@mondarth/fvtt-resolver';
@@ -17,12 +17,15 @@ import {
   gitlabSource,
   httpClient,
   localSource,
+  foundryIndexSource,
   manifestUrlSource,
   memoryCache,
+  proxiedFetch,
   sourceSet,
 } from '@mondarth/fvtt-resolver/sources';
 
 import type { DefaultCatalogue } from '@mondarth/emma-core/default-catalogue';
+import type { DefaultProxy } from '@mondarth/emma-core/default-proxy';
 
 import type { CoreBuild, InstalledManifests } from './setup-game';
 
@@ -45,18 +48,30 @@ export interface ReleaseLookup {
 export interface LookupOptions {
   /** EMMA's package catalogue, with its key, or `null` for none, as in development builds. */
   readonly catalogue: DefaultCatalogue | null;
+  /**
+   * EMMA's version lookup proxy, with its key, or `null` for none, as in development builds. Everything but the
+   * catalogue is fetched through it, so Foundry's package listing and the manifests attached to GitHub releases can be
+   * read too.
+   */
+  readonly proxy: DefaultProxy | null;
+  /**
+   * The EMMA extension's version, named to the proxy, in an `X-EMMA-Version` header, and to the catalogue, so their
+   * logs can say which version asks for what; `null` for none.
+   */
+  readonly clientVersion?: string | null;
   /** Fetches; the browser's by default. */
   readonly fetch?: typeof globalThis.fetch;
 }
 
-/** The most requests one lookup makes, to stay within GitHub's limit of 60 an hour for a browser. */
+/** The most requests one lookup makes, to stay within GitHub's limit of 60 an hour without a proxy. */
 const MAX_REQUESTS = 300;
 
 const CHANNELS: readonly CoreChannel[] = ['stable', 'testing', 'development', 'prototype'];
 
 /**
  * Hosts that send no CORS headers, so a browser cannot read what they answer: GitHub's release downloads and Foundry's
- * package listing. They are not asked at all, as each refused request also puts an error in the console.
+ * package listing. Without a proxy they are not asked at all, as each refused request also puts an error in the
+ * console.
  */
 const NO_CORS_HOSTS: ReadonlySet<string> = new Set([
   'github.com',
@@ -83,6 +98,24 @@ function direct(send: typeof globalThis.fetch): typeof globalThis.fetch {
 }
 
 /**
+ * Send requests with headers of the proxy's: its API key, and the EMMA extension's version.
+ * @param send - The fetch to send them with
+ * @param extra - The headers, each left out when `null`
+ * @returns A fetch that adds them to every request
+ */
+function withHeaders(
+  send: typeof globalThis.fetch,
+  extra: Readonly<Record<string, string | null>>,
+): typeof globalThis.fetch {
+  const set = Object.entries(extra).filter((entry): entry is [string, string] => entry[1] !== null);
+  return (input, init) => {
+    const headers = new Headers(init?.headers);
+    for (const [name, value] of set) headers.set(name, value);
+    return send(input, { ...init, headers });
+  };
+}
+
+/**
  * The installed Foundry build, as the resolver names it.
  * @param build - The build
  * @returns The core release
@@ -102,8 +135,22 @@ function coreRelease(build: CoreBuild): CoreRelease {
  * @returns What was found
  */
 export async function lookUpReleases(installed: InstalledManifests, options: LookupOptions): Promise<ReleaseLookup> {
+  const { catalogue, proxy, clientVersion = null } = options;
   const send = options.fetch ?? globalThis.fetch.bind(globalThis);
-  const http = httpClient({ fetch: direct(send), cache: sessionCache, budget: { maxRequests: MAX_REQUESTS } });
+  const http = httpClient({
+    fetch:
+      proxy === null
+        ? direct(send)
+        : proxiedFetch(
+            withHeaders(send, {
+              'X-API-Key': proxy.key,
+              'X-EMMA-Version': clientVersion === null ? null : `extension-${clientVersion}`,
+            }),
+            proxy.url,
+          ),
+    cache: sessionCache,
+    budget: { maxRequests: MAX_REQUESTS },
+  });
   const core = coreRelease(installed.core);
   const manifests: LocalManifest[] = installed.manifests.map(manifest => ({
     json: manifest.json,
@@ -113,18 +160,32 @@ export async function lookUpReleases(installed: InstalledManifests, options: Loo
   const local = localSource(manifests);
   const set = sourceSet({
     // The installed releases come first, as they are loaded with everything their manifests declare, and then the
-    // manifests the packages declare, which give their newest versions loaded too. GitHub's and GitLab's release lists
-    // give the rest without core compatibility, whose manifests a browser cannot read, so cannot be placed.
-    sources: [local, manifestUrlSource(http), githubSource(http), gitlabSource(http)],
+    // manifests the packages declare, which give their newest versions loaded too. Foundry's package listing, through
+    // the proxy only, and GitHub's and GitLab's release lists give the rest. Without the proxy, a version known only
+    // from a release list has no core compatibility, as a browser cannot read its manifest, so cannot be placed.
+    sources: [
+      local,
+      manifestUrlSource(http),
+      ...(proxy === null ? [] : [foundryIndexSource(http)]),
+      githubSource(http),
+      gitlabSource(http),
+    ],
     http,
-    // Only the installed build: no newer one is found without a proxy, and the core is kept as it is.
+    // Only the installed build, which is kept as it is.
     core: [core],
     manifests: Object.fromEntries(
       installed.manifests.flatMap(({ type, id, manifest }) =>
         manifest === undefined ? [] : [[packageKey({ type, id }), [manifest]]],
       ),
     ),
-    ...(options.catalogue !== null && { catalogue: catalogueSource({ ...options.catalogue, fetch: send }) }),
+    // Asked directly, not through the proxy, as it sends CORS headers.
+    ...(catalogue !== null && {
+      catalogue: catalogueSource({
+        ...catalogue,
+        fetch: send,
+        ...(clientVersion !== null && { client: `EMMA-extension/${clientVersion}` }),
+      }),
+    }),
   });
 
   const refs: PackageRef[] = installed.manifests.map(({ type, id }) => ({ type, id }));

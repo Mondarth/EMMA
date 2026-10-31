@@ -10,6 +10,7 @@ import { readRecords } from '../foundry/records';
 import type { SetupGame } from '../foundry/setup-game';
 import { readInstallation, readManifests, setupGame } from '../foundry/setup-game';
 import { revealCatalogue } from '@mondarth/emma-core/default-catalogue';
+import { revealProxy } from '@mondarth/emma-core/default-proxy';
 
 import { lookUpReleases } from '../foundry/releases';
 import { localize } from '../lib/i18n';
@@ -67,6 +68,8 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
     findUpdates: async overview => {
       const { universe, load } = await lookUpReleases(readManifests(game), {
         catalogue: revealCatalogue(__EMMA_DEFAULT_CATALOGUE__),
+        proxy: revealProxy(__EMMA_DEFAULT_PROXY__),
+        clientVersion: __EMMA_EXTENSION_VERSION__,
       });
       return findUpdates({ overview, universe, load });
     },

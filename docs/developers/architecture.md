@@ -117,8 +117,8 @@ module:
 `packages/core` (`@mondarth/emma-core`)
 : Code that more than one package needs, and that uses no Foundry or browser globals: so far the world record's format
   (`src/world-record.ts`), which the module writes and the setup screen reads, with `parseWorldRecord` to read a record
-  that anything may have written; and EMMA's package catalogue, obscured in a build (`src/obscure.ts`,
-  `src/default-catalogue.ts`), with what builds it in and checks a release for its key in plain text, which run under
+  that anything may have written; and EMMA's package catalogue and version lookup proxy, obscured in a build
+  (`src/obscure.ts`, `src/default-catalogue.ts`, `src/default-proxy.ts`), with what builds them in and checks a release for its key in plain text, which run under
   Node (`scripts/`). Packages import it from its source, through its `exports`.
 
 `packages/setup` (`@mondarth/emma-setup`)
@@ -135,7 +135,7 @@ module:
   beside the tree shows for a system, a module or a group. As a module shows in many places, a row's key is its path
   from the root, and the window keeps the selected row's key. Updates: `src/foundry/releases.ts`, the only code that
   fetches, looks up the releases of the installed packages with `@mondarth/fvtt-resolver`'s sources, the catalogue
-  first, reading the installed manifests `setup-game.ts` gives; `src/lib/updates.ts` resolves each recorded world's
+  first, and the rest through EMMA's proxy, reading the installed manifests `setup-game.ts` gives; `src/lib/updates.ts` resolves each recorded world's
   setup with the packages free to move up, and offers each package the lowest of the bests of the worlds that use it,
   or, if none does, its newest version the installed core can run; `src/app/update-state.svelte.ts` keeps what the
   search found, whether Update mode is on, and the versions chosen. `Splitter.svelte` resizes the panels, whose shares
