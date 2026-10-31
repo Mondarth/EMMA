@@ -1,9 +1,8 @@
 /**
- * Builds the default version lookup proxy into a release. The release workflow sets `EMMA_DEFAULT_PROXY_URL` (a
- * repository variable) and `EMMA_DEFAULT_PROXY_KEY` (a secret); Vite puts them, obscured, in `__EMMA_DEFAULT_PROXY__`.
- * A build with neither, as for development and CI, has no default proxy. See docs/developers/default-proxy.md.
+ * Builds EMMA's version lookup proxy into a bundle, as `__EMMA_DEFAULT_PROXY__` (see `src/default-proxy.ts`): run by
+ * the Vite configurations of the module and the EMMA extension, under Node.
  */
-import { obscure } from '@mondarth/emma-core/obscure';
+import { obscure } from '../src/obscure.ts';
 
 /**
  * The value of `__EMMA_DEFAULT_PROXY__` for a build.

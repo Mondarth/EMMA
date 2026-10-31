@@ -90,9 +90,10 @@ The server reads `hostname` and `ports.base` from `.pdt/mount.json`, as the modu
 { "hostname": "my-dev-box", "ports": { "base": 30000, "dev": 31002, "setup": 31003 } }
 ```
 
-A development build has no package catalogue, so it finds fewer updates (see {doc}`default-proxy`). To try the EMMA
-extension with one, start the server with `EMMA_DEFAULT_CATALOGUE_URL` and `EMMA_DEFAULT_CATALOGUE_KEY` set to a
-catalogue of your own; never commit them.
+A development build has no package catalogue or version lookup proxy, so it finds fewer updates (see
+{doc}`default-proxy`). To try the EMMA extension with them, start the server with `EMMA_DEFAULT_CATALOGUE_URL` and
+`EMMA_DEFAULT_CATALOGUE_KEY` set to a catalogue of your own, and `EMMA_DEFAULT_PROXY_URL` and `EMMA_DEFAULT_PROXY_KEY`
+to a proxy of your own; never commit them.
 
 Do not have the browser extension active for the development server's address as well: the EMMA extension starts once
 on a page, so the one that starts first would win.

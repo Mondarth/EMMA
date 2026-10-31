@@ -5,6 +5,9 @@ import path from 'node:path';
 import { defineConfig } from 'vitest/config';
 
 import { defaultCatalogueDefine } from '@mondarth/emma-core/default-catalogue-define';
+import { defaultProxyDefine } from '@mondarth/emma-core/default-proxy-define';
+
+import extensionJSON from '../extension/package.json' with { type: 'json' };
 
 import { readDevServer } from './scripts/dev/dev-server.ts';
 import { injectSetup } from './scripts/dev/inject-setup.ts';
@@ -31,6 +34,10 @@ export default defineConfig(({ command, mode }) => {
       // EMMA's package catalogue, obscured, from the environment of a release build. Never in tests, so they never ask
       // it. See @mondarth/emma-core/default-catalogue.
       __EMMA_DEFAULT_CATALOGUE__: mode === 'test' ? 'null' : defaultCatalogueDefine(process.env),
+      // EMMA's version lookup proxy, likewise. See @mondarth/emma-core/default-proxy.
+      __EMMA_DEFAULT_PROXY__: mode === 'test' ? 'null' : defaultProxyDefine(process.env),
+      // The browser extension's version, which a release stamps into its package.json before building this.
+      __EMMA_EXTENSION_VERSION__: JSON.stringify(extensionJSON.version),
     },
     test: {
       include: ['tests/unit/**/*.test.ts'],

@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'vitest';
 
-import { reveal } from '@mondarth/emma-core/obscure';
-import type { Obscured } from '@mondarth/emma-core/obscure';
-import { defaultProxyDefine } from '../../../scripts/build/default-proxy';
+import { defaultProxyDefine } from '../../scripts/default-proxy-define.ts';
+import type { Obscured } from '../../src/obscure.ts';
+import { reveal } from '../../src/obscure.ts';
 
 const PROXY_URL = 'https://packages.example.test/?url={url}';
 const KEY = 'k3y-0123456789abcdef';

@@ -176,8 +176,10 @@ resized, and the browser remembers the sizes.
 
 EMMA finds versions in EMMA's package catalogue first, which holds every release of the packages it knows, with the
 Foundry VTT versions each works with. For packages the catalogue does not hold, EMMA reads the manifest each package
-declares, and GitHub's and GitLab's lists of releases. A browser cannot read the manifests attached to GitHub releases,
-so a version found only in such a list says nothing of the Foundry VTT versions it works with, and is not offered.
+declares, Foundry's package listing, and GitHub's and GitLab's lists of releases, through EMMA's version lookup proxy.
+A browser cannot read Foundry's listing or the manifests attached to GitHub releases itself, which the proxy lets it
+do. Without the proxy, as in a development build, a version found only in a release list says nothing of the Foundry
+VTT versions it works with, and is not offered.
 
 ### Worlds without a record
 
@@ -192,9 +194,10 @@ The extension reads the setup screen of the servers you allow it on, and the wor
 through the server's own pages. It keeps the list of servers you activated, the choice of whether EMMA opens by itself
 on each, and the sizes of EMMA's panels, in your browser.
 
-To find updates, EMMA sends the IDs of the installed game systems and modules to EMMA's package catalogue, with a key
-that says the request comes from EMMA, and asks GitHub, GitLab and the sites the packages' manifests are on for their
-releases. It sends nothing about your worlds, your server or you.
+To find updates, EMMA sends the IDs of the installed game systems and modules to EMMA's package catalogue, and asks
+GitHub, GitLab, Foundry's package listing and the sites the packages' manifests are on for their releases, through
+EMMA's version lookup proxy. Each request to the catalogue or the proxy carries a key that says it comes from EMMA,
+and the extension's version. EMMA sends nothing about your worlds, your server or you.
 
 ## Limitations of the alpha
 

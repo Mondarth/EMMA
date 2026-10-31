@@ -7,8 +7,8 @@ import autoprefixer from 'autoprefixer';
 import dts from 'unplugin-dts/vite';
 
 import moduleJSON from './module.json' with { type: 'json' };
-import { defaultProxyDefine } from './scripts/build/default-proxy.ts';
 import { defaultCatalogueDefine } from '@mondarth/emma-core/default-catalogue-define';
+import { defaultProxyDefine } from '@mondarth/emma-core/default-proxy-define';
 
 import tsconfigPaths from 'vite-tsconfig-paths';
 import type { Plugin } from 'vite';

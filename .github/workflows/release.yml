@@ -125,10 +125,13 @@ jobs:
           # it, the Firefox build is released unsigned, which Firefox installs only until it restarts.
           AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
           AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
-          # EMMA's package catalogue, built into the EMMA extension obscured, as into the module; without them, the
-          # extension has none, and looks up releases only from GitHub, GitLab and the installed manifests.
+          # EMMA's package catalogue and version lookup proxy, built into the EMMA extension obscured, as into the
+          # module; without them, the extension has neither, and looks up releases only from GitHub, GitLab and the
+          # manifests a browser may read.
           EMMA_DEFAULT_CATALOGUE_URL: ${{ vars.EMMA_DEFAULT_CATALOGUE_URL }}
           EMMA_DEFAULT_CATALOGUE_KEY: ${{ secrets.EMMA_DEFAULT_CATALOGUE_KEY }}
+          EMMA_DEFAULT_PROXY_URL: ${{ vars.EMMA_DEFAULT_PROXY_URL }}
+          EMMA_DEFAULT_PROXY_KEY: ${{ secrets.EMMA_DEFAULT_PROXY_KEY }}
           GIT_AUTHOR_NAME: ${{ steps.identity.outputs.name }}
           GIT_AUTHOR_EMAIL: ${{ steps.identity.outputs.email }}
           GIT_COMMITTER_NAME: ${{ steps.identity.outputs.name }}
