@@ -7,25 +7,16 @@
  * GitLab's release lists, and manifests on sites that send them. Foundry's package listing and the manifests attached
  * to GitHub releases send none, so they are asked only through EMMA's proxy, when the EMMA extension is built with it;
  * without it, they are not asked at all. The Foundry build is kept as it is either way.
+ *
+ * The resolver and its sources are the ones the setup kit gives, from the installed EMMA module (see
+ * `@mondarth/emma-core/setup-kit`).
  */
 import type { CoreChannel, CoreRelease, PackageKey, PackageRef, Release, Universe } from '@mondarth/fvtt-resolver';
-import { packageKey, sameVersion } from '@mondarth/fvtt-resolver';
-import type { LocalManifest } from '@mondarth/fvtt-resolver/sources';
-import {
-  catalogueSource,
-  githubSource,
-  gitlabSource,
-  httpClient,
-  localSource,
-  foundryIndexSource,
-  manifestUrlSource,
-  memoryCache,
-  proxiedFetch,
-  sourceSet,
-} from '@mondarth/fvtt-resolver/sources';
+import type { Cache as SourceCache, LocalManifest } from '@mondarth/fvtt-resolver/sources';
 
 import type { DefaultCatalogue } from '@mondarth/emma-core/default-catalogue';
 import type { DefaultProxy } from '@mondarth/emma-core/default-proxy';
+import type { SetupKit } from '@mondarth/emma-core/setup-kit';
 
 import type { CoreBuild, InstalledManifests } from './setup-game';
 
@@ -46,6 +37,8 @@ export interface ReleaseLookup {
 
 /** How {@link lookUpReleases} fetches. */
 export interface LookupOptions {
+  /** The setup kit, from the installed EMMA module. */
+  readonly kit: SetupKit;
   /** EMMA's package catalogue, with its key, or `null` for none, as in development builds. */
   readonly catalogue: DefaultCatalogue | null;
   /**
@@ -81,8 +74,20 @@ const NO_CORS_HOSTS: ReadonlySet<string> = new Set([
   'foundryvtt.com',
 ]);
 
-// Kept while the setup screen is open, so reading the installation again does not fetch it all again.
-const sessionCache = memoryCache();
+// Kept while the setup screen is open, so reading the installation again does not fetch it all again: one for each
+// kit, as a module updated meanwhile gives a new one.
+const sessionCaches = new WeakMap<SetupKit, SourceCache>();
+
+/**
+ * The session's cache for a kit.
+ * @param kit - The kit
+ * @returns Its cache, made the first time
+ */
+function sessionCache(kit: SetupKit): SourceCache {
+  const cache = sessionCaches.get(kit) ?? kit.sources.memoryCache();
+  sessionCaches.set(kit, cache);
+  return cache;
+}
 
 /**
  * Send requests directly, refusing those a browser could not read the answer to.
@@ -135,7 +140,19 @@ function coreRelease(build: CoreBuild): CoreRelease {
  * @returns What was found
  */
 export async function lookUpReleases(installed: InstalledManifests, options: LookupOptions): Promise<ReleaseLookup> {
-  const { catalogue, proxy, clientVersion = null } = options;
+  const { kit, catalogue, proxy, clientVersion = null } = options;
+  const { packageKey, sameVersion } = kit.resolver;
+  const {
+    catalogueSource,
+    foundryIndexSource,
+    githubSource,
+    gitlabSource,
+    httpClient,
+    localSource,
+    manifestUrlSource,
+    proxiedFetch,
+    sourceSet,
+  } = kit.sources;
   const send = options.fetch ?? globalThis.fetch.bind(globalThis);
   const http = httpClient({
     fetch:
@@ -148,7 +165,7 @@ export async function lookUpReleases(installed: InstalledManifests, options: Loo
             }),
             proxy.url,
           ),
-    cache: sessionCache,
+    cache: sessionCache(kit),
     budget: { maxRequests: MAX_REQUESTS },
   });
   const core = coreRelease(installed.core);

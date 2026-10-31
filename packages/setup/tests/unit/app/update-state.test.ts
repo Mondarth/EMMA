@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import { UpdateState } from '../../../src/app/update-state.svelte';
+import { KitUnavailable } from '../../../src/foundry/setup-kit';
 import { buildOverview } from '../../../src/lib/overview';
 import type { PackageUpdate, UpdateSearch } from '../../../src/lib/updates';
 import { installation } from '../../mocks/fixtures';
@@ -123,5 +124,49 @@ describe('UpdateState', () => {
 
     expect(updates.on).toBe(false);
     expect(updates.choices).toHaveLength(1);
+  });
+
+  test('says why a search cannot be made, dropping what was found and chosen, until one can again', async () => {
+    let unavailable = false;
+    const updates = new UpdateState(() =>
+      unavailable
+        ? Promise.reject(new KitUnavailable({ reason: 'module-too-old', version: '0.9.0' }))
+        : Promise.resolve(finding(APP)),
+    );
+    await updates.searchFor(OVERVIEW);
+    updates.setOn(true);
+    updates.choose('module:app', '2.0.0');
+
+    unavailable = true;
+    await updates.searchFor(OVERVIEW);
+
+    expect(updates.status).toBe('unavailable');
+    expect(updates.problem).toEqual({ reason: 'module-too-old', version: '0.9.0' });
+    expect(updates.search).toBeNull();
+    expect(updates.on).toBe(false);
+    expect(updates.choices).toEqual([]);
+
+    unavailable = false;
+    await updates.searchFor(OVERVIEW);
+
+    expect(updates.status).toBe('found');
+    expect(updates.problem).toBeNull();
+  });
+
+  test('keeps only the latest search when an earlier one cannot be made', async () => {
+    let refuse: (error: unknown) => void = () => undefined;
+    const first = new Promise<UpdateSearch>((_resolve, reject) => {
+      refuse = reject;
+    });
+    const searches = [first, Promise.resolve(finding(APP))];
+    const updates = new UpdateState(() => searches.shift() ?? Promise.resolve(finding()));
+
+    const earlier = updates.searchFor(OVERVIEW);
+    await updates.searchFor(OVERVIEW);
+    refuse(new KitUnavailable({ reason: 'missing' }));
+    await earlier;
+
+    expect(updates.status).toBe('found');
+    expect(updates.problem).toBeNull();
   });
 });

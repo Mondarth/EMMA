@@ -83,6 +83,23 @@ describe('installGuard', () => {
     expect(post).toHaveBeenCalledExactlyOnceWith({ action: 'launchWorld' }, { notify: false });
   });
 
+  test('lets installations through while EMMA makes its own, and refuses them again after', async () => {
+    const { guard: placed, game, post, onRefused } = setUp();
+
+    const answer = await placed.allowing(async () => {
+      await game.post({ action: 'installPackage', id: 'mondarth-emma' });
+      // Nested, as an install inside another.
+      await placed.allowing(() => game.post({ action: 'installPackage', id: 'lib-wrapper' }));
+      return 'done';
+    });
+    await expect(placed.allowing(() => Promise.reject(new Error('failed')))).rejects.toThrow('failed');
+    await game.post({ action: 'installPackage', id: 'other' });
+
+    expect(answer).toBe('done');
+    expect(post).toHaveBeenCalledTimes(2);
+    expect(onRefused).toHaveBeenCalledOnce();
+  });
+
   test('lets installations through while it is off', async () => {
     const { game, post } = setUp(false);
 

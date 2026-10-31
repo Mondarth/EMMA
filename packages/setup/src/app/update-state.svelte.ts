@@ -5,11 +5,16 @@
 import type { PackageKey } from '@mondarth/fvtt-resolver';
 import { SvelteMap } from 'svelte/reactivity';
 
+import type { KitProblem } from '../foundry/setup-kit';
+import { KitUnavailable } from '../foundry/setup-kit';
 import type { Overview } from '../lib/overview';
 import type { PackageUpdate, UpdateSearch } from '../lib/updates';
 
-/** Where the search for updates is. */
-export type UpdateStatus = 'idle' | 'searching' | 'found' | 'failed';
+/**
+ * Where the search for updates is: `unavailable` when it cannot be made, as without an EMMA module whose setup kit
+ * fits (see {@link UpdateState.problem}).
+ */
+export type UpdateStatus = 'idle' | 'searching' | 'found' | 'failed' | 'unavailable';
 
 /** A version chosen that differs from the one installed. */
 export interface UpdateChoice {
@@ -23,6 +28,8 @@ export class UpdateState {
   status = $state<UpdateStatus>('idle');
   /** What the last search found, once it has. */
   search = $state.raw<UpdateSearch | null>(null);
+  /** Why the search cannot be made, while the status is `unavailable`. */
+  problem = $state.raw<KitProblem | null>(null);
   /** Whether Update mode is on, offering the versions of each package with an update. */
   on = $state(false);
 
@@ -48,8 +55,9 @@ export class UpdateState {
   }
 
   /**
-   * Search for the updates of an installation, as it was read. A failure is kept in {@link status}, never thrown. A
-   * choice the new search no longer offers is dropped.
+   * Search for the updates of an installation, as it was read. A failure is kept in {@link status}, never thrown, and
+   * a search that cannot be made in {@link problem} too, with what was found before dropped. A choice the new search
+   * no longer offers is dropped.
    * @param overview - The installation
    * @returns Once found, or failed
    */
@@ -60,12 +68,22 @@ export class UpdateState {
       const found = await this.#find(overview);
       if (search !== this.#searches) return;
       this.search = found;
+      this.problem = null;
       this.status = 'found';
       for (const [key, version] of this.#chosen) {
         if (found.updates.get(key)?.versions.includes(version) !== true) this.#chosen.delete(key);
       }
-    } catch {
-      if (search === this.#searches) this.status = 'failed';
+    } catch (error) {
+      if (search !== this.#searches) return;
+      if (error instanceof KitUnavailable) {
+        this.search = null;
+        this.problem = error.problem;
+        this.#chosen.clear();
+        this.on = false;
+        this.status = 'unavailable';
+      } else {
+        this.status = 'failed';
+      }
     }
   }
 

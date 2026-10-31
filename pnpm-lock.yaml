@@ -245,7 +245,11 @@ importers:
         specifier: ^4.6.5
         version: 4.6.5
 
-  packages/core: {}
+  packages/core:
+    dependencies:
+      '@mondarth/fvtt-resolver':
+        specifier: 0.8.0
+        version: 0.8.0
 
   packages/extension:
     devDependencies:
@@ -288,6 +292,7 @@ importers:
       '@mondarth/emma-core':
         specifier: workspace:*
         version: link:../core
+    devDependencies:
       '@mondarth/fvtt-resolver':
         specifier: 0.8.0
         version: 0.8.0

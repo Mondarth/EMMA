@@ -7,7 +7,8 @@
  *   own handlers on the same page run. This depends on the buttons' `data-action` (Foundry 14.368);
  * - as a backstop for any other way in, `game.post`, which sends every installation to the server (as
  *   `{ action: "installPackage" }`), is wrapped and refuses it.
- * Uninstalling, creating worlds and launching them are left alone.
+ * Uninstalling, creating worlds and launching them are left alone, and so are the installs EMMA makes itself, while
+ * it makes them (see {@link Guard.allowing}).
  */
 import type { SetupGame, SetupRequest } from './setup-game';
 
@@ -38,6 +39,13 @@ export interface GuardOptions {
 export interface Guard {
   /** Show whether the guard is on, greying the guarded buttons out or not. Call it after switching the guard. */
   refresh(): void;
+  /**
+   * Let requests through while EMMA installs something itself, as the EMMA module, and its dependencies, which
+   * Foundry asks to install after it.
+   * @param run - What EMMA does meanwhile
+   * @returns What it gives, once done
+   */
+  allowing<T>(run: () => Promise<T>): Promise<T>;
   /** Remove the guard, giving Foundry its buttons and requests back. */
   remove(): void;
 }
@@ -50,6 +58,8 @@ export interface Guard {
  */
 export function installGuard(game: SetupGame, options: GuardOptions): Guard {
   const { isOn, onRefused } = options;
+  // How many of EMMA's own installs are going on.
+  let allowed = 0;
   const onClick = (event: MouseEvent): void => {
     if (!isOn() || !(event.target instanceof Element) || event.target.closest(BUTTONS) === null) return;
     event.preventDefault();
@@ -60,7 +70,7 @@ export function installGuard(game: SetupGame, options: GuardOptions): Guard {
 
   const post = game.post;
   game.post = (request: SetupRequest, postOptions?: object): Promise<unknown> => {
-    if (isOn() && GUARDED_REQUESTS.includes(request.action)) {
+    if (isOn() && allowed === 0 && GUARDED_REQUESTS.includes(request.action)) {
       onRefused();
       // Foundry's installer reports an `error` in the answer as a failed installation.
       return Promise.resolve({ error: 'EMMA manages packages on this screen' });
@@ -79,6 +89,14 @@ export function installGuard(game: SetupGame, options: GuardOptions): Guard {
 
   return {
     refresh,
+    async allowing(run) {
+      allowed++;
+      try {
+        return await run();
+      } finally {
+        allowed--;
+      }
+    },
     remove() {
       document.removeEventListener('click', onClick, { capture: true });
       game.post = post;

@@ -7,6 +7,7 @@
   import type { SetupState } from '../app/setup-state.svelte';
   import type { Layout } from '../foundry/preferences';
   import { readLayout, writeLayout } from '../foundry/preferences';
+  import { EXTENSION_RELEASES } from '../foundry/setup-kit';
   import { groupDetail, moduleDetail, systemDetail } from '../lib/details';
   import { format, localize } from '../lib/i18n';
   import type { TreeRow, TreeSelection } from '../lib/tree';
@@ -49,9 +50,12 @@
 
   /** What the footer says of the search for updates. */
   const updateStatus = $derived.by(() => {
+    if (setup.installing) return localize('Update.Installing');
     switch (updates.status) {
       case 'failed':
         return localize('Update.Failed');
+      case 'unavailable':
+        return problemText();
       case 'found':
         return updateCount === 0 ? localize('Update.None') : format('Update.Found', { count: updateCount });
       default:
@@ -60,6 +64,22 @@
     }
   });
   const unresolved = $derived(updates.search?.unresolved.length ?? 0);
+  const problem = $derived(updates.status === 'unavailable' ? updates.problem : null);
+
+  /**
+   * What the footer says when the search for updates cannot be made.
+   * @returns Why, in words
+   */
+  function problemText(): string {
+    switch (problem?.reason) {
+      case 'module-too-old':
+        return format('Update.ModuleTooOld', { version: problem.version });
+      case 'extension-too-old':
+        return format('Update.ExtensionTooOld', { version: problem.version });
+      default:
+        return localize('Update.NeedsModule');
+    }
+  }
   const selection = $derived(selected.selection);
   // What is selected, if it is still there: after reading again, a world may have gone.
   const world = $derived(
@@ -148,6 +168,23 @@
           <span class="emma-setup-note">{format('Update.Unresolved', { count: unresolved })}</span>
         {/if}
       </p>
+      {#if problem?.reason === 'extension-too-old'}
+        <a class="emma-setup-get" href={EXTENSION_RELEASES} target="_blank" rel="noopener noreferrer">
+          <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+          {localize('Update.UpdateExtension')}
+        </a>
+      {:else if problem !== null}
+        <button
+          type="button"
+          class="emma-setup-get"
+          disabled={setup.installing}
+          onclick={() => {
+            void setup.installModule();
+          }}>
+          <i class="fa-solid fa-download" aria-hidden="true"></i>
+          {localize(problem.reason === 'missing' ? 'Update.InstallModule' : 'Update.UpdateModule')}
+        </button>
+      {/if}
     {/if}
     <button
       type="button"

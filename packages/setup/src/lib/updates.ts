@@ -10,20 +10,12 @@
  * - a package no recorded world uses, such as a module active in no recorded world, or a system only worlds without a
  *   record use, is offered its newest version that the installed Foundry build can run.
  *
- * The Foundry build itself is kept: no newer one is found without a proxy. Pure but for the resolver's loading.
+ * The Foundry build itself is kept. Pure but for the resolver's loading. The resolver is the one the setup kit gives,
+ * from the installed EMMA module (see `@mondarth/emma-core/setup-kit`).
  */
 import type { PackageKey, Policy, Release, Universe } from '@mondarth/fvtt-resolver';
-import {
-  CORE,
-  AVAILABILITY,
-  coreAvailability,
-  isNewerVersion,
-  isUnavailable,
-  looksLikePrerelease,
-  packageKey,
-  resolveInRounds,
-  sameVersion,
-} from '@mondarth/fvtt-resolver';
+
+import type { KitResolver } from '@mondarth/emma-core/setup-kit';
 
 import type { Overview } from './overview';
 
@@ -47,6 +39,8 @@ export interface UpdateSearch {
 
 /** What the search works on. */
 export interface UpdateInputs {
+  /** The resolver, from the setup kit. */
+  readonly resolver: KitResolver;
   readonly overview: Overview;
   /** The installed Foundry build, and every release found of the installed systems and modules. */
   readonly universe: Universe;
@@ -71,12 +65,22 @@ const BEST_VERSIONS_POLICY: Partial<Policy> = {
  * @returns The updates, and the worlds no setup was found for
  */
 export async function findUpdates(inputs: UpdateInputs): Promise<UpdateSearch> {
-  const { overview, load } = inputs;
+  const { resolver, overview, load } = inputs;
+  const { CORE, packageKey, resolveInRounds } = resolver;
+  const newer = newerIn(resolver);
   const installed = new Map<PackageKey, string>([
     ...overview.systems.map(({ id, version }) => [packageKey({ type: 'system', id }), version] as const),
     ...overview.modules.map(({ module: { id, version } }) => [packageKey({ type: 'module', id }), version] as const),
   ]);
-  let universe = atLeastInstalled(inputs.universe, installed);
+  const atLeastInstalled = (from: Universe): Universe => ({
+    core: from.core,
+    // An update never goes back.
+    releases: from.releases.filter(release => {
+      const version = installed.get(packageKey(release.package));
+      return version === undefined || !newer(version, release.version);
+    }),
+  });
+  let universe = atLeastInstalled(inputs.universe);
 
   // The best version each world that uses a package accepts.
   const accepted = new Map<PackageKey, string[]>();
@@ -99,7 +103,7 @@ export async function findUpdates(inputs: UpdateInputs): Promise<UpdateSearch> {
       { policy: BEST_VERSIONS_POLICY },
     );
     // What was loaded is kept for the next world, which may well need it too.
-    universe = atLeastInstalled(rounds.universe, installed);
+    universe = atLeastInstalled(rounds.universe);
     const { resolution } = rounds;
     if (resolution.ok) {
       for (const release of [resolution.setup.system, ...resolution.setup.modules])
@@ -116,47 +120,34 @@ export async function findUpdates(inputs: UpdateInputs): Promise<UpdateSearch> {
   const updates = new Map<PackageKey, PackageUpdate>();
   for (const [key, version] of installed) {
     const choosable = newestFirst(
+      resolver,
       universe.releases.filter(
-        release => packageKey(release.package) === key && runsOn(release, overview.core, universe),
+        release => packageKey(release.package) === key && runsOn(resolver, release, overview.core, universe),
       ),
     );
     const bests = accepted.get(key);
-    const newest = bests === undefined ? choosable[0] : oldest(bests);
+    const newest = bests === undefined ? choosable[0] : oldest(resolver, bests);
     if (newest === undefined || !newer(newest, version)) continue;
     // The newest offered is a release the resolver chose, which may be one not offered on its own, such as an unlisted
     // version when no listed one fits.
     const between = choosable.filter(offered => newer(newest, offered) && newer(offered, version));
-    const versions = unique([newest, ...between, version]);
+    const versions = unique(resolver, [newest, ...between, version]);
     updates.set(key, { key, installed: version, newest, versions });
   }
   return { updates, unresolved };
 }
 
 /**
- * The universe without releases older than the installed ones: an update never goes back.
- * @param universe - The universe
- * @param installed - The installed version of each installed package, by key
- * @returns The universe, without them
- */
-function atLeastInstalled(universe: Universe, installed: ReadonlyMap<PackageKey, string>): Universe {
-  return {
-    core: universe.core,
-    releases: universe.releases.filter(release => {
-      const version = installed.get(packageKey(release.package));
-      return version === undefined || !newer(version, release.version);
-    }),
-  };
-}
-
-/**
  * Whether a release may be offered on its own: one the Foundry build can run by the core compatibility it declares,
  * listed, and not a pre-release, as the resolver's policy has it.
+ * @param resolver - The resolver
  * @param release - The release
  * @param core - The Foundry build
  * @param universe - The universe, for the builds known
  * @returns `true` if it may be offered
  */
-function runsOn(release: Release, core: string, universe: Universe): boolean {
+function runsOn(resolver: KitResolver, release: Release, core: string, universe: Universe): boolean {
+  const { AVAILABILITY, coreAvailability, isUnavailable, looksLikePrerelease } = resolver;
   const availability = coreAvailability({ ...release.compatibility, ...release.listing }, core, universe.core);
   return (
     availability !== AVAILABILITY.UNKNOWN &&
@@ -168,19 +159,26 @@ function runsOn(release: Release, core: string, universe: Universe): boolean {
 
 /**
  * The versions of some releases, newest first, each once.
+ * @param resolver - The resolver
  * @param releases - The releases
  * @returns Their versions
  */
-function newestFirst(releases: readonly Release[]): string[] {
-  return unique(releases.map(({ version }) => version).sort((a, b) => Number(newer(b, a)) - Number(newer(a, b))));
+function newestFirst(resolver: KitResolver, releases: readonly Release[]): string[] {
+  const newer = newerIn(resolver);
+  return unique(
+    resolver,
+    releases.map(({ version }) => version).sort((a, b) => Number(newer(b, a)) - Number(newer(a, b))),
+  );
 }
 
 /**
  * The oldest of some versions.
+ * @param resolver - The resolver
  * @param versions - The versions, at least one
  * @returns The oldest
  */
-function oldest(versions: readonly string[]): string | undefined {
+function oldest(resolver: KitResolver, versions: readonly string[]): string | undefined {
+  const newer = newerIn(resolver);
   return versions.reduce<string | undefined>(
     (lowest, version) => (lowest === undefined || newer(lowest, version) ? version : lowest),
     undefined,
@@ -189,20 +187,22 @@ function oldest(versions: readonly string[]): string | undefined {
 
 /**
  * Some versions, each once, as the resolver counts `v1.0.0` and `1.0.0` as one.
+ * @param resolver - The resolver
  * @param versions - The versions, in order
  * @returns The first of each
  */
-function unique(versions: readonly string[]): string[] {
-  return versions.filter((version, index) => versions.findIndex(other => sameVersion(other, version)) === index);
+function unique(resolver: KitResolver, versions: readonly string[]): string[] {
+  return versions.filter(
+    (version, index) => versions.findIndex(other => resolver.sameVersion(other, version)) === index,
+  );
 }
 
 /**
  * Whether Foundry counts one version as newer than another, a leading `v` aside.
- * @param a - A version
- * @param b - Another
- * @returns Whether `a` is newer
+ * @param resolver - The resolver
+ * @returns Whether its first version is newer than its second
  */
-function newer(a: string, b: string): boolean {
+function newerIn(resolver: KitResolver): (a: string, b: string) => boolean {
   const unprefixed = (version: string) => version.replace(/^[vV](?=\d)/, '');
-  return isNewerVersion(unprefixed(a), unprefixed(b));
+  return (a, b) => resolver.isNewerVersion(unprefixed(a), unprefixed(b));
 }

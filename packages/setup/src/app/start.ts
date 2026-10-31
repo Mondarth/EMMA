@@ -4,11 +4,13 @@
  */
 import type { Guard } from '../foundry/guard';
 import { installGuard } from '../foundry/guard';
+import { installEmma } from '../foundry/install-emma';
 import { keepMenuButton } from '../foundry/menu-button';
 import { readGuardOn, writeGuardOn } from '../foundry/preferences';
 import { readRecords } from '../foundry/records';
 import type { SetupGame } from '../foundry/setup-game';
 import { readInstallation, readManifests, setupGame } from '../foundry/setup-game';
+import { KitUnavailable, loadKit, locateKit } from '../foundry/setup-kit';
 import { revealCatalogue } from '@mondarth/emma-core/default-catalogue';
 import { revealProxy } from '@mondarth/emma-core/default-proxy';
 
@@ -66,12 +68,21 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
       return buildOverview(installation, await readRecords(installation.worlds.map(({ id }) => id)));
     },
     findUpdates: async overview => {
-      const { universe, load } = await lookUpReleases(readManifests(game), {
+      const installed = readManifests(game);
+      // The resolver comes from the installed EMMA module's setup kit, if it fits.
+      const found = locateKit(installed, path => foundry.utils.getRoute(path));
+      if (!found.ok) throw new KitUnavailable(found.problem);
+      const kit = await loadKit(found);
+      const { universe, load } = await lookUpReleases(installed, {
+        kit,
         catalogue: revealCatalogue(__EMMA_DEFAULT_CATALOGUE__),
         proxy: revealProxy(__EMMA_DEFAULT_PROXY__),
         clientVersion: __EMMA_EXTENSION_VERSION__,
       });
-      return findUpdates({ overview, universe, load });
+      return findUpdates({ resolver: kit.resolver, overview, universe, load });
+    },
+    installModule: async () => {
+      if (placed.guard !== undefined) await installEmma(game, placed.guard);
     },
     guardOn: readGuardOn(),
     onGuardChange: on => {

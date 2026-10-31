@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from 'vitest';
 
 import { SetupState } from '../../../src/app/setup-state.svelte';
 import { buildOverview } from '../../../src/lib/overview';
-import { installation, noUpdates } from '../../mocks/fixtures';
+import { installation, noInstall, noUpdates } from '../../mocks/fixtures';
 
 const OVERVIEW = buildOverview(installation(), new Map());
 
@@ -19,6 +19,7 @@ describe('SetupState', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: noUpdates,
+      installModule: noInstall,
     });
 
     const reading = setup.refresh();
@@ -34,7 +35,13 @@ describe('SetupState', () => {
   test('keeps a failure rather than throwing it, and clears it on the next reading', async () => {
     const load = vi.fn<() => Promise<typeof OVERVIEW>>().mockRejectedValueOnce(new Error('offline'));
     load.mockResolvedValueOnce(OVERVIEW);
-    const setup = new SetupState({ load, guardOn: true, onGuardChange: vi.fn(), findUpdates: noUpdates });
+    const setup = new SetupState({
+      load,
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: noUpdates,
+      installModule: noInstall,
+    });
 
     await setup.refresh();
     expect(setup.failed).toBe(true);
@@ -51,6 +58,7 @@ describe('SetupState', () => {
       guardOn: false,
       onGuardChange,
       findUpdates: noUpdates,
+      installModule: noInstall,
     });
     expect(setup.guardOn).toBe(false);
 
@@ -58,5 +66,49 @@ describe('SetupState', () => {
 
     expect(setup.guardOn).toBe(true);
     expect(onGuardChange).toHaveBeenCalledExactlyOnceWith(true);
+  });
+
+  test('installs the EMMA module, once at a time, then reads the installation afresh', async () => {
+    let finish = (): void => undefined;
+    const installModule = vi.fn(
+      () =>
+        new Promise<void>(resolve => {
+          finish = resolve;
+        }),
+    );
+    const load = vi.fn(() => Promise.resolve(OVERVIEW));
+    const setup = new SetupState({
+      load,
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: noUpdates,
+      installModule,
+    });
+
+    const installing = setup.installModule();
+    expect(setup.installing).toBe(true);
+    await setup.installModule();
+    finish();
+    await installing;
+
+    expect(installModule).toHaveBeenCalledOnce();
+    expect(setup.installing).toBe(false);
+    expect(load).toHaveBeenCalledOnce();
+  });
+
+  test('reads the installation afresh after a failed install too, which Foundry reports', async () => {
+    const load = vi.fn(() => Promise.resolve(OVERVIEW));
+    const setup = new SetupState({
+      load,
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: noUpdates,
+      installModule: () => Promise.reject(new Error('offline')),
+    });
+
+    await setup.installModule();
+
+    expect(setup.installing).toBe(false);
+    expect(load).toHaveBeenCalledOnce();
   });
 });

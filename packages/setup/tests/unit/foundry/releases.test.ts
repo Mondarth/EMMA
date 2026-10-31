@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from 'vitest';
 
 import { lookUpReleases } from '../../../src/foundry/releases';
 import type { InstalledManifests, PackageManifest } from '../../../src/foundry/setup-game';
+import { KIT } from '../../mocks/kit';
 
 const CORE = { version: '14.368', generation: 14, channel: 'stable' };
 
@@ -48,7 +49,7 @@ describe('lookUpReleases', () => {
       [url]: { id: 'app', title: 'App', version: '2.0.0', compatibility: { minimum: '14', verified: '14' } },
     });
 
-    const found = await lookUpReleases(installed, { catalogue: null, proxy: null, fetch: send });
+    const found = await lookUpReleases(installed, { kit: KIT, catalogue: null, proxy: null, fetch: send });
 
     expect(found.universe.core).toEqual([{ version: '14.368', generation: 14, channel: 'stable' }]);
     expect(found.universe.releases.map(({ version }) => version).sort()).toEqual(['1.0.0', '2.0.0']);
@@ -62,7 +63,7 @@ describe('lookUpReleases', () => {
 
     const found = await lookUpReleases(
       { core: { ...CORE, channel: 'unheard-of' }, manifests: [moduleManifest('lib', '1.0.0', url)] },
-      { catalogue: null, proxy: null, fetch: send },
+      { kit: KIT, catalogue: null, proxy: null, fetch: send },
     );
 
     expect(send.mock.calls.map(([input]) => (input instanceof Request ? input.url : input.toString()))).not.toContain(
@@ -77,7 +78,7 @@ describe('lookUpReleases', () => {
 
     const found = await lookUpReleases(
       { core: CORE, manifests: [moduleManifest('lib', '1.0.0')] },
-      { catalogue: { url: 'https://catalogue.example.test/', key: 'k3y' }, proxy: null, fetch: send },
+      { kit: KIT, catalogue: { url: 'https://catalogue.example.test/', key: 'k3y' }, proxy: null, fetch: send },
     );
 
     expect(
@@ -118,7 +119,7 @@ describe('lookUpReleases', () => {
           { ...moduleManifest('broken', '1.0.0'), json: null },
         ],
       },
-      { catalogue: { url: 'https://catalogue.example.test/', key: 'k3y' }, proxy: null, fetch: send },
+      { kit: KIT, catalogue: { url: 'https://catalogue.example.test/', key: 'k3y' }, proxy: null, fetch: send },
     );
 
     expect(found.universe.releases.map(({ package: { id }, version }) => `${id}@${version}`).sort()).toEqual([
@@ -139,6 +140,7 @@ describe('lookUpReleases', () => {
     const found = await lookUpReleases(
       { core: CORE, manifests: [moduleManifest('lib', '1.0.0', url)] },
       {
+        kit: KIT,
         catalogue: { url: 'https://catalogue.example.test/', key: 'catalogue-k3y' },
         proxy: { url: 'https://proxy.example.test/?url={url}', key: 'proxy-k3y' },
         clientVersion: '0.2.0',
@@ -171,7 +173,12 @@ describe('lookUpReleases', () => {
 
     await lookUpReleases(
       { core: CORE, manifests: [moduleManifest('lib', '1.0.0', 'https://packages.example.test/lib/module.json')] },
-      { catalogue: null, proxy: { url: 'https://proxy.example.test/?url={url}', key: 'proxy-k3y' }, fetch: send },
+      {
+        kit: KIT,
+        catalogue: null,
+        proxy: { url: 'https://proxy.example.test/?url={url}', key: 'proxy-k3y' },
+        fetch: send,
+      },
     );
 
     expect(send).toHaveBeenCalled();

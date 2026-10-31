@@ -14,8 +14,13 @@ export interface SetupStateOptions {
   readonly guardOn: boolean;
   /** Keep the guard's setting, and show it on the screen. */
   readonly onGuardChange: (on: boolean) => void;
-  /** Search for the updates of the installation, each time it is read. */
+  /**
+   * Search for the updates of the installation, each time it is read; failing with a `KitUnavailable` when the EMMA
+   * module's setup kit cannot be used.
+   */
   readonly findUpdates: (overview: Overview) => Promise<UpdateSearch>;
+  /** Install the EMMA module, or update it, which the search for updates needs. */
+  readonly installModule: () => Promise<void>;
 }
 
 /** What the window shows. */
@@ -26,6 +31,8 @@ export class SetupState {
   loading = $state(false);
   /** Whether the last reading failed. */
   failed = $state(false);
+  /** Whether the EMMA module is being installed or updated. */
+  installing = $state(false);
   /** Whether EMMA guards Foundry's own Install, Update and Update All buttons. */
   guardOn = $state(true);
   /** The installation's updates, searched for each time it is read. */
@@ -59,6 +66,24 @@ export class SetupState {
     } finally {
       this.loading = false;
     }
+  }
+
+  /**
+   * Install the EMMA module, or update it, then read the installation afresh. A failure, which Foundry tells the user
+   * of, leaves the installation as it was.
+   * @returns Once installed and read again, or failed
+   */
+  async installModule(): Promise<void> {
+    if (this.installing) return;
+    this.installing = true;
+    try {
+      await this.#options.installModule();
+    } catch {
+      // Foundry says why itself.
+    } finally {
+      this.installing = false;
+    }
+    await this.refresh();
   }
 
   /**
