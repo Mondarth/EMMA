@@ -7,7 +7,8 @@
  *   - the modules, grouped by the game systems they are for: first those for any system, then those for each system.
  *
  * A module that requires others has them under it, wherever it shows, so a module may show many times. Every row with
- * rows under it can be expanded and collapsed. Pure: which rows are showing, and where the keyboard moves between them.
+ * rows under it can be expanded and collapsed, and while it is collapsed says which packages it hides, so that it can
+ * show what they have, as updates. Pure: which rows are showing, and where the keyboard moves between them.
  */
 import { format, localize } from './i18n';
 import type { ModuleStatus, ModuleUse, Overview, WorldModule, WorldOverview, WorldStatus } from './overview';
@@ -47,6 +48,8 @@ export interface TreeRow {
   readonly status?: RowStatus;
   /** Whether the row has rows under it. */
   readonly expandable: boolean;
+  /** While it is collapsed, the packages in the rows under it, at any depth, as {@link packageOf} names them. */
+  readonly hides?: ReadonlySet<string>;
   /** The key of the row it is under, if any. */
   readonly parent?: string;
 }
@@ -94,6 +97,7 @@ export function visibleRows(overview: Overview, expanded: ReadonlySet<string>): 
       ...(node.installed && { installed: true }),
       ...(node.status !== undefined && { status: node.status }),
       expandable: children.length > 0,
+      ...(children.length > 0 && !expanded.has(key) && { hides: packagesUnder(children) }),
       ...(parent !== undefined && { parent }),
     });
     if (!expanded.has(key)) return;
@@ -101,6 +105,25 @@ export function visibleRows(overview: Overview, expanded: ReadonlySet<string>): 
   };
   visit(rootNode(overview), 1);
   return rows;
+}
+
+/**
+ * The packages in rows, and in the rows under them, at any depth.
+ * @param nodes - The rows
+ * @returns The packages, as {@link packageOf} names them
+ */
+function packagesUnder(nodes: readonly TreeNode[]): Set<string> {
+  const found = new Set<string>();
+  const visit = (node: TreeNode): void => {
+    const key = packageOf(node.selection);
+    // A module has the modules it requires under it wherever it shows, but for those it is already under, which are
+    // found already: what is under it the first time it is found is enough. Requirements that loop end this way too.
+    if (key !== undefined && node.selection.kind === 'module' && found.has(key)) return;
+    if (key !== undefined) found.add(key);
+    for (const child of node.children()) visit(child);
+  };
+  for (const node of nodes) visit(node);
+  return found;
 }
 
 /**

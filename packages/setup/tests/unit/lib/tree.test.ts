@@ -61,8 +61,40 @@ const WORLD_A = `${DND}/world:a`;
 describe('visibleRows', () => {
   test('shows only the root while it is collapsed', () => {
     expect(visibleRows(OVERVIEW, new Set())).toEqual([
-      { key: ROOT, level: 1, selection: { kind: 'root' }, title: 'Foundry VTT 14.368', expandable: true },
+      {
+        key: ROOT,
+        level: 1,
+        selection: { kind: 'root' },
+        title: 'Foundry VTT 14.368',
+        expandable: true,
+        hides: new Set([
+          'system:dnd5e',
+          'system:pf2e',
+          'module:app',
+          'module:old',
+          'module:lib',
+          'module:both',
+          'module:loop',
+          'module:back',
+          'module:gone',
+        ]),
+      },
     ]);
+  });
+
+  test('says which packages a collapsed row hides, at any depth, and an expanded row none', () => {
+    const rows = visibleRows(OVERVIEW, new Set([ROOT, SYSTEMS, DND, MODULES]));
+
+    expect(rowOf(rows, ROOT)).not.toHaveProperty('hides');
+    // Under the world, its system and the modules it ran with, and the module those require.
+    expect(rowOf(rows, WORLD_A)?.hides).toEqual(new Set(['system:dnd5e', 'module:app', 'module:old', 'module:lib']));
+    expect(rowOf(rows, `${SYSTEMS}/system:pf2e`)?.hides).toEqual(new Set());
+    // Requirements that loop, and one that is not installed.
+    expect(rowOf(rows, `${MODULES}/universal`)?.hides).toEqual(
+      new Set(['module:lib', 'module:loop', 'module:back', 'module:gone']),
+    );
+    // A row with nothing under it hides nothing.
+    expect(rowOf(rows, `${DND}/world:b`)).not.toHaveProperty('hides');
   });
 
   test('shows the game systems and the modules under the root at first, each in groups', () => {
@@ -129,6 +161,7 @@ describe('visibleRows', () => {
       version: '2.0.0',
       status: { kind: 'package', value: 'same' },
       expandable: true,
+      hides: new Set(['module:lib']),
       parent: WORLD_A,
     });
     // Only the manifest of an installed module says what it requires.

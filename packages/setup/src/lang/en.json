@@ -83,6 +83,7 @@
     "Failed": "Could not look for updates",
     "Unresolved": "EMMA found no working setup for {count} recorded worlds, so nothing they use is offered an update.",
     "Available": "Update available",
+    "Hidden": "Updates in the rows under it",
     "Choose": "Version of {title}",
     "InstalledVersion": "{version} (installed)",
     "Plan": "Update plan",

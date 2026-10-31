@@ -149,7 +149,7 @@ and open and close a row, and Home and End go to the first and last row. **Read 
 
 As soon as EMMA has read the installation, it looks for newer versions of the installed game systems and modules. The
 footer says how many it found. Each package with an update has an upward arrow in a circle to the left of its rows in
-the tree.
+the tree, and a closed row with such a package anywhere under it has a fainter one, so no update is hidden.
 
 Looking for updates needs the EMMA module installed, as the extension uses the module's own code to work them out.
 Without it, the footer says so and offers **Install the EMMA module**, which installs it from its published manifest,
