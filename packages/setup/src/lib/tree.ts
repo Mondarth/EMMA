@@ -10,7 +10,7 @@
  * rows under it can be expanded and collapsed, and while it is collapsed says which packages it hides, so that it can
  * show what they have, as updates. Pure: which rows are showing, and where the keyboard moves between them.
  */
-import { format, localize } from './i18n';
+import { localize } from './i18n';
 import type { ModuleStatus, ModuleUse, Overview, WorldModule, WorldOverview, WorldStatus } from './overview';
 import { byTitle } from './overview';
 
@@ -148,7 +148,9 @@ function rootNode(overview: Overview): TreeNode {
   return {
     segment: ROOT,
     selection: { kind: 'root' },
-    title: format('Tree.Root', { version: overview.core }),
+    title: localize('Tree.Root'),
+    version: overview.core,
+    installed: true,
     children: () => [systems, grouped],
   };
 }
@@ -324,11 +326,12 @@ function groupNodes(overview: Overview, modules: ReadonlyMap<string, ModuleUse>)
 }
 
 /**
- * The package a row shows, as the resolver names it.
+ * The package a row shows, as the resolver names it: Foundry VTT itself for the root.
  * @param selection - The row's selection
- * @returns `system:<id>` or `module:<id>`, or `undefined` for a row that shows no package
+ * @returns `core`, `system:<id>` or `module:<id>`, or `undefined` for a row that shows no package
  */
 export function packageOf(selection: TreeSelection): string | undefined {
+  if (selection.kind === 'root') return 'core';
   if (selection.kind === 'system') return `system:${selection.system}`;
   if (selection.kind === 'module') return `module:${selection.module}`;
   return undefined;

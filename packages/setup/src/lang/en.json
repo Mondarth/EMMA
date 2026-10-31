@@ -8,7 +8,7 @@
   },
   "Tree": {
     "Label": "Installation",
-    "Root": "Foundry VTT {version}",
+    "Root": "Foundry VTT",
     "Systems": "Game systems",
     "Modules": "Modules",
     "Universal": "Universal"
@@ -91,6 +91,10 @@
     "HeldUnrecorded": "{world} has no EMMA record, so EMMA cannot tell whether the modules it runs would work with it.",
     "HeldUnresolved": "EMMA found no working setup for {world}, so nothing it uses is updated.",
     "HeldInconsistent": "In {world}, the other packages it runs cannot all work with it.",
+    "NeedsCore": "It needs Foundry VTT {core} or later, which is not installed.",
+    "CoreFits": "Every package the recorded worlds run works with it.",
+    "CoreUnusable": "Will not work with it: {packages}.",
+    "CoreUnverified": "Not verified with it: {packages}.",
     "Choose": "Version of {title}: {version}",
     "Versions": "Versions of {title}",
     "JudgedIn": "As in {world}, the world that uses it where it fits least.",

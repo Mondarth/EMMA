@@ -65,7 +65,9 @@ describe('visibleRows', () => {
         key: ROOT,
         level: 1,
         selection: { kind: 'root' },
-        title: 'Foundry VTT 14.368',
+        title: 'Foundry VTT',
+        version: '14.368',
+        installed: true,
         expandable: true,
         hides: new Set([
           'system:dnd5e',

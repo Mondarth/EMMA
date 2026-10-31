@@ -140,6 +140,42 @@ describe('updates in the window', () => {
     );
   });
 
+  test('offers Foundry VTT itself on the root row, plans it, and says what holds a newer build back', async () => {
+    const core: PackageUpdate = { key: 'core', installed: '14.368', newest: '14.369', versions: ['14.369', '14.368'] };
+    const { user } = await setUp(() =>
+      Promise.resolve({
+        updates: new Map([['core', core]]),
+        blocked: new Map([
+          [
+            'core',
+            { key: 'core', newest: '14.370', holds: [{ reason: 'inconsistent', world: { id: 'a', title: 'Alpha' } }] },
+          ],
+          ['system:dnd5e', { key: 'system:dnd5e', newest: '6.0.6', holds: [], needsCore: '14.369' }],
+        ]),
+        unresolved: [],
+        judge,
+      }),
+    );
+    const root = row(/Foundry VTT 14\.368/);
+    expect(root).toHaveTextContent(/^Update available Newer version EMMA cannot offer Foundry VTT/);
+    expect(screen.getByRole('status')).toHaveTextContent('Updates available: 1');
+
+    await user.click(screen.getByRole('button', { name: 'Update' }));
+    await user.click(screen.getByRole('button', { name: 'Version of Foundry VTT: 14.368' }));
+    await user.click(screen.getByRole('option', { name: /^14\.369/ }));
+    const plan = screen.getByRole('region', { name: 'Update plan' });
+    expect(within(plan).getAllByRole('row')[1]).toHaveTextContent('Foundry VTT14.36814.369');
+
+    await user.click(within(root).getByText('Foundry VTT'));
+    const blocked = screen.getByRole('region', { name: 'Not offered: 14.370' });
+    expect(blocked).toHaveTextContent('In Alpha, the other packages it runs cannot all work with it.');
+
+    await user.click(within(row(/^Newer version EMMA cannot offer D&D 5e/)).getByText('D&D 5e'));
+    expect(screen.getByRole('region', { name: 'Not offered: 6.0.6' })).toHaveTextContent(
+      'It needs Foundry VTT 14.369 or later, which is not installed.',
+    );
+  });
+
   test('gives no column to red arrows while nothing is blocked', async () => {
     await setUp();
 

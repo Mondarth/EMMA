@@ -1,4 +1,4 @@
-import type { Release } from '@mondarth/fvtt-resolver';
+import type { CoreRelease, Release } from '@mondarth/fvtt-resolver';
 import { describe, expect, test, vi } from 'vitest';
 
 import type { RecordState } from '../../../src/foundry/records';
@@ -16,6 +16,7 @@ const CORE = { version: '14.368', generation: 14, channel: 'stable' } as const;
  * @param releases - Every release found, the installed ones among them
  * @param systems - The installed systems, each as `[id, version]`
  * @param unrecorded - The IDs of worlds without a record, which use D&D 5e too
+ * @param cores - Foundry's builds known, the installed one, 14.368, among them
  * @returns What the search found
  */
 async function search(
@@ -24,6 +25,7 @@ async function search(
   releases: readonly Release[],
   systems: readonly (readonly [string, string])[] = [['dnd5e', '5.3.3']],
   unrecorded: readonly string[] = [],
+  cores: readonly CoreRelease[] = [CORE],
 ) {
   const overview = buildOverview(
     installation({
@@ -42,7 +44,7 @@ async function search(
     resolver: KIT.resolver,
     badges: KIT.badges,
     overview,
-    universe: { core: [CORE], releases },
+    universe: { core: cores, releases },
     load: () => Promise.resolve([]),
   });
 }
@@ -342,5 +344,115 @@ describe('the updates EMMA cannot offer', () => {
     ]);
 
     expect(found.blocked.size).toBe(0);
+  });
+});
+
+describe('updates of Foundry VTT itself', () => {
+  /**
+   * A stable build.
+   * @param version - Its version
+   * @returns The build
+   */
+  const build = (version: string): CoreRelease => ({ version, generation: 14, channel: 'stable' });
+  const CORES = [CORE, build('14.369'), build('14.370')];
+  /**
+   * No version chosen.
+   * @returns No version
+   */
+  const none = () => undefined;
+
+  test('offer the newest build every recorded world can take, blocking a newer one and naming the world', async () => {
+    const found = await search(
+      [
+        ['app', '1.0.0'],
+        ['lib', '1.0.0'],
+      ],
+      { a: [['app', '1.0.0']], b: [['lib', '1.0.0']] },
+      [
+        ...DND,
+        release('module:app', '1.0.0', { core: { minimum: '14', verified: '14', maximum: '14.369' } }),
+        release('module:lib', '1.0.0'),
+      ],
+      undefined,
+      [],
+      CORES,
+    );
+
+    expect(found.updates.get('core')).toEqual({
+      key: 'core',
+      installed: '14.368',
+      newest: '14.369',
+      versions: ['14.369', '14.368'],
+    });
+    expect(found.blocked.get('core')).toEqual({
+      key: 'core',
+      newest: '14.370',
+      holds: [{ reason: 'inconsistent', world: { id: 'a', title: 'a' } }],
+    });
+
+    const { judge } = found;
+    expect(judge('core', '14.369', none).badge).toMatchObject({
+      type: 'success',
+      text: 'Every package the recorded worlds run works with it.',
+    });
+    expect(judge('core', '14.370', none).badge).toMatchObject({ type: 'error', text: 'Will not work with it: app.' });
+    // A package is judged with the build chosen.
+    expect(judge('module:app', '1.0.0', none).badge?.type).toBe('success');
+    expect(judge('module:app', '1.0.0', key => (key === 'core' ? '14.370' : undefined)).badge?.type).toBe('error');
+  });
+
+  test('hold a world without a record to the builds its installed system runs on', async () => {
+    const found = await search(
+      [],
+      {},
+      [release('system:dnd5e', '5.3.3', { core: { minimum: '14', verified: '14', maximum: '14.369' } })],
+      undefined,
+      ['u'],
+      CORES,
+    );
+
+    expect(found.updates.get('core')).toMatchObject({ newest: '14.369' });
+    expect(found.blocked.get('core')?.holds).toEqual([{ reason: 'unrecorded', world: { id: 'u', title: 'u' } }]);
+    // Without a recorded world, a build has nothing to be judged by.
+    expect(found.judge('core', '14.369', none)).toEqual({ version: '14.369', badge: null });
+  });
+
+  test('let a world whose system is not installed hold nothing back', async () => {
+    const found = await search([], {}, [], [], ['u'], CORES);
+
+    expect(found.updates.get('core')).toMatchObject({ newest: '14.370' });
+    expect(found.blocked.has('core')).toBe(false);
+  });
+
+  test('offer no build but the stable ones, and none at all with only the installed one known', async () => {
+    const testing = await search([], {}, DND, undefined, [], [CORE, { ...build('14.369'), channel: 'testing' }]);
+    expect(testing.updates.has('core')).toBe(false);
+    expect(testing.blocked.has('core')).toBe(false);
+
+    const alone = await search([], {}, DND);
+    expect(alone.updates.has('core')).toBe(false);
+  });
+
+  test('block a version only a newer build runs, saying which, rather than offer it', async () => {
+    const found = await search(
+      [['lib', '1.0.0']],
+      { a: [['lib', '1.0.0']] },
+      [
+        ...DND,
+        release('module:lib', '1.0.0'),
+        release('module:lib', '2.0.0', { core: { minimum: '14.369', verified: '14' } }),
+      ],
+      undefined,
+      [],
+      CORES,
+    );
+
+    expect(found.updates.has('module:lib')).toBe(false);
+    expect(found.blocked.get('module:lib')).toEqual({
+      key: 'module:lib',
+      newest: '2.0.0',
+      holds: [],
+      needsCore: '14.369',
+    });
   });
 });
