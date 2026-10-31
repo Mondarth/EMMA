@@ -249,6 +249,9 @@ importers:
 
   packages/extension:
     devDependencies:
+      '@mondarth/emma-core':
+        specifier: workspace:*
+        version: link:../core
       '@mondarth/emma-setup':
         specifier: workspace:*
         version: link:../setup
@@ -285,6 +288,9 @@ importers:
       '@mondarth/emma-core':
         specifier: workspace:*
         version: link:../core
+      '@mondarth/fvtt-resolver':
+        specifier: 0.8.0
+        version: 0.8.0
 
 packages:
 

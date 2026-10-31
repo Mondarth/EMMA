@@ -4,6 +4,8 @@ import path from 'node:path';
 
 import { defineConfig } from 'vitest/config';
 
+import { defaultCatalogueDefine } from '@mondarth/emma-core/default-catalogue-define';
+
 import { readDevServer } from './scripts/dev/dev-server.ts';
 import { injectSetup } from './scripts/dev/inject-setup.ts';
 
@@ -25,6 +27,11 @@ export default defineConfig(({ command, mode }) => {
   return {
     cacheDir: '.vite-cache',
     ...(serving && { base: BASE }),
+    define: {
+      // EMMA's package catalogue, obscured, from the environment of a release build. Never in tests, so they never ask
+      // it. See @mondarth/emma-core/default-catalogue.
+      __EMMA_DEFAULT_CATALOGUE__: mode === 'test' ? 'null' : defaultCatalogueDefine(process.env),
+    },
     test: {
       include: ['tests/unit/**/*.test.ts'],
       environment: 'happy-dom',
