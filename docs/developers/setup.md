@@ -15,7 +15,9 @@ reach a release, and `CONTRIBUTING.md` the checks and commit message rules.
 ## Running a development Foundry VTT
 
 The compose file in `.foundryvtt/` runs the pinned Foundry VTT release (`VERSION` in `.foundryvtt/.env`) with
-`packages/module` mounted as the `mondarth-emma` module.
+`packages/module/module.json` and `packages/module/dist` mounted, read-only, as the `mondarth-emma` module: only what
+Foundry VTT loads, as the release package lays it out. Mounting the whole of `packages/module` would bring in its
+`node_modules` too, whose links point outside it, so that Foundry VTT's **Create a Snapshot** fails on them.
 
 1. Copy `.foundryvtt/secrets.example.json` to `.foundryvtt/secrets.json` and fill in your foundryvtt.com credentials,
    your licence key and an admin password for the server. The file is ignored by {program}`git`.
@@ -32,10 +34,14 @@ The compose file in `.foundryvtt/` runs the pinned Foundry VTT release (`VERSION
    ```
 
    The server keeps its data in `.foundryvtt/data`, which is ignored by {program}`git`. The script creates the
-   directory if it is missing, down to where this project is mounted inside it, so that it belongs to you: left to
-   Docker, it would be created as root. It then runs Foundry VTT as you rather than as the image's own user (uid
+   directory if it is missing, down to the places this project is mounted inside it, so that they belong to you: left
+   to Docker, they would be created as root. It then runs Foundry VTT as you rather than as the image's own user (uid
    1000), so that Foundry VTT can write there; otherwise it hangs. For the same reason, do not start the server with
    `docker compose up` directly.
+
+   The `dist` folder must exist when the server starts, so build first. `pnpm build` writes into it without removing
+   it, so the server sees each build. Anything that removes `dist` and makes it again, such as packaging a release,
+   leaves the server with the old, removed folder: restart it with `docker compose restart` in `.foundryvtt/`.
 
    If this is the first time the VTT server has been run then it will take a few seconds to become available (the Foundry VTT xip is downloaded and installed). You will also need to complete the initial setup of Foundry (accepting the license etc.).
 
