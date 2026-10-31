@@ -3,11 +3,13 @@
   EMMA guards Foundry's own package buttons.
 -->
 <script lang="ts">
+  import type { ExplainedVersion } from '../app/update-state.svelte';
   import { format, localize } from '../lib/i18n';
   import type { Overview, WorldStatus } from '../lib/overview';
   import type { BlockedUpdate as Blocked } from '../lib/updates';
 
   import BlockedUpdate from './BlockedUpdate.svelte';
+  import VersionExplanation from './VersionExplanation.svelte';
 
   interface Props {
     overview: Overview;
@@ -15,9 +17,11 @@
     onGuardChange: (on: boolean) => void;
     /** A newer Foundry build EMMA cannot offer, if there is one. */
     blocked?: Blocked | undefined;
+    /** The build looked at in its list, or chosen, to explain, if any. */
+    explained?: ExplainedVersion | undefined;
   }
 
-  let { overview, guardOn, onGuardChange, blocked }: Props = $props();
+  let { overview, guardOn, onGuardChange, blocked, explained }: Props = $props();
 
   const STATUSES: readonly WorldStatus[] = ['matches', 'differs', 'unrecorded', 'unreadable'];
   const worlds = $derived(overview.summary.worlds);
@@ -25,6 +29,10 @@
 </script>
 
 <h2>{format('Root.Heading', { version: overview.core })}</h2>
+
+{#if explained !== undefined}
+  <VersionExplanation {explained} />
+{/if}
 
 {#if blocked !== undefined}
   <BlockedUpdate {blocked} />

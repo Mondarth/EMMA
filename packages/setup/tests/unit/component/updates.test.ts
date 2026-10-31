@@ -218,8 +218,9 @@ describe('updates in the window', () => {
     const options = within(list).getAllByRole('option');
     expect(options.map(option => option.textContent.trim().split(/\s+/)[0])).toEqual(['5.4.0']);
     expect(options[0]?.querySelector('.emma-badge')).toHaveClass('warning');
-    // Choosing a version does not select the row the list is on.
+    // Opening the list selected its row, for its panel to explain the versions; choosing one keeps it so.
     const selected = screen.getByRole('treeitem', { selected: true });
+    expect(selected).toHaveTextContent('D&D 5e');
     if (options[0] !== undefined) await user.click(options[0]);
     expect(screen.getByRole('treeitem', { selected: true })).toBe(selected);
     const chosen = screen.getByRole('button', { name: 'Version of D&D 5e: 5.4.0' });
@@ -250,6 +251,84 @@ describe('updates in the window', () => {
 
     await user.click(screen.getByRole('button', { name: 'Update' }));
     expect(screen.queryByRole('button', { name: /^Version of/ })).toBeNull();
+  });
+
+  test('explains in the panel the version looked at in a list, and then the one chosen', async () => {
+    const { user } = await setUp();
+    await user.click(screen.getByRole('button', { name: 'Update' }));
+    expect(screen.queryByRole('region', { name: /update$/ })).toBeNull();
+
+    // Opening the list shows its row's panel, explaining the version the keyboard is on.
+    await user.click(screen.getByRole('button', { name: 'Version of D&D 5e: 5.3.3' }));
+    expect(screen.getByRole('heading', { level: 2, name: 'D&D 5e' })).toBeInTheDocument();
+    const looked = screen.getByRole('region', { name: '5.4.0 update' });
+    expect(looked.querySelector('.emma-badge.warning')).toHaveTextContent('5.4.0');
+    expect(within(looked).getByRole('listitem')).toHaveTextContent('warning');
+
+    // Closing it without a choice leaves nothing to explain.
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('region', { name: '5.4.0 update' })).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Version of D&D 5e: 5.3.3' }));
+    await user.click(screen.getByRole('option', { name: /^5\.4\.0/ }));
+    expect(screen.getByRole('region', { name: '5.4.0 update' })).toBeInTheDocument();
+
+    // Looking at the installed one, now in the list, explains it as installed while the list is open.
+    await user.click(screen.getByRole('button', { name: 'Version of D&D 5e: 5.4.0' }));
+    expect(screen.getByRole('region', { name: '5.3.3, installed' })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('region', { name: '5.4.0 update' })).toBeInTheDocument();
+  });
+
+  test('explains a version each recorded world judges, world by world, and one with no verdict', async () => {
+    const { user } = await setUp(() =>
+      Promise.resolve({
+        updates: new Map(UPDATES.map(update => [update.key, update])),
+        blocked: new Map(),
+        unresolved: [],
+        judge: (key, version) =>
+          key === 'system:dnd5e' && version === '5.4.0'
+            ? {
+                version,
+                badge: { type: 'error', icon: '', tooltip: 'Breaks <b>Old</b>', text: 'Breaks Old' },
+                worlds: [
+                  { title: 'Alpha', badge: { type: 'success', icon: '', tooltip: 'Fine', text: 'Fine' } },
+                  {
+                    title: 'Beta',
+                    badge: { type: 'error', icon: '', tooltip: 'Breaks <b>Old</b><br>Truly', text: '' },
+                  },
+                ],
+              }
+            : { version, badge: null },
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Update' }));
+    await user.click(screen.getByRole('button', { name: 'Version of D&D 5e: 5.3.3' }));
+
+    const looked = screen.getByRole('region', { name: '5.4.0 update' });
+    expect(looked.querySelector('p .emma-badge')).toHaveClass('error');
+    expect(Array.from(looked.querySelectorAll('strong'), title => title.textContent)).toEqual(['Alpha', 'Beta']);
+    expect(Array.from(looked.querySelectorAll('li .emma-badge'), badge => badge.classList.contains('error'))).toEqual([
+      false,
+      true,
+    ]);
+    expect(Array.from(looked.querySelectorAll('.emma-explanation-lines li'), line => line.textContent)).toEqual([
+      'Fine',
+      'Breaks Old',
+      'Truly',
+    ]);
+
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: 'Version of D&D 5e: 5.3.3' }));
+    await user.keyboard('{ArrowDown}');
+    // The installed version is shown on the button, so the list holds 5.4.0 alone; the keyboard stays on it.
+    await user.keyboard('{Escape}');
+    await user.click(within(row(/Universal/)).getByText('Universal'));
+    await user.keyboard('{ArrowRight}');
+    await user.click(screen.getByRole('button', { name: 'Version of Library: 1.0.0' }));
+    expect(screen.getByRole('region', { name: '2.0.0 update' })).toHaveTextContent(
+      'EMMA has no verdict on this version',
+    );
   });
 
   test('badges each version with the other packages at the versions chosen', async () => {

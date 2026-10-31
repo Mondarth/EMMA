@@ -4,19 +4,23 @@
   worlds it is active in, or that will need it when next run as what they run now requires it.
 -->
 <script lang="ts">
+  import type { ExplainedVersion } from '../app/update-state.svelte';
   import type { ModuleDetail, RelatedPackage } from '../lib/details';
   import type { BlockedUpdate as Blocked } from '../lib/updates';
 
   import BlockedUpdate from './BlockedUpdate.svelte';
+  import VersionExplanation from './VersionExplanation.svelte';
   import { format, localize } from '../lib/i18n';
 
   interface Props {
     detail: ModuleDetail;
     /** A newer version EMMA cannot offer, if there is one. */
     blocked?: Blocked | undefined;
+    /** The version looked at in its list, or chosen, to explain, if any. */
+    explained?: ExplainedVersion | undefined;
   }
 
-  let { detail, blocked }: Props = $props();
+  let { detail, blocked, explained }: Props = $props();
 </script>
 
 {#snippet packages(list: readonly RelatedPackage[])}
@@ -65,6 +69,10 @@
     </dd>
   {/if}
 </dl>
+
+{#if explained !== undefined}
+  <VersionExplanation {explained} />
+{/if}
 
 {#if blocked !== undefined}
   <BlockedUpdate {blocked} />

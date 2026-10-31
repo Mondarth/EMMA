@@ -116,11 +116,13 @@
           {#if selection.kind === 'module'}
             <ModulePanel
               detail={moduleDetail(overview, selection.module, selection.world)}
-              blocked={updates.blockedOf(`module:${selection.module}`)} />
+              blocked={updates.blockedOf(`module:${selection.module}`)}
+              explained={updates.explainedOf(`module:${selection.module}`)} />
           {:else if selection.kind === 'system'}
             <SystemPanel
               detail={systemDetail(overview, selection.system, selection.world)}
-              blocked={updates.blockedOf(`system:${selection.system}`)} />
+              blocked={updates.blockedOf(`system:${selection.system}`)}
+              explained={updates.explainedOf(`system:${selection.system}`)} />
           {:else if selection.kind === 'systems' || selection.kind === 'modules' || selection.kind === 'group'}
             <GroupPanel detail={groupDetail(overview, selection)} />
           {:else if world !== undefined}
@@ -130,6 +132,7 @@
               {overview}
               guardOn={setup.guardOn}
               blocked={updates.blockedOf('core')}
+              explained={updates.explainedOf('core')}
               onGuardChange={(on: boolean) => {
                 setup.setGuardOn(on);
               }} />

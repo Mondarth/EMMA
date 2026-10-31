@@ -23,6 +23,15 @@ export interface UpdateChoice {
   readonly chosen: string;
 }
 
+/** A version a package's panel explains: one the user is looking at in its list, or else the one chosen. */
+export interface ExplainedVersion {
+  readonly option: VersionOption;
+  /** The version installed. */
+  readonly installed: string;
+  /** Whether it is the one looked at in the list, rather than the one chosen. */
+  readonly previewing: boolean;
+}
+
 /** The updates, and the versions chosen. */
 export class UpdateState {
   status = $state<UpdateStatus>('idle');
@@ -32,6 +41,8 @@ export class UpdateState {
   problem = $state.raw<KitProblem | null>(null);
   /** Whether Update mode is on, offering the versions of each package with an update. */
   on = $state(false);
+  /** The version the user is looking at in a package's list, while it is open. */
+  preview = $state.raw<{ readonly key: PackageKey; readonly version: string } | null>(null);
 
   /** The versions chosen that differ from the installed ones, by package key. */
   readonly #chosen = new SvelteMap<PackageKey, string>();
@@ -122,6 +133,32 @@ export class UpdateState {
    */
   optionOf(key: PackageKey, version: string): VersionOption {
     return this.search?.judge(key, version, other => this.chosenOf(other)) ?? { version, badge: null };
+  }
+
+  /**
+   * Say which version the user is looking at in a package's list.
+   * @param key - The package's key
+   * @param version - The version, or `null` once the list closes
+   */
+  setPreview(key: PackageKey, version: string | null): void {
+    if (version !== null) this.preview = { key, version };
+    else if (this.preview?.key === key) this.preview = null;
+  }
+
+  /**
+   * The version a package's panel explains: the one looked at in its list, or else the one chosen, if not installed.
+   * @param key - The package's key
+   * @returns The version, badged; `undefined` for none
+   */
+  explainedOf(key: PackageKey): ExplainedVersion | undefined {
+    const update = this.updateOf(key);
+    if (update === undefined) return undefined;
+    const { installed } = update;
+    if (this.preview?.key === key) {
+      return { option: this.optionOf(key, this.preview.version), installed, previewing: true };
+    }
+    const chosen = this.#chosen.get(key);
+    return chosen === undefined ? undefined : { option: this.optionOf(key, chosen), installed, previewing: false };
   }
 
   /**

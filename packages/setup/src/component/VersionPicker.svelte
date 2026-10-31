@@ -3,6 +3,8 @@
   badge, which opens the other versions, each in its own badge, newest first. The installed version is marked so.
 -->
 <script lang="ts">
+  import { untrack } from 'svelte';
+
   import { format, localize } from '../lib/i18n';
   import type { VersionOption } from '../lib/updates';
 
@@ -22,9 +24,13 @@
     installed: string;
     /** Called with the version the user chooses. */
     onChoose: (version: string) => void;
+    /** Called as the list opens, before anything else. */
+    onOpen?: () => void;
+    /** Called with the version the keyboard or the pointer is on while the list is open, and `null` once it closes. */
+    onPreview?: (version: string | null) => void;
   }
 
-  const { title, chosen, versions, installed, onChoose }: Props = $props();
+  const { title, chosen, versions, installed, onChoose, onOpen, onPreview }: Props = $props();
 
   const uid = $props.id();
 
@@ -35,6 +41,13 @@
   let expanded = $state(false);
   let options: readonly VersionOption[] = $state.raw([]);
   let active = $state(0);
+
+  // The version looked at, for whoever explains it.
+  $effect(() => {
+    const looked = expanded ? (options[active]?.version ?? null) : null;
+    // Only what the list looks at, not what the callback reads, which may be what it writes.
+    untrack(() => onPreview?.(looked));
+  });
 
   const label = $derived(format('Update.Choose', { title, version: chosen.version }));
 
@@ -52,6 +65,7 @@
    * @param anchor - The button
    */
   function show(anchor: HTMLElement): void {
+    onOpen?.();
     options = versions().filter(({ version }) => version !== chosen.version);
     active = 0;
     // In the top layer, so the module list's scrolling cannot clip it; placed under the button by hand, as CSS anchor
