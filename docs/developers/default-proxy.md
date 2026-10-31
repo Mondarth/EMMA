@@ -45,8 +45,9 @@ always, as it has no proxy settings yet (`packages/setup/src/foundry/releases.ts
 
 The build stops when only one of the two is set, or when the URL is not `https` or has no `{url}`. After building, the
 release, of the module and of the browser extension, refuses to package a bundle that holds the key in plain text
-anywhere. Development, CI and test builds have
-neither, so have no default proxy, and the unit tests always run without one.
+anywhere. A release stops, before it changes anything, when any of the catalogue's and the proxy's variables is not
+set (`packages/core/scripts/release-defaults.ts`). Development, CI and test builds need neither, so have no default
+proxy unless they are set, and the unit tests always run without one.
 
 ## Rotating the key
 
