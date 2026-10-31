@@ -60,7 +60,7 @@
     "@types/node": "^26.2.0",
     "@typescript/native": "npm:typescript@^7.0.2",
     "@vitest/coverage-v8": "^5.0.5",
-    "autoprefixer": "^10.5.4",
+    "autoprefixer": "^10.6.2",
     "commitizen": "4.3.2",
     "commitlint-plugin-tense": "^1.0.12",
     "conventional-changelog-conventionalcommits": "^9.3.1",
