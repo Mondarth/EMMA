@@ -65,6 +65,11 @@ export interface VersionOption {
     readonly remove: readonly { readonly title: string; readonly version: string }[];
     readonly explanation: readonly string[];
   };
+  /**
+   * Whether the version was found, but no manifest URL for it alone was. EMMA cannot install it, so it cannot be
+   * chosen, whatever else is.
+   */
+  readonly missingManifest?: true;
   /** What the version needs, as its manifest declares it, one sentence to a line. */
   readonly needs?: readonly string[];
   /** What else choosing it would change, beyond what is chosen already: each package by its title, at its version. */
@@ -131,12 +136,13 @@ export interface UpdateInputs {
 /**
  * How the best setup is found, as the module's hypothetical mode finds it: a module's `verified` core is no limit, the
  * systems it names must be met, and a release that declares no core compatibility, which Foundry cannot place, is not
- * chosen.
+ * chosen; nor is one found without a manifest URL of its own, which EMMA could not install.
  */
 const BEST_VERSIONS_POLICY: Partial<Policy> = {
   verified: 'ignore',
   systemCompatibility: 'require',
   missingCompatibility: 'reject',
+  versionManifest: 'require',
 };
 
 /**
@@ -156,6 +162,10 @@ export async function findUpdates(inputs: UpdateInputs): Promise<UpdateSearch> {
     ...overview.systems.map(({ id, version }) => [packageKey({ type: 'system', id }), version] as const),
     ...overview.modules.map(({ module: { id, version } }) => [packageKey({ type: 'module', id }), version] as const),
   ]);
+  // The versions installed need no manifest URL of their own: nothing has to install them.
+  const declarations = {
+    installed: [...installed].map(([key, version]) => ({ package: key, version })),
+  };
   const atLeastInstalled = (from: Universe): Universe => ({
     // An update never goes back.
     core: from.core.filter(build => !newer(core, build.version)),
@@ -188,7 +198,7 @@ export async function findUpdates(inputs: UpdateInputs): Promise<UpdateSearch> {
       universe,
       { require: used.map(key => ({ package: key })), pins: [{ package: CORE, version: overview.core }] },
       load,
-      { policy },
+      { policy, declarations },
     );
     // What was loaded is kept for the next world, which may well need it too.
     universe = atLeastInstalled(rounds.universe);
@@ -227,7 +237,7 @@ export async function findUpdates(inputs: UpdateInputs): Promise<UpdateSearch> {
         uses === undefined
           ? { require: [{ package: system }], pins: [{ package: system, version: world.system.version }] }
           : { require: [uses.system, ...uses.modules].map(({ key }) => ({ package: key })) };
-      const rounds = await resolveInRounds(universe, requirements, load, { policy });
+      const rounds = await resolveInRounds(universe, requirements, load, { policy, declarations });
       universe = atLeastInstalled(rounds.universe);
       const { resolution } = rounds;
       const reason = unrecorded ? 'unrecorded' : resolution.ok ? 'inconsistent' : 'unresolved';
@@ -252,16 +262,22 @@ export async function findUpdates(inputs: UpdateInputs): Promise<UpdateSearch> {
   }
 
   for (const [key, version] of installed) {
+    const runnable = universe.releases.filter(
+      release => packageKey(release.package) === key && runsOn(resolver, release, core, universe),
+    );
     const choosable = newestFirst(
       resolver,
-      universe.releases
-        .filter(release => packageKey(release.package) === key && runsOn(resolver, release, core, universe))
-        .map(release => release.version),
+      runnable.map(release => release.version),
+    );
+    // A version with no manifest URL of its own cannot be installed, so is never the newest offered.
+    const installable = newestFirst(
+      resolver,
+      runnable.filter(release => !resolver.missingManifest(release)).map(release => release.version),
     );
     const bests = accepted.get(key);
     const newest =
       bests === undefined
-        ? choosable[0]
+        ? installable[0]
         : oldest(
             resolver,
             bests.map(({ version: best }) => best),

@@ -219,8 +219,19 @@ describe('createPlanner', () => {
 
     await expect(plans.plan(picks(['system:dnd5e', '6.0.6']))).resolves.toEqual([
       { key: 'core', installed: '14.368', version: '14.369', by: { package: 'system:dnd5e', version: '6.0.6' } },
-      { key: 'system:dnd5e', installed: '5.3.3', version: '6.0.6' },
-      { key: 'module:midi', installed: '1.0.0', version: '2.0.0', by: { package: 'system:dnd5e', version: '6.0.6' } },
+      {
+        key: 'system:dnd5e',
+        installed: '5.3.3',
+        version: '6.0.6',
+        manifest: 'https://example.org/dnd5e/6.0.6/system.json',
+      },
+      {
+        key: 'module:midi',
+        installed: '1.0.0',
+        version: '2.0.0',
+        by: { package: 'system:dnd5e', version: '6.0.6' },
+        manifest: 'https://example.org/midi/2.0.0/module.json',
+      },
     ]);
     // The same choices are not worked out again.
     await expect(plans.complete(picks(['system:dnd5e', '6.0.6']))).resolves.toMatchObject({ ok: true });
@@ -232,9 +243,19 @@ describe('createPlanner', () => {
       ...DND,
       ...MIDI,
       release('module:midi', '3.0.0', { core: { minimum: '15', verified: '15' } }),
+      release('module:midi', '2.5.0', { versionManifest: null }),
+      release('module:midi', 'v1.0.0', { versionManifest: null }),
     ]);
 
-    expect(plans.candidates('module:midi')).toEqual(['2.0.0']);
+    // A version found without a manifest of its own, unless it is installed.
+    expect(plans.missingManifest('module:midi', '2.5.0')).toBe(true);
+    expect(plans.missingManifest('module:midi', 'v1.0.0')).toBe(false);
+    expect(plans.missingManifest('module:midi', '2.0.0')).toBe(false);
+    expect(plans.missingManifest('module:midi', '9.9.9')).toBe(false);
+    expect(plans.missingManifest('core', '14.369')).toBe(false);
+
+    // One without a manifest is among them, to be listed, locked.
+    expect(plans.candidates('module:midi')).toEqual(['2.5.0', '2.0.0']);
     expect(plans.candidates('system:dnd5e')).toEqual(['6.0.6']);
     expect(plans.candidates('core')).toEqual(['14.370', '14.369']);
     expect(plans.candidates('module:gone')).toEqual([]);
