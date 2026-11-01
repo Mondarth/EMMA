@@ -6,6 +6,7 @@ import type { SetupStateOptions } from '../../../src/app/setup-state.svelte';
 import { SetupState } from '../../../src/app/setup-state.svelte';
 import SetupRoot from '../../../src/component/SetupRoot.svelte';
 import { LAYOUT_KEY } from '../../../src/foundry/preferences';
+import type { CoreTarget, CoreUpdateState } from '../../../src/foundry/setup-game';
 import type { KitProblem } from '../../../src/foundry/setup-kit';
 import { EXTENSION_RELEASES, KitUnavailable } from '../../../src/foundry/setup-kit';
 import { buildOverview } from '../../../src/lib/overview';
@@ -923,7 +924,8 @@ describe("the plan's snapshot and backups", () => {
     await vi.waitFor(() => {
       expect(within(step).getByRole('button', { name: 'Update Foundry VTT to 14.369 in place' })).toBeInTheDocument();
     });
-    expect(core.check).toHaveBeenCalledOnce();
+    // Foundry is asked once the plan has its build, and again once the run has read the installation afresh.
+    expect(core.check).toHaveBeenCalledTimes(2);
     const code = /type ([A-Z0-9]{6}):/.exec(within(step).getByText(/^To update in place/).textContent)?.[1] ?? '';
     await user.type(within(step).getByRole('textbox'), code);
     await user.click(within(step).getByRole('button', { name: 'Update Foundry VTT to 14.369 in place' }));
@@ -932,6 +934,44 @@ describe("the plan's snapshot and backups", () => {
       expect(core.update).toHaveBeenCalledOnce();
     });
     expect(within(step).getByRole('status')).toHaveTextContent('Foundry VTT is updating to 14.369.');
+  });
+
+  test.each<[string, CoreUpdateState, CoreTarget | Error, string | undefined]>([
+    [
+      'updates are switched off',
+      { canUpdate: false, channel: 'stable' },
+      { version: '14.369', manual: false },
+      '(--noupdate)',
+    ],
+    [
+      'it would install another build',
+      { canUpdate: true, channel: 'stable' },
+      { version: '14.370', manual: false },
+      'would install 14.370, not 14.369',
+    ],
+    ['it could not ask', { canUpdate: true, channel: 'stable' }, new Error('down'), 'could not say which build'],
+    ['it can update in place', { canUpdate: true, channel: 'stable' }, { version: '14.369', manual: false }, undefined],
+  ])("marks Foundry VTT's row before a run when %s", async (_label, state, target, reason) => {
+    const check = vi.fn(() => (target instanceof Error ? Promise.reject(target) : Promise.resolve(target)));
+    const { setup, plan } = await planning('core', '14.369', undefined, undefined, {
+      core: { state: () => state, check, update: vi.fn() },
+    });
+    const coreRow = changesIn(plan).getAllByRole('row')[1];
+    if (coreRow === undefined) throw new Error('No row for Foundry VTT');
+
+    if (reason === undefined) {
+      await vi.waitFor(() => {
+        expect(setup.coreTarget).toEqual(target);
+      });
+      expect(within(coreRow).queryByRole('img')).toBeNull();
+      return;
+    }
+    const mark = await within(coreRow).findByRole('img', { name: /^Cannot update in place: / });
+    expect(mark).toHaveAttribute('data-tooltip', expect.stringContaining(reason));
+    expect(mark).toHaveClass('fa-triangle-exclamation');
+    // The mark comes before the title.
+    expect(coreRow.querySelector('th')?.firstElementChild).toBe(mark);
+    expect(check).toHaveBeenCalledTimes(state.canUpdate ? 1 : 0);
   });
 
   test('does not ask Foundry which build it would install where it cannot update itself', async () => {

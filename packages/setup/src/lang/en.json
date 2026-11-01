@@ -137,6 +137,7 @@
   },
   "Plan": {
     "Safeguards": "Keep first",
+    "CoreBlocked": "Cannot update in place: {reason}",
     "Changes": "Changes",
     "Keep": "Keep",
     "Note": "Note",

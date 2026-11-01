@@ -4,6 +4,7 @@
   window. A handle between the panels resizes them; each keeps its share as the window is resized.
 -->
 <script lang="ts">
+  import { coreRefusal } from '../app/core-refusal';
   import type { SetupState } from '../app/setup-state.svelte';
   import type { Layout } from '../foundry/preferences';
   import { readLayout, writeLayout } from '../foundry/preferences';
@@ -40,10 +41,17 @@
     const version = setup.run?.beforeCore;
     return updates.plan.some(entry => entry.key === 'core' && entry.version === version) ? version : undefined;
   });
-  // Where updating in place may be offered, Foundry is asked which build it would install.
+  /** The build of Foundry VTT the plan chose, if it changes Foundry VTT. */
+  const coreChosen = $derived(updates.plan.find(entry => entry.key === 'core')?.version);
+  // Where updating in place may be offered, Foundry is asked which build it would install, so that the plan can say
+  // before a run whether it can update in place.
   $effect(() => {
-    if (coreStop !== undefined && setup.coreUpdate.canUpdate) void setup.checkCoreTarget();
+    if (coreChosen !== undefined && setup.coreUpdate.canUpdate) void setup.checkCoreTarget();
   });
+  /** Why the plan's build of Foundry VTT cannot be updated to in place, if it cannot. */
+  const coreBlocked = $derived(
+    coreChosen === undefined ? undefined : coreRefusal(coreChosen, setup.coreUpdate, setup.coreTarget),
+  );
   // The plan offers a snapshot, so the space one needs is asked for once the plan opens.
   $effect(() => {
     if (planOpen) void setup.checkSnapshotSpace();
@@ -189,6 +197,7 @@
             {overview}
             {updates}
             space={setup.snapshotSpace}
+            {coreBlocked}
             run={setup.run}
             onRun={setup.canRun
               ? () => {

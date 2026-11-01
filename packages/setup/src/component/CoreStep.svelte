@@ -6,6 +6,7 @@
   hand. Even then, the user must type a code shown, so that it is not done by a slip.
 -->
 <script lang="ts">
+  import { coreRefusal } from '../app/core-refusal';
   import type { CoreTargetState, CoreUpdating } from '../app/setup-state.svelte';
   import type { CoreUpdateState } from '../foundry/setup-game';
   import { format, localize } from '../lib/i18n';
@@ -38,17 +39,12 @@
   ).join('');
   let typed = $state('');
 
-  /** Why updating in place cannot be offered, if it cannot. */
-  const refusal = $derived.by(() => {
-    if (!core.canUpdate) return localize('Core.NoUpdateMode');
-    if (target === null || target === 'checking') return localize('Core.Checking');
-    if (target === 'failed') return localize('Core.CheckFailed');
-    if ('none' in target) return format('Core.NoTarget', { message: target.none });
-    if (target.version !== version) {
-      return format('Core.OtherTarget', { target: target.version, version, channel: core.channel });
-    }
-    return target.manual ? format('Core.Manual', { version }) : undefined;
-  });
+  /** Why updating in place cannot be offered, if it cannot; not yet, while Foundry is asked which build. */
+  const refusal = $derived(
+    core.canUpdate && (target === null || target === 'checking')
+      ? localize('Core.Checking')
+      : coreRefusal(version, core, target),
+  );
 </script>
 
 <section class="emma-core-step" aria-labelledby="{uid}-heading">
