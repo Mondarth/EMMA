@@ -187,7 +187,6 @@
     <i
       class="fa-solid fa-lock emma-version-lock"
       data-tooltip={localize('Update.NoManifestExplained')}
-      title={localize('Update.NoManifestExplained')}
       aria-hidden="true"></i>
     <span class="emma-version-text">{localize('Update.NoManifestShort')}</span>
   {:else if option.conflict !== undefined}

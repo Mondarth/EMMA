@@ -206,8 +206,7 @@
                 class="fa-solid fa-triangle-exclamation emma-plan-blocked"
                 role="img"
                 aria-label={format('Plan.CoreBlocked', { reason: coreBlocked })}
-                data-tooltip={coreBlocked}
-                title={coreBlocked}></i>
+                data-tooltip={coreBlocked}></i>
             {/if}
             {titles.get(choice.key) ?? choice.key}{@render stateOf(choice.key)}
           </th>
