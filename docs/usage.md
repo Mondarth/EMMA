@@ -287,6 +287,10 @@ The catalogue also keeps versions an author has published ahead of Foundry's pac
 GitLab not yet on the listing. EMMA offers them marked with a flask, and their tooltip says they are not on Foundry's
 package listing: Foundry's own installer does not offer them, so choose one knowingly.
 
+To install a version, EMMA needs a manifest URL for that version alone: a package's own manifest URL usually gives only
+its newest. A version EMMA found but could not locate such a URL for is listed with a lock, and its tooltip says why: it
+cannot be chosen, and **Update** never recommends it. The versions in use need none.
+
 The catalogue also knows which packages cannot be had: those whose Foundry listing is **archived**, which Foundry's
 Setup screen no longer offers (often because the author removed them), and those the catalogue's maintainers found
 **gone**, their files no longer available. Hypothetical mode never looks such a module up or judges it, and leaves it

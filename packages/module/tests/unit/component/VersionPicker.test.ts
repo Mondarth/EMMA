@@ -87,6 +87,32 @@ describe('VersionPicker', () => {
     expect(screen.getByRole('button', { name: CHOOSE })).toHaveAttribute('aria-expanded', 'false');
   });
 
+  test('shows a version with no manifest of its own, locked, and never chooses it', async () => {
+    const onChoose = vi.fn();
+    const locked: VersionOption = { ...option('3.0.0'), missingManifest: true };
+    render(VersionPicker, {
+      title: 'Dice',
+      chosen: option('2.0.0'),
+      versions: () => [locked, option('1.0.0')],
+      onChoose,
+    });
+    await userEvent.click(screen.getByRole('button', { name: CHOOSE }));
+
+    const [lockedOption, other] = screen.getAllByRole('option');
+    expect(lockedOption).toHaveAttribute('aria-disabled', 'true');
+    expect(lockedOption).toHaveClass('locked');
+    expect(lockedOption?.querySelector('.emma-version-lock')).toHaveAttribute(
+      'data-tooltip',
+      'MONDARTH-EMMA.Versions.NoManifest',
+    );
+    expect(other).toHaveAttribute('aria-disabled', 'false');
+
+    await userEvent.click(lockedOption as HTMLElement);
+    expect(onChoose).not.toHaveBeenCalled();
+    // The list stays open, for another choice.
+    expect(screen.getByRole('button', { name: CHOOSE })).toHaveAttribute('aria-expanded', 'true');
+  });
+
   test('closes when its button is clicked again', async () => {
     renderPicker();
     const button = screen.getByRole('button', { name: CHOOSE });

@@ -23,7 +23,14 @@ import type {
   Release,
   SetupSpec,
 } from '@mondarth/fvtt-resolver';
-import { check, isNewerVersion, normaliseManifest, packageKey, sameVersion } from '@mondarth/fvtt-resolver';
+import {
+  check,
+  isNewerVersion,
+  missingManifest,
+  normaliseManifest,
+  packageKey,
+  sameVersion,
+} from '@mondarth/fvtt-resolver';
 import type { Cache as SourceCache, LocalManifest, ReleaseSource } from '@mondarth/fvtt-resolver/sources';
 import {
   catalogueSource,
@@ -63,6 +70,11 @@ export interface VersionOption {
   readonly badge: VersionBadge | null;
   /** A version not on Foundry's package listing, such as one its author has published on GitLab ahead of it. */
   readonly unlisted?: true;
+  /**
+   * A version found without a manifest URL for it alone, which installing it needs: it cannot be chosen. Never the
+   * installed version, which needs none.
+   */
+  readonly missingManifest?: true;
 }
 
 /**
@@ -583,13 +595,13 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
         ? []
         : judgeVersions(catalogue, setupOf(catalogue, active, choices), choosable(catalogue, versions, id), id),
     judgePlatform: (active, choices, part) =>
-      platformVersions(catalogue, part).map(version =>
-        withListing(
-          fitOf(catalogue, setupOf(catalogue, active, { ...choices, [part]: version }), version),
-          // Foundry's builds all come from its release notes; only the system's versions can be unlisted.
-          part === 'system' && isUnlisted(catalogue, catalogue.base.system.package, version),
-        ),
-      ),
+      platformVersions(catalogue, part).map(version => {
+        const option = fitOf(catalogue, setupOf(catalogue, active, { ...choices, [part]: version }), version);
+        // Foundry's builds all come from its release notes, and update themselves; only the system's versions can be
+        // unlisted, or have no manifest of their own.
+        if (part !== 'system') return option;
+        return withManifest(catalogue, systemKey, withListing(option, isUnlisted(catalogue, systemKey, version)));
+      }),
     reportCheck: (active, choices) => {
       const setup = setupOf(catalogue, active, choices);
       const report = checkReport(
@@ -617,6 +629,13 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
         // What loading finds, as the modules taken as present leave it, as the universe is.
         async needs => withAssumed(await set.load(needs), setup),
         setup.modules.filter(({ package: key }) => setup.assumed?.has(key) === true),
+        [
+          catalogue.base.system,
+          ...[...catalogue.installed].map(([id, version]) => ({
+            package: packageKey({ type: 'module', id }),
+            version,
+          })),
+        ],
       );
       // A module taken as present has one release, so cannot change; nothing of it is reported either way.
       const { solution } = solved;
@@ -995,6 +1014,41 @@ function withListing(option: VersionOption, unlisted: boolean): VersionOption {
 }
 
 /**
+ * A version, marked when it was found without a manifest URL for it alone and is not the one in use, with a word on it
+ * in its badge's tooltip and text. EMMA could not install it, so it cannot be chosen.
+ * @param catalogue - The releases found
+ * @param key - The package
+ * @param option - The version, with its badge
+ * @returns The version, marked if it has no manifest of its own
+ */
+function withManifest(catalogue: VersionCatalogue, key: string, option: VersionOption): VersionOption {
+  const { version } = option;
+  const inUse =
+    key === catalogue.base.system.package
+      ? catalogue.base.system.version
+      : catalogue.installed.get(key.slice(key.indexOf(':') + 1));
+  if (inUse !== undefined && sameVersion(inUse, version)) return option;
+  const release = releasesByKey(catalogue.releases)
+    .get(key)
+    ?.find(found => sameVersion(found.version, version));
+  if (release === undefined || !missingManifest(release)) return option;
+  const note = localize('MONDARTH-EMMA.Versions.NoManifest');
+  const { badge } = option;
+  return {
+    ...option,
+    missingManifest: true,
+    badge:
+      badge === null
+        ? null
+        : {
+            ...badge,
+            tooltip: `${badge.tooltip}<br>${foundry.utils.escapeHTML(note)}`,
+            text: `${badge.text} ${note}`,
+          },
+  };
+}
+
+/**
  * A package's version, with the badge Foundry gives its release with a verdict.
  * @param checked - What checking found of the release
  * @param setup - What checking found of every package in the same setup
@@ -1079,6 +1133,8 @@ function judgeVersions(
     const checks = checkSetup(catalogue, withModule(setup, id, version));
     const found = modulesOf(checks).find(({ release }) => release.package.id === id);
     // Every version listed has a release, so is always found.
-    return found === undefined ? [] : [optionOf(found, checks)];
+    return found === undefined
+      ? []
+      : [withManifest(catalogue, packageKey({ type: 'module', id }), optionOf(found, checks))];
   });
 }
