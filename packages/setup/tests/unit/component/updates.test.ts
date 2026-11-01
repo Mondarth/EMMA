@@ -276,6 +276,73 @@ describe('updates in the window', () => {
     expect(screen.getByRole('button', { name: 'Version of D&D 5e: 5.3.3' })).toBeInTheDocument();
   });
 
+  test('shows a version found without a manifest of its own, locked, saying why, and never plans it', async () => {
+    const planner = createPlanner({
+      resolver: KIT.resolver,
+      overview: OVERVIEW,
+      universe: {
+        core: [{ version: '14.368', generation: 14, channel: 'stable' }],
+        releases: [
+          release('system:dnd5e', '5.3.3', { versionManifest: null }),
+          release('module:lib', '1.0.0', { versionManifest: null }),
+          release('module:lib', '1.5.0', { versionManifest: null }),
+        ],
+      },
+      load: () => Promise.resolve([]),
+      policy: { versionManifest: 'require' },
+      coreTitle: 'Foundry VTT',
+    });
+    const { setup, user } = await setUp(() =>
+      Promise.resolve({
+        updates: new Map([
+          ['module:lib', { key: 'module:lib', installed: '1.0.0', newest: '1.0.0', versions: ['1.0.0'] }],
+        ]),
+        blocked: new Map(),
+        unresolved: [],
+        judge,
+        planner,
+      }),
+    );
+
+    await user.click(within(row(/Universal/)).getByText('Universal'));
+    await user.keyboard('{ArrowRight}');
+    await openList(user, 'Version of Library: 1.0.0');
+    const locked = screen.getByRole('option', { name: /^1\.5\.0/ });
+    expect(locked).toHaveAttribute('aria-disabled', 'true');
+    expect(locked).toHaveTextContent('No manifest for this version');
+    expect(locked.querySelector('.emma-version-lock')).toHaveAttribute(
+      'data-tooltip',
+      expect.stringContaining('could not locate a manifest URL for it alone'),
+    );
+    expect(screen.getByRole('region', { name: '1.5.0 update' })).toHaveTextContent(
+      'EMMA identified this version, but could not locate a manifest URL for it alone, so it cannot install it.',
+    );
+
+    await user.click(locked);
+    expect(screen.queryByRole('region', { name: 'Update plan' })).toBeNull();
+    // Nor can it be chosen otherwise.
+    await expect(setup.updates.choose('module:lib', '1.5.0')).resolves.toBe(false);
+  });
+
+  test('marks a planned version that has no manifest of its own', async () => {
+    const planner = alone(...UPDATES);
+    vi.spyOn(planner, 'plan').mockResolvedValue([{ key: 'module:lib', installed: '1.0.0', version: '1.5.0' }]);
+    const { setup } = await setUp(() =>
+      Promise.resolve({
+        updates: new Map(UPDATES.map(update => [update.key, update])),
+        blocked: new Map(),
+        unresolved: [],
+        judge,
+        planner,
+      }),
+    );
+
+    await setup.updates.choose('module:lib', '1.5.0');
+    await vi.waitFor(() => {
+      expect(screen.getByRole('region', { name: 'Update plan' })).toHaveTextContent('None found for this version');
+    });
+  });
+
   test('brings in what a version chosen needs, saying so, and offers only versions that work with it', async () => {
     const planner = createPlanner({
       resolver: KIT.resolver,
@@ -320,7 +387,7 @@ describe('updates in the window', () => {
         .map(item => Array.from(item.querySelectorAll('th, td'), cell => cell.textContent.replace(/\s+/g, ' ').trim())),
     ).toEqual([
       ['D&D 5e', '5.3.3', '5.4.0', 'https://example.org/dnd5e/5.4.0/system.json'],
-      ['Library', '1.0.0', '2.0.0 needed by D&D 5e 5.4.0', 'None found for this version'],
+      ['Library', '1.0.0', '2.0.0 needed by D&D 5e 5.4.0', 'https://example.org/lib/2.0.0/module.json'],
     ]);
 
     // The library's versions for D&D 5e 5.3 no longer work with what is chosen: listed, locked, saying what is in the way.

@@ -40,6 +40,7 @@ export type KitResolver = Pick<
   | 'isNewerVersion'
   | 'isUnavailable'
   | 'looksLikePrerelease'
+  | 'missingManifest'
   | 'packageKey'
   | 'releaseConstraints'
   | 'resolveInRounds'

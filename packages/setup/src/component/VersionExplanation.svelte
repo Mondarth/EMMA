@@ -35,7 +35,9 @@
 <section class="emma-explanation" aria-labelledby="emma-setup-explained" aria-live="polite">
   <h3 id="emma-setup-explained">{heading}</h3>
   <p><VersionBadge version={option.version} badge={option.badge} unlisted={option.unlisted === true} /></p>
-  {#if option.conflict !== undefined}
+  {#if option.missingManifest === true}
+    <p class="emma-explanation-conflict">{localize('Update.NoManifestExplained')}</p>
+  {:else if option.conflict !== undefined}
     <p class="emma-explanation-conflict">
       {format('Update.TakeOut', {
         choices: option.conflict.remove.map(choice => format('Update.Choice', choice)).join(', '),

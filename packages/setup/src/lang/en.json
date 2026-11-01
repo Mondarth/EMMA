@@ -102,6 +102,8 @@
     "NoneFit": "No other version works with what is chosen.",
     "Needs": "It needs:",
     "Locked": "Not with what is chosen",
+    "NoManifestShort": "No manifest for this version",
+    "NoManifestExplained": "EMMA identified this version, but could not locate a manifest URL for it alone, so it cannot install it. A package's own manifest URL usually gives only its newest version. This version cannot be chosen.",
     "Choice": "{title} {version}",
     "TakeOut": "The plan cannot take it as it is: to choose it, take {choices} out of the plan.",
     "Why": "Why:",

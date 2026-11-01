@@ -107,6 +107,14 @@ export interface Planner {
    */
   needsOf(key: PackageKey, version: string): readonly string[];
   /**
+   * Whether a version of a package was found, but no manifest URL for it alone was, so that it cannot be installed and
+   * is never planned.
+   * @param key - The package
+   * @param version - The version
+   * @returns `true` for such a version; `false` for one installed, one not found, or Foundry VTT
+   */
+  missingManifest(key: PackageKey, version: string): boolean;
+  /**
    * A package's title.
    * @param key - The package, or `core`
    * @returns Its title, or its key if it is not installed
@@ -225,6 +233,10 @@ export function createPlanner(inputs: PlannerInputs): Planner {
     ...overview.systems.map(({ id, version }) => [packageKey({ type: 'system', id }), version] as const),
     ...overview.modules.map(({ module: { id, version } }) => [packageKey({ type: 'module', id }), version] as const),
   ]);
+  // The versions installed need no manifest URL of their own: nothing has to install them.
+  const declarations = {
+    installed: [...installed].filter(([key]) => key !== CORE).map(([key, version]) => ({ package: key, version })),
+  };
   const titles = new Map<PackageKey, string>([
     [CORE, inputs.coreTitle],
     ...overview.systems.map(({ id, title }) => [packageKey({ type: 'system', id }), title] as const),
@@ -284,7 +296,7 @@ export function createPlanner(inputs: PlannerInputs): Planner {
    * @returns The resolution
    */
   async function setupFor(requirements: Requirements) {
-    const rounds = await resolveInRounds(universe, requirements, load, { policy });
+    const rounds = await resolveInRounds(universe, requirements, load, { policy, declarations });
     // An update never goes back.
     const releases = rounds.universe.releases.filter(release => {
       const from = installed.get(packageKey(release.package));
@@ -494,6 +506,14 @@ export function createPlanner(inputs: PlannerInputs): Planner {
           .filter(release => packageKey(release.package) === key && newer(release.version, from))
           .filter(release => runnable.some(build => runsOn(resolver, release, build, universe)))
           .map(({ version }) => version),
+      );
+    },
+
+    missingManifest(key, version) {
+      const release = key === CORE ? undefined : releaseOf(key, version);
+      const at = installed.get(key);
+      return (
+        release !== undefined && !(at !== undefined && sameVersion(at, version)) && resolver.missingManifest(release)
       );
     },
 

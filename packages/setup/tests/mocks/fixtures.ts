@@ -76,8 +76,8 @@ export interface ReleaseShape {
   /** The game systems it runs in, by ID, each with the versions it admits; any system if none. */
   readonly systems?: Readonly<Record<string, Compatibility>>;
   readonly unlisted?: true;
-  /** The manifest URL for this version alone. */
-  readonly versionManifest?: string;
+  /** The manifest URL for this version alone: one at example.org unless given, and none if `null`. */
+  readonly versionManifest?: string | null;
 }
 
 /**
@@ -105,7 +105,9 @@ export function release(ref: `${'module' | 'system'}:${string}`, version: string
     origin: `test:${ref}@${version}`,
     detail: 'loaded',
     ...(shape.unlisted === true && { unlisted: true }),
-    ...(shape.versionManifest !== undefined && { versionManifest: shape.versionManifest }),
+    ...(shape.versionManifest !== null && {
+      versionManifest: shape.versionManifest ?? `https://example.org/${id}/${version}/${type}.json`,
+    }),
   };
 }
 
@@ -147,6 +149,7 @@ export function alone(...updates: readonly PackageUpdate[]): Planner {
       updates.find(update => update.key === key)?.versions.filter(version => version !== installed.get(key)) ?? [],
     titleOf: key => key,
     needsOf: () => [],
+    missingManifest: () => false,
   };
 }
 

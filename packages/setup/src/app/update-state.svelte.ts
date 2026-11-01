@@ -217,6 +217,8 @@ export class UpdateState {
    * the plan would have it, saying what else it would change. The installed one is among them if the plan can go
    * without it. A version the plan cannot take only because of other choices in it is among them too, but cannot be
    * chosen until those are taken out (see {@link VersionOption.conflict}); one no change to the plan would let in is not.
+   * A version found with no manifest URL of its own is among them, but cannot be chosen at all (see
+   * {@link VersionOption.missingManifest}).
    * @param key - The package's key
    * @returns The versions, newest first
    */
@@ -225,8 +227,14 @@ export class UpdateState {
     const installed = this.updateOf(key)?.installed;
     if (search === null || installed === undefined) return [];
     const { planner } = search;
+    const chosen = (other: PackageKey) => this.chosenOf(other);
     const options: VersionOption[] = [];
     for (const version of [...planner.candidates(key), installed]) {
+      if (planner.missingManifest(key, version)) {
+        const judged = search.judge(key, version, chosen);
+        options.push({ ...this.#withNeeds(key, judged), missingManifest: true });
+        continue;
+      }
       const picks = this.#picksWith(key, version);
       const completion = await planner.complete(picks);
       if (!completion.ok) {
@@ -239,10 +247,7 @@ export class UpdateState {
           }
         }
         if (remove.length === 0) continue;
-        const locked = this.#withNeeds(
-          key,
-          search.judge(key, version, other => this.chosenOf(other)),
-        );
+        const locked = this.#withNeeds(key, search.judge(key, version, chosen));
         options.push({ ...locked, conflict: { remove, explanation: completion.explanation ?? [] } });
         continue;
       }

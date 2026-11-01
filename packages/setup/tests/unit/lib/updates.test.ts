@@ -154,6 +154,38 @@ describe('findUpdates', () => {
     expect(found.updates.get('system:dnd5e')).toMatchObject({ newest: '5.5.0' });
   });
 
+  test('offers no version found without a manifest of its own, blocking it and saying why', async () => {
+    const found = await search(
+      [
+        ['idle', '1.0.0'],
+        ['used', '1.0.0'],
+      ],
+      { a: [['used', '1.0.0']] },
+      [
+        release('system:dnd5e', '5.3.3', { versionManifest: null }),
+        release('module:idle', '1.0.0', { versionManifest: null }),
+        release('module:idle', '1.1.0'),
+        release('module:idle', '1.2.0', { versionManifest: null }),
+        release('module:used', '1.0.0', { versionManifest: null }),
+        release('module:used', '2.0.0', { versionManifest: null }),
+      ],
+    );
+
+    // The installed versions need none: a world keeps working with them.
+    expect(found.unresolved).toEqual([]);
+    expect(found.updates.get('module:idle')).toMatchObject({ newest: '1.1.0', versions: ['1.1.0', '1.0.0'] });
+    expect(found.updates.get('module:used')).toBeUndefined();
+    for (const [key, newest] of [
+      ['module:idle', '1.2.0'],
+      ['module:used', '2.0.0'],
+    ] as const) {
+      expect(found.blocked.get(key)?.newest).toBe(newest);
+      expect(found.blocked.get(key)?.explanation?.join(' ')).toContain(
+        `was found, but no manifest URL for that version could be, so it cannot be installed`,
+      );
+    }
+  });
+
   test('loads the releases the resolver needs, and keeps them for the next world', async () => {
     const listed = { ...release('module:app', '2.0.0'), detail: 'listed' as const };
     const load = vi.fn(() => Promise.resolve([release('module:app', '2.0.0')]));

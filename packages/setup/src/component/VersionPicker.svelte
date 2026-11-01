@@ -1,7 +1,8 @@
 <!--
   A version list, as the EMMA module's (its component/VersionPicker.svelte): a button showing the version chosen in its
   badge, which opens the other versions, each in its own badge, newest first. The installed version is marked so, and
-  one that other choices stand in the way of is shown, locked, but cannot be chosen.
+  one that other choices stand in the way of, or one with no manifest URL of its own, is shown, locked, but cannot be
+  chosen.
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
@@ -99,6 +100,15 @@
   }
 
   /**
+   * Whether a version is shown but cannot be chosen: other choices stand in its way, or it has no manifest of its own.
+   * @param option - The version
+   * @returns Whether it is locked
+   */
+  function isLocked(option: VersionOption): boolean {
+    return option.conflict !== undefined || option.missingManifest === true;
+  }
+
+  /**
    * Close the list.
    * @param refocus - Whether to put the keyboard back on the button
    */
@@ -114,7 +124,7 @@
   function choose(index: number): void {
     const option = options[index];
     // A locked version stays in the list, for the panel to say what stands in its way.
-    if (option?.conflict !== undefined) return;
+    if (option !== undefined && isLocked(option)) return;
     hide(true);
     if (option !== undefined) onChoose(option.version);
   }
@@ -173,7 +183,14 @@
   {#if option.version === installed}
     <span class="emma-version-installed">{localize('Update.Installed')}</span>
   {/if}
-  {#if option.conflict !== undefined}
+  {#if option.missingManifest === true}
+    <i
+      class="fa-solid fa-lock emma-version-lock"
+      data-tooltip={localize('Update.NoManifestExplained')}
+      title={localize('Update.NoManifestExplained')}
+      aria-hidden="true"></i>
+    <span class="emma-version-text">{localize('Update.NoManifestShort')}</span>
+  {:else if option.conflict !== undefined}
     <i class="fa-solid fa-lock emma-version-lock" title={localize('Update.Locked')} aria-hidden="true"></i>
     <span class="emma-version-text">{localize('Update.Locked')}</span>
   {/if}
@@ -210,8 +227,8 @@
         id={optionId(index)}
         role="option"
         aria-selected={index === active}
-        aria-disabled={option.conflict !== undefined}
-        class={{ active: index === active, locked: option.conflict !== undefined }}
+        aria-disabled={isLocked(option)}
+        class={{ active: index === active, locked: isLocked(option) }}
         onclick={() => {
           choose(index);
         }}
