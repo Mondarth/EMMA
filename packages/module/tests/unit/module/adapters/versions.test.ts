@@ -565,9 +565,16 @@ describe('the core and the system', () => {
       ['5.2.0', 'warning'],
       ['5.1.0', 'success'],
     ]);
-    expect(systems[0]?.badge?.text).toBe('MONDARTH-EMMA.Versions.Fit.Unverified {"packages":"Dice & Co"}');
+    // 5.2.0 is known only from the system's manifest URL, which gives the newest, so it has no manifest of its own.
+    expect(systems[0]?.missingManifest).toBe(true);
+    expect(systems[1]?.missingManifest).toBeUndefined();
+    expect(systems[0]?.badge?.text).toBe(
+      'MONDARTH-EMMA.Versions.Fit.Unverified {"packages":"Dice & Co"} MONDARTH-EMMA.Versions.NoManifest',
+    );
     // The tooltip is HTML, so the titles in it are escaped.
-    expect(systems[0]?.badge?.tooltip).toBe('MONDARTH-EMMA.Versions.Fit.Unverified {"packages":"Dice &amp; Co"}');
+    expect(systems[0]?.badge?.tooltip).toBe(
+      'MONDARTH-EMMA.Versions.Fit.Unverified {"packages":"Dice &amp; Co"}<br>MONDARTH-EMMA.Versions.NoManifest',
+    );
     expect(systems[0]?.badge?.icon).toBe('fa-solid icon-3');
     expect(systems[1]?.badge).toEqual({
       type: 'success',
@@ -751,6 +758,7 @@ describe('createVersionJudge with EMMA’s catalogue', () => {
       relationships: { requires: [], systems: [], conflicts: [], recommends: [] },
       protected: false,
       origin: `https://files.test/${id}/${version}/module.json`,
+      versionManifest: `https://files.test/${id}/${version}/module.json`,
       detail: 'loaded',
     };
   }
@@ -1230,6 +1238,32 @@ describe('createVersionJudge with EMMA’s catalogue', () => {
         { package: { type: 'module', id: 'dice' }, title: expect.any(String) as string, from: '1.0.0', to: '1.1.0' },
       ],
     });
+  });
+
+  test('never recommends or offers a version with no manifest of its own, except the one installed', async () => {
+    // Known only from a manifest URL that gives the newest.
+    const bare = (version: string) => {
+      const { versionManifest, ...rest } = held('dice', version);
+      return { ...rest, manifest: versionManifest.replace(`/${version}/`, '/latest/') };
+    };
+    const { judge } = await lookUpWithCatalogue({ modules: { dice: onGithub('owner/dice', { version: '1.0.0' }) } }, [
+      universe([bare('1.0.0'), held('dice', '1.1.0'), bare('2.0.0')]),
+    ]);
+
+    const solved = await judge.reportSolve(['dice'], { modules: new Map() });
+    const listed = judge.judgeVersions(['dice'], { modules: new Map() }, 'dice');
+
+    expect(solved.solution).toEqual({
+      kind: 'found',
+      changes: [
+        { package: { type: 'module', id: 'dice' }, title: expect.any(String) as string, from: '1.0.0', to: '1.1.0' },
+      ],
+    });
+    expect(listed.map(({ version, missingManifest }) => [version, missingManifest])).toEqual([
+      ['2.0.0', true],
+      ['1.1.0', undefined],
+      ['1.0.0', undefined],
+    ]);
   });
 
   // Regression: a module looked up before it was ignored kept its own releases in the reports' universe, which the

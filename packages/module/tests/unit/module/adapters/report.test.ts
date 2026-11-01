@@ -64,8 +64,19 @@ function release(type: 'module' | 'system', id: string, version: string, declare
     },
     protected: false,
     origin: `${type}s/${id}`,
+    versionManifest: `https://files.test/${id}/${version}/${type}.json`,
     detail: 'loaded',
   };
+}
+
+/**
+ * A release without a manifest URL of its own, as one known only from a manifest URL that gives the newest.
+ * @param found - The release
+ * @returns It, without its `versionManifest`
+ */
+function withoutOwnManifest(found: Release): Release {
+  const { versionManifest, ...rest } = found;
+  return versionManifest === undefined ? found : rest;
 }
 
 /**
@@ -322,7 +333,7 @@ describe('planReport', () => {
 
   test('gives each module its title and the manifest URL of the version chosen alone, never one for the newest', () => {
     const latestOnly = {
-      ...release('module', 'old', '1.0.0'),
+      ...withoutOwnManifest(release('module', 'old', '1.0.0')),
       manifest: 'https://example.test/old/latest/module.json',
     };
 

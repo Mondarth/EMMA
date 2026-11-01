@@ -288,12 +288,14 @@ export function planReport(
  * How the best versions are found. A version not verified for the core is a compatibility risk, which is acceptable,
  * so it counts the same as a verified one (with the core kept, the resolver's default already does so; this keeps it
  * so); a version outside the range of systems it declares is not compatible with
- * the system; and one that declares no compatibility at all, which Foundry cannot place, is not chosen.
+ * the system; and one that declares no compatibility at all, which Foundry cannot place, is not chosen; nor is one
+ * found without a manifest URL of its own, which could not be installed, unless it is installed already.
  */
 const BEST_VERSIONS_POLICY: Partial<Policy> = {
   verified: 'ignore',
   systemCompatibility: 'require',
   missingCompatibility: 'reject',
+  versionManifest: 'require',
 };
 
 /**
@@ -306,6 +308,7 @@ const BEST_VERSIONS_POLICY: Partial<Policy> = {
  * @param load - Loads releases known only from a listing, as the answer needs them
  * @param kept - Modules to keep at their versions, as the core and system are: those taken as present, whose version
  *   is the one release standing for them, which the update would otherwise leave out if it looked like a pre-release
+ * @param installed - The versions installed, which need no manifest URL of their own
  * @returns The best versions, as changes to the setup, or why there are none
  */
 export async function solveReport(
@@ -314,13 +317,16 @@ export async function solveReport(
   messages: ExplanationMessages,
   load: (needs: readonly Release[]) => Promise<readonly Release[]>,
   kept: readonly PackageVersion[] = [],
+  installed: readonly PackageVersion[] = [],
 ): Promise<SetupSolve> {
   const versions = versionsIn(setup);
   const requirements: Requirements = {
     require: setup.modules.map(({ package: key }) => ({ package: key })),
     pins: [{ package: CORE, version: setup.core }, setup.system, ...kept],
   };
-  const rounds = await resolveInRounds(universe, requirements, load, { policy: BEST_VERSIONS_POLICY });
+  // A module taken as present stands in for one installed, so needs none either.
+  const declarations = { installed: [...installed, ...kept] };
+  const rounds = await resolveInRounds(universe, requirements, load, { policy: BEST_VERSIONS_POLICY, declarations });
   const { resolution } = rounds;
   // Those `load` left out, and those it returned marked as failed, as the resolver's own sources do.
   const failed = rounds.universe.releases
