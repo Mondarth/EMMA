@@ -122,6 +122,7 @@
         "ConflictsWith": "{release} conflicts with {on}",
         "RunsIn": "{release} runs only in {systems}",
         "Unusable": "{release} declares no Foundry VTT compatibility, which is not accepted",
+        "MissingManifest": "{release} was found, but no manifest URL for that version could be, so it cannot be installed",
         "Excluded": "{release} cannot be used ({reason})",
         "ExcludedWith": "{release} cannot be used with {on} ({reason})",
         "Overridden": "{text} ({reason})",
