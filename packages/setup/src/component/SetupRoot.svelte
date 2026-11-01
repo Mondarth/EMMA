@@ -33,6 +33,10 @@
   const overview = $derived(setup.overview);
   const updates = $derived(setup.updates);
   const planOpen = $derived(updates.choices.length > 0);
+  // The plan offers a snapshot, so the space one needs is asked for once the plan opens.
+  $effect(() => {
+    if (planOpen) void setup.checkSnapshotSpace();
+  });
   const updateCount = $derived(updates.search?.updates.size ?? 0);
 
   let layout = $state<Layout>(readLayout());
@@ -149,7 +153,7 @@
             resize({ plan });
           }} />
         <div class="emma-setup-plan" style:flex-basis="{layout.plan * 100}%">
-          <UpdatePlan {overview} {updates} />
+          <UpdatePlan {overview} {updates} space={setup.snapshotSpace} />
         </div>
       {/if}
     </div>

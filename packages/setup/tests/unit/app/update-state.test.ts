@@ -338,4 +338,10 @@ describe('UpdateState', () => {
     expect(updates.status).toBe('found');
     expect(updates.problem).toBeNull();
   });
+
+  test('offers no snapshot or backup before it has searched', () => {
+    const updates = new UpdateState(() => Promise.resolve(finding(APP)));
+
+    expect(updates.safeguards).toEqual([]);
+  });
 });

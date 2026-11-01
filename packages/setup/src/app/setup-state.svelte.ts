@@ -2,6 +2,7 @@
  * What the setup screen's EMMA window shows: the installation as last read, its updates, and whether EMMA guards
  * Foundry's own package buttons. Reactive, with Svelte 5 runes, so the window follows any change.
  */
+import type { SnapshotSpace } from '../foundry/setup-game';
 import type { Overview } from '../lib/overview';
 import type { UpdateSearch } from '../lib/updates';
 import { UpdateState } from './update-state.svelte';
@@ -21,7 +22,12 @@ export interface SetupStateOptions {
   readonly findUpdates: (overview: Overview) => Promise<UpdateSearch>;
   /** Install the EMMA module, or update it, which the search for updates needs. */
   readonly installModule: () => Promise<void>;
+  /** Ask how much space a snapshot needs, and how much is free; none where it cannot be asked. */
+  readonly snapshotSpace?: () => Promise<SnapshotSpace>;
 }
+
+/** Whether the space a snapshot needs is known: `checking`, `failed`, or the space; `null` before it is asked. */
+export type SnapshotSpaceState = SnapshotSpace | 'checking' | 'failed' | null;
 
 /** What the window shows. */
 export class SetupState {
@@ -37,6 +43,8 @@ export class SetupState {
   guardOn = $state(true);
   /** The installation's updates, searched for each time it is read. */
   readonly updates: UpdateState;
+  /** The space a snapshot needs and the space free, once asked, until the installation is read again. */
+  snapshotSpace = $state.raw<SnapshotSpaceState>(null);
 
   readonly #options: SetupStateOptions;
 
@@ -59,6 +67,8 @@ export class SetupState {
     try {
       const overview = await this.#options.load();
       this.overview = overview;
+      // What a snapshot needs changes with what is installed.
+      this.snapshotSpace = null;
       this.failed = false;
       void this.updates.searchFor(overview);
     } catch {
@@ -84,6 +94,22 @@ export class SetupState {
       this.installing = false;
     }
     await this.refresh();
+  }
+
+  /**
+   * Ask how much space a snapshot needs, and how much is free, once until the installation is read again. A failure is
+   * kept in {@link snapshotSpace}, never thrown.
+   * @returns Once known, or failed
+   */
+  async checkSnapshotSpace(): Promise<void> {
+    const ask = this.#options.snapshotSpace;
+    if (ask === undefined || this.snapshotSpace !== null) return;
+    this.snapshotSpace = 'checking';
+    try {
+      this.snapshotSpace = await ask();
+    } catch {
+      this.snapshotSpace = 'failed';
+    }
   }
 
   /**

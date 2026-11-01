@@ -135,6 +135,26 @@
     "Installing": "Installing the EMMA module…",
     "UpdateExtension": "Get the newest browser extension"
   },
+  "Plan": {
+    "Safeguards": "Keep first",
+    "Changes": "Changes",
+    "Keep": "Keep",
+    "Note": "Note",
+    "Space": "Space",
+    "Snapshot": "Snapshot of the installation",
+    "Backup": "Back up {world}",
+    "BackupUses": "It uses {packages}, which the plan changes.",
+    "Recommended": "Recommended, as the plan changes Foundry VTT",
+    "SnapshotNote": "EMMA: before the update plan of {date}",
+    "BackupNote": "EMMA: before updating {packages}",
+    "NoteOf": "Note of: {name}",
+    "Checking": "Checking the space…",
+    "SpaceUnknown": "Space not known",
+    "SnapshotSpace": "Needs about {required}; {available} free",
+    "NotEnough": "Not enough space: needs about {required}, {available} free",
+    "BackupSpace": "Size not known; {available} free",
+    "BackupSizeUnknown": "Size not known"
+  },
   "Layout": {
     "Tree": "Resize the installation tree",
     "Plan": "Resize the update plan"

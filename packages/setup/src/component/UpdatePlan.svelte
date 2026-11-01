@@ -1,19 +1,54 @@
 <!--
-  The update plan, below the tree and the panel beside it while versions are chosen: each package whose chosen version
-  differs from the one installed, with both, in the order they are to be installed, and the manifest URL that installs
-  the version chosen.
+  The update plan, below the tree and the panel beside it while versions are chosen. First what to keep before anything
+  changes: a snapshot of the installation, and a backup of each world that uses a package the plan changes, each with a
+  box to check and the note Foundry keeps with it, and the space a snapshot needs and the space free. Then each package
+  whose chosen version differs from the one installed, with both, in the order they are to be installed, and the
+  manifest URL that installs the version chosen.
 -->
 <script lang="ts">
+  import type { SnapshotSpaceState } from '../app/setup-state.svelte';
   import type { UpdateState } from '../app/update-state.svelte';
-  import { format, localize } from '../lib/i18n';
+  import { format, formatSize, localize } from '../lib/i18n';
   import type { Overview } from '../lib/overview';
+  import type { Safeguard } from '../lib/safeguards';
 
   interface Props {
     overview: Overview;
     updates: UpdateState;
+    /** The space a snapshot needs and the space free, as far as it is known. */
+    space?: SnapshotSpaceState;
   }
 
-  let { overview, updates }: Props = $props();
+  let { overview, updates, space = null }: Props = $props();
+
+  /**
+   * A safeguard's name.
+   * @param guard - The snapshot or backup
+   * @returns Its name
+   */
+  function nameOf(guard: Safeguard): string {
+    return guard.world === undefined ? localize('Plan.Snapshot') : format('Plan.Backup', { world: guard.world.title });
+  }
+
+  /**
+   * What is known of the space a safeguard needs: a snapshot's size and the space free; only the space free for a
+   * backup, as Foundry does not say what one needs.
+   * @param guard - The snapshot or backup
+   * @returns The space, in words, and whether there is too little
+   */
+  function spaceOf(guard: Safeguard): { text: string; short: boolean } {
+    if (space === 'checking') return { text: localize('Plan.Checking'), short: false };
+    if (space === null || space === 'failed') {
+      return {
+        text: localize(guard.kind === 'snapshot' ? 'Plan.SpaceUnknown' : 'Plan.BackupSizeUnknown'),
+        short: false,
+      };
+    }
+    const sizes = { required: formatSize(space.required), available: formatSize(space.available) };
+    if (guard.kind === 'backup') return { text: format('Plan.BackupSpace', sizes), short: false };
+    const short = space.required > space.available;
+    return { text: format(short ? 'Plan.NotEnough' : 'Plan.SnapshotSpace', sizes), short };
+  }
 
   const uid = $props.id();
 
@@ -39,7 +74,53 @@
       {localize('Update.Clear')}
     </button>
   </header>
-  <table>
+  {#if updates.safeguards.length > 0}
+    <table aria-label={localize('Plan.Safeguards')}>
+      <thead>
+        <tr>
+          <th scope="col">{localize('Plan.Keep')}</th>
+          <th scope="col">{localize('Plan.Note')}</th>
+          <th scope="col">{localize('Plan.Space')}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {#each updates.safeguards as guard (guard.key)}
+          {@const room = spaceOf(guard)}
+          <tr>
+            <th scope="row">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={guard.checked}
+                  onchange={event => {
+                    updates.setSafeguard(guard.key, { checked: event.currentTarget.checked });
+                  }} />
+                {nameOf(guard)}
+              </label>
+              {#if guard.recommended}
+                <span class="emma-plan-needed">{localize('Plan.Recommended')}</span>
+              {:else if guard.packages !== undefined}
+                <span class="emma-plan-needed"
+                  >{format('Plan.BackupUses', { packages: guard.packages.join(', ') })}</span>
+              {/if}
+            </th>
+            <td>
+              <input
+                type="text"
+                class="emma-plan-note-input"
+                aria-label={format('Plan.NoteOf', { name: nameOf(guard) })}
+                value={guard.note}
+                oninput={event => {
+                  updates.setSafeguard(guard.key, { note: event.currentTarget.value });
+                }} />
+            </td>
+            <td class={['emma-plan-space', room.short && 'emma-plan-missing']}>{room.text}</td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  {/if}
+  <table aria-label={localize('Plan.Changes')}>
     <thead>
       <tr>
         <th scope="col">{localize('Update.Package')}</th>
@@ -79,6 +160,15 @@
     font-size: 0.85em;
     opacity: 0.8;
     font-style: italic;
+  }
+
+  .emma-plan-note-input {
+    width: 100%;
+  }
+
+  .emma-plan-space {
+    font-family: var(--font-primary, sans-serif);
+    font-size: 0.85em;
   }
 
   .emma-plan-manifest {

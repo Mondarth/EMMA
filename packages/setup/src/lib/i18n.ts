@@ -28,3 +28,34 @@ export function format(key: string, data: Readonly<Record<string, string | numbe
     name in data ? String(data[name]) : placeholder,
   );
 }
+
+/**
+ * Today's date in the user's language, such as for a note.
+ * @returns The date
+ */
+export function today(): string {
+  return new Date().toLocaleDateString();
+}
+
+/** The units sizes are given in, each a thousand of the one before, as `Intl.NumberFormat` names them. */
+const SIZE_UNITS = ['byte', 'kilobyte', 'megabyte', 'gigabyte', 'terabyte'] as const;
+
+/**
+ * A size in the user's language, in the largest unit it is at least one of, such as `1.2 GB`.
+ * @param bytes - The size, in bytes
+ * @returns The size, in words
+ */
+export function formatSize(bytes: number): string {
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1000 && unit < SIZE_UNITS.length - 1) {
+    value /= 1000;
+    unit += 1;
+  }
+  return new Intl.NumberFormat(undefined, {
+    style: 'unit',
+    unit: SIZE_UNITS[unit],
+    unitDisplay: 'short',
+    maximumFractionDigits: value < 10 ? 1 : 0,
+  }).format(value);
+}

@@ -8,9 +8,12 @@ import { SvelteMap } from 'svelte/reactivity';
 
 import type { KitProblem } from '../foundry/setup-kit';
 import { KitUnavailable } from '../foundry/setup-kit';
+import { format, today } from '../lib/i18n';
 import type { Overview } from '../lib/overview';
 import type { PlanEntry } from '../lib/plans';
 import { keepChoices, withChoice } from '../lib/plans';
+import type { Safeguard, SafeguardEdit } from '../lib/safeguards';
+import { safeguardsFor } from '../lib/safeguards';
 import type { BlockedUpdate, PackageUpdate, UpdateSearch, VersionOption } from '../lib/updates';
 
 /**
@@ -39,6 +42,20 @@ export interface ExplainedVersion {
   readonly previewing: boolean;
 }
 
+/**
+ * An installed system's or module's title, as the installation gives it.
+ * @param overview - The installation
+ * @param key - The package's key
+ * @returns Its title, or its key if it is not installed
+ */
+function titleIn(overview: Overview, key: PackageKey): string {
+  const id = key.slice(key.indexOf(':') + 1);
+  const installed = key.startsWith('system:')
+    ? overview.systems.find(system => system.id === id)
+    : overview.modules.find(use => use.module.id === id)?.module;
+  return installed?.title ?? key;
+}
+
 /** The updates, and the versions chosen. */
 export class UpdateState {
   status = $state<UpdateStatus>('idle');
@@ -55,6 +72,10 @@ export class UpdateState {
 
   /** The versions chosen, by package key, in the order they were chosen. */
   readonly #picks = new SvelteMap<PackageKey, string>();
+  /** What the user changed of the plan's snapshot and backups, by their keys. */
+  readonly #safeguardEdits = new SvelteMap<string, SafeguardEdit>();
+  /** The installation the last search was for. */
+  #overview = $state.raw<Overview | null>(null);
   /** The versions last listed for a package, badged as the plan would have them, by `<key>@<version>`. */
   #listed = $state.raw<Readonly<Record<string, VersionOption>>>({});
   readonly #find: (overview: Overview) => Promise<UpdateSearch>;
@@ -75,6 +96,25 @@ export class UpdateState {
   );
 
   /**
+   * What the plan offers to keep before it changes anything: a snapshot, checked when Foundry VTT changes, then a
+   * backup of each world that uses a package the plan changes (see `lib/safeguards.ts`). None while nothing is chosen.
+   */
+  readonly safeguards: readonly Safeguard[] = $derived.by(() => {
+    const overview = this.#overview;
+    if (overview === null) return [];
+    return safeguardsFor(
+      overview,
+      this.plan,
+      this.#safeguardEdits,
+      {
+        snapshot: format('Plan.SnapshotNote', { date: today() }),
+        backup: packages => format('Plan.BackupNote', { packages: packages.join(', ') }),
+      },
+      key => titleIn(overview, key),
+    );
+  });
+
+  /**
    * @param search - Search for the updates of an installation
    */
   constructor(search: (overview: Overview) => Promise<UpdateSearch>) {
@@ -90,6 +130,7 @@ export class UpdateState {
    */
   async searchFor(overview: Overview): Promise<void> {
     const search = ++this.#searches;
+    this.#overview = overview;
     this.status = 'searching';
     try {
       const found = await this.#find(overview);
@@ -291,9 +332,20 @@ export class UpdateState {
     }
   }
 
-  /** Take back every choice. */
+  /** Take back every choice, and what was changed of the plan's snapshot and backups. */
   clear(): void {
     this.#picks.clear();
+    this.#safeguardEdits.clear();
     this.plan = [];
+  }
+
+  /**
+   * Check or uncheck one of the plan's snapshot and backups, or change its note. What is changed stays while the plan
+   * offers it.
+   * @param key - Its key (see {@link Safeguard.key})
+   * @param edit - What changes
+   */
+  setSafeguard(key: string, edit: SafeguardEdit): void {
+    this.#safeguardEdits.set(key, { ...this.#safeguardEdits.get(key), ...edit });
   }
 }

@@ -2,7 +2,9 @@ import { screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
-import { closeEmmaSetup } from '../../../src/app/emma-setup-app';
+import type * as EmmaSetupApp from '../../../src/app/emma-setup-app';
+import { closeEmmaSetup, openEmmaSetup } from '../../../src/app/emma-setup-app';
+import type { SetupState } from '../../../src/app/setup-state.svelte';
 import { startEmmaSetup, waitForSetup } from '../../../src/app/start';
 import { GUARDED_CLASS } from '../../../src/foundry/guard';
 import { GUARD_KEY } from '../../../src/foundry/preferences';
@@ -17,6 +19,12 @@ vi.mock('../../../src/foundry/setup-kit', async importOriginal => ({
   ...(await importOriginal<typeof SetupKitModule>()),
   loadKit: vi.fn(() => Promise.resolve(KIT)),
 }));
+
+// The window opens as ever; the tests may read the state it shows.
+vi.mock('../../../src/app/emma-setup-app', async importOriginal => {
+  const actual = await importOriginal<typeof EmmaSetupApp>();
+  return { ...actual, openEmmaSetup: vi.fn(actual.openEmmaSetup) };
+});
 
 const STARTED = Symbol.for('mondarth-emma.setup');
 
@@ -122,6 +130,20 @@ describe('startEmmaSetup', () => {
     menu.querySelector('button')?.click();
 
     expect(await screen.findByText('No updates found')).toBeInTheDocument();
+  });
+
+  test("asks the server for the space a snapshot needs, as Foundry's own dialog does", async () => {
+    const { post } = installSetupMocks();
+    post.mockResolvedValue({ required: 10, available: 20 });
+    const menu = showMenu();
+    await startEmmaSetup();
+    menu.querySelector('button')?.click();
+    const setup = vi.mocked(openEmmaSetup).mock.lastCall?.[0] as SetupState;
+
+    await setup.checkSnapshotSpace();
+
+    expect(setup.snapshotSpace).toEqual({ required: 10, available: 20 });
+    expect(post).toHaveBeenCalledWith({ action: 'checkCreateSnapshotDiskSpace' }, { timeoutMs: null });
   });
 
   test('installs the EMMA module from its prompt, through the guard', async () => {

@@ -201,7 +201,19 @@ the update offered; when it is the newest, its red arrow says so. The installed 
 stay as they are where they can, and Foundry VTT moves only as far as it must. Choosing a version other than the installed one opens the **Update plan** below the tree and the panel, the full width of the window, listing each package that
 changes with its installed and new versions, and, for one a choice brings in, which choice needs it. The plan lists
 the changes in the order they are to be installed: Foundry VTT first, then the game systems, then the modules, each after
-the modules in the plan it requires. Each row gives the manifest URL that installs the version chosen: one for that
+the modules in the plan it requires.
+
+Before the changes, under **Keep first**, the plan offers what Foundry's **Manage Backups** makes by hand:
+
+- a **snapshot of the installation**, unchecked unless the plan changes Foundry VTT, when EMMA checks it as a strong
+  recommendation, which can be unchecked;
+- a **backup of each world** that uses a package the plan changes: its game system, a module its record says it runs,
+  or one it will need when next run. Each is unchecked, as a reminder.
+
+Each has a note, which Foundry keeps with it, written for it at first and free to change. The snapshot's row gives the
+space it needs and the space free, as Foundry's own dialog does, and says when there is too little; Foundry does not
+say what a world's backup needs, so its row gives the space free alone. What is checked is made before anything changes,
+once installing the plan is built. Each row gives the manifest URL that installs the version chosen: one for that
 version alone, since a package's own manifest URL usually gives its newest. Foundry VTT updates itself, and a version for
 which none is found is marked so. **Clear choices**
 takes them all back, and choosing the installed version takes back one, with what it brought in. The plan is shown only while something is chosen. Installing the plan
