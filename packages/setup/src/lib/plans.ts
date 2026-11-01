@@ -70,6 +70,8 @@ export interface PlanEntry {
   readonly version: string;
   /** The choice that needs it; none for a version chosen. */
   readonly by?: PackageVersion;
+  /** The manifest URL to install the version from, one for that version alone; none for Foundry VTT, or if none is found. */
+  readonly manifest?: string;
 }
 
 /** Plans updates of an installation. */
@@ -462,7 +464,14 @@ export function createPlanner(inputs: PlannerInputs): Planner {
       }
       const entry = (key: PackageKey, version: string): PlanEntry => {
         const needer = picks.has(key) ? undefined : by.get(key);
-        return { key, installed: installed.get(key) ?? version, version, ...(needer !== undefined && { by: needer }) };
+        const manifest = key === CORE ? undefined : releaseOf(key, version)?.versionManifest;
+        return {
+          key,
+          installed: installed.get(key) ?? version,
+          version,
+          ...(needer !== undefined && { by: needer }),
+          ...(manifest !== undefined && { manifest }),
+        };
       };
       return installOrder(
         [

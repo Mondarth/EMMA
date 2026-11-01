@@ -89,7 +89,14 @@ describe('UpdateState', () => {
     await updates.searchFor(OVERVIEW);
 
     await expect(updates.choose('module:app', '2.0.0')).resolves.toBe(true);
-    expect(updates.choices).toEqual([{ key: 'module:app', installed: '1.0.0', chosen: '2.0.0' }]);
+    expect(updates.choices).toEqual([
+      {
+        key: 'module:app',
+        installed: '1.0.0',
+        chosen: '2.0.0',
+        manifest: 'https://example.org/module:app/2.0.0/module.json',
+      },
+    ]);
     plan.mockResolvedValueOnce(undefined);
     await expect(updates.choose('module:lib', '1.1.0')).resolves.toBe(false);
     expect(updates.choices.map(({ key }) => key)).toEqual(['module:app']);
@@ -255,8 +262,18 @@ describe('UpdateState', () => {
     await updates.choose('module:other', '1.0.0');
 
     expect(updates.choices).toEqual([
-      { key: 'module:lib', installed: '1.0.0', chosen: '1.1.0' },
-      { key: 'module:app', installed: '1.0.0', chosen: '1.5.0' },
+      {
+        key: 'module:lib',
+        installed: '1.0.0',
+        chosen: '1.1.0',
+        manifest: 'https://example.org/module:lib/1.1.0/module.json',
+      },
+      {
+        key: 'module:app',
+        installed: '1.0.0',
+        chosen: '1.5.0',
+        manifest: 'https://example.org/module:app/1.5.0/module.json',
+      },
     ]);
     expect(updates.chosenOf('module:app')).toBe('1.5.0');
 

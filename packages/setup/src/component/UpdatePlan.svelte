@@ -1,6 +1,7 @@
 <!--
   The update plan, below the tree and the panel beside it while versions are chosen: each package whose chosen version
-  differs from the one installed, with both, in the order they are to be installed.
+  differs from the one installed, with both, in the order they are to be installed, and the manifest URL that installs
+  the version chosen.
 -->
 <script lang="ts">
   import type { UpdateState } from '../app/update-state.svelte';
@@ -44,6 +45,7 @@
         <th scope="col">{localize('Update.Package')}</th>
         <th scope="col">{localize('Update.Installed')}</th>
         <th scope="col">{localize('Update.Chosen')}</th>
+        <th scope="col">{localize('Update.Manifest')}</th>
       </tr>
     </thead>
     <tbody>
@@ -57,6 +59,15 @@
               <span class="emma-plan-needed">{format('Update.NeededBy', choice.by)}</span>
             {/if}
           </td>
+          <td class="emma-plan-manifest">
+            {#if choice.manifest !== undefined}
+              <a href={choice.manifest} target="_blank" rel="noopener noreferrer">{choice.manifest}</a>
+            {:else if choice.key === 'core'}
+              <span class="emma-plan-note">{localize('Update.CoreManifest')}</span>
+            {:else}
+              <span class="emma-plan-missing">{localize('Update.NoManifest')}</span>
+            {/if}
+          </td>
         </tr>
       {/each}
     </tbody>
@@ -68,6 +79,21 @@
     font-size: 0.85em;
     opacity: 0.8;
     font-style: italic;
+  }
+
+  .emma-plan-manifest {
+    font-size: 0.85em;
+    overflow-wrap: anywhere;
+  }
+
+  .emma-plan-note,
+  .emma-plan-missing {
+    font-family: var(--font-primary, sans-serif);
+    font-style: italic;
+  }
+
+  .emma-plan-missing {
+    color: var(--color-level-error, #c00);
   }
 
   .emma-update-plan {
