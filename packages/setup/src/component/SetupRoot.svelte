@@ -4,6 +4,7 @@
   window. A handle between the panels resizes them; each keeps its share as the window is resized.
 -->
 <script lang="ts">
+  import { coreRefusal } from '../app/core-refusal';
   import type { SetupState } from '../app/setup-state.svelte';
   import type { Layout } from '../foundry/preferences';
   import { readLayout, writeLayout } from '../foundry/preferences';
@@ -19,6 +20,7 @@
   import RootPanel from './RootPanel.svelte';
   import Splitter from './Splitter.svelte';
   import SystemPanel from './SystemPanel.svelte';
+  import CoreStep from './CoreStep.svelte';
   import UpdatePlan from './UpdatePlan.svelte';
   import WorldPanel from './WorldPanel.svelte';
 
@@ -34,6 +36,22 @@
   const overview = $derived(setup.overview);
   const updates = $derived(setup.updates);
   const planOpen = $derived(updates.choices.length > 0);
+  /** The build of Foundry VTT a run stopped before updating to, while the plan still has it. */
+  const coreStop = $derived.by(() => {
+    const version = setup.run?.beforeCore;
+    return updates.plan.some(entry => entry.key === 'core' && entry.version === version) ? version : undefined;
+  });
+  /** The build of Foundry VTT the plan chose, if it changes Foundry VTT. */
+  const coreChosen = $derived(updates.plan.find(entry => entry.key === 'core')?.version);
+  // Where updating in place may be offered, Foundry is asked which build it would install, so that the plan can say
+  // before a run whether it can update in place.
+  $effect(() => {
+    if (coreChosen !== undefined && setup.coreUpdate.canUpdate) void setup.checkCoreTarget();
+  });
+  /** Why the plan's build of Foundry VTT cannot be updated to in place, if it cannot. */
+  const coreBlocked = $derived(
+    coreChosen === undefined ? undefined : coreRefusal(coreChosen, setup.coreUpdate, setup.coreTarget),
+  );
   // The plan offers a snapshot, so the space one needs is asked for once the plan opens.
   $effect(() => {
     if (planOpen) void setup.checkSnapshotSpace();
@@ -69,6 +87,7 @@
   /** What the footer says of the last run of the plan. */
   const runStatus = $derived.by(() => {
     const { run } = setup;
+    if (setup.resumedOn !== null && run === null) return format('Core.Resumed', { version: setup.resumedOn });
     if (run === null) return undefined;
     if (!run.over) return localize('Run.Running');
     if (run.failure !== undefined) {
@@ -164,10 +183,21 @@
             resize({ plan });
           }} />
         <div class="emma-setup-plan" style:flex-basis="{layout.plan * 100}%">
+          {#if coreStop !== undefined}
+            <CoreStep
+              version={coreStop}
+              core={setup.coreUpdate}
+              target={setup.coreTarget}
+              updating={setup.coreUpdating}
+              onUpdate={() => {
+                void setup.updateCoreInPlace();
+              }} />
+          {/if}
           <UpdatePlan
             {overview}
             {updates}
             space={setup.snapshotSpace}
+            {coreBlocked}
             run={setup.run}
             onRun={setup.canRun
               ? () => {

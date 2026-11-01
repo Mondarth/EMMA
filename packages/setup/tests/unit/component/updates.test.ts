@@ -2,9 +2,11 @@ import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
+import type { SetupStateOptions } from '../../../src/app/setup-state.svelte';
 import { SetupState } from '../../../src/app/setup-state.svelte';
 import SetupRoot from '../../../src/component/SetupRoot.svelte';
 import { LAYOUT_KEY } from '../../../src/foundry/preferences';
+import type { CoreTarget, CoreUpdateState } from '../../../src/foundry/setup-game';
 import type { KitProblem } from '../../../src/foundry/setup-kit';
 import { EXTENSION_RELEASES, KitUnavailable } from '../../../src/foundry/setup-kit';
 import { buildOverview } from '../../../src/lib/overview';
@@ -711,6 +713,7 @@ describe("the plan's snapshot and backups", () => {
    * @param version - Its version
    * @param snapshotSpace - How the space a snapshot needs is asked for
    * @param runStep - How a step of the plan is carried out
+   * @param more - What else differs
    * @returns The state, the plan, and a user to act with
    */
   async function planning(
@@ -718,6 +721,7 @@ describe("the plan's snapshot and backups", () => {
     version: string,
     snapshotSpace?: () => Promise<{ required: number; available: number }>,
     runStep?: (step: Exclude<RunStep, { kind: 'core' }>) => Promise<void>,
+    more: Partial<SetupStateOptions> = {},
   ) {
     const core: PackageUpdate = { key: 'core', installed: '14.368', newest: '14.369', versions: ['14.369', '14.368'] };
     const setup = new SetupState({
@@ -735,6 +739,7 @@ describe("the plan's snapshot and backups", () => {
       installModule: noInstall,
       ...(snapshotSpace !== undefined && { snapshotSpace }),
       ...(runStep !== undefined && { runStep }),
+      ...more,
     });
     await setup.refresh();
     render(SetupRoot, { setup });
@@ -898,6 +903,104 @@ describe("the plan's snapshot and backups", () => {
     await setup.updates.choose('module:lib', '1.5.0');
     await setup.runPlan();
     expect(screen.getByRole('status')).toHaveTextContent('The plan ran: every step is done.');
+  });
+
+  test("stops before Foundry VTT's update, warning, and offers it in place only as Foundry's updater can", async () => {
+    const core = {
+      state: () => ({ canUpdate: true, channel: 'stable' }),
+      check: vi.fn(() => Promise.resolve({ version: '14.369', manual: false })),
+      update: vi.fn(() => Promise.resolve()),
+    };
+    const { plan, user } = await planning('core', '14.369', undefined, () => Promise.resolve(), {
+      core,
+      keepPendingPlan: () => true,
+    });
+    expect(screen.queryByRole('region', { name: 'Updating Foundry VTT to 14.369' })).toBeNull();
+
+    await user.click(within(plan).getByRole('button', { name: 'Run plan' }));
+    await user.click(within(plan).getByRole('button', { name: 'Run' }));
+
+    const step = await screen.findByRole('region', { name: 'Updating Foundry VTT to 14.369' });
+    await vi.waitFor(() => {
+      expect(within(step).getByRole('button', { name: 'Update Foundry VTT to 14.369 in place' })).toBeInTheDocument();
+    });
+    // Foundry is asked once the plan has its build, and again once the run has read the installation afresh.
+    expect(core.check).toHaveBeenCalledTimes(2);
+    const code = /type ([A-Z0-9]{6}):/.exec(within(step).getByText(/^To update in place/).textContent)?.[1] ?? '';
+    await user.type(within(step).getByRole('textbox'), code);
+    await user.click(within(step).getByRole('button', { name: 'Update Foundry VTT to 14.369 in place' }));
+
+    await vi.waitFor(() => {
+      expect(core.update).toHaveBeenCalledOnce();
+    });
+    expect(within(step).getByRole('status')).toHaveTextContent('Foundry VTT is updating to 14.369.');
+  });
+
+  test.each<[string, CoreUpdateState, CoreTarget | Error, string | undefined]>([
+    [
+      'updates are switched off',
+      { canUpdate: false, channel: 'stable' },
+      { version: '14.369', manual: false },
+      '(--noupdate)',
+    ],
+    [
+      'it would install another build',
+      { canUpdate: true, channel: 'stable' },
+      { version: '14.370', manual: false },
+      'would install 14.370, not 14.369',
+    ],
+    ['it could not ask', { canUpdate: true, channel: 'stable' }, new Error('down'), 'could not say which build'],
+    ['it can update in place', { canUpdate: true, channel: 'stable' }, { version: '14.369', manual: false }, undefined],
+  ])("marks Foundry VTT's row before a run when %s", async (_label, state, target, reason) => {
+    const check = vi.fn(() => (target instanceof Error ? Promise.reject(target) : Promise.resolve(target)));
+    const { setup, plan } = await planning('core', '14.369', undefined, undefined, {
+      core: { state: () => state, check, update: vi.fn() },
+    });
+    const coreRow = changesIn(plan).getAllByRole('row')[1];
+    if (coreRow === undefined) throw new Error('No row for Foundry VTT');
+
+    if (reason === undefined) {
+      await vi.waitFor(() => {
+        expect(setup.coreTarget).toEqual(target);
+      });
+      expect(within(coreRow).queryByRole('img')).toBeNull();
+      return;
+    }
+    const mark = await within(coreRow).findByRole('img', { name: /^Cannot update in place: / });
+    expect(mark).toHaveAttribute('data-tooltip', expect.stringContaining(reason));
+    expect(mark).toHaveClass('fa-triangle-exclamation');
+    // The mark comes before the title.
+    expect(coreRow.querySelector('th')?.firstElementChild).toBe(mark);
+    expect(check).toHaveBeenCalledTimes(state.canUpdate ? 1 : 0);
+  });
+
+  test('does not ask Foundry which build it would install where it cannot update itself', async () => {
+    const check = vi.fn(() => Promise.resolve({ version: '14.369', manual: false }));
+    const { plan, user } = await planning('core', '14.369', undefined, () => Promise.resolve(), {
+      core: { state: () => ({ canUpdate: false, channel: 'stable' }), check, update: vi.fn() },
+    });
+
+    await user.click(within(plan).getByRole('button', { name: 'Run plan' }));
+    await user.click(within(plan).getByRole('button', { name: 'Run' }));
+
+    expect(await screen.findByRole('region', { name: 'Updating Foundry VTT to 14.369' })).toHaveTextContent(
+      '(--noupdate)',
+    );
+    expect(check).not.toHaveBeenCalled();
+  });
+
+  test('says the plan kept from before Foundry VTT was updated is back', async () => {
+    await planning('module:lib', '1.5.0', undefined, undefined, {
+      load: () => Promise.resolve(buildOverview(installation({ core: '14.369' }), new Map())),
+      pendingPlan: () => ({ core: '14.369', picks: [['module:lib', '1.5.0']] }),
+      keepPendingPlan: () => true,
+    });
+
+    await vi.waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent(
+        "The plan from before Foundry VTT's update to 14.369 is back: run it to finish.",
+      );
+    });
   });
 
   test('offers no run where the plan cannot be run', async () => {

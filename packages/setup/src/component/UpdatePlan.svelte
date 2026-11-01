@@ -19,13 +19,15 @@
     updates: UpdateState;
     /** The space a snapshot needs and the space free, as far as it is known. */
     space?: SnapshotSpaceState;
+    /** Why Foundry VTT cannot be updated in place to the build chosen, if it cannot: its row is marked, saying why. */
+    coreBlocked?: string | undefined;
     /** The last run of the plan, if any. */
     run?: PlanRun | null;
     /** Run the plan, once the user confirms it; the plan cannot be run without. */
     onRun?: (() => void) | undefined;
   }
 
-  let { overview, updates, space = null, run = null, onRun }: Props = $props();
+  let { overview, updates, space = null, coreBlocked, run = null, onRun }: Props = $props();
 
   /** Whether the user is asked to confirm a run. */
   let confirming = $state(false);
@@ -198,7 +200,16 @@
     <tbody>
       {#each updates.choices as choice (choice.key)}
         <tr>
-          <th scope="row">{titles.get(choice.key) ?? choice.key}{@render stateOf(choice.key)}</th>
+          <th scope="row">
+            {#if choice.key === 'core' && coreBlocked !== undefined}
+              <i
+                class="fa-solid fa-triangle-exclamation emma-plan-blocked"
+                role="img"
+                aria-label={format('Plan.CoreBlocked', { reason: coreBlocked })}
+                data-tooltip={coreBlocked}></i>
+            {/if}
+            {titles.get(choice.key) ?? choice.key}{@render stateOf(choice.key)}
+          </th>
           <td>{choice.installed}</td>
           <td>
             {choice.chosen}
@@ -242,6 +253,11 @@
   .emma-plan-state {
     margin-left: 0.5rem;
     font-size: 0.85em;
+  }
+
+  .emma-plan-blocked {
+    margin-right: 0.25rem;
+    color: var(--color-level-warning, #ec3);
   }
 
   .emma-plan-state-done {

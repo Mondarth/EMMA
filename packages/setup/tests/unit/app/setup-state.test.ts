@@ -1,6 +1,9 @@
 import { describe, expect, test, vi } from 'vitest';
 
+import type { CoreUpdater } from '../../../src/app/setup-state.svelte';
 import { SetupState } from '../../../src/app/setup-state.svelte';
+import type { PendingPlan } from '../../../src/foundry/preferences';
+import type { Overview } from '../../../src/lib/overview';
 import { buildOverview } from '../../../src/lib/overview';
 import type { RunStep } from '../../../src/lib/run';
 import type { PackageUpdate } from '../../../src/lib/updates';
@@ -292,6 +295,183 @@ describe('SetupState', () => {
       expect(unable.canRun).toBe(false);
       await unable.runPlan();
       expect(unable.run).toBeNull();
+    });
+  });
+
+  describe('updating Foundry VTT in place', () => {
+    const APP: PackageUpdate = { key: 'module:app', installed: '1.0.0', newest: '2.0.0', versions: ['2.0.0', '1.0.0'] };
+    const CORE: PackageUpdate = { key: 'core', installed: '14.368', newest: '14.369', versions: ['14.369', '14.368'] };
+
+    /**
+     * Foundry's updater, finding a build.
+     * @param target - What it would install
+     * @returns The updater
+     */
+    const updater = (target: Awaited<ReturnType<CoreUpdater['check']>>): CoreUpdater => ({
+      state: () => ({ canUpdate: true, channel: 'stable' }),
+      check: vi.fn(() => Promise.resolve(target)),
+      update: vi.fn(() => Promise.resolve()),
+    });
+
+    /**
+     * A state whose plan updates Foundry VTT and a module, run up to Foundry's update.
+     * @param core - Foundry's updater
+     * @param kept - Where the plan kept for after the update goes
+     * @returns The state
+     */
+    async function stopped(core: CoreUpdater | undefined, kept: (PendingPlan | null)[] = []) {
+      const setup = new SetupState({
+        load: () => Promise.resolve(OVERVIEW),
+        guardOn: true,
+        onGuardChange: vi.fn(),
+        findUpdates: () =>
+          Promise.resolve({
+            updates: new Map([APP, CORE].map(update => [update.key, update])),
+            blocked: new Map(),
+            unresolved: [],
+            judge: unjudged,
+            planner: alone(APP, CORE),
+          }),
+        installModule: noInstall,
+        runStep: () => Promise.resolve(),
+        ...(core !== undefined && { core }),
+        keepPendingPlan: plan => {
+          kept.push(plan);
+          return true;
+        },
+      });
+      await setup.refresh();
+      await vi.waitFor(() => {
+        expect(setup.updates.status).toBe('found');
+      });
+      await setup.updates.choose('core', '14.369');
+      await setup.updates.choose('module:app', '2.0.0');
+      await setup.runPlan();
+      expect(setup.run?.beforeCore).toBe('14.369');
+      return setup;
+    }
+
+    test('asks once which build the updater would install, keeping a failure', async () => {
+      const core = updater({ version: '14.369', manual: false });
+      const setup = await stopped(core);
+      expect(setup.coreUpdate).toEqual({ canUpdate: true, channel: 'stable' });
+
+      const asking = setup.checkCoreTarget();
+      expect(setup.coreTarget).toBe('checking');
+      await asking;
+      await setup.checkCoreTarget();
+      expect(setup.coreTarget).toEqual({ version: '14.369', manual: false });
+      expect(core.check).toHaveBeenCalledOnce();
+
+      vi.mocked(core.check).mockRejectedValueOnce(new Error('offline'));
+      await setup.refresh();
+      expect(setup.coreTarget).toBeNull();
+      await setup.checkCoreTarget();
+      expect(setup.coreTarget).toBe('failed');
+    });
+
+    test('keeps the rest of the plan, then starts the update', async () => {
+      const kept: (PendingPlan | null)[] = [];
+      const core = updater({ version: '14.369', manual: false });
+      const setup = await stopped(core, kept);
+      await setup.checkCoreTarget();
+
+      await setup.updateCoreInPlace();
+
+      expect(kept).toEqual([{ core: '14.369', picks: [['module:app', '2.0.0']] }]);
+      expect(core.update).toHaveBeenCalledOnce();
+      expect(setup.coreUpdating).toEqual({ kind: 'begun', version: '14.369', kept: true });
+    });
+
+    test('forgets the plan kept when Foundry does not update, saying why', async () => {
+      const kept: (PendingPlan | null)[] = [];
+      const core = updater({ version: '14.369', manual: false });
+      vi.mocked(core.update).mockRejectedValueOnce(new Error('Not allowed'));
+      const setup = await stopped(core, kept);
+      await setup.checkCoreTarget();
+
+      await setup.updateCoreInPlace();
+
+      expect(kept).toEqual([expect.objectContaining({ core: '14.369' }), null]);
+      expect(setup.coreUpdating).toEqual({ kind: 'failed', message: 'Not allowed' });
+    });
+
+    test.each([
+      ['the updater would install another build', { version: '14.370', manual: false }],
+      ['the build is installed only by hand', { version: '14.369', manual: true }],
+      ['there is no build to update to', { none: 'Up to date' }],
+    ] as const)('updates nothing when %s', async (_label, target) => {
+      const core = updater(target);
+      const setup = await stopped(core);
+      await setup.checkCoreTarget();
+
+      await setup.updateCoreInPlace();
+
+      expect(core.update).not.toHaveBeenCalled();
+      expect(setup.coreUpdating).toBeNull();
+    });
+
+    test('updates nothing before it knows the build, nor without an updater', async () => {
+      const core = updater({ version: '14.369', manual: false });
+      const setup = await stopped(core);
+      await setup.updateCoreInPlace();
+      expect(core.update).not.toHaveBeenCalled();
+
+      const without = await stopped(undefined);
+      expect(without.coreUpdate).toEqual({ canUpdate: false, channel: 'stable' });
+      await without.checkCoreTarget();
+      expect(without.coreTarget).toBeNull();
+      await without.updateCoreInPlace();
+      expect(without.coreUpdating).toBeNull();
+    });
+
+    /**
+     * A state that reads an installation, with a plan kept from before Foundry VTT's update.
+     * @param overview - The installation
+     * @param keepPendingPlan - Where the plan kept is forgotten
+     * @returns The state, once its search is done
+     */
+    async function readOn(overview: Overview, keepPendingPlan: (plan: PendingPlan | null) => boolean) {
+      const setup = new SetupState({
+        load: () => Promise.resolve(overview),
+        guardOn: true,
+        onGuardChange: vi.fn(),
+        findUpdates: () =>
+          Promise.resolve({
+            updates: new Map([[APP.key, APP]]),
+            blocked: new Map(),
+            unresolved: [],
+            judge: unjudged,
+            planner: alone(APP),
+          }),
+        installModule: noInstall,
+        pendingPlan: () => ({ core: '14.369', picks: [['module:app', '2.0.0']] }),
+        keepPendingPlan,
+      });
+      await setup.refresh();
+      await vi.waitFor(() => {
+        expect(setup.updates.status).toBe('found');
+      });
+      return setup;
+    }
+
+    test('restores the plan kept once Foundry VTT is on the build updated to, and forgets it', async () => {
+      const keepPendingPlan = vi.fn(() => true);
+      const setup = await readOn(buildOverview(installation({ core: '14.369' }), new Map()), keepPendingPlan);
+
+      await vi.waitFor(() => {
+        expect(setup.resumedOn).toBe('14.369');
+      });
+      expect(setup.updates.picks).toEqual([['module:app', '2.0.0']]);
+      expect(keepPendingPlan).toHaveBeenCalledExactlyOnceWith(null);
+    });
+
+    test('keeps the plan kept while Foundry VTT is on another build', async () => {
+      const keepPendingPlan = vi.fn(() => true);
+      const setup = await readOn(OVERVIEW, keepPendingPlan);
+
+      expect(setup.resumedOn).toBeNull();
+      expect(keepPendingPlan).not.toHaveBeenCalled();
     });
   });
 });

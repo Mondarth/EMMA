@@ -137,6 +137,7 @@
   },
   "Plan": {
     "Safeguards": "Keep first",
+    "CoreBlocked": "Cannot update in place: {reason}",
     "Changes": "Changes",
     "Keep": "Keep",
     "Note": "Note",
@@ -179,6 +180,26 @@
     "NoInstalls": "Foundry offers no way to install packages here.",
     "BackupFailed": "Foundry could not back up {world}.",
     "NoManifest": "EMMA has no manifest URL for {title} {version} alone, so cannot install it."
+  },
+  "Core": {
+    "Heading": "Updating Foundry VTT to {version}",
+    "Warning": "Updating Foundry VTT in place is not recommended. It replaces the software every world on this server runs on, and there is no undoing it from here: if the new build, or a package on it, misbehaves, worlds may not open until Foundry VTT is put back by hand and the snapshot restored.",
+    "Test": "Test an update on a separate copy of Foundry VTT first, with a copy of your data, as Foundry's guide shows:",
+    "Guide": "Updating Foundry VTT",
+    "NoUpdateMode": "This Foundry VTT was started with in-place updates switched off (--noupdate), so it cannot be updated from here. Update it the way it was installed: for example a new image for a container, your host's control panel, or a fresh install of the build.",
+    "Checking": "Asking Foundry which build its updater would install…",
+    "CheckFailed": "Foundry could not say which build its updater would install, so it cannot be updated from here.",
+    "NoTarget": "Foundry's updater offers no build to update to: {message}",
+    "OtherTarget": "Foundry's updater would install {target}, not {version}: it installs only the newest build on its channel ({channel}). Choose {target} in the plan, or install {version} by other means.",
+    "Manual": "Foundry installs {version} only by hand, as a new install, so it cannot be updated from here.",
+    "Confirm": "If you are sure, Foundry's own updater will download {version}, install it over this one, and stop or restart the server. EMMA keeps the rest of the plan, to restore once Foundry VTT is on {version}.",
+    "TypeCode": "To update in place, type {code}:",
+    "Update": "Update Foundry VTT to {version} in place",
+    "Begun": "Foundry VTT is updating to {version}. The server stops or restarts once it is done; open this page again then.",
+    "Kept": "EMMA kept the rest of the plan, and restores it once Foundry VTT is on that build.",
+    "NotKept": "EMMA could not keep the rest of the plan, as the browser refused to store it: plan it again then.",
+    "Failed": "Foundry did not update: {message}",
+    "Resumed": "The plan from before Foundry VTT's update to {version} is back: run it to finish."
   },
   "Layout": {
     "Tree": "Resize the installation tree",

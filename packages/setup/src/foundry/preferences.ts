@@ -72,3 +72,46 @@ export function writeLayout(layout: Layout): void {
     // As for the guard's setting.
   }
 }
+
+/** The key the plan left for after Foundry VTT's update is kept under. */
+export const PENDING_PLAN_KEY = 'mondarth-emma.setup.pending-plan';
+
+/** The choices of a plan that stopped to update Foundry VTT in place, to restore once it is on the build updated to. */
+export interface PendingPlan {
+  /** The Foundry build updated to. */
+  readonly core: string;
+  /** The versions chosen besides Foundry VTT's, as `[key, version]`, in the order they were chosen. */
+  readonly picks: readonly (readonly [string, string])[];
+}
+
+/**
+ * The plan left for after Foundry VTT's update, if one was kept and can be read.
+ * @returns The plan, or `undefined`
+ */
+export function readPendingPlan(): PendingPlan | undefined {
+  try {
+    const kept: unknown = JSON.parse(localStorage.getItem(PENDING_PLAN_KEY) ?? 'null');
+    if (typeof kept !== 'object' || kept === null) return undefined;
+    const { core, picks } = kept as Record<string, unknown>;
+    const pick = (value: unknown): value is [string, string] =>
+      Array.isArray(value) && value.length === 2 && value.every(part => typeof part === 'string');
+    return typeof core === 'string' && Array.isArray(picks) && picks.every(pick) ? { core, picks } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Keep the plan to restore after Foundry VTT's update.
+ * @param plan - The plan, or `null` to forget it
+ * @returns Whether it was kept, or forgotten; not if the storage cannot be written
+ */
+export function writePendingPlan(plan: PendingPlan | null): boolean {
+  try {
+    if (plan === null) localStorage.removeItem(PENDING_PLAN_KEY);
+    else localStorage.setItem(PENDING_PLAN_KEY, JSON.stringify(plan));
+    return true;
+  } catch {
+    return false;
+  }
+}
