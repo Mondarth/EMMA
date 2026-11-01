@@ -198,7 +198,9 @@ panel says which choices to take out of the plan for it, and why. A version chos
 stay as they are where they can, and Foundry VTT moves only as far as it must. Choosing a version other than the installed one opens the **Update plan** below the tree and the panel, the full width of the window, listing each package that
 changes with its installed and new versions, and, for one a choice brings in, which choice needs it. The plan lists
 the changes in the order they are to be installed: Foundry VTT first, then the game systems, then the modules, each after
-the modules in the plan it requires. **Clear choices**
+the modules in the plan it requires. Each row gives the manifest URL that installs the version chosen: one for that
+version alone, since a package's own manifest URL usually gives its newest. Foundry VTT updates itself, and a version for
+which none is found is marked so. **Clear choices**
 takes them all back, and choosing the installed version takes back one, with what it brought in. The plan is shown only while something is chosen. Installing the plan
 is to come.
 

@@ -26,6 +26,8 @@ export interface UpdateChoice {
   readonly chosen: string;
   /** The version chosen that needs it, by its package's title; none for a version chosen. */
   readonly by?: { readonly title: string; readonly version: string };
+  /** The manifest URL to install it from; none for Foundry VTT, or if none is found. */
+  readonly manifest?: string;
 }
 
 /** A version a package's panel explains: one the user is looking at in its list, or else the one chosen. */
@@ -61,10 +63,11 @@ export class UpdateState {
 
   /** The changes in the plan: the versions chosen, in the order they were chosen, then what they need. */
   readonly choices: readonly UpdateChoice[] = $derived(
-    this.plan.map(({ key, installed, version, by }) => ({
+    this.plan.map(({ key, installed, version, by, manifest }) => ({
       key,
       installed,
       chosen: version,
+      ...(manifest !== undefined && { manifest }),
       ...(by !== undefined && {
         by: { title: this.search?.planner.titleOf(by.package) ?? by.package, version: by.version },
       }),

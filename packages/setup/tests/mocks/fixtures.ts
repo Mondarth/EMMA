@@ -76,6 +76,8 @@ export interface ReleaseShape {
   /** The game systems it runs in, by ID, each with the versions it admits; any system if none. */
   readonly systems?: Readonly<Record<string, Compatibility>>;
   readonly unlisted?: true;
+  /** The manifest URL for this version alone. */
+  readonly versionManifest?: string;
 }
 
 /**
@@ -103,6 +105,7 @@ export function release(ref: `${'module' | 'system'}:${string}`, version: string
     origin: `test:${ref}@${version}`,
     detail: 'loaded',
     ...(shape.unlisted === true && { unlisted: true }),
+    ...(shape.versionManifest !== undefined && { versionManifest: shape.versionManifest }),
   };
 }
 
@@ -115,7 +118,8 @@ export function noUpdates(): Promise<UpdateSearch> {
 }
 
 /**
- * A planner that plans the versions chosen alone, needing nothing else, offering the versions of some updates.
+ * A planner that plans the versions chosen alone, needing nothing else, offering the versions of some updates. Each
+ * package's version has a manifest URL of its own, at example.org.
  * @param updates - The updates
  * @returns The planner, its titles the packages' keys
  */
@@ -136,6 +140,7 @@ export function alone(...updates: readonly PackageUpdate[]): Planner {
         key,
         installed: installed.get(key) ?? version,
         version,
+        ...(key !== 'core' && { manifest: `https://example.org/${key}/${version}/module.json` }),
       }));
     },
     candidates: key =>

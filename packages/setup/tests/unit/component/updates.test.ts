@@ -192,7 +192,7 @@ describe('updates in the window', () => {
     await openList(user, 'Version of Foundry VTT: 14.368');
     await user.click(screen.getByRole('option', { name: /^14\.369/ }));
     const plan = screen.getByRole('region', { name: 'Update plan' });
-    expect(within(plan).getAllByRole('row')[1]).toHaveTextContent('Foundry VTT14.36814.369');
+    expect(within(plan).getAllByRole('row')[1]).toHaveTextContent('Foundry VTT14.36814.369 Foundry VTT updates itself');
 
     await user.click(within(root).getByText('Foundry VTT'));
     const blocked = screen.getByRole('region', { name: 'Not offered: 14.370' });
@@ -266,8 +266,8 @@ describe('updates in the window', () => {
         .getAllByRole('row')
         .map(item => Array.from(item.querySelectorAll('th, td'), cell => cell.textContent.trim())),
     ).toEqual([
-      ['Package', 'Installed', 'Chosen'],
-      ['D&D 5e', '5.3.3', '5.4.0'],
+      ['Package', 'Installed', 'Chosen', 'Manifest URL'],
+      ['D&D 5e', '5.3.3', '5.4.0', 'https://example.org/system:dnd5e/5.4.0/module.json'],
     ]);
     expect(screen.getByRole('separator', { name: 'Resize the update plan' })).toBeInTheDocument();
 
@@ -284,7 +284,7 @@ describe('updates in the window', () => {
         core: [{ version: '14.368', generation: 14, channel: 'stable' }],
         releases: [
           release('system:dnd5e', '5.3.3'),
-          release('system:dnd5e', '5.4.0'),
+          release('system:dnd5e', '5.4.0', { versionManifest: 'https://example.org/dnd5e/5.4.0/system.json' }),
           release('module:lib', '1.0.0', { systems: { dnd5e: { maximum: '5.3.9' } } }),
           release('module:lib', '1.5.0', { systems: { dnd5e: { maximum: '5.3.9' } } }),
           release('module:lib', '2.0.0', { systems: { dnd5e: { minimum: '5.4.0' } } }),
@@ -319,8 +319,8 @@ describe('updates in the window', () => {
         .slice(1)
         .map(item => Array.from(item.querySelectorAll('th, td'), cell => cell.textContent.replace(/\s+/g, ' ').trim())),
     ).toEqual([
-      ['D&D 5e', '5.3.3', '5.4.0'],
-      ['Library', '1.0.0', '2.0.0 needed by D&D 5e 5.4.0'],
+      ['D&D 5e', '5.3.3', '5.4.0', 'https://example.org/dnd5e/5.4.0/system.json'],
+      ['Library', '1.0.0', '2.0.0 needed by D&D 5e 5.4.0', 'None found for this version'],
     ]);
 
     // The library's versions for D&D 5e 5.3 no longer work with what is chosen: listed, locked, saying what is in the way.
