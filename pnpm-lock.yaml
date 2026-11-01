@@ -248,8 +248,8 @@ importers:
   packages/core:
     dependencies:
       '@mondarth/fvtt-resolver':
-        specifier: 0.8.0
-        version: 0.8.0
+        specifier: 0.9.0
+        version: 0.9.0
 
   packages/extension:
     devDependencies:
@@ -272,8 +272,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@mondarth/fvtt-resolver':
-        specifier: 0.8.0
-        version: 0.8.0
+        specifier: 0.9.0
+        version: 0.9.0
 
   packages/release:
     dependencies:
@@ -294,8 +294,8 @@ importers:
         version: link:../core
     devDependencies:
       '@mondarth/fvtt-resolver':
-        specifier: 0.8.0
-        version: 0.8.0
+        specifier: 0.9.0
+        version: 0.9.0
 
 packages:
 
@@ -680,8 +680,8 @@ packages:
     resolution: {integrity: sha512-scwRUBIuysOwWQGh+eytqQ1Eo0nvRMgcaxDnAs9AdAq0og4u25kMayVnl+6JWioiwV9W58G/y3fIGfdK34O5Sg==}
     engines: {node: '>=24'}
 
-  '@mondarth/fvtt-resolver@0.8.0':
-    resolution: {integrity: sha512-ISdt4Yc2bBASSBA3VG0swnze4xaYcjDoQ1OhdItsHL87knz9inWqhQ3Lfe2SGDYuvbQ5Gklypcv+IFv6DGCUpw==}
+  '@mondarth/fvtt-resolver@0.9.0':
+    resolution: {integrity: sha512-HNZuLiyF/i4NN7nCkcMfzqOvbcjcGH7HGr5a28s1IzVFwzVBUHdKBHHDp8EcMDlRyvOpAjXIINuHjTg72uzLJw==}
     engines: {node: '>=24'}
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
@@ -5524,7 +5524,7 @@ snapshots:
     dependencies:
       zod: 4.6.7
 
-  '@mondarth/fvtt-resolver@0.8.0':
+  '@mondarth/fvtt-resolver@0.9.0':
     dependencies:
       '@mondarth/fvtt-package-catalogue-contract': 0.3.0
       zod: 4.6.7
