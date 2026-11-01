@@ -19,6 +19,7 @@
   import RootPanel from './RootPanel.svelte';
   import Splitter from './Splitter.svelte';
   import SystemPanel from './SystemPanel.svelte';
+  import CoreStep from './CoreStep.svelte';
   import UpdatePlan from './UpdatePlan.svelte';
   import WorldPanel from './WorldPanel.svelte';
 
@@ -34,6 +35,15 @@
   const overview = $derived(setup.overview);
   const updates = $derived(setup.updates);
   const planOpen = $derived(updates.choices.length > 0);
+  /** The build of Foundry VTT a run stopped before updating to, while the plan still has it. */
+  const coreStop = $derived.by(() => {
+    const version = setup.run?.beforeCore;
+    return updates.plan.some(entry => entry.key === 'core' && entry.version === version) ? version : undefined;
+  });
+  // Where updating in place may be offered, Foundry is asked which build it would install.
+  $effect(() => {
+    if (coreStop !== undefined && setup.coreUpdate.canUpdate) void setup.checkCoreTarget();
+  });
   // The plan offers a snapshot, so the space one needs is asked for once the plan opens.
   $effect(() => {
     if (planOpen) void setup.checkSnapshotSpace();
@@ -69,6 +79,7 @@
   /** What the footer says of the last run of the plan. */
   const runStatus = $derived.by(() => {
     const { run } = setup;
+    if (setup.resumedOn !== null && run === null) return format('Core.Resumed', { version: setup.resumedOn });
     if (run === null) return undefined;
     if (!run.over) return localize('Run.Running');
     if (run.failure !== undefined) {
@@ -164,6 +175,16 @@
             resize({ plan });
           }} />
         <div class="emma-setup-plan" style:flex-basis="{layout.plan * 100}%">
+          {#if coreStop !== undefined}
+            <CoreStep
+              version={coreStop}
+              core={setup.coreUpdate}
+              target={setup.coreTarget}
+              updating={setup.coreUpdating}
+              onUpdate={() => {
+                void setup.updateCoreInPlace();
+              }} />
+          {/if}
           <UpdatePlan
             {overview}
             {updates}

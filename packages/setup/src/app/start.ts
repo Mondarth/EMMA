@@ -6,11 +6,19 @@ import type { Guard } from '../foundry/guard';
 import { installGuard } from '../foundry/guard';
 import { installEmma } from '../foundry/install-emma';
 import { keepMenuButton } from '../foundry/menu-button';
-import { readGuardOn, writeGuardOn } from '../foundry/preferences';
+import { readGuardOn, readPendingPlan, writeGuardOn, writePendingPlan } from '../foundry/preferences';
 import { readRecords } from '../foundry/records';
 import { runStep } from '../foundry/run-step';
 import type { SetupGame } from '../foundry/setup-game';
-import { checkSnapshotSpace, readInstallation, readManifests, setupGame } from '../foundry/setup-game';
+import {
+  checkCoreUpdate,
+  checkSnapshotSpace,
+  readCoreUpdate,
+  readInstallation,
+  readManifests,
+  setupGame,
+  startCoreUpdate,
+} from '../foundry/setup-game';
 import { KitUnavailable, loadKit, locateKit } from '../foundry/setup-kit';
 import { revealCatalogue } from '@mondarth/emma-core/default-catalogue';
 import { revealProxy } from '@mondarth/emma-core/default-proxy';
@@ -86,6 +94,13 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
       if (placed.guard !== undefined) await installEmma(game, placed.guard);
     },
     snapshotSpace: () => checkSnapshotSpace(game),
+    core: {
+      state: () => readCoreUpdate(game),
+      check: () => checkCoreUpdate(game, readCoreUpdate(game).channel),
+      update: () => startCoreUpdate(game, readCoreUpdate(game).channel),
+    },
+    keepPendingPlan: writePendingPlan,
+    pendingPlan: readPendingPlan,
     runStep: async step => {
       if (placed.guard !== undefined) await runStep(game, placed.guard, step);
     },

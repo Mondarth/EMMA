@@ -82,9 +82,13 @@ export interface SetupGame {
   readonly version: string;
   /** The Foundry build; read with care, as Foundry's types do not describe it here. */
   readonly release?: unknown;
+  /** What the server sent the setup screen, such as `coreUpdate` and `options`; read with care, as for `release`. */
+  readonly data?: unknown;
   readonly worlds: Iterable<unknown>;
   readonly modules: Iterable<unknown>;
   readonly systems: Iterable<unknown>;
+  /** Foundry's translations, for the messages its server answers with. */
+  readonly i18n?: { localize(key: string): string };
   /** Sends a request to the server; every package installation and update goes through it. */
   post: (request: SetupRequest, options?: object) => Promise<unknown>;
   /** Installs a package, or updates it, through {@link post}; the package installed, once it is. */
@@ -128,6 +132,96 @@ export async function checkSnapshotSpace(game: SetupGame): Promise<SnapshotSpace
     throw new Error('The server did not say how much space a snapshot needs');
   }
   return { required, available };
+}
+
+/** Whether Foundry can update itself in place, and the channel its updater takes builds from. */
+export interface CoreUpdateState {
+  /** `false` when the server was started with `--noupdate`, which refuses every update in place. */
+  readonly canUpdate: boolean;
+  /** Such as `stable`. */
+  readonly channel: string;
+}
+
+/**
+ * Whether Foundry can update itself in place, from what the server sent the setup screen.
+ *
+ * Checked on Foundry 14.368: `game.data.coreUpdate.canUpdate` is `!options.noupdate`, and `game.data.options` has the
+ * `updateChannel` the Update Software form sends. Neither is a documented API.
+ * @param game - The setup screen's `game`
+ * @returns Whether it can, and the channel; it cannot if the server does not say
+ */
+export function readCoreUpdate(game: SetupGame): CoreUpdateState {
+  const { coreUpdate, options } = record(game.data);
+  const channel = record(options).updateChannel;
+  return {
+    canUpdate: record(coreUpdate).canUpdate === true,
+    channel: typeof channel === 'string' ? channel : 'stable',
+  };
+}
+
+/** The build Foundry's updater would install: the newest on its channel, or why there is none. */
+export type CoreTarget =
+  | {
+      readonly version: string;
+      /** Whether Foundry installs it only by hand, as a new generation. */
+      readonly manual: boolean;
+    }
+  | { readonly none: string };
+
+/**
+ * Ask Foundry's updater which build it would install, as the Update Software form's first step does. The server asks
+ * Foundry's website, which gives only the newest build on the channel.
+ *
+ * Checked on Foundry 14.368: the form posts `{ action: "updateCheck", updateChannel, forceUpdate }`; the answer is the
+ * build's release data (`generation`, `build`, and `flags` that say whether it must be installed by hand), or an
+ * `info` or `warn` message key when there is none.
+ * @param game - The setup screen's `game`
+ * @param channel - The channel
+ * @returns The build, or why there is none
+ * @throws {Error} When the answer is not as Foundry 14.368 gives it
+ */
+export async function checkCoreUpdate(game: SetupGame, channel: string): Promise<CoreTarget> {
+  const answer = record(
+    await game.post({ action: 'updateCheck', updateChannel: channel, forceUpdate: false }, { notify: false }),
+  );
+  const message = answer.info ?? answer.warn;
+  if (typeof message === 'string') return { none: game.i18n?.localize(message) ?? message };
+  const { generation, build, flags } = answer;
+  if (typeof generation !== 'number' || typeof build !== 'number') {
+    throw new Error('Foundry did not say which build its updater would install');
+  }
+  const { requires_generation_reinstall, requires_electron_reinstall, requires_full_reinstall } = record(flags);
+  return {
+    version: `${String(generation)}.${String(build)}`,
+    manual: [requires_generation_reinstall, requires_electron_reinstall, requires_full_reinstall].some(Boolean),
+  };
+}
+
+/**
+ * Start Foundry's updater on the build {@link checkCoreUpdate} found, as the Update Software form's second step does.
+ * The server downloads and installs it, then stops, or restarts where it can; the setup screen loses it meanwhile.
+ *
+ * Checked on Foundry 14.368: the form posts `{ action: "updateDownload", updateChannel, forceUpdate }`, which answers
+ * once the download has begun, or with an `error`.
+ * @param game - The setup screen's `game`
+ * @param channel - The channel, as checked
+ * @returns Once the update has begun
+ * @throws {Error} If the server refuses it, saying why
+ */
+export async function startCoreUpdate(game: SetupGame, channel: string): Promise<void> {
+  const answer = record(
+    await game.post({ action: 'updateDownload', updateChannel: channel, forceUpdate: false }, { notify: false }),
+  );
+  if (typeof answer.error === 'string') throw new Error(game.i18n?.localize(answer.error) ?? answer.error);
+}
+
+/**
+ * A value's properties, if it is an object.
+ * @param value - Any value
+ * @returns Its properties; none for anything else
+ */
+function record(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
 }
 
 /** What `game.installPackage` is given. */

@@ -224,7 +224,26 @@ say what a world's backup needs, so its row gives the space free alone. What is 
 Each row says how far its step has got, and the footer how the run went. A run stops at the first step that fails,
 saying why, and before Foundry VTT's own update: updating Foundry in place restarts it, and is for the user to do with
 care. Meanwhile the choices cannot change. After a run, EMMA reads the installation again, so what was done leaves the
-plan and the rest stays in it, to run again. Each row gives the manifest URL that installs the version chosen: one for that
+plan and the rest stays in it, to run again.
+
+A run that reaches Foundry VTT's own update stops there, and the plan shows the step with a warning: updating Foundry
+VTT in place is not recommended, as it replaces what every world runs on and cannot be undone from the setup screen.
+It points to Foundry's guide, [Updating Foundry VTT](https://foundryvtt.com/article/updating/), which shows how to
+test an update on a separate copy first. Updating in place is offered only where Foundry's own updater can do it:
+
+- not when the server was started with in-place updates switched off (`--noupdate`), as container images and some
+  hosts start it: such a Foundry VTT is updated the way it was installed. EMMA cannot tell from the browser how that
+  was, so it does not say;
+- not when the updater would install another build than the plan's: it installs only the newest build on Foundry's
+  update channel, which EMMA asks it for, so the plan says to choose that build, or to install the plan's by other
+  means;
+- not for a build Foundry installs only by hand, as a new generation.
+
+Where it is offered, the user must type a code of six letters and digits that EMMA shows, to enable **Update Foundry
+VTT to <version> in place**. EMMA then keeps the rest of the plan's choices in the browser and starts Foundry's updater,
+as its **Update Software** form does: Foundry downloads the build, installs it, and stops or restarts the server. Once
+the setup screen opens on that build, EMMA restores the choices kept, and the footer says so: running the plan then
+finishes it. If Foundry does not update, EMMA says why and forgets the choices kept. Each row gives the manifest URL that installs the version chosen: one for that
 version alone, since a package's own manifest URL usually gives its newest. Foundry VTT updates itself, and a version for
 which none is found is marked so. **Clear choices**
 takes them all back, and choosing the installed version takes back one, with what it brought in. The plan is shown only while something is chosen.

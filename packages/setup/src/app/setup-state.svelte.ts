@@ -2,7 +2,8 @@
  * What the setup screen's EMMA window shows: the installation as last read, its updates, and whether EMMA guards
  * Foundry's own package buttons. Reactive, with Svelte 5 runes, so the window follows any change.
  */
-import type { SnapshotSpace } from '../foundry/setup-game';
+import type { PendingPlan } from '../foundry/preferences';
+import type { CoreTarget, CoreUpdateState, SnapshotSpace } from '../foundry/setup-game';
 import type { Overview } from '../lib/overview';
 import type { RunStep, StepState } from '../lib/run';
 import { runSteps } from '../lib/run';
@@ -28,7 +29,31 @@ export interface SetupStateOptions {
   readonly snapshotSpace?: () => Promise<SnapshotSpace>;
   /** Carry out a step of the update plan, failing with why; none where the plan cannot be run. */
   readonly runStep?: (step: Exclude<RunStep, { kind: 'core' }>) => Promise<void>;
+  /** Foundry's updater; none where Foundry VTT cannot be updated from here. */
+  readonly core?: CoreUpdater;
+  /** Keep the plan to restore after Foundry VTT's update, or forget it with `null`; whether it could. */
+  readonly keepPendingPlan?: (plan: PendingPlan | null) => boolean;
+  /** The plan kept to restore after Foundry VTT's update, if any. */
+  readonly pendingPlan?: () => PendingPlan | undefined;
 }
+
+/** Foundry's own updater, as its Update Software form drives it (see `foundry/setup-game.ts`). */
+export interface CoreUpdater {
+  /** Whether Foundry can update itself in place, and its channel. */
+  readonly state: () => CoreUpdateState;
+  /** Ask which build it would install. */
+  readonly check: () => Promise<CoreTarget>;
+  /** Start updating to it; Foundry stops or restarts once done. */
+  readonly update: () => Promise<void>;
+}
+
+/** What is known of updating Foundry VTT in place: `checking`, `failed`, the build its updater would install, or none. */
+export type CoreTargetState = CoreTarget | 'checking' | 'failed' | null;
+
+/** Where updating Foundry VTT in place has got: begun, with whether the rest of the plan was kept, or failed. */
+export type CoreUpdating =
+  | { readonly kind: 'begun'; readonly version: string; readonly kept: boolean }
+  | { readonly kind: 'failed'; readonly message: string };
 
 /** A run of the update plan, going on or done. */
 export interface PlanRun {
@@ -65,6 +90,20 @@ export class SetupState {
   snapshotSpace = $state.raw<SnapshotSpaceState>(null);
   /** The last run of the update plan, until the next. */
   run = $state.raw<PlanRun | null>(null);
+  /** The build Foundry's updater would install, once asked, until the installation is read again. */
+  coreTarget = $state.raw<CoreTargetState>(null);
+  /** Where updating Foundry VTT in place has got, once begun. */
+  coreUpdating = $state.raw<CoreUpdating | null>(null);
+  /** The version of Foundry VTT the plan was restored on, after it was updated to it. */
+  resumedOn = $state<string | null>(null);
+
+  /**
+   * Whether Foundry can update itself in place, and its channel.
+   * @returns Whether it can; it cannot where there is no updater
+   */
+  get coreUpdate(): CoreUpdateState {
+    return this.#options.core?.state() ?? { canUpdate: false, channel: 'stable' };
+  }
 
   /**
    * Whether the update plan can be run here.
@@ -103,10 +142,11 @@ export class SetupState {
     try {
       const overview = await this.#options.load();
       this.overview = overview;
-      // What a snapshot needs changes with what is installed.
+      // What a snapshot needs changes with what is installed, as does what Foundry's updater offers.
       this.snapshotSpace = null;
+      this.coreTarget = null;
       this.failed = false;
-      void this.updates.searchFor(overview);
+      void this.updates.searchFor(overview).then(() => this.#resume(overview));
     } catch {
       this.failed = true;
     } finally {
@@ -189,6 +229,58 @@ export class SetupState {
       this.run = { steps, states, over: true, ...end };
     }
     await this.refresh();
+  }
+
+  /**
+   * Ask which build Foundry's updater would install, once until the installation is read again. A failure is kept in
+   * {@link coreTarget}, never thrown.
+   * @returns Once known, or failed
+   */
+  async checkCoreTarget(): Promise<void> {
+    const core = this.#options.core;
+    if (core === undefined || this.coreTarget !== null) return;
+    this.coreTarget = 'checking';
+    try {
+      this.coreTarget = await core.check();
+    } catch {
+      this.coreTarget = 'failed';
+    }
+  }
+
+  /**
+   * Update Foundry VTT in place to the build the plan stopped before, which must be the one its updater would install.
+   * The rest of the plan's choices are kept first, to restore once Foundry is on that build. A failure is kept in
+   * {@link coreUpdating}, never thrown, and forgets the plan kept.
+   * @returns Once the update has begun, or failed
+   */
+  async updateCoreInPlace(): Promise<void> {
+    const core = this.#options.core;
+    const version = this.run?.beforeCore;
+    const target = this.coreTarget;
+    if (core === undefined || version === undefined || typeof target !== 'object' || target === null) return;
+    if (!('version' in target) || target.version !== version || target.manual) return;
+    const picks = this.updates.picks.filter(([key]) => key !== 'core');
+    const kept = this.#options.keepPendingPlan?.({ core: version, picks }) ?? false;
+    try {
+      await core.update();
+      this.coreUpdating = { kind: 'begun', version, kept };
+    } catch (error) {
+      this.#options.keepPendingPlan?.(null);
+      this.coreUpdating = { kind: 'failed', message: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  /**
+   * Restore the plan kept before Foundry VTT's update, once Foundry is on the build it was updated to, and forget it.
+   * @param overview - The installation, as read
+   * @returns Once restored
+   */
+  async #resume(overview: Overview): Promise<void> {
+    const pending = this.#options.pendingPlan?.();
+    if (pending === undefined || pending.core !== overview.core || this.updates.status !== 'found') return;
+    this.#options.keepPendingPlan?.(null);
+    for (const [key, version] of pending.picks) await this.updates.choose(key, version);
+    this.resumedOn = pending.core;
   }
 
   /**

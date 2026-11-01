@@ -336,6 +336,14 @@ export class UpdateState {
   }
 
   /**
+   * The versions chosen, in the order they were chosen.
+   * @returns Each as `[key, version]`
+   */
+  get picks(): readonly (readonly [PackageKey, string])[] {
+    return [...this.#picks];
+  }
+
+  /**
    * A package's title, as the installation gives it.
    * @param key - The package's key, or `core`
    * @returns Its title, or its key if it is not installed
