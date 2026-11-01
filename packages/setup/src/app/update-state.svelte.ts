@@ -1,6 +1,5 @@
 /**
- * The EMMA extension's updates: what the last search found, whether Update mode is on, the versions the user has chosen
- * in it, and the plan they make: those versions, with every other change they need (see `lib/plans.ts`). A version is
+ * The EMMA extension's updates: what the last search found, the versions the user has chosen, and the plan they make: those versions, with every other change they need (see `lib/plans.ts`). A version is
  * offered only if the plan can take it, and choosing it brings in what it needs. Reactive, with Svelte 5 runes, so the
  * window follows any change.
  */
@@ -45,8 +44,6 @@ export class UpdateState {
   search = $state.raw<UpdateSearch | null>(null);
   /** Why the search cannot be made, while the status is `unavailable`. */
   problem = $state.raw<KitProblem | null>(null);
-  /** Whether Update mode is on, offering the versions of each package with an update. */
-  on = $state(false);
   /** The version the user is looking at in a package's list, while it is open. */
   preview = $state.raw<{ readonly key: PackageKey; readonly version: string } | null>(null);
   /** The plan: the versions chosen, and what they need. */
@@ -112,7 +109,6 @@ export class UpdateState {
         this.problem = error.problem;
         this.#picks.clear();
         this.plan = [];
-        this.on = false;
         this.status = 'unavailable';
       } else {
         this.status = 'failed';
@@ -291,13 +287,5 @@ export class UpdateState {
   clear(): void {
     this.#picks.clear();
     this.plan = [];
-  }
-
-  /**
-   * Turn Update mode on or off. The choices are kept for when it is turned on again.
-   * @param on - Whether it is on
-   */
-  setOn(on: boolean): void {
-    this.on = on;
   }
 }

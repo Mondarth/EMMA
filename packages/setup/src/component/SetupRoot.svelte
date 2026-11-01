@@ -1,6 +1,6 @@
 <!--
-  EMMA on the setup screen: the installation tree, and beside it the panel for what is selected in it. In Update mode,
-  once versions other than the installed ones are chosen, the update plan opens below both, the full width of the
+  EMMA on the setup screen: the installation tree, and beside it the panel for what is selected in it. Once versions
+  other than the installed ones are chosen, the update plan opens below both, the full width of the
   window. A handle between the panels resizes them; each keeps its share as the window is resized.
 -->
 <script lang="ts">
@@ -32,7 +32,7 @@
 
   const overview = $derived(setup.overview);
   const updates = $derived(setup.updates);
-  const planOpen = $derived(updates.on && updates.choices.length > 0);
+  const planOpen = $derived(updates.choices.length > 0);
   const updateCount = $derived(updates.search?.updates.size ?? 0);
 
   let layout = $state<Layout>(readLayout());
@@ -45,8 +45,6 @@
     layout = { ...layout, ...change };
     writeLayout(layout);
   }
-
-  const MODE_HINT = localize('Update.ModeHint');
 
   /** What the footer says of the search for updates. */
   const updateStatus = $derived.by(() => {
@@ -158,18 +156,6 @@
   {/if}
   <footer class="emma-setup-footer">
     {#if overview !== null}
-      <button
-        type="button"
-        class="emma-setup-mode"
-        aria-pressed={updates.on}
-        title={MODE_HINT}
-        disabled={updateCount === 0}
-        onclick={() => {
-          updates.setOn(!updates.on);
-        }}>
-        <i class="fa-solid fa-circle-up" aria-hidden="true"></i>
-        {localize('Update.Mode')}
-      </button>
       <p class="emma-setup-status" role="status">
         {updateStatus}
         {#if unresolved > 0}
@@ -269,10 +255,6 @@
 
   .emma-setup-refresh {
     margin-left: auto;
-  }
-
-  .emma-setup-mode[aria-pressed='true'] {
-    background: var(--color-warm-2, rgba(255, 100, 0, 0.25));
   }
 
   .emma-setup-status {

@@ -155,7 +155,7 @@
         <span class="emma-tree-toggle"></span>
       {/if}
       <span class="emma-tree-title">{row.title}</span>
-      {#if updates?.on === true && update !== undefined && key !== undefined && row.installed === true}
+      {#if updates !== undefined && update !== undefined && key !== undefined && row.installed === true}
         <VersionPicker
           title={row.title}
           chosen={updates.optionOf(key, updates.chosenOf(key) ?? update.installed)}

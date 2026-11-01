@@ -184,8 +184,7 @@ together and every world that uses them keeps working: dnd5e 6, say, with the ne
 and the Foundry build those need. If there is no such set, it is not offered, and its red arrow's panel says which world
 cannot take it, or which build it needs, and why, step by step, in the words of EMMA's resolver.
 
-**Update** in the footer turns Update mode on. Each row that shows a package's installed version then offers its
-versions in a list, from the newest offered down to the installed one, which is marked so. Each version is in the
+Each row that shows the installed version of a package with an update offers its versions in a list, from the newest offered down to the installed one, which is marked so. Each version is in the
 colour of EMMA's badge for it, as in the EMMA module's version lists: EMMA's checks judge it, not Foundry's, in each
 recorded world that uses the package, with the other packages at the versions chosen. The badge is the worst of those
 worlds', and its tooltip names that world when more than one uses the package. A package no recorded world uses is
@@ -198,8 +197,8 @@ change. A version that other choices in the plan stand in the way of is listed t
 panel says which choices to take out of the plan for it, and why. A version chosen is never changed to suit another. Choosing a version brings in whatever else it needs, from the fewest changes that work: a world's other packages
 stay as they are where they can, and Foundry VTT moves only as far as it must. Choosing a version other than the installed one opens the **Update plan** below the tree and the panel, the full width of the window, listing each package that
 changes with its installed and new versions, and, for one a choice brings in, which choice needs it. **Clear choices**
-takes them all back, and choosing the installed version takes back one, with what it brought in. Turning Update mode off hides the lists and the plan, and keeps the choices for when it is
-turned on again. Installing the plan is to come.
+takes them all back, and choosing the installed version takes back one, with what it brought in. The plan is shown only while something is chosen. Installing the plan
+is to come.
 
 The handle between the tree and the panel, and the one above the update plan, resize them, by dragging or from the
 keyboard: the arrow keys move a handle, and Home and End to its limits. Each panel keeps its share as the window is
