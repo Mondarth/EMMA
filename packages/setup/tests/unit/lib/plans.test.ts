@@ -3,7 +3,8 @@ import { describe, expect, test } from 'vitest';
 
 import type { RecordState } from '../../../src/foundry/records';
 import { buildOverview } from '../../../src/lib/overview';
-import { createPlanner, keepChoices, toldOfWorld, withChoice } from '../../../src/lib/plans';
+import type { PlanEntry } from '../../../src/lib/plans';
+import { createPlanner, installOrder, keepChoices, toldOfWorld, withChoice } from '../../../src/lib/plans';
 import { installation, installedModule, record, recorded, release } from '../../mocks/fixtures';
 import { KIT } from '../../mocks/kit';
 
@@ -213,12 +214,12 @@ describe('createPlanner', () => {
     });
   });
 
-  test('plans the choices first, then what each needs, saying which', async () => {
+  test('plans the choices and what each needs, saying which, in the order to install them', async () => {
     const plans = planner([['midi', '1.0.0']], { a: [['midi', '1.0.0']] }, [...DND, ...MIDI]);
 
     await expect(plans.plan(picks(['system:dnd5e', '6.0.6']))).resolves.toEqual([
-      { key: 'system:dnd5e', installed: '5.3.3', version: '6.0.6' },
       { key: 'core', installed: '14.368', version: '14.369', by: { package: 'system:dnd5e', version: '6.0.6' } },
+      { key: 'system:dnd5e', installed: '5.3.3', version: '6.0.6' },
       { key: 'module:midi', installed: '1.0.0', version: '2.0.0', by: { package: 'system:dnd5e', version: '6.0.6' } },
     ]);
     // The same choices are not worked out again.
@@ -247,6 +248,46 @@ describe('createPlanner', () => {
     expect(plans.needsOf('module:midi', '9.9.9')).toEqual([]);
     expect(plans.needsOf('core', '14.369')).toEqual([]);
     expect(plans.universe.core).toBe(CORES);
+  });
+});
+
+describe('the order to install a plan in', () => {
+  /**
+   * A change in a plan.
+   * @param key - The package's key
+   * @returns The change
+   */
+  const entry = (key: string): PlanEntry => ({ key, installed: '1.0.0', version: '2.0.0' });
+
+  test('is Foundry VTT, the game systems, then each module after those in the plan it requires', () => {
+    const requires: Readonly<Record<string, readonly string[]>> = {
+      'module:covens': ['module:midi', 'module:dae', 'system:dnd5e'],
+      'module:midi': ['module:libwrapper', 'module:socketlib', 'module:gone'],
+      'module:dae': ['module:libwrapper', 'module:covens'],
+    };
+    const order = installOrder(
+      [
+        'module:covens',
+        'module:midi',
+        'system:dnd5e',
+        'module:dae',
+        'module:socketlib',
+        'module:libwrapper',
+        'core',
+      ].map(entry),
+      ({ key }) => requires[key] ?? [],
+    );
+
+    // DAE and Coven's require each other: the one first in the plan comes after the other.
+    expect(order.map(({ key }) => key)).toEqual([
+      'core',
+      'system:dnd5e',
+      'module:libwrapper',
+      'module:socketlib',
+      'module:midi',
+      'module:dae',
+      'module:covens',
+    ]);
   });
 });
 
@@ -358,5 +399,8 @@ describe('a version chosen of a package no recorded world runs', () => {
         ['module:cat', '0.1.6'],
       ]),
     });
+    // The module chosen is installed after the one it requires.
+    const plan = await plans.plan(picks(['module:cat', '0.1.6']));
+    expect(plan?.map(({ key }) => key)).toEqual(['core', 'system:dnd5e', 'module:midi', 'module:cat']);
   });
 });

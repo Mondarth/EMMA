@@ -1,6 +1,6 @@
 <!--
-  The update plan, below the tree and the panel beside it while Update mode is on and versions are chosen: each package
-  whose chosen version differs from the one installed, with both.
+  The update plan, below the tree and the panel beside it while versions are chosen: each package whose chosen version
+  differs from the one installed, with both, in the order they are to be installed.
 -->
 <script lang="ts">
   import type { UpdateState } from '../app/update-state.svelte';

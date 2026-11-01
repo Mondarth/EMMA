@@ -85,7 +85,8 @@ export interface Planner {
   /**
    * Plan a set of choices: complete them, saying which choice needs each change it does not choose.
    * @param picks - The versions chosen, in the order they were chosen
-   * @returns The changes, the choices first, or `undefined` if they cannot be completed
+   * @returns The changes, in the order to install them (see {@link installOrder}), or `undefined` if they cannot be
+   *   completed
    */
   plan(picks: ReadonlyMap<PackageKey, string>): Promise<readonly PlanEntry[] | undefined>;
   /**
@@ -153,6 +154,37 @@ export function keepChoices(
   keep: (key: PackageKey, version: string) => boolean,
 ): ReadonlyMap<PackageKey, string> {
   return new Map([...picks].filter(([key, version]) => keep(key, version)));
+}
+
+/**
+ * A plan's changes in the order to install them: Foundry VTT, then the game systems, then the modules, each after the
+ * modules in the plan it requires. Otherwise they keep their order, the choices first.
+ * @param entries - The changes
+ * @param requiresOf - The packages a change's version requires
+ * @returns The changes, in order
+ */
+export function installOrder(
+  entries: readonly PlanEntry[],
+  requiresOf: (entry: PlanEntry) => readonly PackageKey[],
+): PlanEntry[] {
+  const rank = (key: PackageKey) => (key === 'core' ? 0 : key.startsWith('system:') ? 1 : 2);
+  const ranked = [...entries].sort((a, b) => rank(a.key) - rank(b.key));
+  const byKey = new Map(entries.map(entry => [entry.key, entry]));
+  const ordered: PlanEntry[] = [];
+  const seen = new Set<PackageKey>();
+  const visit = (entry: PlanEntry): void => {
+    if (seen.has(entry.key)) return;
+    seen.add(entry.key);
+    if (rank(entry.key) === 2) {
+      for (const required of requiresOf(entry)) {
+        const other = byKey.get(required);
+        if (other !== undefined) visit(other);
+      }
+    }
+    ordered.push(entry);
+  };
+  for (const entry of ranked) visit(entry);
+  return ordered;
 }
 
 /**
@@ -432,10 +464,14 @@ export function createPlanner(inputs: PlannerInputs): Planner {
         const needer = picks.has(key) ? undefined : by.get(key);
         return { key, installed: installed.get(key) ?? version, version, ...(needer !== undefined && { by: needer }) };
       };
-      return [
-        ...order.filter(([key]) => versions.has(key)).map(([key, version]) => entry(key, version)),
-        ...[...versions].filter(([key]) => !picks.has(key)).map(([key, version]) => entry(key, version)),
-      ];
+      return installOrder(
+        [
+          ...order.filter(([key]) => versions.has(key)).map(([key, version]) => entry(key, version)),
+          ...[...versions].filter(([key]) => !picks.has(key)).map(([key, version]) => entry(key, version)),
+        ],
+        ({ key, version }) =>
+          releaseOf(key, version)?.relationships.requires.map(required => packageKey(required.package)) ?? [],
+      );
     },
 
     candidates(key) {
