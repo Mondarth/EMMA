@@ -280,18 +280,6 @@ describe('UpdateState', () => {
     expect(updates.choices.map(({ key }) => key)).toEqual(['module:lib']);
   });
 
-  test('turns Update mode on and off, keeping the choices', async () => {
-    const updates = new UpdateState(() => Promise.resolve(finding(APP)));
-    await updates.searchFor(OVERVIEW);
-    updates.setOn(true);
-    await updates.choose('module:app', '2.0.0');
-
-    updates.setOn(false);
-
-    expect(updates.on).toBe(false);
-    expect(updates.choices).toHaveLength(1);
-  });
-
   test('says why a search cannot be made, dropping what was found and chosen, until one can again', async () => {
     let unavailable = false;
     const updates = new UpdateState(() =>
@@ -300,7 +288,6 @@ describe('UpdateState', () => {
         : Promise.resolve(finding(APP)),
     );
     await updates.searchFor(OVERVIEW);
-    updates.setOn(true);
     await updates.choose('module:app', '2.0.0');
 
     unavailable = true;
@@ -309,7 +296,6 @@ describe('UpdateState', () => {
     expect(updates.status).toBe('unavailable');
     expect(updates.problem).toEqual({ reason: 'module-too-old', version: '0.9.0' });
     expect(updates.search).toBeNull();
-    expect(updates.on).toBe(false);
     expect(updates.choices).toEqual([]);
 
     unavailable = false;

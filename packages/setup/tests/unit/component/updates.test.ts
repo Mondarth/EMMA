@@ -119,7 +119,7 @@ describe('updates in the window', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Updates available: 2');
     expect(row(/^Update available D&D 5e 5\.3\.3/)).toBeInTheDocument();
     expect(row(/^Foundry VTT/)).not.toHaveTextContent('Update available');
-    expect(screen.getByRole('button', { name: 'Update' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Version of D&D 5e: 5.3.3' })).toBeInTheDocument();
   });
 
   test('marks a package with a newer version EMMA cannot offer in red, and says why in its panel', async () => {
@@ -189,7 +189,6 @@ describe('updates in the window', () => {
     expect(root).toHaveTextContent(/^Update available Newer version EMMA cannot offer Foundry VTT/);
     expect(screen.getByRole('status')).toHaveTextContent('Updates available: 1');
 
-    await user.click(screen.getByRole('button', { name: 'Update' }));
     await openList(user, 'Version of Foundry VTT: 14.368');
     await user.click(screen.getByRole('option', { name: /^14\.369/ }));
     const plan = screen.getByRole('region', { name: 'Update plan' });
@@ -229,12 +228,10 @@ describe('updates in the window', () => {
     expect(row(/Foundry VTT/)).toHaveTextContent(/^Updates in the rows under it/);
   });
 
-  test('offers the versions in Update mode, each in its badge, and plans the ones chosen below the tree', async () => {
+  test('offers the versions of each package with an update, each in its badge, and plans the ones chosen below the tree', async () => {
     const { user } = await setUp();
-    expect(screen.queryByRole('button', { name: /^Version of/ })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Update plan' })).toBeNull();
 
-    await user.click(screen.getByRole('button', { name: 'Update' }));
-    expect(screen.getByRole('button', { name: 'Update' })).toHaveAttribute('aria-pressed', 'true');
     const system = screen.getByRole('button', { name: 'Version of D&D 5e: 5.3.3' });
     expect(system).toHaveAttribute('aria-haspopup', 'listbox');
     expect(system.querySelector('.emma-badge.success')).toHaveTextContent('5.3.3');
@@ -277,9 +274,6 @@ describe('updates in the window', () => {
     await user.click(within(plan).getByRole('button', { name: 'Clear choices' }));
     expect(screen.queryByRole('region', { name: 'Update plan' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Version of D&D 5e: 5.3.3' })).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Update' }));
-    expect(screen.queryByRole('button', { name: /^Version of/ })).toBeNull();
   });
 
   test('brings in what a version chosen needs, saying so, and offers only versions that work with it', async () => {
@@ -309,7 +303,6 @@ describe('updates in the window', () => {
         planner,
       }),
     );
-    await user.click(screen.getByRole('button', { name: 'Update' }));
 
     await openList(user, 'Version of D&D 5e: 5.3.3');
     const looked = screen.getByRole('region', { name: '5.4.0 update' });
@@ -358,7 +351,6 @@ describe('updates in the window', () => {
 
   test('explains in the panel the version looked at in a list, and then the one chosen', async () => {
     const { user } = await setUp();
-    await user.click(screen.getByRole('button', { name: 'Update' }));
     expect(screen.queryByRole('region', { name: /update$/ })).toBeNull();
 
     // Opening the list shows its row's panel, explaining the version the keyboard is on.
@@ -406,7 +398,6 @@ describe('updates in the window', () => {
             : { version, badge: null },
       }),
     );
-    await user.click(screen.getByRole('button', { name: 'Update' }));
     await openList(user, 'Version of D&D 5e: 5.3.3');
 
     const looked = screen.getByRole('region', { name: '5.4.0 update' });
@@ -437,7 +428,6 @@ describe('updates in the window', () => {
 
   test('badges each version with the other packages at the versions chosen', async () => {
     const { user } = await setUp();
-    await user.click(screen.getByRole('button', { name: 'Update' }));
     await user.click(within(row(/Universal/)).getByText('Universal'));
     await user.keyboard('{ArrowRight}');
 
@@ -451,7 +441,6 @@ describe('updates in the window', () => {
 
   test("leaves the tree's keys to the version list while it has the keyboard", async () => {
     const { user } = await setUp();
-    await user.click(screen.getByRole('button', { name: 'Update' }));
     await openList(user, 'Version of D&D 5e: 5.3.3');
     const list = screen.getByRole('listbox', { name: 'Versions of D&D 5e' });
     expect(list).toHaveFocus();
@@ -483,11 +472,11 @@ describe('updates in the window', () => {
         }),
       'EMMA found no working setup for 1 recorded worlds',
     ],
-  ] as const)('says so when the search %s, and offers no Update mode', async (_label, find, text) => {
+  ] as const)('says so when the search %s, and offers no versions', async (_label, find, text) => {
     await setUp(find);
 
     expect(screen.getByRole('status')).toHaveTextContent(text);
-    expect(screen.getByRole('button', { name: 'Update' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /^Version of/ })).toBeNull();
   });
 
   test('says it is looking while the search goes on', async () => {
@@ -538,7 +527,7 @@ describe('without an EMMA module whose setup kit fits', () => {
     );
     const { user } = await unavailable({ reason: 'missing' }, installModule);
     expect(screen.getByRole('status')).toHaveTextContent('Finding updates needs the EMMA module installed.');
-    expect(screen.getByRole('button', { name: 'Update' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /^Version of/ })).toBeNull();
     // The tree works without it.
     expect(screen.getByRole('tree')).toBeInTheDocument();
 
@@ -593,7 +582,6 @@ describe("the panels' sizes", () => {
     expect(tree).toHaveAttribute('aria-valuenow', '15');
     expect(JSON.parse(localStorage.getItem(LAYOUT_KEY) ?? '{}')).toMatchObject({ tree: 0.15 });
 
-    await user.click(screen.getByRole('button', { name: 'Update' }));
     await openList(user, 'Version of D&D 5e: 5.3.3');
     await user.click(screen.getByRole('option', { name: /^5\.4\.0/ }));
     const plan = screen.getByRole('separator', { name: 'Resize the update plan' });

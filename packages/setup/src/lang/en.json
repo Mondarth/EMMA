@@ -82,8 +82,6 @@
     "Plan": "the plan"
   },
   "Update": {
-    "Mode": "Update",
-    "ModeHint": "Choose newer versions of the packages that have them. EMMA offers the newest version that works in every recorded world that uses the package.",
     "Searching": "Looking for updates…",
     "Found": "Updates available: {count}",
     "None": "No updates found",
