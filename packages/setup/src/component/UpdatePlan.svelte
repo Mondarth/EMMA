@@ -3,13 +3,15 @@
   changes: a snapshot of the installation, and a backup of each world that uses a package the plan changes, each with a
   box to check and the note Foundry keeps with it, and the space a snapshot needs and the space free. Then each package
   whose chosen version differs from the one installed, with both, in the order they are to be installed, and the
-  manifest URL that installs the version chosen.
+  manifest URL that installs the version chosen. **Run plan** asks to confirm, listing the steps, then runs them, each
+  row saying how far its step has got.
 -->
 <script lang="ts">
-  import type { SnapshotSpaceState } from '../app/setup-state.svelte';
+  import type { PlanRun, SnapshotSpaceState } from '../app/setup-state.svelte';
   import type { UpdateState } from '../app/update-state.svelte';
   import { format, formatSize, localize } from '../lib/i18n';
   import type { Overview } from '../lib/overview';
+  import { runSteps, stepText } from '../lib/run';
   import type { Safeguard } from '../lib/safeguards';
 
   interface Props {
@@ -17,9 +19,19 @@
     updates: UpdateState;
     /** The space a snapshot needs and the space free, as far as it is known. */
     space?: SnapshotSpaceState;
+    /** The last run of the plan, if any. */
+    run?: PlanRun | null;
+    /** Run the plan, once the user confirms it; the plan cannot be run without. */
+    onRun?: (() => void) | undefined;
   }
 
-  let { overview, updates, space = null }: Props = $props();
+  let { overview, updates, space = null, run = null, onRun }: Props = $props();
+
+  /** Whether the user is asked to confirm a run. */
+  let confirming = $state(false);
+  const running = $derived(run !== null && !run.over);
+  /** The steps a run would take now. */
+  const steps = $derived(runSteps(updates.safeguards, updates.plan, key => updates.titleOf(key)));
 
   /**
    * A safeguard's name.
@@ -62,11 +74,38 @@
   );
 </script>
 
+{#snippet stateOf(key: string)}
+  {@const state = run?.states[key]}
+  {#if state !== undefined}
+    <span class={['emma-plan-state', `emma-plan-state-${state}`]}>
+      <i
+        class={[
+          'fa-solid',
+          { waiting: 'fa-hourglass', running: 'fa-spinner fa-spin', done: 'fa-check', failed: 'fa-xmark' }[state],
+        ]}
+        aria-hidden="true"></i>
+      {localize(`Run.State.${state}`)}
+    </span>
+  {/if}
+{/snippet}
+
 <section class="emma-update-plan" aria-labelledby="{uid}-heading">
   <header>
     <h3 id="{uid}-heading">{localize('Update.Plan')}</h3>
+    {#if onRun !== undefined}
+      <button
+        type="button"
+        disabled={running || confirming}
+        onclick={() => {
+          confirming = true;
+        }}>
+        <i class="fa-solid fa-play" aria-hidden="true"></i>
+        {localize('Run.Run')}
+      </button>
+    {/if}
     <button
       type="button"
+      disabled={running}
       onclick={() => {
         updates.clear();
       }}>
@@ -74,6 +113,32 @@
       {localize('Update.Clear')}
     </button>
   </header>
+  {#if confirming && onRun !== undefined}
+    <div class="emma-plan-confirm" role="alertdialog" aria-labelledby="{uid}-confirm">
+      <p id="{uid}-confirm">{localize('Run.Confirm')}</p>
+      <ol>
+        {#each steps as step (step.key)}
+          <li>{stepText(step)}</li>
+        {/each}
+      </ol>
+      <button
+        type="button"
+        onclick={() => {
+          confirming = false;
+          onRun();
+        }}>
+        <i class="fa-solid fa-play" aria-hidden="true"></i>
+        {localize('Run.Go')}
+      </button>
+      <button
+        type="button"
+        onclick={() => {
+          confirming = false;
+        }}>
+        {localize('Run.Cancel')}
+      </button>
+    </div>
+  {/if}
   {#if updates.safeguards.length > 0}
     <table aria-label={localize('Plan.Safeguards')}>
       <thead>
@@ -97,6 +162,7 @@
                   }} />
                 {nameOf(guard)}
               </label>
+              {@render stateOf(guard.key)}
               {#if guard.recommended}
                 <span class="emma-plan-needed">{localize('Plan.Recommended')}</span>
               {:else if guard.packages !== undefined}
@@ -132,7 +198,7 @@
     <tbody>
       {#each updates.choices as choice (choice.key)}
         <tr>
-          <th scope="row">{titles.get(choice.key) ?? choice.key}</th>
+          <th scope="row">{titles.get(choice.key) ?? choice.key}{@render stateOf(choice.key)}</th>
           <td>{choice.installed}</td>
           <td>
             {choice.chosen}
@@ -160,6 +226,30 @@
     font-size: 0.85em;
     opacity: 0.8;
     font-style: italic;
+  }
+
+  .emma-plan-confirm {
+    margin: 0.5rem 0;
+    padding: 0.5rem;
+    border: 1px solid var(--color-border, #555);
+    border-radius: 4px;
+  }
+
+  .emma-plan-confirm button {
+    width: auto;
+  }
+
+  .emma-plan-state {
+    margin-left: 0.5rem;
+    font-size: 0.85em;
+  }
+
+  .emma-plan-state-done {
+    color: var(--color-level-success, #2a2);
+  }
+
+  .emma-plan-state-failed {
+    color: var(--color-level-error, #c00);
   }
 
   .emma-plan-note-input {

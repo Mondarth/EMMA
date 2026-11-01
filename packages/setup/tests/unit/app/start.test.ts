@@ -146,6 +146,35 @@ describe('startEmmaSetup', () => {
     expect(post).toHaveBeenCalledWith({ action: 'checkCreateSnapshotDiskSpace' }, { timeoutMs: null });
   });
 
+  test("runs the plan's steps with Foundry's own install, through the guard", async () => {
+    const { game, post, ui } = installSetupMocks();
+    const installPackage = vi.fn(() => game.post({ action: 'installPackage', id: 'app' }));
+    Object.assign(game, { installPackage });
+    const menu = showMenu();
+    await startEmmaSetup();
+    menu.querySelector('button')?.click();
+    const setup = vi.mocked(openEmmaSetup).mock.lastCall?.[0] as SetupState;
+    await vi.waitFor(() => {
+      expect(setup.updates.status).not.toBe('searching');
+    });
+    setup.updates.plan = [
+      {
+        key: 'module:app',
+        installed: '1.0.0',
+        version: '2.0.0',
+        manifest: 'https://example.org/app/2.0.0/module.json',
+      },
+    ];
+
+    await setup.runPlan();
+
+    expect(setup.run).toMatchObject({ over: true, states: { 'module:app': 'done' } });
+    expect(installPackage).toHaveBeenCalledWith(expect.objectContaining({ id: 'app', dependencies: false }));
+    // The guard let the install through, and said nothing.
+    expect(post).toHaveBeenCalledWith({ action: 'installPackage', id: 'app' }, undefined);
+    expect(ui.notifications.info).not.toHaveBeenCalled();
+  });
+
   test('installs the EMMA module from its prompt, through the guard', async () => {
     const { game, post, ui } = installSetupMocks();
     const installPackage = vi.fn(() => game.post({ action: 'installPackage', id: 'mondarth-emma' }));

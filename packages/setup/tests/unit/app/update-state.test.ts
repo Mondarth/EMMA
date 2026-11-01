@@ -344,4 +344,15 @@ describe('UpdateState', () => {
 
     expect(updates.safeguards).toEqual([]);
   });
+
+  test('names a package by its title in the installation, or by its key', async () => {
+    const updates = new UpdateState(() => Promise.resolve(finding(APP)));
+    expect(updates.titleOf('core')).toBe('Foundry VTT');
+    expect(updates.titleOf('system:dnd5e')).toBe('system:dnd5e');
+
+    await updates.searchFor(OVERVIEW);
+
+    expect(updates.titleOf('system:dnd5e')).toBe('D&D 5e');
+    expect(updates.titleOf('module:gone')).toBe('module:gone');
+  });
 });

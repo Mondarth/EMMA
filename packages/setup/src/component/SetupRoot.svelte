@@ -8,6 +8,7 @@
   import type { Layout } from '../foundry/preferences';
   import { readLayout, writeLayout } from '../foundry/preferences';
   import { EXTENSION_RELEASES } from '../foundry/setup-kit';
+  import { stepText } from '../lib/run';
   import { groupDetail, moduleDetail, systemDetail } from '../lib/details';
   import { format, localize } from '../lib/i18n';
   import type { TreeRow, TreeSelection } from '../lib/tree';
@@ -64,6 +65,16 @@
         // The search starts as soon as the installation is read.
         return localize('Update.Searching');
     }
+  });
+  /** What the footer says of the last run of the plan. */
+  const runStatus = $derived.by(() => {
+    const { run } = setup;
+    if (run === null) return undefined;
+    if (!run.over) return localize('Run.Running');
+    if (run.failure !== undefined) {
+      return format('Run.Failed', { step: stepText(run.failure.step), message: run.failure.message });
+    }
+    return run.beforeCore === undefined ? localize('Run.Ran') : format('Run.BeforeCore', { version: run.beforeCore });
   });
   const unresolved = $derived(updates.search?.unresolved.length ?? 0);
   const problem = $derived(updates.status === 'unavailable' ? updates.problem : null);
@@ -153,7 +164,16 @@
             resize({ plan });
           }} />
         <div class="emma-setup-plan" style:flex-basis="{layout.plan * 100}%">
-          <UpdatePlan {overview} {updates} space={setup.snapshotSpace} />
+          <UpdatePlan
+            {overview}
+            {updates}
+            space={setup.snapshotSpace}
+            run={setup.run}
+            onRun={setup.canRun
+              ? () => {
+                  void setup.runPlan();
+                }
+              : undefined} />
         </div>
       {/if}
     </div>
@@ -164,6 +184,9 @@
         {updateStatus}
         {#if unresolved > 0}
           <span class="emma-setup-note">{format('Update.Unresolved', { count: unresolved })}</span>
+        {/if}
+        {#if runStatus !== undefined}
+          <span class="emma-setup-note">{runStatus}</span>
         {/if}
       </p>
       {#if problem?.reason === 'extension-too-old'}

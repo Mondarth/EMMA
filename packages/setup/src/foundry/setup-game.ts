@@ -91,6 +91,13 @@ export interface SetupGame {
   installPackage?: (options: PackageInstall) => Promise<unknown>;
   /** Asks the user whether to install a package's missing dependencies, and installs those chosen. */
   installDependencies?: (pkg: unknown) => Promise<unknown>;
+  /** Makes a snapshot of the installation, as **Manage Backups** does, with a note; it says itself if it fails. */
+  createSnapshot?: (options: { readonly note?: string }) => Promise<unknown>;
+  /** Backs a package up, such as a world, with a note; whether it did. */
+  createBackup?: (
+    pkg: { readonly type: 'world' | 'module' | 'system'; readonly id: string; readonly title: string },
+    options: { readonly note?: string },
+  ) => Promise<boolean>;
 }
 
 /** The disk space a snapshot of the installation needs, and the space free, in bytes. */
@@ -130,6 +137,8 @@ export interface PackageInstall {
   readonly manifest: string;
   /** Whether Foundry asks the user about the package's dependencies after it, by itself. */
   readonly dependencies?: boolean;
+  /** Whether Foundry says itself that the package was installed, or why not. */
+  readonly notify?: boolean;
 }
 
 /**

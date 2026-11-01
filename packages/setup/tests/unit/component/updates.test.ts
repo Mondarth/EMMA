@@ -8,6 +8,7 @@ import { LAYOUT_KEY } from '../../../src/foundry/preferences';
 import type { KitProblem } from '../../../src/foundry/setup-kit';
 import { EXTENSION_RELEASES, KitUnavailable } from '../../../src/foundry/setup-kit';
 import { buildOverview } from '../../../src/lib/overview';
+import type { RunStep } from '../../../src/lib/run';
 import type { BlockedUpdate, PackageUpdate, UpdateSearch, VersionJudge } from '../../../src/lib/updates';
 import { createPlanner } from '../../../src/lib/plans';
 import {
@@ -709,12 +710,14 @@ describe("the plan's snapshot and backups", () => {
    * @param key - The package chosen
    * @param version - Its version
    * @param snapshotSpace - How the space a snapshot needs is asked for
+   * @param runStep - How a step of the plan is carried out
    * @returns The state, the plan, and a user to act with
    */
   async function planning(
     key: string,
     version: string,
     snapshotSpace?: () => Promise<{ required: number; available: number }>,
+    runStep?: (step: Exclude<RunStep, { kind: 'core' }>) => Promise<void>,
   ) {
     const core: PackageUpdate = { key: 'core', installed: '14.368', newest: '14.369', versions: ['14.369', '14.368'] };
     const setup = new SetupState({
@@ -731,6 +734,7 @@ describe("the plan's snapshot and backups", () => {
         }),
       installModule: noInstall,
       ...(snapshotSpace !== undefined && { snapshotSpace }),
+      ...(runStep !== undefined && { runStep }),
     });
     await setup.refresh();
     render(SetupRoot, { setup });
@@ -830,6 +834,76 @@ describe("the plan's snapshot and backups", () => {
       expect(setup.snapshotSpace).toBe('failed');
     });
     expect(keptRows(plan).map(([, space]) => space)).toEqual(['Space not known', 'Size not known']);
+  });
+
+  test('runs the plan once confirmed, listing its steps first, each row saying how far it got', async () => {
+    let fail = (_error: Error): void => undefined;
+    const runStep = vi.fn((step: Exclude<RunStep, { kind: 'core' }>) =>
+      step.kind === 'snapshot'
+        ? Promise.resolve()
+        : new Promise<void>((_resolve, reject) => {
+            fail = reject;
+          }),
+    );
+    const { setup, plan, user } = await planning('module:lib', '1.5.0', undefined, runStep);
+    await user.click(within(plan).getByRole('checkbox', { name: 'Snapshot of the installation' }));
+
+    await user.click(within(plan).getByRole('button', { name: 'Run plan' }));
+    const confirm = within(plan).getByRole('alertdialog', { name: 'Run the plan? EMMA will, in order:' });
+    expect(
+      within(confirm)
+        .getAllByRole('listitem')
+        .map(item => item.textContent),
+    ).toEqual(['make a snapshot of the installation', 'install Library 1.5.0']);
+    expect(within(plan).getByRole('button', { name: 'Run plan' })).toBeDisabled();
+    await user.click(within(confirm).getByRole('button', { name: 'Cancel' }));
+    expect(within(plan).queryByRole('alertdialog')).toBeNull();
+    expect(runStep).not.toHaveBeenCalled();
+
+    await user.click(within(plan).getByRole('button', { name: 'Run plan' }));
+    await user.click(within(plan).getByRole('button', { name: 'Run' }));
+
+    await vi.waitFor(() => {
+      expect(changesIn(plan).getAllByRole('row')[1]).toHaveTextContent(/^Library\s*Running…/);
+    });
+    expect(within(plan).getByRole('table', { name: 'Keep first' })).toHaveTextContent('Done');
+    expect(within(plan).getByRole('button', { name: 'Run plan' })).toBeDisabled();
+    expect(within(plan).getByRole('button', { name: 'Clear choices' })).toBeDisabled();
+    expect(screen.getByRole('status')).toHaveTextContent('Running the plan…');
+
+    fail(new Error('The download failed'));
+
+    await vi.waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'The plan stopped at “install Library 1.5.0”: The download failed',
+      );
+    });
+    expect(setup.run?.over).toBe(true);
+  });
+
+  test('says when the plan ran in full, and when it stopped before Foundry VTT', async () => {
+    const { setup, plan, user } = await planning('core', '14.369', undefined, () => Promise.resolve());
+
+    await user.click(within(plan).getByRole('button', { name: 'Run plan' }));
+    expect(within(plan).getByRole('alertdialog')).toHaveTextContent(
+      'stop before updating Foundry VTT to 14.369: the steps after it wait for another run',
+    );
+    await user.click(within(plan).getByRole('button', { name: 'Run' }));
+
+    await vi.waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent('The plan stopped before updating Foundry VTT to 14.369.');
+    });
+
+    setup.updates.clear();
+    await setup.updates.choose('module:lib', '1.5.0');
+    await setup.runPlan();
+    expect(screen.getByRole('status')).toHaveTextContent('The plan ran: every step is done.');
+  });
+
+  test('offers no run where the plan cannot be run', async () => {
+    const { plan } = await planning('module:lib', '1.5.0');
+
+    expect(within(plan).queryByRole('button', { name: 'Run plan' })).toBeNull();
   });
 
   test('cannot say what space there is without a way to ask', async () => {

@@ -212,12 +212,22 @@ Before the changes, under **Keep first**, the plan offers what Foundry's **Manag
 
 Each has a note, which Foundry keeps with it, written for it at first and free to change. The snapshot's row gives the
 space it needs and the space free, as Foundry's own dialog does, and says when there is too little; Foundry does not
-say what a world's backup needs, so its row gives the space free alone. What is checked is made before anything changes,
-once installing the plan is built. Each row gives the manifest URL that installs the version chosen: one for that
+say what a world's backup needs, so its row gives the space free alone. What is checked is made before anything changes.
+
+**Run plan** lists the steps and asks to confirm them, then runs them in order:
+
+1. the snapshot and backups checked, as Foundry's **Manage Backups** makes them;
+2. each package change, installed from the manifest URL of the version chosen, as Foundry's Install button installs
+   one; the guard lets EMMA's installs through. Foundry's dependency dialog is not shown, as the plan already has
+   what each change needs.
+
+Each row says how far its step has got, and the footer how the run went. A run stops at the first step that fails,
+saying why, and before Foundry VTT's own update: updating Foundry in place restarts it, and is for the user to do with
+care. Meanwhile the choices cannot change. After a run, EMMA reads the installation again, so what was done leaves the
+plan and the rest stays in it, to run again. Each row gives the manifest URL that installs the version chosen: one for that
 version alone, since a package's own manifest URL usually gives its newest. Foundry VTT updates itself, and a version for
 which none is found is marked so. **Clear choices**
-takes them all back, and choosing the installed version takes back one, with what it brought in. The plan is shown only while something is chosen. Installing the plan
-is to come.
+takes them all back, and choosing the installed version takes back one, with what it brought in. The plan is shown only while something is chosen.
 
 The handle between the tree and the panel, and the one above the update plan, resize them, by dragging or from the
 keyboard: the arrow keys move a handle, and Home and End to its limits. Each panel keeps its share as the window is
