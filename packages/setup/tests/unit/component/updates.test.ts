@@ -102,6 +102,13 @@ async function openList(user: ReturnType<typeof userEvent.setup>, name: string):
 }
 
 /**
+ * The table of a plan's package changes.
+ * @param plan - The plan
+ * @returns Queries within the table
+ */
+const changesIn = (plan: HTMLElement) => within(within(plan).getByRole('table', { name: 'Changes' }));
+
+/**
  * A row of the tree, by its name.
  * @param name - The name
  * @returns The row
@@ -192,7 +199,9 @@ describe('updates in the window', () => {
     await openList(user, 'Version of Foundry VTT: 14.368');
     await user.click(screen.getByRole('option', { name: /^14\.369/ }));
     const plan = screen.getByRole('region', { name: 'Update plan' });
-    expect(within(plan).getAllByRole('row')[1]).toHaveTextContent('Foundry VTT14.36814.369 Foundry VTT updates itself');
+    expect(changesIn(plan).getAllByRole('row')[1]).toHaveTextContent(
+      'Foundry VTT14.36814.369 Foundry VTT updates itself',
+    );
 
     await user.click(within(root).getByText('Foundry VTT'));
     const blocked = screen.getByRole('region', { name: 'Not offered: 14.370' });
@@ -262,7 +271,7 @@ describe('updates in the window', () => {
 
     const plan = screen.getByRole('region', { name: 'Update plan' });
     expect(
-      within(plan)
+      changesIn(plan)
         .getAllByRole('row')
         .map(item => Array.from(item.querySelectorAll('th, td'), cell => cell.textContent.trim())),
     ).toEqual([
@@ -381,7 +390,7 @@ describe('updates in the window', () => {
     });
     const plan = screen.getByRole('region', { name: 'Update plan' });
     expect(
-      within(plan)
+      changesIn(plan)
         .getAllByRole('row')
         .slice(1)
         .map(item => Array.from(item.querySelectorAll('th, td'), cell => cell.textContent.replace(/\s+/g, ' ').trim())),
@@ -691,5 +700,141 @@ describe("the panels' sizes", () => {
     await fireEvent.pointerCancel(tree, { pointerId: 1 });
     await fireEvent.pointerMove(tree, { clientX: 300, pointerId: 1 });
     expect(tree).toHaveAttribute('aria-valuenow', '85');
+  });
+});
+
+describe("the plan's snapshot and backups", () => {
+  /**
+   * Render EMMA's window content, with the updates of {@link UPDATES} and Foundry VTT, and a choice made.
+   * @param key - The package chosen
+   * @param version - Its version
+   * @param snapshotSpace - How the space a snapshot needs is asked for
+   * @returns The state, the plan, and a user to act with
+   */
+  async function planning(
+    key: string,
+    version: string,
+    snapshotSpace?: () => Promise<{ required: number; available: number }>,
+  ) {
+    const core: PackageUpdate = { key: 'core', installed: '14.368', newest: '14.369', versions: ['14.369', '14.368'] };
+    const setup = new SetupState({
+      load: () => Promise.resolve(OVERVIEW),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: () =>
+        Promise.resolve({
+          updates: new Map([...UPDATES, core].map(update => [update.key, update])),
+          blocked: new Map(),
+          unresolved: [],
+          judge,
+          planner: alone(...UPDATES, core),
+        }),
+      installModule: noInstall,
+      ...(snapshotSpace !== undefined && { snapshotSpace }),
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    await vi.waitFor(() => {
+      expect(setup.updates.status).toBe('found');
+    });
+    await setup.updates.choose(key, version);
+    const plan = await screen.findByRole('region', { name: 'Update plan' });
+    return { setup, plan, user: userEvent.setup() };
+  }
+
+  /**
+   * The rows of the plan's snapshot and backups, each as its name and its space.
+   * @param plan - The plan
+   * @returns The rows, after the heading
+   */
+  const keptRows = (plan: HTMLElement) =>
+    within(within(plan).getByRole('table', { name: 'Keep first' }))
+      .getAllByRole('row')
+      .slice(1)
+      .map(item => {
+        // The note is an input, whose text is its value: the name and the space are read.
+        const [name, , space] = Array.from(item.querySelectorAll('th, td'), cell =>
+          cell.textContent.replace(/\s+/g, ' ').trim(),
+        );
+        return [name, space];
+      });
+
+  test('offers a snapshot, unchecked, and a backup of each world that uses what changes, with notes to write', async () => {
+    const { setup, plan, user } = await planning('module:lib', '1.5.0', () =>
+      Promise.resolve({ required: 1_500_000_000, available: 40_000_000_000 }),
+    );
+
+    await vi.waitFor(() => {
+      expect(keptRows(plan)).toEqual([
+        ['Snapshot of the installation', 'Needs about 1.5 GB; 40 GB free'],
+        ['Back up Alpha It uses Library, which the plan changes.', 'Size not known; 40 GB free'],
+      ]);
+    });
+    const snapshot = within(plan).getByRole('checkbox', { name: 'Snapshot of the installation' });
+    const alpha = within(plan).getByRole('checkbox', { name: 'Back up Alpha' });
+    expect(snapshot).not.toBeChecked();
+    expect(alpha).not.toBeChecked();
+    expect(within(plan).getByRole('textbox', { name: 'Note of: Snapshot of the installation' })).toHaveValue(
+      `EMMA: before the update plan of ${new Date().toLocaleDateString()}`,
+    );
+    const note = within(plan).getByRole('textbox', { name: 'Note of: Back up Alpha' });
+    expect(note).toHaveValue('EMMA: before updating Library');
+
+    await user.click(alpha);
+    await user.clear(note);
+    await user.type(note, 'Before the library');
+
+    expect(setup.updates.safeguards[1]).toMatchObject({ checked: true, note: 'Before the library' });
+    expect(within(plan).getByRole('checkbox', { name: 'Back up Alpha' })).toBeChecked();
+    // Choices taken back take what was changed of them too.
+    setup.updates.clear();
+    await setup.updates.choose('module:lib', '1.5.0');
+    expect(setup.updates.safeguards[1]).toMatchObject({ checked: false, note: 'EMMA: before updating Library' });
+  });
+
+  test('checks the snapshot, recommending it, when the plan changes Foundry VTT, and says when space is short', async () => {
+    const { plan, user } = await planning('core', '14.369', () =>
+      Promise.resolve({ required: 50_000_000_000, available: 40_000_000_000 }),
+    );
+
+    const snapshot = within(plan).getByRole('checkbox', { name: 'Snapshot of the installation' });
+    expect(snapshot).toBeChecked();
+    expect(plan).toHaveTextContent('Recommended, as the plan changes Foundry VTT');
+    await vi.waitFor(() => {
+      expect(keptRows(plan)[0]?.[1]).toBe('Not enough space: needs about 50 GB, 40 GB free');
+    });
+    // No world uses Foundry VTT alone, so none is backed up.
+    expect(keptRows(plan)).toHaveLength(1);
+
+    await user.click(snapshot);
+    expect(snapshot).not.toBeChecked();
+  });
+
+  test('says while it checks the space, and when the space cannot be known', async () => {
+    let fail = (): void => undefined;
+    const { plan, setup } = await planning(
+      'module:lib',
+      '1.5.0',
+      () =>
+        new Promise((_resolve, reject) => {
+          fail = () => {
+            reject(new Error('down'));
+          };
+        }),
+    );
+    expect(keptRows(plan).map(([, space]) => space)).toEqual(['Checking the space…', 'Checking the space…']);
+
+    fail();
+
+    await vi.waitFor(() => {
+      expect(setup.snapshotSpace).toBe('failed');
+    });
+    expect(keptRows(plan).map(([, space]) => space)).toEqual(['Space not known', 'Size not known']);
+  });
+
+  test('cannot say what space there is without a way to ask', async () => {
+    const { plan } = await planning('module:lib', '1.5.0');
+
+    expect(keptRows(plan).map(([, space]) => space)).toEqual(['Space not known', 'Size not known']);
   });
 });

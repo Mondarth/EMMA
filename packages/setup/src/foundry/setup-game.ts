@@ -93,6 +93,36 @@ export interface SetupGame {
   installDependencies?: (pkg: unknown) => Promise<unknown>;
 }
 
+/** The disk space a snapshot of the installation needs, and the space free, in bytes. */
+export interface SnapshotSpace {
+  readonly required: number;
+  readonly available: number;
+}
+
+/**
+ * Ask the server how much disk space a snapshot of the installation needs, and how much is free, as Foundry's own
+ * **Manage Backups** dialog does before it makes one. The server works it out from every package installed, so it may
+ * take a while.
+ *
+ * The request's action, `checkCreateSnapshotDiskSpace`, is the server's, not a documented API: Foundry 14.368's
+ * `SnapshotOperationDialog` sends it through `game.post` and reads `required` and `available` from the answer. This is
+ * the one place EMMA sends it; refactor here should Foundry give it an API.
+ * @param game - The setup screen's `game`
+ * @returns The space
+ * @throws {Error} When the answer is not as Foundry 14.368 gives it
+ */
+export async function checkSnapshotSpace(game: SetupGame): Promise<SnapshotSpace> {
+  const answer = await game.post({ action: 'checkCreateSnapshotDiskSpace' }, { timeoutMs: null });
+  const { required, available } = (typeof answer === 'object' && answer !== null ? answer : {}) as Record<
+    string,
+    unknown
+  >;
+  if (typeof required !== 'number' || typeof available !== 'number') {
+    throw new Error('The server did not say how much space a snapshot needs');
+  }
+  return { required, available };
+}
+
 /** What `game.installPackage` is given. */
 export interface PackageInstall {
   readonly type: 'module' | 'system';

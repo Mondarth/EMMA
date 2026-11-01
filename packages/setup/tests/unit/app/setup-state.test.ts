@@ -111,4 +111,45 @@ describe('SetupState', () => {
     expect(setup.installing).toBe(false);
     expect(load).toHaveBeenCalledOnce();
   });
+
+  test('asks for the space a snapshot needs once, until the installation is read again, keeping a failure', async () => {
+    const snapshotSpace = vi
+      .fn<() => Promise<{ required: number; available: number }>>()
+      .mockResolvedValueOnce({ required: 1, available: 2 })
+      .mockRejectedValueOnce(new Error('down'));
+    const setup = new SetupState({
+      load: () => Promise.resolve(OVERVIEW),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: noUpdates,
+      installModule: noInstall,
+      snapshotSpace,
+    });
+
+    const asking = setup.checkSnapshotSpace();
+    expect(setup.snapshotSpace).toBe('checking');
+    await asking;
+    await setup.checkSnapshotSpace();
+    expect(setup.snapshotSpace).toEqual({ required: 1, available: 2 });
+    expect(snapshotSpace).toHaveBeenCalledOnce();
+
+    await setup.refresh();
+    expect(setup.snapshotSpace).toBeNull();
+    await setup.checkSnapshotSpace();
+    expect(setup.snapshotSpace).toBe('failed');
+  });
+
+  test('cannot ask for the space a snapshot needs without a way to', async () => {
+    const setup = new SetupState({
+      load: () => Promise.resolve(OVERVIEW),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: noUpdates,
+      installModule: noInstall,
+    });
+
+    await setup.checkSnapshotSpace();
+
+    expect(setup.snapshotSpace).toBeNull();
+  });
 });

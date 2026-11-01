@@ -1,6 +1,13 @@
 import { describe, expect, test, vi } from 'vitest';
 
-import { isSetupGame, readInstallation, readManifests, setupGame } from '../../../src/foundry/setup-game';
+import {
+  checkSnapshotSpace,
+  isSetupGame,
+  readInstallation,
+  readManifests,
+  setupGame,
+} from '../../../src/foundry/setup-game';
+import type { SetupGame } from '../../../src/foundry/setup-game';
 import { installSetupMocks } from '../../mocks/foundry';
 
 describe('isSetupGame', () => {
@@ -140,4 +147,27 @@ describe('readManifests', () => {
 
     expect(readManifests(game as never).core).toEqual({ version: '15.001', generation: 15, channel: 'stable' });
   });
+});
+
+describe('checkSnapshotSpace', () => {
+  test("asks the server, as Foundry's Manage Backups dialog does, waiting as long as it takes", async () => {
+    const { game, post } = installSetupMocks();
+    post.mockResolvedValueOnce({ required: 1_000, available: 5_000 });
+
+    await expect(checkSnapshotSpace(game as unknown as SetupGame)).resolves.toEqual({
+      required: 1_000,
+      available: 5_000,
+    });
+    expect(post).toHaveBeenCalledWith({ action: 'checkCreateSnapshotDiskSpace' }, { timeoutMs: null });
+  });
+
+  test.each([null, 'busy', { required: '1 GB', available: 5_000 }])(
+    'fails on an answer it cannot read: %j',
+    async answer => {
+      const { game, post } = installSetupMocks();
+      post.mockResolvedValueOnce(answer);
+
+      await expect(checkSnapshotSpace(game as unknown as SetupGame)).rejects.toThrow('did not say how much space');
+    },
+  );
 });
