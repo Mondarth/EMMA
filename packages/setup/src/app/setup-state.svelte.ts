@@ -4,6 +4,8 @@
  */
 import type { SnapshotSpace } from '../foundry/setup-game';
 import type { Overview } from '../lib/overview';
+import type { RunStep, StepState } from '../lib/run';
+import { runSteps } from '../lib/run';
 import type { UpdateSearch } from '../lib/updates';
 import { UpdateState } from './update-state.svelte';
 
@@ -24,6 +26,22 @@ export interface SetupStateOptions {
   readonly installModule: () => Promise<void>;
   /** Ask how much space a snapshot needs, and how much is free; none where it cannot be asked. */
   readonly snapshotSpace?: () => Promise<SnapshotSpace>;
+  /** Carry out a step of the update plan, failing with why; none where the plan cannot be run. */
+  readonly runStep?: (step: Exclude<RunStep, { kind: 'core' }>) => Promise<void>;
+}
+
+/** A run of the update plan, going on or done. */
+export interface PlanRun {
+  /** Its steps, in order. */
+  readonly steps: readonly RunStep[];
+  /** How far each step has got, by its key. */
+  readonly states: Readonly<Record<string, StepState>>;
+  /** Whether it is over: done, failed, or stopped before Foundry VTT's update. */
+  readonly over: boolean;
+  /** The step that failed, and why. */
+  readonly failure?: { readonly step: RunStep; readonly message: string };
+  /** The version of Foundry VTT it stopped before updating to. */
+  readonly beforeCore?: string;
 }
 
 /** Whether the space a snapshot needs is known: `checking`, `failed`, or the space; `null` before it is asked. */
@@ -45,6 +63,24 @@ export class SetupState {
   readonly updates: UpdateState;
   /** The space a snapshot needs and the space free, once asked, until the installation is read again. */
   snapshotSpace = $state.raw<SnapshotSpaceState>(null);
+  /** The last run of the update plan, until the next. */
+  run = $state.raw<PlanRun | null>(null);
+
+  /**
+   * Whether the update plan can be run here.
+   * @returns `true` where it can
+   */
+  get canRun(): boolean {
+    return this.#options.runStep !== undefined;
+  }
+
+  /**
+   * Whether the update plan is being run.
+   * @returns `true` while it is
+   */
+  get running(): boolean {
+    return this.run !== null && !this.run.over;
+  }
 
   readonly #options: SetupStateOptions;
 
@@ -110,6 +146,49 @@ export class SetupState {
     } catch {
       this.snapshotSpace = 'failed';
     }
+  }
+
+  /**
+   * Run the update plan: the snapshot and backups checked, then each change, in order (see `lib/run.ts`). It stops at
+   * the first step that fails, and before Foundry VTT's own update; the choices cannot change meanwhile. The
+   * installation is read afresh after, so what was done leaves the plan and the rest stays in it. A failure is kept in
+   * {@link run}, never thrown.
+   * @returns Once the run is over, and the installation read again
+   */
+  async runPlan(): Promise<void> {
+    const runStep = this.#options.runStep;
+    if (runStep === undefined || this.running) return;
+    const { updates } = this;
+    const steps = runSteps(updates.safeguards, updates.plan, key => updates.titleOf(key));
+    let states: Record<string, StepState> = Object.fromEntries(steps.map(({ key }) => [key, 'waiting']));
+    const mark = (key: string, state: StepState): void => {
+      states = { ...states, [key]: state };
+      this.run = { steps, states, over: false };
+    };
+    this.run = { steps, states, over: false };
+    updates.locked = true;
+    let end: Pick<PlanRun, 'failure' | 'beforeCore'> = {};
+    try {
+      for (const step of steps) {
+        if (step.kind === 'core') {
+          end = { beforeCore: step.version };
+          break;
+        }
+        mark(step.key, 'running');
+        try {
+          await runStep(step);
+        } catch (error) {
+          mark(step.key, 'failed');
+          end = { failure: { step, message: error instanceof Error ? error.message : String(error) } };
+          break;
+        }
+        mark(step.key, 'done');
+      }
+    } finally {
+      updates.locked = false;
+      this.run = { steps, states, over: true, ...end };
+    }
+    await this.refresh();
   }
 
   /**

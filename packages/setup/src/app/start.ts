@@ -8,6 +8,7 @@ import { installEmma } from '../foundry/install-emma';
 import { keepMenuButton } from '../foundry/menu-button';
 import { readGuardOn, writeGuardOn } from '../foundry/preferences';
 import { readRecords } from '../foundry/records';
+import { runStep } from '../foundry/run-step';
 import type { SetupGame } from '../foundry/setup-game';
 import { checkSnapshotSpace, readInstallation, readManifests, setupGame } from '../foundry/setup-game';
 import { KitUnavailable, loadKit, locateKit } from '../foundry/setup-kit';
@@ -85,6 +86,9 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
       if (placed.guard !== undefined) await installEmma(game, placed.guard);
     },
     snapshotSpace: () => checkSnapshotSpace(game),
+    runStep: async step => {
+      if (placed.guard !== undefined) await runStep(game, placed.guard, step);
+    },
     guardOn: readGuardOn(),
     onGuardChange: on => {
       writeGuardOn(on);

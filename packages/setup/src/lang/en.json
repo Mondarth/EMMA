@@ -155,6 +155,31 @@
     "BackupSpace": "Size not known; {available} free",
     "BackupSizeUnknown": "Size not known"
   },
+  "Run": {
+    "Run": "Run plan",
+    "Confirm": "Run the plan? EMMA will, in order:",
+    "Go": "Run",
+    "Cancel": "Cancel",
+    "StepSnapshot": "make a snapshot of the installation",
+    "StepBackup": "back up {world}",
+    "StepInstall": "install {title} {version}",
+    "StepCore": "stop before updating Foundry VTT to {version}: the steps after it wait for another run",
+    "State": {
+      "waiting": "Waiting",
+      "running": "Running…",
+      "done": "Done",
+      "failed": "Failed"
+    },
+    "Ran": "The plan ran: every step is done.",
+    "Failed": "The plan stopped at “{step}”: {message}",
+    "BeforeCore": "The plan stopped before updating Foundry VTT to {version}.",
+    "Running": "Running the plan…",
+    "NoSnapshots": "Foundry offers no way to make a snapshot here.",
+    "NoBackups": "Foundry offers no way to back a world up here.",
+    "NoInstalls": "Foundry offers no way to install packages here.",
+    "BackupFailed": "Foundry could not back up {world}.",
+    "NoManifest": "EMMA has no manifest URL for {title} {version} alone, so cannot install it."
+  },
   "Layout": {
     "Tree": "Resize the installation tree",
     "Plan": "Resize the update plan"

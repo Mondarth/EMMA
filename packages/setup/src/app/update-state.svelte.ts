@@ -8,7 +8,7 @@ import { SvelteMap } from 'svelte/reactivity';
 
 import type { KitProblem } from '../foundry/setup-kit';
 import { KitUnavailable } from '../foundry/setup-kit';
-import { format, today } from '../lib/i18n';
+import { format, localize, today } from '../lib/i18n';
 import type { Overview } from '../lib/overview';
 import type { PlanEntry } from '../lib/plans';
 import { keepChoices, withChoice } from '../lib/plans';
@@ -69,6 +69,8 @@ export class UpdateState {
   plan = $state.raw<readonly PlanEntry[]>([]);
   /** Whether a choice is being planned. */
   planning = $state(false);
+  /** Whether the choices cannot change, as while the plan runs. */
+  locked = $state(false);
 
   /** The versions chosen, by package key, in the order they were chosen. */
   readonly #picks = new SvelteMap<PackageKey, string>();
@@ -314,6 +316,7 @@ export class UpdateState {
    * @returns Whether the plan could take it, and so it is chosen
    */
   async choose(key: PackageKey, version: string): Promise<boolean> {
+    if (this.locked) return false;
     const search = this.search;
     const installed = this.updateOf(key)?.installed;
     if (search === null || installed === undefined) return false;
@@ -332,8 +335,19 @@ export class UpdateState {
     }
   }
 
+  /**
+   * A package's title, as the installation gives it.
+   * @param key - The package's key, or `core`
+   * @returns Its title, or its key if it is not installed
+   */
+  titleOf(key: PackageKey): string {
+    if (key === 'core') return localize('Tree.Root');
+    return this.#overview === null ? key : titleIn(this.#overview, key);
+  }
+
   /** Take back every choice, and what was changed of the plan's snapshot and backups. */
   clear(): void {
+    if (this.locked) return;
     this.#picks.clear();
     this.#safeguardEdits.clear();
     this.plan = [];
