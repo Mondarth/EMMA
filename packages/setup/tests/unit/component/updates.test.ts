@@ -974,6 +974,68 @@ describe("the plan's snapshot and backups", () => {
     expect(check).toHaveBeenCalledTimes(state.canUpdate ? 1 : 0);
   });
 
+  test("marks a build of Foundry VTT that is not its generation's newest, offering the newest where it can", async () => {
+    const core: PackageUpdate = {
+      key: 'core',
+      installed: '14.368',
+      newest: '14.370',
+      versions: ['14.370', '14.369', '14.368'],
+    };
+    const planner = alone(...UPDATES, core);
+    const complete = planner.complete.bind(planner);
+    // 14.370 cannot go with Library 1.5.0, nor with D&D 5e 5.4.0 at all.
+    vi.spyOn(planner, 'complete').mockImplementation(picks =>
+      picks.get('core') === '14.370' && (picks.has('module:lib') || picks.has('system:dnd5e'))
+        ? Promise.resolve({ ok: false })
+        : complete(picks),
+    );
+    const { setup, user } = await planning('core', '14.369', undefined, undefined, {
+      findUpdates: () =>
+        Promise.resolve({
+          updates: new Map([...UPDATES, core].map(update => [update.key, update])),
+          blocked: new Map(),
+          unresolved: [],
+          judge,
+          planner,
+        }),
+    });
+    // Clearing the choices closes the plan, and choosing opens another, so it is found afresh each time.
+    const plan = () => screen.getByRole('region', { name: 'Update plan' });
+    const coreRow = () => changesIn(plan()).getAllByRole('row')[1];
+
+    expect(await within(plan()).findByText('Not the newest build: 14.370 is.')).toBeInTheDocument();
+    expect(within(plan()).getByText('14.369')).toHaveClass('emma-plan-older');
+
+    await setup.updates.choose('module:lib', '1.5.0');
+    await vi.waitFor(() => {
+      expect(coreRow()).toHaveTextContent('The plan can take it only without module:lib 1.5.0.');
+    });
+
+    setup.updates.clear();
+    await setup.updates.choose('core', '14.369');
+    await setup.updates.choose('system:dnd5e', '5.4.0');
+    await vi.waitFor(() => {
+      expect(coreRow()).toHaveTextContent('The plan can take it only without system:dnd5e 5.4.0.');
+    });
+
+    // With both, taking out either leaves the other in its way.
+    await setup.updates.choose('module:lib', '1.5.0');
+    await vi.waitFor(() => {
+      expect(coreRow()).toHaveTextContent('The plan cannot take it, whatever is taken out of it.');
+    });
+
+    setup.updates.clear();
+    await setup.updates.choose('core', '14.369');
+    await user.click(await within(plan()).findByRole('button', { name: 'Choose 14.370' }));
+
+    await vi.waitFor(() => {
+      expect(setup.updates.chosenOf('core')).toBe('14.370');
+    });
+    await vi.waitFor(() => {
+      expect(within(plan()).queryByText(/Not the newest build/)).toBeNull();
+    });
+  });
+
   test('does not ask Foundry which build it would install where it cannot update itself', async () => {
     const check = vi.fn(() => Promise.resolve({ version: '14.369', manual: false }));
     const { plan, user } = await planning('core', '14.369', undefined, () => Promise.resolve(), {

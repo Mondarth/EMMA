@@ -8,7 +8,7 @@
 -->
 <script lang="ts">
   import type { PlanRun, SnapshotSpaceState } from '../app/setup-state.svelte';
-  import type { UpdateState } from '../app/update-state.svelte';
+  import type { NewerCore, UpdateState } from '../app/update-state.svelte';
   import { format, formatSize, localize } from '../lib/i18n';
   import type { Overview } from '../lib/overview';
   import { runSteps, stepText } from '../lib/run';
@@ -28,6 +28,16 @@
   }
 
   let { overview, updates, space = null, coreBlocked, run = null, onRun }: Props = $props();
+
+  /** The newest build of Foundry VTT's generation, when the plan has an older one, and whether the plan can take it. */
+  let newerCore = $state.raw<NewerCore | undefined>(undefined);
+  $effect(() => {
+    const { plan } = updates;
+    void updates.newerCore().then(newer => {
+      // An answer for a plan since changed is dropped.
+      if (plan === updates.plan) newerCore = newer;
+    });
+  });
 
   /** Whether the user is asked to confirm a run. */
   let confirming = $state(false);
@@ -199,6 +209,7 @@
     </thead>
     <tbody>
       {#each updates.choices as choice (choice.key)}
+        {@const older = choice.key === 'core' ? newerCore : undefined}
         <tr>
           <th scope="row">
             {#if choice.key === 'core' && coreBlocked !== undefined}
@@ -212,9 +223,28 @@
           </th>
           <td>{choice.installed}</td>
           <td>
-            {choice.chosen}
+            <span class={[older !== undefined && 'emma-plan-older']}>{choice.chosen}</span>
             {#if choice.by !== undefined}
               <span class="emma-plan-needed">{format('Update.NeededBy', choice.by)}</span>
+            {/if}
+            {#if older !== undefined}
+              <span class="emma-plan-newer">
+                {format('Plan.NotNewest', { version: older.version })}
+                {#if older.kind === 'coherent'}
+                  <button
+                    type="button"
+                    disabled={running || updates.locked}
+                    onclick={() => {
+                      void updates.choose('core', older.version);
+                    }}>{format('Plan.ChooseNewest', { version: older.version })}</button>
+                {:else if older.kind === 'conflict'}
+                  {format('Plan.NewestNeeds', {
+                    choices: older.remove.map(({ title, version }) => `${title} ${version}`).join(', '),
+                  })}
+                {:else}
+                  {localize('Plan.NewestUnavailable')}
+                {/if}
+              </span>
             {/if}
           </td>
           <td class="emma-plan-manifest">
@@ -253,6 +283,21 @@
   .emma-plan-state {
     margin-left: 0.5rem;
     font-size: 0.85em;
+  }
+
+  .emma-plan-older {
+    color: var(--color-level-warning, #ec3);
+    font-weight: bold;
+  }
+
+  .emma-plan-newer {
+    display: block;
+    font-family: var(--font-primary, sans-serif);
+    font-size: 0.85em;
+  }
+
+  .emma-plan-newer button {
+    width: auto;
   }
 
   .emma-plan-blocked {

@@ -10,7 +10,7 @@ import type { KitProblem } from '../foundry/setup-kit';
 import { KitUnavailable } from '../foundry/setup-kit';
 import { format, localize, today } from '../lib/i18n';
 import type { Overview } from '../lib/overview';
-import type { PlanEntry } from '../lib/plans';
+import type { PlanEntry, Planner } from '../lib/plans';
 import { keepChoices, withChoice } from '../lib/plans';
 import type { Safeguard, SafeguardEdit } from '../lib/safeguards';
 import { safeguardsFor } from '../lib/safeguards';
@@ -41,6 +41,19 @@ export interface ExplainedVersion {
   /** Whether it is the one looked at in the list, rather than the one chosen. */
   readonly previewing: boolean;
 }
+
+/**
+ * The newest build of Foundry VTT's generation, when the plan chose an older one: whether the plan can take it as it
+ * stands (`coherent`), or only with other choices taken out (`conflict`, naming them), or not at all (`unavailable`).
+ */
+export type NewerCore =
+  | { readonly kind: 'coherent'; readonly version: string }
+  | {
+      readonly kind: 'conflict';
+      readonly version: string;
+      readonly remove: readonly { readonly title: string; readonly version: string }[];
+    }
+  | { readonly kind: 'unavailable'; readonly version: string };
 
 /**
  * An installed system's or module's title, as the installation gives it.
@@ -281,14 +294,7 @@ export class UpdateState {
       const picks = this.#picksWith(key, version);
       const completion = await planner.complete(picks);
       if (!completion.ok) {
-        // The choices that stand in its way: each of those without which it could be had.
-        const remove: { title: string; version: string }[] = [];
-        for (const [other, to] of picks) {
-          if (other === key) continue;
-          if ((await planner.complete(withChoice(picks, other, null))).ok) {
-            remove.push({ title: planner.titleOf(other), version: to });
-          }
-        }
+        const remove = await this.#inTheWay(planner, picks, key);
         if (remove.length === 0) continue;
         const locked = this.#withNeeds(key, search.judge(key, version, chosen));
         options.push({ ...locked, conflict: { remove, explanation: completion.explanation ?? [] } });
@@ -307,6 +313,46 @@ export class UpdateState {
       this.#listed = Object.fromEntries(options.map(option => [`${key}@${option.version}`, option]));
     }
     return options;
+  }
+
+  /**
+   * The choices that stand in the way of a version: each of those without which the plan could take it.
+   * @param planner - The planner
+   * @param picks - The versions chosen, with the version
+   * @param key - The version's package
+   * @returns The choices, by title, at their versions
+   */
+  async #inTheWay(
+    planner: Planner,
+    picks: ReadonlyMap<PackageKey, string>,
+    key: PackageKey,
+  ): Promise<{ title: string; version: string }[]> {
+    const remove: { title: string; version: string }[] = [];
+    for (const [other, to] of picks) {
+      if (other === key) continue;
+      if ((await planner.complete(withChoice(picks, other, null))).ok) {
+        remove.push({ title: planner.titleOf(other), version: to });
+      }
+    }
+    return remove;
+  }
+
+  /**
+   * The newest build of Foundry VTT, of the generation of the one the plan has, when the plan has an older one. A
+   * build of another generation is not offered: Foundry installs those only by hand.
+   * @returns The build, and whether the plan can take it; none if the plan does not change Foundry VTT, or has its newest
+   */
+  async newerCore(): Promise<NewerCore | undefined> {
+    const search = this.search;
+    const chosen = this.plan.find(entry => entry.key === 'core')?.version;
+    if (search === null || chosen === undefined) return undefined;
+    const generation = (build: string) => build.split('.')[0];
+    const version = search.planner.candidates('core').find(build => generation(build) === generation(chosen));
+    if (version === undefined || version === chosen) return undefined;
+    const picks = withChoice(this.#picks, 'core', version);
+    if ((await search.planner.complete(picks)).ok) return { kind: 'coherent', version };
+    const remove = await this.#inTheWay(search.planner, picks, 'core');
+    return remove.length === 0 ? { kind: 'unavailable', version } : { kind: 'conflict', version, remove };
   }
 
   /**

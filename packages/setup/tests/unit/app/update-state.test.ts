@@ -161,6 +161,71 @@ describe('UpdateState', () => {
     expect(options[1]).not.toHaveProperty('conflict');
   });
 
+  describe('newerCore', () => {
+    const CORE: PackageUpdate = {
+      key: 'core',
+      installed: '14.368',
+      newest: '15.300',
+      versions: ['15.300', '14.370', '14.369', '14.368'],
+    };
+
+    /**
+     * The state, with Foundry VTT and the library on offer, and some choices made.
+     * @param fails - Whether the planner cannot take a set of choices
+     * @param choices - The choices, in order
+     * @returns The state
+     */
+    async function choosing(
+      fails: (picks: ReadonlyMap<string, string>) => boolean,
+      ...choices: readonly (readonly [string, string])[]
+    ): Promise<UpdateState> {
+      const planner = alone(CORE, LIB);
+      const complete = planner.complete.bind(planner);
+      vi.spyOn(planner, 'complete').mockImplementation(picks =>
+        fails(picks) ? Promise.resolve({ ok: false }) : complete(picks),
+      );
+      const updates = new UpdateState(() => Promise.resolve({ ...finding(CORE, LIB), planner }));
+      await updates.searchFor(OVERVIEW);
+      for (const [key, version] of choices) await updates.choose(key, version);
+      return updates;
+    }
+
+    test('gives nothing before a search, without Foundry VTT in the plan, or with its newest build', async () => {
+      expect(await new UpdateState(() => Promise.resolve(finding(CORE))).newerCore()).toBeUndefined();
+      expect(await (await choosing(() => false, ['module:lib', '1.1.0'])).newerCore()).toBeUndefined();
+      expect(await (await choosing(() => false, ['core', '14.370'])).newerCore()).toBeUndefined();
+      // A new generation is installed only by hand, so its newest build is the newest of its own.
+      expect(await (await choosing(() => false, ['core', '15.300'])).newerCore()).toBeUndefined();
+    });
+
+    test("gives the newest build of the chosen one's generation, which the plan can take", async () => {
+      const updates = await choosing(() => false, ['core', '14.369']);
+
+      expect(await updates.newerCore()).toEqual({ kind: 'coherent', version: '14.370' });
+    });
+
+    test('names the choices without which the plan could take it', async () => {
+      // 14.370 cannot go with Library 1.1.0.
+      const updates = await choosing(
+        picks => picks.get('core') === '14.370' && picks.get('module:lib') === '1.1.0',
+        ['core', '14.369'],
+        ['module:lib', '1.1.0'],
+      );
+
+      expect(await updates.newerCore()).toEqual({
+        kind: 'conflict',
+        version: '14.370',
+        remove: [{ title: 'module:lib', version: '1.1.0' }],
+      });
+    });
+
+    test('says when the plan cannot take it, whatever is taken out', async () => {
+      const updates = await choosing(picks => picks.get('core') === '14.370', ['core', '14.369']);
+
+      expect(await updates.newerCore()).toEqual({ kind: 'unavailable', version: '14.370' });
+    });
+  });
+
   test('plans the choices again for a new search, dropping them if it cannot, and keeps only the latest', async () => {
     const planner = alone(APP, LIB);
     const answers: ((search: UpdateSearch) => void)[] = [];

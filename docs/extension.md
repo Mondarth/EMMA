@@ -243,6 +243,11 @@ The plan says so before a run too: once it has Foundry VTT's update, EMMA asks F
 install, and where it cannot update in place, an amber warning triangle at the left of Foundry VTT's title gives the
 reason in its tooltip.
 
+When the plan has a build of Foundry VTT older than the newest of its generation, the build is marked in amber and the
+row names the newest. If the plan can take the newest as it stands, **Choose <version>** puts it in the plan; if it can
+only without some of the other choices, the row names them; otherwise it says the plan cannot take it. A build of a
+newer generation is not suggested, as Foundry installs those only by hand.
+
 Where it is offered, the user must type a code of six letters and digits that EMMA shows, to enable **Update Foundry
 VTT to <version> in place**. EMMA then keeps the rest of the plan's choices in the browser and starts Foundry's updater,
 as its **Update Software** form does: Foundry downloads the build, installs it, and stops or restarts the server. Once
