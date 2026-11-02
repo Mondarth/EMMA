@@ -320,5 +320,12 @@
     "CoreLocked": "EMMA keeps {title} at {version}: no plan updates it, though plans still update the game systems and modules that run on it. This is EMMA's own lock, as Foundry has none for itself; Foundry's own Update Software is not stopped by it.",
     "CoreUnlocked": "Locking {title} in EMMA keeps it at {version}: no plan updates it, though plans still update the game systems and modules that run on it. Foundry has no lock for itself, so this is EMMA's own.",
     "TreeCore": "Locked in EMMA"
+  },
+  "Best": {
+    "Heading": "Best versions",
+    "Hint": "Plans the newest versions of Foundry VTT and of every game system and module installed that work together, and keep every recorded world working, in place of what is chosen now. Locked packages stay as they are.",
+    "Plan": "Plan the best versions",
+    "Replace": "Replace the plan with the best versions",
+    "Working": "Working out the best versions…"
   }
 }

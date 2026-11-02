@@ -1885,3 +1885,34 @@ describe('locking Foundry VTT in EMMA', () => {
     });
   });
 });
+
+describe('planning the best versions', () => {
+  test('plans them from the root panel, saying while it does, then offers to replace the plan', async () => {
+    const setup = new SetupState({
+      load: () => Promise.resolve(OVERVIEW),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: findingBlocked(),
+      installModule: noInstall,
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    await vi.waitFor(() => {
+      expect(setup.updates.status).toBe('found');
+    });
+    const user = userEvent.setup();
+    const section = screen.getByRole('region', { name: 'Best versions' });
+
+    await user.click(within(section).getByRole('button', { name: 'Plan the best versions' }));
+
+    const plan = await screen.findByRole('region', { name: 'Update plan' });
+    expect(
+      changesIn(plan)
+        .getAllByRole('row')
+        .slice(1)
+        .map(tr => within(tr).getByRole('rowheader').textContent.trim()),
+    ).toEqual(['D&D 5e', 'Library']);
+    expect(within(section).getByRole('button', { name: 'Replace the plan with the best versions' })).toBeEnabled();
+    expect(within(section).queryByRole('status')).toBeNull();
+  });
+});

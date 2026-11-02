@@ -746,6 +746,51 @@ export class UpdateState {
     if (!this.locked) this.#forced.delete(key);
   }
 
+  /**
+   * Replace the plan with the best versions there are: the newest of Foundry VTT, then of each game system, then of each
+   * module installed, that the plan can take with those chosen before it, as choosing each by hand would, so that every
+   * recorded world keeps working. A package locked, in Foundry or, for Foundry VTT itself, in EMMA, has no other
+   * version to choose, so it stays as it is. What was chosen before goes, uninstalls and packages added against advice
+   * among it. It is greedy: the order is a choice, and another might find newer versions of some packages at the cost
+   * of others.
+   * @returns Whether the plan was replaced: not while it runs, nor before the search has found anything
+   */
+  async planBest(): Promise<boolean> {
+    const search = this.search;
+    const overview = this.#overview;
+    if (search === null || overview === null || this.locked) return false;
+    const { planner } = search;
+    const keys = [
+      'core',
+      ...overview.systems.map(({ id }) => `system:${id}`),
+      ...overview.modules.map(({ module: { id } }) => `module:${id}`),
+    ];
+    this.planning = true;
+    try {
+      let picks: ReadonlyMap<PackageKey, string> = new SvelteMap();
+      for (const key of keys) {
+        for (const version of planner.candidates(key)) {
+          if (planner.missingManifest(key, version)) continue;
+          const tried = withChoice(picks, key, version);
+          if ((await planner.complete(tried)).ok) {
+            picks = tried;
+            break;
+          }
+        }
+      }
+      const plan = picks.size === 0 ? [] : await planner.plan(picks);
+      if (plan === undefined || search !== this.search) return false;
+      this.#picks.clear();
+      this.#forced.clear();
+      this.#safeguardEdits.clear();
+      for (const [picked, to] of picks) this.#picks.set(picked, to);
+      this.plan = plan;
+      return true;
+    } finally {
+      this.planning = false;
+    }
+  }
+
   /** Take back every choice, and what was changed of the plan's snapshot and backups. */
   clear(): void {
     if (this.locked) return;
