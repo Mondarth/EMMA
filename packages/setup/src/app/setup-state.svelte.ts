@@ -37,6 +37,8 @@ export interface SetupStateOptions {
   readonly keepPendingPlan?: (plan: PendingPlan | null) => boolean;
   /** The plan kept to restore after Foundry VTT's update, if any. */
   readonly pendingPlan?: () => PendingPlan | undefined;
+  /** Keep whether EMMA keeps Foundry VTT at the build installed, which reading the installation then reads; none can be without. */
+  readonly lockCore?: (locked: boolean) => void;
   /** Lock a game system or module in Foundry, or unlock it, as Foundry's own package menu does; none can be without. */
   readonly lockPackage?: (type: 'module' | 'system', id: string, lock: boolean) => Promise<void>;
   /** Read Foundry's listing of the packages of a type that may be installed; none where it cannot be read. */
@@ -203,6 +205,29 @@ export class SetupState {
     } catch {
       return false;
     }
+    await this.refresh();
+    return true;
+  }
+
+  /**
+   * Whether Foundry VTT can be locked here.
+   * @returns `true` where it can
+   */
+  get canLockCore(): boolean {
+    return this.#options.lockCore !== undefined;
+  }
+
+  /**
+   * Lock Foundry VTT at the build installed, or unlock it: EMMA's own lock, as Foundry has none for itself. Locked, the
+   * plan never updates Foundry VTT, though it still updates the game systems and modules that run on its build. The
+   * installation is read afresh, so that the plan takes the lock. Nothing is done while the plan runs.
+   * @param lock - Whether to lock it, or unlock it
+   * @returns Whether it was done
+   */
+  async setCoreLocked(lock: boolean): Promise<boolean> {
+    const lockCore = this.#options.lockCore;
+    if (lockCore === undefined || this.running || this.updates.locked) return false;
+    lockCore(lock);
     await this.refresh();
     return true;
   }

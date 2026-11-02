@@ -5,9 +5,12 @@ import {
   GUARD_KEY,
   LAYOUT_KEY,
   PENDING_PLAN_KEY,
+  CORE_LOCK_KEY,
+  readCoreLocked,
   readGuardOn,
   readLayout,
   readPendingPlan,
+  writeCoreLocked,
   writeGuardOn,
   writeLayout,
   writePendingPlan,
@@ -16,6 +19,32 @@ import {
 afterEach(() => {
   vi.unstubAllGlobals();
   localStorage.clear();
+});
+
+describe("EMMA's lock of Foundry VTT", () => {
+  test('is off until switched on, and is kept', () => {
+    expect(readCoreLocked()).toBe(false);
+
+    writeCoreLocked(true);
+    expect(localStorage.getItem(CORE_LOCK_KEY)).toBe('locked');
+    expect(readCoreLocked()).toBe(true);
+
+    writeCoreLocked(false);
+    expect(localStorage.getItem(CORE_LOCK_KEY)).toBeNull();
+    expect(readCoreLocked()).toBe(false);
+  });
+
+  test('is off, and is not kept, when the storage refuses', () => {
+    const blocked = () => {
+      throw new Error('blocked');
+    };
+    vi.stubGlobal('localStorage', { getItem: blocked, setItem: blocked, removeItem: blocked });
+
+    expect(readCoreLocked()).toBe(false);
+    expect(() => {
+      writeCoreLocked(true);
+    }).not.toThrow();
+  });
 });
 
 describe('the guard setting', () => {

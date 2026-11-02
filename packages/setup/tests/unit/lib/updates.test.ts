@@ -18,6 +18,7 @@ const CORE = { version: '14.368', generation: 14, channel: 'stable' } as const;
  * @param unrecorded - The IDs of worlds without a record, which use D&D 5e too
  * @param cores - Foundry's builds known, the installed one, 14.368, among them
  * @param locked - The IDs of the modules locked in Foundry
+ * @param coreLocked - Whether Foundry VTT is locked in EMMA
  * @returns What the search found
  */
 async function search(
@@ -28,6 +29,7 @@ async function search(
   unrecorded: readonly string[] = [],
   cores: readonly CoreRelease[] = [CORE],
   locked: readonly string[] = [],
+  coreLocked = false,
 ) {
   const overview = buildOverview(
     installation({
@@ -37,6 +39,7 @@ async function search(
         ...(locked.includes(id) && { locked: true as const }),
       })),
       systems: systems.map(([id, version]) => ({ id, title: id, version })),
+      ...(coreLocked && { coreLocked: true as const }),
     }),
     new Map<string, RecordState>(
       Object.entries(records).map(([world, run]) => [
@@ -441,6 +444,30 @@ describe('updates of Foundry VTT itself', () => {
    * @returns No version
    */
   const none = () => undefined;
+
+  test('offer none while Foundry VTT is locked in EMMA, though the modules that run on its build are updated', async () => {
+    const found = await search(
+      [['app', '1.0.0']],
+      { a: [['app', '1.0.0']] },
+      [
+        ...DND,
+        release('module:app', '1.0.0'),
+        release('module:app', '1.5.0'),
+        // Needs a newer build than the one locked.
+        release('module:app', '2.0.0', { core: { minimum: '14.369', verified: '14.369' } }),
+      ],
+      undefined,
+      [],
+      CORES,
+      [],
+      true,
+    );
+
+    expect(found.updates.get('core')).toBeUndefined();
+    expect(found.blocked.get('core')).toBeUndefined();
+    expect(found.updates.get('module:app')).toMatchObject({ newest: '1.5.0' });
+    expect(found.planner.candidates('core')).toEqual([]);
+  });
 
   test('offer the newest build every recorded world can take, blocking a newer one and naming the world', async () => {
     const found = await search(

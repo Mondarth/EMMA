@@ -271,6 +271,17 @@
               onGuardChange={(on: boolean) => {
                 setup.setGuardOn(on);
               }} />
+            {#if setup.canLockCore}
+              <LockSection
+                core
+                title={localize('Tree.Root')}
+                version={overview.core}
+                locked={overview.coreLocked === true}
+                disabled={updates.locked || setup.running}
+                onLock={(locking: boolean) => {
+                  void setup.setCoreLocked(locking);
+                }} />
+            {/if}
           {/if}
         </section>
       </div>

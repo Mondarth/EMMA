@@ -182,6 +182,7 @@ function rootNode(overview: Overview, pending: Pending): TreeNode {
     title: localize('Tree.Root'),
     version: overview.core,
     installed: true,
+    ...(overview.coreLocked && { locked: true }),
     children: () => [systems, grouped],
   };
 }

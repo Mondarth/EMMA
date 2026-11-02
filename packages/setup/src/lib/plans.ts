@@ -299,7 +299,14 @@ export function createPlanner(inputs: PlannerInputs): Planner {
   const channels = policy.coreChannels ?? ['stable'];
   // A package locked in Foundry keeps its installed release alone, however releases are found.
   const unlocked = keepsLocked(resolver, overview);
-  let universe = { core: inputs.universe.core, releases: inputs.universe.releases.filter(unlocked) };
+  // So does Foundry VTT locked in EMMA: its installed build alone.
+  const { core: builtFrom } = inputs.universe;
+  let universe = {
+    core:
+      overview.coreLocked === true ? builtFrom.filter(build => sameVersion(build.version, overview.core)) : builtFrom,
+    releases: inputs.universe.releases.filter(unlocked),
+  };
+
   const builds = () =>
     newestFirst(
       resolver,

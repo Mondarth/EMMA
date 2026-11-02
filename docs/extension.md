@@ -354,6 +354,12 @@ The panel of each installed game system and module has a **Lock** section: **Loc
 <title>**, which locks or unlocks it in Foundry at once, as Foundry's own package menu does, and reads the installation
 again. A choice of the package in the plan goes once it is locked.
 
+Foundry VTT itself can be locked too, in EMMA alone, as Foundry has no lock for itself: the root's panel has the same
+**Lock** section, **Lock Foundry VTT at <build>**. Locked, the plan never updates Foundry VTT, nor offers a newer
+build, but still updates the game systems and modules that run on the build installed, so that a server can be kept on
+its build and still have its packages brought up to date. The tree's root shows the lock, **Locked in EMMA**. The
+browser remembers the lock for that server. It does not stop Foundry's own **Update Software**.
+
 ### Uninstalling
 
 The panel of a game system or module has an **Uninstall** section below it. **Uninstall <title>** puts the package in

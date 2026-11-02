@@ -101,6 +101,8 @@ export interface Summary {
 /** Everything EMMA shows on the setup screen. */
 export interface Overview {
   readonly core: string;
+  /** Whether EMMA keeps Foundry VTT at the build installed (see {@link Installation.coreLocked}). */
+  readonly coreLocked?: true;
   /** The installed game systems, sorted by title. */
   readonly systems: readonly InstalledPackage[];
   readonly worlds: readonly WorldOverview[];
@@ -132,6 +134,7 @@ export function buildOverview(installation: Installation, records: ReadonlyMap<s
   });
   return {
     core: installation.core,
+    ...(installation.coreLocked && { coreLocked: true }),
     systems: installation.systems,
     worlds,
     modules: uses,
