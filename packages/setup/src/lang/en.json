@@ -138,6 +138,10 @@
   "Plan": {
     "Safeguards": "Keep first",
     "CoreBlocked": "Cannot update in place: {reason}",
+    "NotNewest": "Not the newest build: {version} is.",
+    "ChooseNewest": "Choose {version}",
+    "NewestNeeds": "The plan can take it only without {choices}.",
+    "NewestUnavailable": "The plan cannot take it, whatever is taken out of it.",
     "Changes": "Changes",
     "Keep": "Keep",
     "Note": "Note",
