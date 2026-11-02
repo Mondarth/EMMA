@@ -282,7 +282,23 @@ export async function lookUpReleases(installed: InstalledManifests, options: Loo
       ),
     readManifest: async (url, type) => {
       const fetched = await http.getJson(url, { maxAge: 0 });
-      if (!fetched.ok) return { ok: false, problem: 'unreadable' };
+      if (!fetched.ok) {
+        const { reason, status } = fetched.gap;
+        let host = url;
+        try {
+          host = new URL(url).hostname;
+        } catch {
+          // Not a URL: named as it is.
+        }
+        return {
+          ok: false,
+          problem: 'unreadable',
+          reason,
+          ...(status !== undefined && { status }),
+          host,
+          proxied: proxy !== null,
+        };
+      }
       const shape = manifestShape(fetched.value);
       const typed = manifestTypeOf(url, fetched.value);
       if (shape !== undefined && typed !== undefined && typed !== type) {

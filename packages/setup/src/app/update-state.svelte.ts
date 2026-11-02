@@ -16,7 +16,7 @@ import type { Safeguard, SafeguardEdit } from '../lib/safeguards';
 import { safeguardsFor } from '../lib/safeguards';
 import type { UninstallEffects } from '../lib/uninstall';
 import { uninstallEffects } from '../lib/uninstall';
-import type { BlockedUpdate, PackageUpdate, UpdateSearch, VersionOption } from '../lib/updates';
+import type { BlockedUpdate, ManifestRead, PackageUpdate, UpdateSearch, VersionOption } from '../lib/updates';
 
 /**
  * Where the search for updates is: `unavailable` when it cannot be made, as without an EMMA module whose setup kit
@@ -107,6 +107,22 @@ function titleIn(overview: Overview, key: PackageKey): string {
     ? overview.systems.find(system => system.id === id)
     : overview.modules.find(use => use.module.id === id)?.module;
   return installed?.title ?? key;
+}
+
+/**
+ * Why a manifest the user gave could not be added, in words.
+ * @param read - What reading it found
+ * @returns The reason
+ */
+function unreadText(read: Exclude<ManifestRead, { ok: true }>): string {
+  if (read.problem === 'not-manifest') return localize('Manifest.NotManifest');
+  if (read.problem === 'other-type')
+    return localize(read.type === 'system' ? 'Manifest.IsSystem' : 'Manifest.IsModule');
+  const { reason, status, host, proxied } = read;
+  if (reason === 'http' && status === 403 && proxied) return format('Manifest.Forbidden', { host });
+  if (reason === 'http') return format('Manifest.Status', { host, status: String(status ?? '') });
+  if (reason === 'network') return format(proxied ? 'Manifest.Unreached' : 'Manifest.NoCors', { host });
+  return localize(reason === 'budget' ? 'Manifest.Budget' : 'Manifest.NotJson');
 }
 
 /** The updates, and the versions chosen. */
@@ -616,15 +632,7 @@ export class UpdateState {
     const read = search?.readManifest;
     if (search === null || read === undefined || this.locked) return { ok: false, reason: localize('Install.NotNow') };
     const found = await read(url, type);
-    if (!found.ok) {
-      return {
-        ok: false,
-        reason:
-          found.problem === 'other-type'
-            ? localize(found.type === 'system' ? 'Manifest.IsSystem' : 'Manifest.IsModule')
-            : localize(found.problem === 'unreadable' ? 'Manifest.Unreadable' : 'Manifest.NotManifest'),
-      };
-    }
+    if (!found.ok) return { ok: false, reason: unreadText(found) };
     const { release, title } = found;
     const key = `${release.package.type}:${release.package.id}`;
     if (this.#installedOf(key) !== undefined) return { ok: false, reason: format('Manifest.Installed', { title }) };

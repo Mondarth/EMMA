@@ -133,7 +133,19 @@ export interface UpdateSearch {
 /** What reading a manifest the user gives found: the release it describes, or why it is none. */
 export type ManifestRead =
   | { readonly ok: true; readonly release: Release; readonly title: string }
-  | { readonly ok: false; readonly problem: 'unreadable' | 'not-manifest' }
+  | { readonly ok: false; readonly problem: 'not-manifest' }
+  | {
+      readonly ok: false;
+      readonly problem: 'unreadable';
+      /** Why: the server answered with an error, could not be reached, the budget of requests ran out, or not JSON. */
+      readonly reason: 'http' | 'network' | 'budget' | 'invalid';
+      /** The server's status, for an error. */
+      readonly status?: number;
+      /** The host asked. */
+      readonly host: string;
+      /** Whether it was asked through EMMA's proxy. */
+      readonly proxied: boolean;
+    }
   | { readonly ok: false; readonly problem: 'other-type'; readonly type: 'module' | 'system' };
 
 /** Read a manifest the user gives, as of a type of package. */

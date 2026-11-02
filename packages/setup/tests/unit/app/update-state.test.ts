@@ -699,18 +699,38 @@ describe('installing from a manifest URL', () => {
   });
 
   test('says why a manifest cannot be added', async () => {
+    const unread = { ok: false, problem: 'unreadable', host: 'example.org' } as const;
     const reasons = await Promise.all(
       (
         [
-          { ok: false, problem: 'unreadable' },
+          { ...unread, reason: 'http', status: 403, proxied: true },
+          { ...unread, reason: 'http', status: 404, proxied: true },
+          { ...unread, reason: 'http', status: 403, proxied: false },
+          { ...unread, reason: 'http', proxied: false },
+          { ...unread, reason: 'network', proxied: true },
+          { ...unread, reason: 'network', proxied: false },
+          { ...unread, reason: 'budget', proxied: true },
+          { ...unread, reason: 'invalid', proxied: true },
           { ok: false, problem: 'not-manifest' },
-          { ok: false, problem: 'other-type', type: 'system' },
           { ok: false, problem: 'other-type', type: 'module' },
-          { ok: true, release: { ...DICE, package: { type: 'module', id: 'app' } }, title: 'App' },
         ] satisfies ManifestRead[]
-      ).map(async read => (await (await searched(read)).updates.installFrom(DICE_URL, 'module')).ok),
+      ).map(async read => {
+        const result = await (await searched(read)).updates.installFrom(DICE_URL, 'system');
+        return result.ok ? '' : result.reason;
+      }),
     );
-    expect(reasons).toEqual([false, false, false, false, false]);
+    expect(reasons).toEqual([
+      "EMMA's proxy refused to read it from example.org (403). The proxy reads only from the sites packages are known to be on, such as GitHub, GitLab and Foundry's own; or example.org itself refused it.",
+      'example.org answered 404, not the manifest.',
+      'example.org answered 403, not the manifest.',
+      'example.org answered , not the manifest.',
+      'example.org could not be reached.',
+      'example.org could not be reached, or does not let a browser read it (it sends no CORS headers), and this build of EMMA has no proxy to read it through.',
+      'EMMA has made as many requests as it may this session. Read the installation again later.',
+      "What the URL gives is not a manifest's JSON.",
+      "That is not a game system's or module's manifest.",
+      "That is a module's manifest, not a game system's.",
+    ]);
 
     const { updates } = await searched({ ok: false, problem: 'other-type', type: 'system' });
     await expect(updates.installFrom(DICE_URL, 'module')).resolves.toEqual({

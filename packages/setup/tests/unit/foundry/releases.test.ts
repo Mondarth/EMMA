@@ -103,6 +103,18 @@ describe('lookUpReleases', () => {
     await expect(found.readManifest('https://example.org/gone/module.json', 'module')).resolves.toEqual({
       ok: false,
       problem: 'unreadable',
+      reason: 'http',
+      status: 404,
+      host: 'example.org',
+      proxied: false,
+    });
+    // A site that sends no CORS headers is not asked without the proxy.
+    await expect(
+      found.readManifest('https://github.com/o/r/releases/latest/download/module.json', 'module'),
+    ).resolves.toMatchObject({
+      problem: 'unreadable',
+      reason: 'network',
+      host: 'github.com',
     });
     await expect(found.readManifest('https://example.org/page.json', 'module')).resolves.toEqual({
       ok: false,
