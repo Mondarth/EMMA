@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { format, formatSize, localize } from '../../../src/lib/i18n';
+import { format, formatSize, localize, takesAn } from '../../../src/lib/i18n';
 
 describe('localize', () => {
   test('finds a nested key', () => {
@@ -31,5 +31,22 @@ describe('formatSize', () => {
     [7_000_000_000_000_000, '7,000 TB'],
   ])('gives %d bytes as %s', (bytes, words) => {
     expect(formatSize(bytes)).toBe(words);
+  });
+});
+
+describe('takesAn', () => {
+  test.each([
+    ['Ancient Worlds', true],
+    ['Earthdawn', true],
+    ['Old-School Essentials', true],
+    ['Urban Shadows', true],
+    ['Ultimate Fantasy', true],
+    ['Universal', false],
+    ['useful things', false],
+    ['Utility', false],
+    ['Dungeons and Dragons Fifth Edition', false],
+    ['  Iron Kingdoms', true],
+  ])('says %j takes an: %s', (word, an) => {
+    expect(takesAn(word)).toBe(an);
   });
 });

@@ -132,6 +132,23 @@ describe('startEmmaSetup', () => {
     expect(await screen.findByText('No updates found')).toBeInTheDocument();
   });
 
+  test("reads Foundry's listing of what may be installed, as its Install dialog does", async () => {
+    const { game } = installSetupMocks();
+    const getPackages = vi.fn(() =>
+      Promise.resolve(new Map([['dice', { id: 'dice', title: 'Dice', version: '1.0.0' }]])),
+    );
+    Object.assign(game, { getPackages });
+    const menu = showMenu();
+    await startEmmaSetup();
+    menu.querySelector('button')?.click();
+    const setup = vi.mocked(openEmmaSetup).mock.lastCall?.[0] as SetupState;
+
+    await setup.loadListing('module');
+
+    expect(setup.listings.module).toEqual([expect.objectContaining({ id: 'dice' })]);
+    expect(setup.canInstall).toBe(true);
+  });
+
   test("asks the server for the space a snapshot needs, as Foundry's own dialog does", async () => {
     const { post } = installSetupMocks();
     post.mockResolvedValue({ required: 10, available: 20 });

@@ -129,6 +129,10 @@ Foundry VTT
 - **Under each module**, wherever it shows, the modules it requires, and under those the modules they require in turn.
   A requirement that is not installed is marked **Not installed**.
 
+A game system or module the plan installs anew shows in the tree as soon as it is added, at the version the plan
+takes, on a pale amber background with an amber edge, marked **Pending**: a game system among the game systems, with
+a group of the modules for it, and a module in the groups of the game systems it is for, as Foundry's listing says.
+
 A game system's panel gives the version installed, how many modules are for it, and the worlds that use it, each with
 the version it last ran with; under a world, also the version that world last ran with.
 
@@ -217,9 +221,9 @@ say what a world's backup needs, so its row gives the space free alone. What is 
 **Run plan** lists the steps and asks to confirm them, then runs them in order:
 
 1. the snapshot and backups checked, as Foundry's **Manage Backups** makes them;
-2. each package change, installed from the manifest URL of the version chosen, as Foundry's Install button installs
-   one; the guard lets EMMA's installs through. Foundry's dependency dialog is not shown, as the plan already has
-   what each change needs;
+2. each package change, a package installed anew among them, installed from the manifest URL of the version chosen,
+   as Foundry's Install button installs one; the guard lets EMMA's installs through. Foundry's dependency dialog is
+   not shown, as the plan already has what each change needs;
 3. each package to uninstall, last, once nothing installed needs it (see [Uninstalling](#uninstalling)).
 
 Each row says how far its step has got, and the footer how the run went. A run stops at the first step that fails,
@@ -268,6 +272,62 @@ declares, Foundry's package listing, and GitHub's and GitLab's lists of releases
 A browser cannot read Foundry's listing or the manifests attached to GitHub releases itself, which the proxy lets it
 do. Without the proxy, as in a development build, a version found only in a release list says nothing of the Foundry
 VTT versions it works with, and is not offered.
+
+### Installing
+
+The panels of the **Game systems** and **Modules** groups have an **Install** section below them, of the packages on
+Foundry's own package listing, which EMMA reads as Foundry's Install dialog does, through the server, so it needs no
+proxy. It offers those that fit the installation and the plan: not installed, not a premium package the user does not
+own, whose newest version runs on the plan's Foundry VTT build, and, for a module, for a game system that stays
+installed, or for any. A game system's group of modules offers those for it, and the universal group those for any
+system. A search finds a package by its title, ID or author. The list shows enough packages to fill the panel, and
+more as it is scrolled down.
+
+Two filters narrow it, each kept for the session, apart for game systems and for modules:
+
+- **Hide … more than one generation behind the plan's build**, on at first, hides what was made for an older
+  generation of Foundry VTT: one verified on, or, if it says none, requiring at least, a generation more than one
+  behind, such as 12 or 0.6.6 on a 14 build. Many old packages declare no maximum, so would seem to run on every build
+  since.
+- **Show premium … I do not own**, off at first, shows premium packages that Foundry cannot install for you. They
+  cannot be added.
+- For modules, a badge for each tag on Foundry's listing, and **Untagged** for those it gives none, all on at first. A
+  module shows if any of its tags is on. A click turns a tag on or off; a shift-click turns every other tag off first,
+  so on a tag that is off it shows that tag alone, and on one that is on it turns every tag off.
+
+Each package's title opens and closes a drawer, as the triangle at the right of it shows, of what Foundry's listing
+says of it: its description, as plain text, authors, newest version, the Foundry VTT builds it declares, the game
+systems a module is for, its tags, whether it is premium or exclusive content, and its web page.
+
+The checkbox at the left of each title, **Install <title>**, is ticked while the plan installs it. Ticking it looks up
+the package's releases, from the same sources as the updates, and the plan takes the newest version that fits with its
+other choices, and with what that version requires, which comes in with it. Its row says it is not installed. If no
+version fits, the section says why, in the resolver's words, and the box stays unticked. Unticking it takes it out of
+the plan again, with what it brought in. A premium package you do not own has its box disabled.
+
+**Manifest URL**, at the top of the section, installs a package from a manifest you give, as Foundry's own Install
+dialog can. **+** (or Enter) reads it, through EMMA's proxy where a site sends no CORS headers, and checks that it is a
+manifest of the section's type: by its file name, `module.json` or `system.json`, or failing that by the fields only a
+game system declares. A package installed already, or in the plan already, is refused. EMMA then looks up the modules
+it requires, and checks the version it gives against the plan, as for any other: if the plan can take it, it is added,
+at the manifest's URL as its own.
+
+If the plan cannot take it, the section says why, with **Override and add anyway**, in red. That adds it to the plan
+against EMMA's advice: it is installed as the manifest gives it, and left out of everything the plan resolves, so it
+stops nothing else being planned, nor is anything planned around it. Its row in the plan is red, and says **Added
+against EMMA's advice**, and the section says it is in the plan, with a button to take it out again. A package added
+this way is kept through a new search, until it is installed, but not through a reload for Foundry VTT's own update.
+
+Foundry's listing gives each package's newest version alone, without the modules it requires, and looking up every
+listed package's releases would take thousands of requests. So the section filters by what the listing says, and a
+package whose newest version does not fit is not offered, even if an older version would.
+
+Some packages publish only a "latest" manifest, such as `releases/latest/download/module.json` or a file on a branch,
+that always gives the newest version, and no manifest for any one version. EMMA installs and updates them from that
+manifest, at the version it gives now: the newest release found from it, and, where Foundry's own package listing
+lists the package, only at the version the listing gives. Older versions found from it cannot be installed, as the
+manifest no longer gives them, so such a package has only the version installed and the latest to choose between.
+What its download gives may also change under the same version.
 
 ### Uninstalling
 

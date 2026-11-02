@@ -59,3 +59,13 @@ export function formatSize(bytes: number): string {
     maximumFractionDigits: value < 10 ? 1 : 0,
   }).format(value);
 }
+
+/**
+ * Whether an English word takes `an` rather than `a`: one that starts with a vowel sound. A `u` said as "you", as in
+ * "Universal", "useful" or "utility", takes `a`. A heuristic, for EMMA's English text alone.
+ * @param word - The word, such as a game system's title
+ * @returns `true` for `an`
+ */
+export function takesAn(word: string): boolean {
+  return /^(?:[aeio]|u(?!ni|s[aeiu]|r[aeiou]|ti|ku|ga|vu|bi|ki))/i.test(word.trim());
+}

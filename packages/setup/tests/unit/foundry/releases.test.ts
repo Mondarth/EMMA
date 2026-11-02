@@ -59,6 +59,95 @@ describe('lookUpReleases', () => {
     await expect(found.load([])).resolves.toEqual([]);
   });
 
+  test('installs from a "latest" manifest at the version it gives, where the index agrees or cannot be read', async () => {
+    const url = 'https://packages.example.test/app/module.json';
+    const installed: InstalledManifests = { core: CORE, manifests: [moduleManifest('app', '1.0.0', url)] };
+    const send = answering({
+      [url]: { id: 'app', title: 'App', version: '2.0.0', compatibility: { minimum: '14', verified: '14' } },
+    });
+    const newest = async (index?: () => Promise<ReadonlyMap<string, string>>) => {
+      const found = await lookUpReleases(installed, {
+        kit: KIT,
+        catalogue: null,
+        proxy: null,
+        fetch: send,
+        ...(index !== undefined && { index }),
+      });
+      return found.universe.releases.find(({ version }) => version === '2.0.0')?.versionManifest;
+    };
+
+    await expect(newest()).resolves.toBe(url);
+    await expect(newest(() => Promise.resolve(new Map([['module:app', '2.0.0']])))).resolves.toBe(url);
+    await expect(newest(() => Promise.resolve(new Map([['module:app', '2.1.0']])))).resolves.toBeUndefined();
+    await expect(newest(() => Promise.reject(new Error('offline')))).resolves.toBe(url);
+  });
+
+  test('reads a manifest the user gives, as the version it names, from its own URL', async () => {
+    const url = 'https://example.org/dice/module.json';
+    const send = answering({
+      [url]: { id: 'dice', title: 'Dice', version: '1.2.0', compatibility: { minimum: '14' } },
+      'https://example.org/page.json': { hello: 'world' },
+      'https://example.org/pf2e/system.json': { id: 'pf2e', title: 'Pathfinder', version: '8.6.1' },
+    });
+    const found = await lookUpReleases(
+      { core: CORE, manifests: [] },
+      { kit: KIT, catalogue: null, proxy: null, fetch: send },
+    );
+
+    const read = await found.readManifest(url, 'module');
+    expect(read).toMatchObject({
+      ok: true,
+      title: 'Dice',
+      release: { package: { type: 'module', id: 'dice' }, version: '1.2.0', manifest: url, versionManifest: url },
+    });
+    await expect(found.readManifest('https://example.org/gone/module.json', 'module')).resolves.toEqual({
+      ok: false,
+      problem: 'unreadable',
+      reason: 'http',
+      status: 404,
+      host: 'example.org',
+      proxied: false,
+    });
+    // A site that sends no CORS headers is not asked without the proxy.
+    await expect(
+      found.readManifest('https://github.com/o/r/releases/latest/download/module.json', 'module'),
+    ).resolves.toMatchObject({
+      problem: 'unreadable',
+      reason: 'network',
+      host: 'github.com',
+    });
+    await expect(found.readManifest('https://example.org/page.json', 'module')).resolves.toEqual({
+      ok: false,
+      problem: 'not-manifest',
+    });
+    await expect(found.readManifest('https://example.org/pf2e/system.json', 'module')).resolves.toEqual({
+      ok: false,
+      problem: 'other-type',
+      type: 'system',
+    });
+  });
+
+  test('looks up more packages from the same sources, as one to install anew', async () => {
+    const installed: InstalledManifests = { core: CORE, manifests: [] };
+    const send = answering({});
+    const found = await lookUpReleases(installed, { kit: KIT, catalogue: null, proxy: null, fetch: send });
+
+    await expect(found.lookUp([{ type: 'module', id: 'dice' }])).resolves.toEqual([]);
+  });
+
+  test("finds a package to install anew by the manifest URL Foundry's listing gives", async () => {
+    const url = 'https://packages.example.test/dice/module.json';
+    const installed: InstalledManifests = { core: CORE, manifests: [] };
+    const send = answering({
+      [url]: { id: 'dice', title: 'Dice', version: '3.0.0', compatibility: { minimum: '14', verified: '14' } },
+    });
+    const found = await lookUpReleases(installed, { kit: KIT, catalogue: null, proxy: null, fetch: send });
+
+    const releases = await found.lookUp([{ type: 'module', id: 'dice' }], { 'module:dice': [url] });
+
+    expect(releases.map(({ version }) => version)).toEqual(['3.0.0']);
+  });
+
   test('never asks a site that sends no CORS headers', async () => {
     const url = 'https://github.com/someone/lib/releases/latest/download/module.json';
     const send = answering({});

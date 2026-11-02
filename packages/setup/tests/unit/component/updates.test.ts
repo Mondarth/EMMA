@@ -6,7 +6,8 @@ import type { SetupStateOptions } from '../../../src/app/setup-state.svelte';
 import { SetupState } from '../../../src/app/setup-state.svelte';
 import SetupRoot from '../../../src/component/SetupRoot.svelte';
 import { LAYOUT_KEY } from '../../../src/foundry/preferences';
-import type { CoreTarget, CoreUpdateState } from '../../../src/foundry/setup-game';
+import { MODULES, SYSTEMS } from '../../../src/lib/tree';
+import type { CoreTarget, CoreUpdateState, ListedPackage } from '../../../src/foundry/setup-game';
 import type { KitProblem } from '../../../src/foundry/setup-kit';
 import { EXTENSION_RELEASES, KitUnavailable } from '../../../src/foundry/setup-kit';
 import { buildOverview } from '../../../src/lib/overview';
@@ -703,6 +704,504 @@ describe("the panels' sizes", () => {
     await fireEvent.pointerCancel(tree, { pointerId: 1 });
     await fireEvent.pointerMove(tree, { clientX: 300, pointerId: 1 });
     expect(tree).toHaveAttribute('aria-valuenow', '85');
+  });
+});
+
+describe('installing anew', () => {
+  test("offers what fits from Foundry's listing, adds one to the plan at the newest version that fits, and takes it out", async () => {
+    const base = alone(...UPDATES);
+    const planner = {
+      ...base,
+      add: (key: string) => Promise.resolve(key === 'module:dice' || key === 'module:stuck'),
+      candidates: (key: string) =>
+        key === 'module:dice' ? ['2.0.0', '1.0.0'] : key === 'module:stuck' ? ['1.0.0'] : base.candidates(key),
+      complete: (picks: ReadonlyMap<string, string>) =>
+        picks.has('module:stuck') || picks.get('module:dice') === '2.0.0'
+          ? Promise.resolve({ ok: false as const, explanation: ['Alpha cannot keep working.'] })
+          : base.complete(picks),
+      plan: async (picks: ReadonlyMap<string, string>) =>
+        (await base.plan(picks))?.map(entry =>
+          entry.key === 'module:dice'
+            ? { key: entry.key, version: entry.version, manifest: 'https://example.org/dice/module.json' }
+            : entry,
+        ),
+    };
+    const listPackages = vi.fn((type: 'module' | 'system') =>
+      Promise.resolve(
+        type === 'module'
+          ? [
+              {
+                type,
+                id: 'dice',
+                title: 'Dice',
+                version: '2.0.0',
+                author: 'Someone',
+                compatibility: {},
+                systems: [],
+                unowned: false,
+              },
+              { type, id: 'stuck', title: 'Stuck', version: '1.0.0', compatibility: {}, systems: [], unowned: false },
+              { type, id: 'lib', title: 'Library', version: '2.0.0', compatibility: {}, systems: [], unowned: false },
+              { type, id: 'paid', title: 'Paid', version: '1.0.0', compatibility: {}, systems: [], unowned: true },
+            ]
+          : [],
+      ),
+    );
+    const setup = new SetupState({
+      load: () => Promise.resolve(OVERVIEW),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: () =>
+        Promise.resolve({
+          updates: new Map(UPDATES.map(update => [update.key, update])),
+          blocked: new Map(),
+          unresolved: [],
+          judge,
+          planner,
+        }),
+      installModule: noInstall,
+      runStep: () => Promise.resolve(),
+      listPackages,
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    await vi.waitFor(() => {
+      expect(setup.updates.status).toBe('found');
+    });
+    const user = userEvent.setup();
+
+    await user.click(within(row(/^Modules/)).getByText('Modules'));
+    const section = await screen.findByRole('region', { name: 'Install a module' });
+    // Library is installed, and Paid not owned.
+    await vi.waitFor(() => {
+      expect(within(section).getByRole('status')).toHaveTextContent('Showing 2 of 2');
+    });
+    await user.type(within(section).getByRole('searchbox', { name: 'Search' }), 'some');
+    expect(within(section).getByRole('status')).toHaveTextContent('Showing 1 of 1');
+    expect(section).toHaveTextContent('Dice by Someone newest 2.0.0');
+
+    const dice = within(section).getByRole('checkbox', { name: 'Install Dice' });
+    expect(dice).not.toBeChecked();
+    await user.click(dice);
+
+    const plan = await screen.findByRole('region', { name: 'Update plan' });
+    expect(changesIn(plan).getAllByRole('row')[1]).toHaveTextContent(/^Dice\s*Not installed\s*1\.0\.0/);
+    expect(section).toHaveTextContent('In the plan at 1.0.0');
+    expect(dice).toBeChecked();
+
+    await user.click(dice);
+    expect(screen.queryByRole('region', { name: 'Update plan' })).toBeNull();
+    expect(dice).not.toBeChecked();
+
+    await user.clear(within(section).getByRole('searchbox', { name: 'Search' }));
+    const stuck = within(section).getByRole('checkbox', { name: 'Install Stuck' });
+    await user.click(stuck);
+    await vi.waitFor(() => {
+      expect(section).toHaveTextContent(
+        'No version of it fits the installation and the plan. Alpha cannot keep working.',
+      );
+    });
+    // What the plan could not take stays unticked.
+    expect(stuck).not.toBeChecked();
+
+    // A system's group of modules offers those for it; the game systems offer systems.
+    await user.click(within(row(/^Game systems/)).getByText('Game systems'));
+    expect(await screen.findByRole('region', { name: 'Install a game system' })).toHaveTextContent('Showing 0 of 0');
+    expect(listPackages).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('installing anew, by group', () => {
+  /**
+   * Render EMMA's window content, with a listing of modules.
+   * @param listPackages - How the listing is read
+   * @param findUpdates - How updates are found
+   * @returns A user to act with
+   */
+  async function listing(
+    listPackages: (type: 'module' | 'system') => Promise<readonly ListedPackage[]>,
+    findUpdates: SetupStateOptions['findUpdates'] = findingBlocked(),
+  ) {
+    // Tools is for D&D 5e alone, so the modules have a group for it.
+    const overview = buildOverview(
+      installation({
+        modules: [
+          installedModule('lib', 'Library', '1.0.0'),
+          installedModule('tools', 'Tools', '1.0.0', { systems: ['dnd5e'] }),
+        ],
+      }),
+      new Map(),
+    );
+    const setup = new SetupState({
+      load: () => Promise.resolve(overview),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates,
+      installModule: noInstall,
+      runStep: () => Promise.resolve(),
+      listPackages,
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    await vi.waitFor(() => {
+      expect(setup.updates.status).toBe('found');
+    });
+    return userEvent.setup();
+  }
+
+  /**
+   * A module on Foundry's listing.
+   * @param id - Its ID
+   * @param systems - The systems it is for
+   * @returns The module
+   */
+  const listed = (id: string, systems: readonly string[] = []): ListedPackage => ({
+    type: 'module',
+    id,
+    title: id,
+    version: '1.0.0',
+    compatibility: {},
+    systems,
+    unowned: false,
+  });
+
+  test("offers in a game system's group the modules for it, and in the universal group those for any", async () => {
+    const user = await listing(() => Promise.resolve([listed('anywhere'), listed('dnd-only', ['dnd5e'])]));
+
+    await user.click(within(row(/Universal/)).getByText('Universal'));
+    expect(await screen.findByRole('region', { name: 'Install a Universal module' })).toHaveTextContent('anywhere');
+    expect(screen.getByRole('region', { name: 'Install a Universal module' })).not.toHaveTextContent('dnd-only');
+
+    const group = document.querySelector(`[data-key="${MODULES}/system:dnd5e"]`);
+    if (!(group instanceof HTMLElement)) throw new Error('No group for D&D 5e');
+    await user.click(within(group).getByText('D&D 5e'));
+    const section = screen.getByRole('region', { name: 'Install a D&D 5e module' });
+    expect(section).toHaveTextContent('dnd-only');
+    expect(section).not.toHaveTextContent('anywhere');
+  });
+
+  test('filters out old packages and premium ones not owned unless asked, and shows what the listing says', async () => {
+    const user = await listing(() =>
+      Promise.resolve([
+        {
+          ...listed('fresh'),
+          title: 'Fresh',
+          description: 'Rolls dice.',
+          authors: ['Ann', 'Bo'],
+          compatibility: { minimum: '13', verified: '14.368' },
+          tags: ['dice-rolls'],
+          url: 'https://example.org/fresh',
+          exclusive: true,
+        },
+        { ...listed('ancient', ['dnd5e']), title: 'Ancient', compatibility: { minimum: '0.6.6' }, premium: true },
+        { ...listed('paid'), title: 'Paid', unowned: true, premium: true },
+      ]),
+    );
+
+    await user.click(within(row(/^Modules/)).getByText('Modules'));
+    const section = await screen.findByRole('region', { name: 'Install a module' });
+    await vi.waitFor(() => {
+      expect(within(section).getByRole('status')).toHaveTextContent('Showing 1 of 1');
+    });
+    const hide = within(section).getByRole('checkbox', {
+      name: "Hide modules more than one generation behind the plan's build",
+    });
+    const premium = within(section).getByRole('checkbox', { name: 'Show premium modules I do not own' });
+    expect(hide).toBeChecked();
+    expect(premium).not.toBeChecked();
+
+    await user.click(hide);
+    await user.click(premium);
+    expect(within(section).getByRole('status')).toHaveTextContent('Showing 3 of 3');
+    // One not owned cannot be added.
+    expect(within(section).getByRole('checkbox', { name: 'Install Paid' })).toBeDisabled();
+    expect(section).toHaveTextContent('Premium content you do not own, so Foundry cannot install it.');
+
+    // A title opens and closes its drawer.
+    const fresh = within(section).getByText('Fresh').closest('details');
+    if (fresh === null) throw new Error('No details of Fresh');
+    expect(fresh).not.toHaveAttribute('open');
+    await user.click(within(fresh).getByText('Fresh'));
+    expect(fresh).toHaveAttribute('open');
+    expect(fresh).toHaveTextContent(
+      'Description Rolls dice. Authors Ann, Bo Newest version 1.0.0 Foundry VTT minimum 13, verified 14.368 ' +
+        'Game systems Any Tags Dice Rolls Content Exclusive Web page https://example.org/fresh',
+    );
+    expect(within(fresh).getByRole('link', { name: 'https://example.org/fresh' })).toHaveAttribute('target', '_blank');
+    expect(within(section).getByText('Ancient').closest('details')).toHaveTextContent(
+      'Foundry VTT minimum 0.6.6 Game systems dnd5e Content Premium, owned',
+    );
+    expect(within(section).getByText('Paid').closest('details')).toHaveTextContent('Premium, not owned');
+    await user.click(within(fresh).getByText('Fresh'));
+    expect(fresh).not.toHaveAttribute('open');
+    // Each type keeps its own filters.
+    await user.click(within(row(/^Game systems/)).getByText('Game systems'));
+    expect(
+      await screen.findByRole('checkbox', {
+        name: "Hide game systems more than one generation behind the plan's build",
+      }),
+    ).toBeChecked();
+  });
+
+  test('filters modules by tag: a click toggles one, a shift-click shows one alone or turns all off', async () => {
+    const user = await listing(type =>
+      Promise.resolve(
+        type === 'module'
+          ? [{ ...listed('maps'), tags: ['maps', 'art'] }, { ...listed('dice'), tags: ['dice-rolls'] }, listed('plain')]
+          : [{ ...listed('pf2e'), type, tags: ['rules'] }],
+      ),
+    );
+    await user.click(within(row(/^Modules/)).getByText('Modules'));
+    const section = await screen.findByRole('region', { name: 'Install a module' });
+    const tags = await within(section).findByRole('group', { name: 'Tags' });
+    const badge = (name: string) => within(tags).getByRole('button', { name });
+    const status = () => within(section).getByRole('status');
+
+    expect(
+      within(tags)
+        .getAllByRole('button')
+        .map(button => button.textContent.trim()),
+    ).toEqual(['Art', 'Dice Rolls', 'Maps', 'Untagged']);
+    expect(
+      within(tags)
+        .getAllByRole('button')
+        .every(button => button.getAttribute('aria-pressed') === 'true'),
+    ).toBe(true);
+    expect(status()).toHaveTextContent('Showing 3 of 3');
+
+    await user.click(badge('Untagged'));
+    expect(badge('Untagged')).toHaveAttribute('aria-pressed', 'false');
+    expect(status()).toHaveTextContent('Showing 2 of 2');
+    await user.click(badge('Maps'));
+    // Maps still has Art on.
+    expect(status()).toHaveTextContent('Showing 2 of 2');
+
+    await user.keyboard('{Shift>}');
+    await user.click(badge('Dice Rolls'));
+    await user.keyboard('{/Shift}');
+    expect(status()).toHaveTextContent('Showing 0 of 0');
+    expect(
+      within(tags)
+        .getAllByRole('button')
+        .some(button => button.getAttribute('aria-pressed') === 'true'),
+    ).toBe(false);
+
+    await user.keyboard('{Shift>}');
+    await user.click(badge('Art'));
+    await user.keyboard('{/Shift}');
+    expect(status()).toHaveTextContent('Showing 1 of 1');
+    expect(section).toHaveTextContent('maps');
+
+    // Game systems have no tag filter.
+    await user.click(within(row(/^Game systems/)).getByText('Game systems'));
+    const systems = await screen.findByRole('region', { name: 'Install a game system' });
+    expect(within(systems).queryByRole('group', { name: 'Tags' })).toBeNull();
+  });
+
+  test('adds from a manifest URL, or against advice where the plan cannot take it, marked in red', async () => {
+    const good = 'https://example.org/dice/module.json';
+    const bad = 'https://example.org/old/module.json';
+    const base = alone();
+    const known = new Set<string>();
+    const planner = {
+      ...base,
+      include: (releases: readonly { package: { id: string } }[]) => {
+        for (const { package: ref } of releases) known.add(`module:${ref.id}`);
+      },
+      add: (key: string) => Promise.resolve(known.has(key)),
+      candidates: (key: string) => (key === 'module:dice' && known.has(key) ? ['1.2.0'] : base.candidates(key)),
+      complete: (picks: ReadonlyMap<string, string>) =>
+        picks.has('module:old')
+          ? Promise.resolve({ ok: false as const, explanation: ['Old needs Foundry VTT 9.'] })
+          : base.complete(picks),
+      plan: async (picks: ReadonlyMap<string, string>) =>
+        (await base.plan(picks))?.map(({ installed: _none, ...entry }) => entry),
+    };
+    const manifestOf = (id: string, url: string) => ({
+      ...release(`module:${id}`, '1.2.0'),
+      manifest: url,
+      versionManifest: url,
+    });
+    const user = await listing(
+      () => Promise.resolve([]),
+      () =>
+        Promise.resolve({
+          updates: new Map(),
+          blocked: new Map(),
+          unresolved: [],
+          judge,
+          planner,
+          readManifest: (url: string) =>
+            Promise.resolve(
+              url === good
+                ? { ok: true as const, release: manifestOf('dice', good), title: 'Dice' }
+                : { ok: true as const, release: manifestOf('old', bad), title: 'Old' },
+            ),
+        }),
+    );
+    await user.click(within(row(/^Modules/)).getByText('Modules'));
+    const section = await screen.findByRole('region', { name: 'Install a module' });
+    const field = within(section).getByRole('textbox', { name: 'Manifest URL' });
+    const add = within(section).getByRole('button', { name: 'Add from the manifest URL' });
+    expect(add).toBeDisabled();
+
+    await user.type(field, good);
+    await user.click(add);
+    expect(await within(section).findByText('Dice 1.2.0 is in the plan.')).toBeInTheDocument();
+    expect(field).toHaveValue('');
+
+    await user.type(field, `${bad}{Enter}`);
+    const refused = await within(section).findByRole('alert');
+    expect(refused).toHaveTextContent('The plan cannot take it. Old needs Foundry VTT 9.');
+    await user.click(within(refused).getByRole('button', { name: 'Override and add anyway' }));
+
+    const plan = screen.getByRole('region', { name: 'Update plan' });
+    const old = changesIn(plan)
+      .getAllByRole('row')
+      .find(tr => tr.textContent.includes('Old'));
+    expect(old).toHaveClass('emma-plan-forced');
+    expect(old).toHaveTextContent(/Old\s*Not installed\s*1\.2\.0\s*Added against EMMA's advice/);
+    expect(section).toHaveTextContent("Old 1.2.0 is in the plan against EMMA's advice.");
+
+    await user.click(within(section).getByRole('button', { name: 'Take Old out of the plan' }));
+    expect(section).not.toHaveTextContent("against EMMA's advice");
+    expect(
+      changesIn(screen.getByRole('region', { name: 'Update plan' }))
+        .getAllByRole('row')
+        .some(tr => tr.textContent.includes('Old')),
+    ).toBe(false);
+  });
+
+  test('offers the modules for a game system the plan installs', async () => {
+    // Pathfinder is not installed; the planner can add it, and plans it with no version installed.
+    const pathfinder: PackageUpdate = { key: 'system:pf2e', installed: 'none', newest: '7.0.0', versions: ['7.0.0'] };
+    const base = alone(pathfinder);
+    const planner = {
+      ...base,
+      plan: async (picks: ReadonlyMap<string, string>) =>
+        (await base.plan(picks))?.map(({ installed: _none, ...entry }) => entry),
+    };
+    const user = await listing(
+      type =>
+        Promise.resolve(
+          type === 'system'
+            ? [{ ...listed('pf2e'), type, title: 'Pathfinder' }]
+            : [listed('anywhere'), listed('pf-tools', ['pf2e'])],
+        ),
+      () =>
+        Promise.resolve({
+          updates: new Map(),
+          blocked: new Map(),
+          unresolved: [],
+          judge,
+          planner,
+        }),
+    );
+
+    await user.click(within(row(/^Modules/)).getByText('Modules'));
+    const modules = await screen.findByRole('region', { name: 'Install a module' });
+    await vi.waitFor(() => {
+      expect(modules).toHaveTextContent('anywhere');
+    });
+    expect(modules).not.toHaveTextContent('pf-tools');
+
+    await user.click(within(row(/^Game systems/)).getByText('Game systems'));
+    const systems = await screen.findByRole('region', { name: 'Install a game system' });
+    await user.click(await within(systems).findByRole('checkbox', { name: 'Install Pathfinder' }));
+    await vi.waitFor(() => {
+      expect(within(systems).getByRole('checkbox', { name: 'Install Pathfinder' })).toBeChecked();
+    });
+
+    await user.click(within(row(/^Modules/)).getByText('Modules'));
+    expect(await screen.findByRole('region', { name: 'Install a module' })).toHaveTextContent('pf-tools');
+
+    // The tree shows Pathfinder as pending, and a group for its modules, which offers them.
+    const system = document.querySelector(`[data-key="${SYSTEMS}/system:pf2e"]`);
+    expect(system).toHaveClass('emma-tree-pending');
+    expect(system).toHaveTextContent(/Pathfinder\s*7\.0\.0\s*Pending/);
+    const group = document.querySelector(`[data-key="${MODULES}/system:pf2e"]`);
+    if (!(group instanceof HTMLElement)) throw new Error('No group for Pathfinder');
+    expect(group).toHaveClass('emma-tree-pending');
+    await user.click(within(group).getByText('Pathfinder'));
+    const offered = screen.getByRole('region', { name: 'Install a Pathfinder module' });
+    expect(offered).toHaveTextContent('pf-tools');
+    expect(offered).not.toHaveTextContent('anywhere');
+  });
+
+  test('shows more of the list as its end comes into view, and starts again on a search', async () => {
+    // An observer that reports only when told to, as if the panel were filled, or scrolled to the end of the list.
+    const observers: { callback: IntersectionObserverCallback; target?: Element; disconnected: boolean }[] = [];
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        readonly #entry: (typeof observers)[number];
+        constructor(callback: IntersectionObserverCallback) {
+          this.#entry = { callback, disconnected: false };
+          observers.push(this.#entry);
+        }
+        observe(target: Element): void {
+          this.#entry.target = target;
+        }
+        disconnect(): void {
+          this.#entry.disconnected = true;
+        }
+      },
+    );
+    /**
+     * Report to the observer watching whether the end of the list is in view.
+     * @param inView - Whether it is
+     */
+    const report = (inView: boolean): void => {
+      const watching = observers.filter(({ disconnected }) => !disconnected);
+      expect(watching).toHaveLength(1);
+      const [{ callback, target } = { callback: () => undefined }] = watching;
+      if (target === undefined) throw new Error('Nothing observed');
+      callback(
+        [{ isIntersecting: inView, target } as unknown as IntersectionObserverEntry],
+        {} as unknown as IntersectionObserver,
+      );
+    };
+    try {
+      const user = await listing(() =>
+        Promise.resolve(Array.from({ length: 60 }, (_, index) => listed(`mod-${String(index).padStart(2, '0')}`))),
+      );
+
+      await user.click(within(row(/^Modules/)).getByText('Modules'));
+      const section = await screen.findByRole('region', { name: 'Install a module' });
+      await vi.waitFor(() => {
+        expect(within(section).getByRole('status')).toHaveTextContent('Showing 25 of 60');
+      });
+      report(false);
+      expect(within(section).getByRole('status')).toHaveTextContent('Showing 25 of 60');
+      report(true);
+      await vi.waitFor(() => {
+        expect(within(section).getByRole('status')).toHaveTextContent('Showing 50 of 60');
+      });
+      report(true);
+      await vi.waitFor(() => {
+        expect(within(section).getByRole('status')).toHaveTextContent('Showing 60 of 60');
+      });
+      expect(section).toHaveTextContent('mod-59');
+      // All are shown, so nothing is watched.
+      expect(observers.every(({ disconnected }) => disconnected)).toBe(true);
+
+      await user.type(within(section).getByRole('searchbox', { name: 'Search' }), 'mod');
+      expect(within(section).getByRole('status')).toHaveTextContent('Showing 25 of 60');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  test("says when Foundry's listing cannot be read", async () => {
+    const user = await listing(() => Promise.reject(new Error('offline')));
+
+    await user.click(within(row(/^Modules/)).getByText('Modules'));
+
+    await vi.waitFor(() => {
+      expect(screen.getByRole('region', { name: 'Install a module' })).toHaveTextContent(
+        "Could not read Foundry's package listing.",
+      );
+    });
   });
 });
 

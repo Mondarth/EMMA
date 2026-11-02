@@ -97,6 +97,8 @@ export interface SetupGame {
   installPackage?: (options: PackageInstall) => Promise<unknown>;
   /** Asks the user whether to install a package's missing dependencies, and installs those chosen. */
   installDependencies?: (pkg: unknown) => Promise<unknown>;
+  /** Foundry's listing of the packages of a type that may be installed, by ID, as its Install dialog shows it. */
+  getPackages?: (options: { readonly type: 'module' | 'system' }) => Promise<unknown>;
   /** Reads what is installed from the server again, and shows it, as Foundry does after uninstalling a package. */
   reload?: () => Promise<unknown>;
   /** Makes a snapshot of the installation, as **Manage Backups** does, with a note; it says itself if it fails. */
@@ -260,6 +262,119 @@ function field(value: unknown, name: string): unknown {
   return (typeof value === 'object' && value !== null) || typeof value === 'function'
     ? (Reflect.get(value, name) as unknown)
     : undefined;
+}
+
+/** A package on Foundry's listing, which gives only its newest version. */
+export interface ListedPackage {
+  readonly type: 'module' | 'system';
+  readonly id: string;
+  readonly title: string;
+  /** Its newest version. */
+  readonly version: string;
+  readonly author?: string;
+  /** The Foundry builds its newest version runs on, as its manifest declares them. */
+  readonly compatibility: { readonly minimum?: string; readonly verified?: string; readonly maximum?: string };
+  /** The IDs of the game systems a module is for; empty if it is for any. */
+  readonly systems: readonly string[];
+  /** Whether it is a premium package the user does not own, which Foundry cannot install for them. */
+  readonly unowned: boolean;
+  /** Its description, as plain text. */
+  readonly description?: string;
+  /** All its authors' names. */
+  readonly authors?: readonly string[];
+  /** Its project's web page. */
+  readonly url?: string;
+  /** Its manifest's URL, which Foundry installs it from, and EMMA finds its releases by. */
+  readonly manifest?: string;
+  /** The listing's tags for it, such as `maps` or `combat`. */
+  readonly tags?: readonly string[];
+  /** Whether it is premium content, sold through Foundry. */
+  readonly premium?: true;
+  /** Whether it is exclusive content. */
+  readonly exclusive?: true;
+}
+
+/**
+ * Read Foundry's listing of the game systems or modules that may be installed, as its Install dialog does, through
+ * `game.getPackages`, which asks the server, so it needs no proxy. Checked on Foundry 14.368: it answers a `Map` of
+ * each package's data by ID, keeps it for the session, and says itself if the server fails, answering an empty map.
+ * The listing gives each package's newest version alone, without the modules it requires.
+ * @param game - The setup screen's `game`
+ * @param type - Which
+ * @returns The packages, sorted by title; none if Foundry offers no listing
+ */
+export async function listPackages(game: SetupGame, type: 'module' | 'system'): Promise<ListedPackage[]> {
+  const listing = await game.getPackages?.call(game, { type });
+  if (!(listing instanceof Map)) return [];
+  return sorted(Array.from(listing.values() as Iterable<unknown>, entry => toListed(entry, type)));
+}
+
+/**
+ * The newest version of each game system and module Foundry's listing gives, as the index a "latest" manifest's version
+ * is checked against (see `lib/latest.ts`).
+ * @param game - The setup screen's `game`
+ * @returns The versions, by package key
+ */
+export async function readIndex(game: SetupGame): Promise<Map<string, string>> {
+  const listed = await Promise.all([listPackages(game, 'system'), listPackages(game, 'module')]);
+  return new Map(listed.flat().map(({ type, id, version }) => [`${type}:${id}`, version]));
+}
+
+/**
+ * Describe a package on Foundry's listing.
+ * @param entry - Its data
+ * @param type - Its type
+ * @returns The package, or `undefined` if it lacks an ID, title or version
+ */
+function toListed(entry: unknown, type: 'module' | 'system'): ListedPackage | undefined {
+  const described = toPackage(entry);
+  if (described === undefined) return undefined;
+  const data = entry as Record<string, unknown>;
+  const compatibility = field(data, 'compatibility');
+  const version = (name: string) => {
+    const value = field(compatibility, name);
+    return typeof value === 'string' || typeof value === 'number' ? { [name]: String(value) } : {};
+  };
+  const names = field(data, 'authors');
+  const authors = (Array.isArray(names) ? names : [])
+    .map(person => field(person, 'name'))
+    .filter((name): name is string => typeof name === 'string' && name !== '');
+  const [author] = authors;
+  const description = field(data, 'description');
+  const text = typeof description === 'string' ? plainText(description) : '';
+  const url = field(data, 'url');
+  const manifest = field(data, 'manifest');
+  const tags = field(data, 'tags');
+  const tagList = (Array.isArray(tags) ? tags : []).filter((tag): tag is string => typeof tag === 'string');
+  return {
+    type,
+    id: described.id,
+    title: described.title,
+    version: described.version,
+    ...(author !== undefined && { author }),
+    compatibility: { ...version('minimum'), ...version('verified'), ...version('maximum') },
+    systems: type === 'module' ? relatedIds(field(field(data, 'relationships'), 'systems')) : [],
+    unowned: data.protected === true && data.owned !== true,
+    ...(text !== '' && { description: text }),
+    ...(authors.length > 0 && { authors }),
+    ...(typeof url === 'string' && /^https?:\/\//i.test(url) && { url }),
+    ...(typeof manifest === 'string' && /^https?:\/\//i.test(manifest) && { manifest }),
+    ...(tagList.length > 0 && { tags: tagList }),
+    ...(data.protected === true && { premium: true as const }),
+    ...(data.exclusive === true && { exclusive: true as const }),
+  };
+}
+
+/**
+ * The text of a package's description, which its manifest gives as HTML. It is parsed apart from the page, so nothing in
+ * it runs or loads, and only its text is kept, without that of its scripts and styles.
+ * @param html - The description
+ * @returns Its text, with its runs of white space made single spaces
+ */
+function plainText(html: string): string {
+  const parsed = new DOMParser().parseFromString(html, 'text/html');
+  for (const code of parsed.body.querySelectorAll('script, style')) code.remove();
+  return parsed.body.textContent.replace(/\s+/g, ' ').trim();
 }
 
 /** What `game.installPackage` is given. */

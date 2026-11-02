@@ -9,6 +9,8 @@
   import type { Layout } from '../foundry/preferences';
   import { readLayout, writeLayout } from '../foundry/preferences';
   import { EXTENSION_RELEASES } from '../foundry/setup-kit';
+  import type { InstallFilters } from '../lib/install';
+  import { installable, keptSystems, pendingPackages } from '../lib/install';
   import { UNINSTALL } from '../lib/plans';
   import { stepText } from '../lib/run';
   import { groupDetail, moduleDetail, systemDetail } from '../lib/details';
@@ -22,6 +24,7 @@
   import Splitter from './Splitter.svelte';
   import SystemPanel from './SystemPanel.svelte';
   import CoreStep from './CoreStep.svelte';
+  import InstallSection from './InstallSection.svelte';
   import UninstallSection from './UninstallSection.svelte';
   import UpdatePlan from './UpdatePlan.svelte';
   import WorldPanel from './WorldPanel.svelte';
@@ -115,6 +118,49 @@
     }
   }
   const selection = $derived(selected.selection);
+  /** The type of package the selected group offers to install, if it offers any. */
+  const installType = $derived(
+    selection.kind === 'systems'
+      ? 'system'
+      : selection.kind === 'modules' || selection.kind === 'group'
+        ? 'module'
+        : undefined,
+  );
+  /**
+   * What the modules the selected group offers to install are for: universal, or a game system, by its title as the
+   * installation or the plan gives it, or else its ID, as the tree names it; none outside a group.
+   */
+  const installScope = $derived.by(() => {
+    if (selection.kind !== 'group') return undefined;
+    if (selection.system === undefined) return localize('Tree.Universal');
+    const key = `system:${selection.system}`;
+    const title = updates.titleOf(key);
+    return title === key ? selection.system : title;
+  });
+  /** The packages on Foundry's listing that fit the installation and the plan, as the selected group shows them. */
+  const installablePackages = $derived.by(() => {
+    const listing = installType === undefined ? null : setup.listings[installType];
+    if (installType === undefined || overview === null || typeof listing !== 'object' || listing === null) return [];
+    const kept = keptSystems(overview, updates.picks);
+    const fits = installable(
+      listing,
+      overview,
+      { core: updates.chosenOf('core') ?? overview.core, systems: kept },
+      setup.installFilters[installType],
+    );
+    // A system's group offers the modules for it, and the universal group those for any system.
+    if (selection.kind !== 'group') return fits;
+    const { system } = selection;
+    return fits.filter(pkg => (system === undefined ? pkg.systems.length === 0 : pkg.systems.includes(system)));
+  });
+  /**
+   * Change how the user narrows what a listing offers.
+   * @param type - Which listing
+   * @param change - The filters that change
+   */
+  function filterInstall(type: 'module' | 'system', change: Partial<InstallFilters>): void {
+    setup.setInstallFilters(type, change);
+  }
   // What is selected, if it is still there: after reading again, a world may have gone.
   const world = $derived(
     selection.kind === 'world' ? overview?.worlds.find(({ world: { id } }) => id === selection.world) : undefined,
@@ -145,6 +191,11 @@
         <InstallationTree
           {overview}
           {updates}
+          pending={pendingPackages(
+            updates.choices,
+            key => updates.titleOf(key),
+            Array.isArray(setup.listings.module) ? setup.listings.module : [],
+          )}
           selected={selected.key}
           onSelect={(row: TreeRow) => {
             selected = { key: row.key, selection: row.selection };
@@ -174,6 +225,21 @@
             {@render uninstall(`system:${selection.system}`)}
           {:else if selection.kind === 'systems' || selection.kind === 'modules' || selection.kind === 'group'}
             <GroupPanel detail={groupDetail(overview, selection)} />
+            {#if installType !== undefined && setup.canInstall}
+              <InstallSection
+                type={installType}
+                listing={setup.listings[installType]}
+                scope={installScope}
+                packages={installablePackages}
+                filters={setup.installFilters[installType]}
+                {updates}
+                onFilter={(change: Partial<InstallFilters>) => {
+                  filterInstall(installType, change);
+                }}
+                onShow={(type: 'module' | 'system') => {
+                  void setup.loadListing(type);
+                }} />
+            {/if}
           {:else if world !== undefined}
             <WorldPanel {world} />
           {:else}

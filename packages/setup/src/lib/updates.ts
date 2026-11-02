@@ -28,7 +28,15 @@
  * Pure but for the resolver's loading, and the badges, which are Foundry's. The resolver and the badges are the ones the
  * setup kit gives, from the installed EMMA module (see `@mondarth/emma-core/setup-kit`).
  */
-import type { PackageKey, Policy, Release, ReleaseCheck, SetupSpec, Universe } from '@mondarth/fvtt-resolver';
+import type {
+  PackageKey,
+  PackageRef,
+  Policy,
+  Release,
+  ReleaseCheck,
+  SetupSpec,
+  Universe,
+} from '@mondarth/fvtt-resolver';
 
 import type { KitBadge, KitBadges, KitResolver } from '@mondarth/emma-core/setup-kit';
 
@@ -118,7 +126,30 @@ export interface UpdateSearch {
   readonly judge: VersionJudge;
   /** Plans the versions chosen, with what they need. */
   readonly planner: Planner;
+  /** Read a manifest the user gives, to install a package from; none can be without it. */
+  readonly readManifest?: ReadManifest;
 }
+
+/** What reading a manifest the user gives found: the release it describes, or why it is none. */
+export type ManifestRead =
+  | { readonly ok: true; readonly release: Release; readonly title: string }
+  | { readonly ok: false; readonly problem: 'not-manifest' }
+  | {
+      readonly ok: false;
+      readonly problem: 'unreadable';
+      /** Why: the server answered with an error, could not be reached, the budget of requests ran out, or not JSON. */
+      readonly reason: 'http' | 'network' | 'budget' | 'invalid';
+      /** The server's status, for an error. */
+      readonly status?: number;
+      /** The host asked. */
+      readonly host: string;
+      /** Whether it was asked through EMMA's proxy. */
+      readonly proxied: boolean;
+    }
+  | { readonly ok: false; readonly problem: 'other-type'; readonly type: 'module' | 'system' };
+
+/** Read a manifest the user gives, as of a type of package. */
+export type ReadManifest = (url: string, type: 'module' | 'system') => Promise<ManifestRead>;
 
 /** What the search works on. */
 export interface UpdateInputs {
@@ -131,6 +162,13 @@ export interface UpdateInputs {
   readonly universe: Universe;
   /** Load listed releases from their manifests, as the resolver needs them. */
   readonly load: (needs: readonly Release[]) => Promise<readonly Release[]>;
+  /** Look up the releases of packages not installed, to install anew; none can be without it. */
+  readonly lookUp?: (
+    packages: readonly PackageRef[],
+    manifests?: Readonly<Record<PackageKey, readonly string[]>>,
+  ) => Promise<readonly Release[]>;
+  /** Read a manifest the user gives; none can be without it. */
+  readonly readManifest?: ReadManifest;
 }
 
 /**
@@ -298,7 +336,15 @@ export async function findUpdates(inputs: UpdateInputs): Promise<UpdateSearch> {
     updates.set(key, { key, installed: version, newest, versions });
   }
   // A newer version that is not offered on its own may be, with what it needs changed too.
-  const planner = createPlanner({ resolver, overview, universe, load, policy, coreTitle: localize('Tree.Root') });
+  const planner = createPlanner({
+    resolver,
+    overview,
+    universe,
+    load,
+    policy,
+    coreTitle: localize('Tree.Root'),
+    ...(inputs.lookUp !== undefined && { lookUp: inputs.lookUp }),
+  });
   for (const [key, block] of [...blocked]) {
     const completion = await planner.complete(new Map([[key, block.newest]]));
     if (completion.ok) {
@@ -320,7 +366,14 @@ export async function findUpdates(inputs: UpdateInputs): Promise<UpdateSearch> {
       blocked.set(key, { ...block, holds, ...(explanation.length > 0 && { explanation }) });
     }
   }
-  return { updates, blocked, unresolved, judge: judgeIn({ resolver, badges, overview, planner }), planner };
+  return {
+    updates,
+    blocked,
+    unresolved,
+    judge: judgeIn({ resolver, badges, overview, planner }),
+    planner,
+    ...(inputs.readManifest !== undefined && { readManifest: inputs.readManifest }),
+  };
 }
 
 /** How badly each colour of badge fits, worst last; a version with no badge fits, as in the EMMA module. */

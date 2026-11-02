@@ -4,6 +4,8 @@ import {
   checkCoreUpdate,
   checkSnapshotSpace,
   isSetupGame,
+  listPackages,
+  readIndex,
   readCoreUpdate,
   readInstallation,
   readManifests,
@@ -252,5 +254,121 @@ describe("Foundry's updater", () => {
     await expect(startCoreUpdate(game, 'stable')).rejects.toThrow('[SETUP.UpdateRefused]');
     const untranslated = gameWith({}, { error: 'Not allowed' }, false).game;
     await expect(startCoreUpdate(untranslated, 'stable')).rejects.toThrow('Not allowed');
+  });
+});
+
+describe('listPackages', () => {
+  test("reads Foundry's listing as its Install dialog does, sorted by title, leaving out what is incomplete", async () => {
+    const getPackages = vi.fn(() =>
+      Promise.resolve(
+        new Map<string, unknown>([
+          [
+            'midi',
+            {
+              id: 'midi',
+              title: 'Midi QOL',
+              version: '13.0.1',
+              authors: [{ name: 'tposney' }, { name: 'Helper' }, 'odd'],
+              compatibility: { minimum: '14', verified: 14.368, maximum: null },
+              relationships: { systems: [{ id: 'dnd5e' }] },
+              protected: false,
+              exclusive: true,
+              description:
+                '<p>Automates\n  <b>combat</b>.</p><script>alert(1)</script><img src="x" onerror="alert(2)">',
+              url: 'https://example.org/midi',
+              manifest: 'https://example.org/midi/module.json',
+              tags: ['combat', 7, 'automation'],
+            },
+          ],
+          [
+            'dice',
+            { id: 'dice', title: 'Dice', version: '1.0.0', authors: [{ name: '' }], protected: true, owned: true },
+          ],
+          [
+            'paid',
+            {
+              id: 'paid',
+              title: 'Paid',
+              version: '2.0.0',
+              protected: true,
+              url: 'javascript:alert(1)',
+              description: ' ',
+            },
+          ],
+          ['broken', { id: 'broken' }],
+        ]),
+      ),
+    );
+    const { game } = installSetupMocks();
+    Object.assign(game, { getPackages });
+
+    await expect(listPackages(game as never, 'module')).resolves.toEqual([
+      {
+        type: 'module',
+        id: 'dice',
+        title: 'Dice',
+        version: '1.0.0',
+        compatibility: {},
+        systems: [],
+        unowned: false,
+        premium: true,
+      },
+      {
+        type: 'module',
+        id: 'midi',
+        title: 'Midi QOL',
+        version: '13.0.1',
+        author: 'tposney',
+        compatibility: { minimum: '14', verified: '14.368' },
+        systems: ['dnd5e'],
+        unowned: false,
+        // Its description's text alone: what the HTML would run or load is gone.
+        description: 'Automates combat.',
+        authors: ['tposney', 'Helper'],
+        url: 'https://example.org/midi',
+        manifest: 'https://example.org/midi/module.json',
+        tags: ['combat', 'automation'],
+        exclusive: true,
+      },
+      // A web page that is not one is left out.
+      {
+        type: 'module',
+        id: 'paid',
+        title: 'Paid',
+        version: '2.0.0',
+        compatibility: {},
+        systems: [],
+        unowned: true,
+        premium: true,
+      },
+    ]);
+    expect(getPackages).toHaveBeenCalledWith({ type: 'module' });
+    // A system names no systems.
+    const [system] = await listPackages(game as never, 'system');
+    expect(system).toMatchObject({ type: 'system', systems: [] });
+  });
+
+  test("reads Foundry's index: the newest version of each game system and module listed", async () => {
+    const { game } = installSetupMocks();
+    Object.assign(game, {
+      getPackages: ({ type }: { type: string }) =>
+        Promise.resolve(
+          new Map([[type, { id: `${type}-one`, title: 'One', version: type === 'system' ? '2.0' : '1.0' }]]),
+        ),
+    });
+
+    await expect(readIndex(game as never)).resolves.toEqual(
+      new Map([
+        ['system:system-one', '2.0'],
+        ['module:module-one', '1.0'],
+      ]),
+    );
+  });
+
+  test('lists nothing where Foundry offers no listing, or an odd one', async () => {
+    const { game } = installSetupMocks();
+    await expect(listPackages(game as never, 'module')).resolves.toEqual([]);
+    Object.assign(game, { getPackages: () => Promise.resolve([]) });
+    await expect(listPackages(game as never, 'module')).resolves.toEqual([]);
   });
 });

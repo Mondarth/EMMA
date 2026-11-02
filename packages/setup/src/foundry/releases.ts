@@ -19,6 +19,10 @@ import type { DefaultCatalogue } from '@mondarth/emma-core/default-catalogue';
 import type { DefaultProxy } from '@mondarth/emma-core/default-proxy';
 import type { SetupKit } from '@mondarth/emma-core/setup-kit';
 
+import { acceptLatest } from '../lib/latest';
+import { manifestShape, manifestTypeOf } from '../lib/manifest-url';
+import type { ReadManifest } from '../lib/updates';
+
 import type { CoreBuild, InstalledManifests } from './setup-game';
 
 /** The releases found, and how to load more as the resolver needs them. */
@@ -27,6 +31,16 @@ export interface ReleaseLookup {
   readonly universe: Universe;
   /** Load listed releases from their manifests, for `resolveInRounds`. */
   readonly load: (needs: readonly Release[]) => Promise<readonly Release[]>;
+  /**
+   * Look up every release of more packages, as of one to install anew, from the same sources, with manifest URLs to
+   * find them by, as Foundry's listing gives them: those of a package not installed are known from nowhere else.
+   */
+  readonly lookUp: (
+    packages: readonly PackageRef[],
+    manifests?: Readonly<Record<PackageKey, readonly string[]>>,
+  ) => Promise<readonly Release[]>;
+  /** Read a manifest the user gives, to install a package from, through the same client. */
+  readonly readManifest: ReadManifest;
   /**
    * The packages the catalogue says cannot be had, archived or gone: only their installed releases are in the
    * universe, so they stay as they are.
@@ -58,6 +72,11 @@ export interface LookupOptions {
   readonly clientVersion?: string | null;
   /** Fetches; the browser's by default. */
   readonly fetch?: typeof globalThis.fetch;
+  /**
+   * The newest version of each package Foundry's index lists, by key, against which a "latest" manifest's version is
+   * checked (see `lib/latest.ts`); none by default, or if it cannot be read.
+   */
+  readonly index?: () => Promise<ReadonlyMap<PackageKey, string>>;
 }
 
 /** The most requests one lookup makes, to stay within GitHub's limit of 60 an hour without a proxy. */
@@ -145,6 +164,11 @@ function coreRelease(build: CoreBuild): CoreRelease {
  */
 export async function lookUpReleases(installed: InstalledManifests, options: LookupOptions): Promise<ReleaseLookup> {
   const { kit, catalogue, proxy, clientVersion = null } = options;
+  const index = await (options.index?.() ?? Promise.resolve(new Map<PackageKey, string>())).catch(
+    () => new Map<PackageKey, string>(),
+  );
+  // A "latest" manifest is installable at the version it gives now, in each batch of releases found.
+  const latest = (found: readonly Release[]) => acceptLatest(kit.resolver, found, index);
   const { CORE, packageKey, sameVersion } = kit.resolver;
   const {
     catalogueSource,
@@ -187,34 +211,42 @@ export async function lookUpReleases(installed: InstalledManifests, options: Loo
     core,
     ...(cores?.ok === true ? cores.value.filter(({ version }) => !sameVersion(version, core.version)) : []),
   ];
-  const set = sourceSet({
-    // The installed releases come first, as they are loaded with everything their manifests declare, and then the
-    // manifests the packages declare, which give their newest versions loaded too. Foundry's package listing, through
-    // the proxy only, and GitHub's and GitLab's release lists give the rest. Without the proxy, a version known only
-    // from a release list has no core compatibility, as a browser cannot read its manifest, so cannot be placed.
-    sources: [
-      local,
-      manifestUrlSource(http),
-      ...(proxy === null ? [] : [foundryIndexSource(http)]),
-      githubSource(http),
-      gitlabSource(http),
-    ],
-    http,
-    core: builds,
-    manifests: Object.fromEntries(
-      installed.manifests.flatMap(({ type, id, manifest }) =>
-        manifest === undefined ? [] : [[packageKey({ type, id }), [manifest]]],
-      ),
+  const declared: Readonly<Record<PackageKey, readonly string[]>> = Object.fromEntries(
+    installed.manifests.flatMap(({ type, id, manifest }) =>
+      manifest === undefined ? [] : [[packageKey({ type, id }), [manifest]]],
     ),
-    // Asked directly, not through the proxy, as it sends CORS headers.
-    ...(catalogue !== null && {
-      catalogue: catalogueSource({
-        ...catalogue,
-        fetch: send,
-        ...(clientVersion !== null && { client: `EMMA-extension/${clientVersion}` }),
+  );
+  /**
+   * The sources together, as the resolver asks them.
+   * @param hints - The manifest URLs to find packages by
+   * @returns The source set
+   */
+  const sourcesWith = (hints: Readonly<Record<PackageKey, readonly string[]>>) =>
+    sourceSet({
+      // The installed releases come first, as they are loaded with everything their manifests declare, and then the
+      // manifests the packages declare, which give their newest versions loaded too. Foundry's package listing, through
+      // the proxy only, and GitHub's and GitLab's release lists give the rest. Without the proxy, a version known only
+      // from a release list has no core compatibility, as a browser cannot read its manifest, so cannot be placed.
+      sources: [
+        local,
+        manifestUrlSource(http),
+        ...(proxy === null ? [] : [foundryIndexSource(http)]),
+        githubSource(http),
+        gitlabSource(http),
+      ],
+      http,
+      core: builds,
+      manifests: hints,
+      // Asked directly, not through the proxy, as it sends CORS headers.
+      ...(catalogue !== null && {
+        catalogue: catalogueSource({
+          ...catalogue,
+          fetch: send,
+          ...(clientVersion !== null && { client: `EMMA-extension/${clientVersion}` }),
+        }),
       }),
-    }),
-  });
+    });
+  const set = sourcesWith(declared);
 
   const refs: PackageRef[] = installed.manifests.map(({ type, id }) => ({ type, id }));
   const { releases } = await set.universe(refs);
@@ -239,8 +271,48 @@ export async function lookUpReleases(installed: InstalledManifests, options: Loo
       .map(gap => gap.package),
   );
   return {
-    universe: { core: builds, releases: [...releases, ...missing.flat()] },
-    load: needs => set.load(needs),
+    universe: { core: builds, releases: latest([...releases, ...missing.flat()]) },
+    load: async needs => latest(await set.load(needs)),
+    // A set cannot be given more manifest URLs once made, so a lookup with them has its own, on the same client, so with
+    // the same cache and budget of requests.
+    lookUp: async (packages, more = {}) =>
+      latest(
+        (await (Object.keys(more).length === 0 ? set : sourcesWith({ ...declared, ...more })).universe(packages))
+          .releases,
+      ),
+    readManifest: async (url, type) => {
+      const fetched = await http.getJson(url, { maxAge: 0 });
+      if (!fetched.ok) {
+        const { reason, status } = fetched.gap;
+        let host = url;
+        try {
+          host = new URL(url).hostname;
+        } catch {
+          // Not a URL: named as it is.
+        }
+        return {
+          ok: false,
+          problem: 'unreadable',
+          reason,
+          ...(status !== undefined && { status }),
+          host,
+          proxied: proxy !== null,
+        };
+      }
+      const shape = manifestShape(fetched.value);
+      const typed = manifestTypeOf(url, fetched.value);
+      if (shape !== undefined && typed !== undefined && typed !== type) {
+        return { ok: false, problem: 'other-type', type: typed };
+      }
+      const read =
+        shape === undefined
+          ? undefined
+          : await localSource([{ json: fetched.value, origin: url, type }]).releases({ type, id: shape.id });
+      const found = read?.ok === true ? read.value[0] : undefined;
+      if (shape === undefined || found === undefined) return { ok: false, problem: 'not-manifest' };
+      // The user's URL is the version's own manifest: what it gives is what they chose.
+      return { ok: true, title: shape.title, release: { ...found, manifest: url, versionManifest: url } };
+    },
     unavailable,
     unreached: [...refs.map(packageKey).filter(key => failed.has(key)), ...(cores?.ok === false ? [CORE] : [])],
   };
