@@ -16,6 +16,8 @@
 {#if detail.note !== undefined}
   <p class="emma-note">{detail.note}</p>
 {/if}
+<!-- A list that scrolls is reached from the keyboard to scroll it. -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <ul class="emma-group-items" tabindex="0" aria-label={detail.title}>
   {#each detail.items as item, index (index)}
     <li>
