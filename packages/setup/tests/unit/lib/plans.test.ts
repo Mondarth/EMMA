@@ -349,6 +349,49 @@ describe('installing anew', () => {
 });
 
 describe('the changes Foundry VTT leads to', () => {
+  test('names each change that needs the new build, with the way to it: Midi, and DAE, which Midi requires', async () => {
+    // D&D 5e 6.0.6 takes 14.368; Midi 2.0.0, for D&D 5e 6, needs 14.369 and DAE 2.0.0, which needs 14.369 too.
+    const NEEDS = { minimum: '14.369', verified: '14' };
+    const plans = planner(
+      [
+        ['dae', '1.0.0'],
+        ['midi', '1.0.0'],
+      ],
+      {
+        a: [
+          ['dae', '1.0.0'],
+          ['midi', '1.0.0'],
+        ],
+      },
+      [
+        release('system:dnd5e', '5.3.3'),
+        release('system:dnd5e', '6.0.6'),
+        release('module:dae', '1.0.0'),
+        release('module:dae', '2.0.0', { core: NEEDS, systems: { dnd5e: { minimum: '6.0.6' } } }),
+        release('module:midi', '1.0.0', {
+          requires: { dae: { minimum: '1.0.0' } },
+          systems: { dnd5e: { minimum: '5.3.0', maximum: '5.9.99' } },
+        }),
+        release('module:midi', '2.0.0', {
+          core: NEEDS,
+          requires: { dae: { minimum: '2.0.0' } },
+          systems: { dnd5e: { minimum: '6.0.6' } },
+        }),
+      ],
+    );
+
+    const plan = await plans.plan(picks(['system:dnd5e', '6.0.6']));
+
+    expect(plan?.find(({ key }) => key === 'core')).toMatchObject({
+      version: '14.369',
+      by: { package: 'system:dnd5e', version: '6.0.6' },
+      through: [
+        { package: 'module:midi', version: '2.0.0' },
+        { package: 'module:dae', version: '2.0.0' },
+      ],
+    });
+  });
+
   test("names Foundry VTT's change where a choice needs a newer build, which an installed module does not run on", async () => {
     // App 2.0.0 needs 14.370, which Old 1.0.0, installed, does not run on, though Old 2.0.0 does.
     const plans = planner(

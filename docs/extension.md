@@ -208,8 +208,9 @@ stay as they are where they can, and Foundry VTT moves only as far as it must. C
 changes with its installed and new versions, and, for one a choice brings in, which choice needs it, and, where the
 choice does not name it itself, the changes it is needed through: "needed for DAE 14.6.0, through D&D 5e 5.4.0", for a
 module whose installed version does not run in the new game system DAE needs. Foundry VTT is among them: a newer build
-reads as needed for D&D 5e 6.0.6, through Midi-QOL 14.6.8, where Midi-QOL is what needs the build, and a module whose
-installed version does not run on the new build reads as needed through Foundry VTT. The plan lists
+reads as needed for D&D 5e 6.0.6, through Midi-QOL 14.6.8 and DAE 14.6.6, as each of them needs the build, and DAE
+comes in as Midi-QOL requires it; a module whose installed version does not run on the new build reads as needed
+through Foundry VTT. Each change that needs it is named, with the changes on the way to it from the choice. The plan lists
 the changes in the order they are to be installed: Foundry VTT first, then the game systems, then the modules, each after
 the modules in the plan it requires.
 
