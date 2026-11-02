@@ -45,3 +45,38 @@ export function acceptLatest(
     return { ...release, versionManifest: release.manifest };
   });
 }
+
+/**
+ * Add what each installed package's own manifest gives now, as Foundry's updater reads it when it updates the package:
+ * a version Foundry's listing, or EMMA's catalogue, does not have yet, as one published by its manifest alone. That
+ * version is what Foundry installs from the manifest, so it is taken as listed, installable from it; one already found
+ * keeps what else was found of it.
+ * @param resolver - The resolver
+ * @param releases - The releases found
+ * @param current - The releases the installed packages' manifests give now, read this session
+ * @returns The releases, with the current ones among them
+ */
+export function withCurrent(
+  resolver: KitResolver,
+  releases: readonly Release[],
+  current: readonly Release[],
+): Release[] {
+  const key = (release: Release) => resolver.packageKey(release.package);
+  const currentOf = (release: Release) =>
+    current.find(given => key(given) === key(release) && resolver.sameVersion(given.version, release.version));
+  const known = releases.map(release => {
+    const given = currentOf(release);
+    if (given === undefined) return release;
+    const { unlisted, ...listed } = release;
+    if (unlisted !== true && release.versionManifest !== undefined) return release;
+    const own = release.versionManifest ?? given.versionManifest ?? given.manifest;
+    return { ...listed, ...(own !== undefined && { versionManifest: own }) };
+  });
+  const added = current
+    .filter(given => !releases.some(release => currentOf(release) === given))
+    .map(given => {
+      const own = given.versionManifest ?? given.manifest;
+      return { ...given, ...(own !== undefined && { versionManifest: own }) };
+    });
+  return [...known, ...added];
+}

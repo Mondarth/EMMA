@@ -1,7 +1,7 @@
 import type { Release } from '@mondarth/fvtt-resolver';
 import { describe, expect, test } from 'vitest';
 
-import { acceptLatest } from '../../../src/lib/latest';
+import { acceptLatest, withCurrent } from '../../../src/lib/latest';
 import { release } from '../../mocks/fixtures';
 import { KIT } from '../../mocks/kit';
 
@@ -68,5 +68,37 @@ describe('acceptLatest', () => {
     expect(found[0]).toBe(own);
     expect(found[1]).toBe(none);
     expect(found[2]).toBe(later);
+  });
+});
+
+describe('withCurrent', () => {
+  test('adds what a manifest gives now, takes one held as unlisted as listed, and keeps one held as it is', () => {
+    const own = release('module:lib', '2.0.0');
+    const unlisted = { ...release('module:dice', '1.3.0', { versionManifest: null }), unlisted: true as const };
+    const current = [
+      fromLatest('1.3.0', { package: { type: 'module', id: 'dice' } }),
+      fromLatest('1.4.0', { package: { type: 'module', id: 'dice' } }),
+      { ...release('module:lib', '2.0.0', { versionManifest: null }), manifest: LATEST },
+      // Without a manifest URL, as no source gives one, it stays without.
+      release('module:bare', '1.0.0', { versionManifest: null }),
+    ];
+
+    const found = withCurrent(KIT.resolver, [own, unlisted], current);
+
+    expect(found[0]).toBe(own);
+    expect(
+      found
+        .slice(1)
+        .map(({ package: { id }, version, versionManifest, unlisted: marked }) => [
+          id,
+          version,
+          versionManifest,
+          marked,
+        ]),
+    ).toEqual([
+      ['dice', '1.3.0', LATEST, undefined],
+      ['dice', '1.4.0', LATEST, undefined],
+      ['bare', '1.0.0', undefined, undefined],
+    ]);
   });
 });

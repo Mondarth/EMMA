@@ -333,12 +333,14 @@ Foundry's listing gives each package's newest version alone, without the modules
 listed package's releases would take thousands of requests. So the section filters by what the listing says, and a
 package whose newest version does not fit is not offered, even if an older version would.
 
-Some packages publish only a "latest" manifest, such as `releases/latest/download/module.json` or a file on a branch,
-that always gives the newest version, and no manifest for any one version. EMMA installs and updates them from that
-manifest, at the version it gives now: the newest release found from it, and, where Foundry's own package listing
-lists the package, only at the version the listing gives. Older versions found from it cannot be installed, as the
-manifest no longer gives them, so such a package has only the version installed and the latest to choose between.
-What its download gives may also change under the same version.
+Each installed package's own manifest is read as updates are searched for, as Foundry's updater reads it: the version
+it gives now is offered, though Foundry's listing and EMMA's catalogue may not have it yet, as when an author publishes
+by the manifest alone. Some packages publish only such a "latest" manifest, such as
+`releases/latest/download/module.json` or a file on a branch, that always gives the newest version, and no manifest for
+any one version. EMMA installs and updates them from that manifest, at the version it gives now. A version the
+catalogue saw it give before is installed from it only where Foundry's listing lists the package at that version. Older
+versions found from it cannot be installed, as the manifest no longer gives them, so such a package has only the
+version installed and the latest to choose between. What its download gives may also change under the same version.
 
 ### Uninstalling
 

@@ -19,7 +19,7 @@ import type { DefaultCatalogue } from '@mondarth/emma-core/default-catalogue';
 import type { DefaultProxy } from '@mondarth/emma-core/default-proxy';
 import type { SetupKit } from '@mondarth/emma-core/setup-kit';
 
-import { acceptLatest } from '../lib/latest';
+import { acceptLatest, withCurrent } from '../lib/latest';
 import { manifestShape, manifestTypeOf } from '../lib/manifest-url';
 import type { ReadManifest } from '../lib/updates';
 
@@ -264,6 +264,20 @@ export async function lookUpReleases(installed: InstalledManifests, options: Loo
       return read.ok ? read.value : [];
     }),
   );
+  // What each installed package's own manifest gives now, as Foundry's updater reads it: a version published by the
+  // manifest alone, ahead of Foundry's listing and of the catalogue, which gives a package it holds without the sources.
+  // Without the catalogue, the sources read the same manifests, so these come from the client's cache.
+  const manifestSource = manifestUrlSource(http);
+  const current = await Promise.all(
+    installed.manifests.map(async ({ type, id, manifest }) => {
+      if (manifest === undefined) return [];
+      const read = await manifestSource.releases({ type, id }, { declared: [manifest], seen: [] });
+      const key = packageKey({ type, id });
+      return read.ok
+        ? read.value.filter(release => release.detail === 'loaded' && packageKey(release.package) === key)
+        : [];
+    }),
+  );
   const failed = new Set(
     set
       .gaps()
@@ -271,7 +285,10 @@ export async function lookUpReleases(installed: InstalledManifests, options: Loo
       .map(gap => gap.package),
   );
   return {
-    universe: { core: builds, releases: latest([...releases, ...missing.flat()]) },
+    universe: {
+      core: builds,
+      releases: latest(withCurrent(kit.resolver, [...releases, ...missing.flat()], current.flat())),
+    },
     load: async needs => latest(await set.load(needs)),
     // A set cannot be given more manifest URLs once made, so a lookup with them has its own, on the same client, so with
     // the same cache and budget of requests.
