@@ -1,7 +1,15 @@
 import { describe, expect, test } from 'vitest';
 
 import type { ListedPackage } from '../../../src/foundry/setup-game';
-import { fitsCore, installable, keptSystems, matching } from '../../../src/lib/install';
+import {
+  compatibilityText,
+  fitsCore,
+  installable,
+  isBehind,
+  keptSystems,
+  matching,
+  tagText,
+} from '../../../src/lib/install';
 import { buildOverview } from '../../../src/lib/overview';
 import { installation, installedModule } from '../../mocks/fixtures';
 
@@ -38,6 +46,21 @@ describe('fitsCore', () => {
   });
 });
 
+describe('isBehind', () => {
+  test.each<[ListedPackage['compatibility'], string, boolean]>([
+    [{}, '14.368', false],
+    [{ minimum: '0.6.6' }, '14.368', true],
+    [{ minimum: '11', verified: '12' }, '14.368', true],
+    [{ minimum: '11', verified: '13.351' }, '14.368', false],
+    [{ minimum: '13' }, '14.368', false],
+    [{ minimum: '12', maximum: '14' }, '14.368', false],
+    [{ minimum: 'soon' }, '14.368', false],
+    [{ minimum: '0.6.6' }, 'odd', false],
+  ])('judges %j on %s behind: %s', (compatibility, core, behind) => {
+    expect(isBehind(compatibility, core)).toBe(behind);
+  });
+});
+
 describe('installable', () => {
   const OVERVIEW = buildOverview(
     installation({
@@ -68,6 +91,21 @@ describe('installable', () => {
     );
 
     expect(offered.map(({ type, id }) => `${type}:${id}`)).toEqual(['module:any', 'module:dnd', 'system:sw5e']);
+  });
+
+  test('hides what is made for a generation more than one behind, and premium packages not owned, unless asked', () => {
+    const listing = [
+      listed('any'),
+      listed('ancient', { compatibility: { minimum: '0.6.6' } }),
+      listed('premium', { unowned: true }),
+    ];
+    const target = { core: '14.368', systems: [] };
+    const ids = (filters: Parameters<typeof installable>[3]) =>
+      installable(listing, OVERVIEW, target, filters).map(({ id }) => id);
+
+    expect(ids({ hideBehind: true, showUnowned: false })).toEqual(['any']);
+    expect(ids({ hideBehind: false, showUnowned: false })).toEqual(['any', 'ancient']);
+    expect(ids({ hideBehind: true, showUnowned: true })).toEqual(['any', 'premium']);
   });
 });
 
@@ -103,5 +141,14 @@ describe('matching', () => {
     expect(matching(packages, 'qol').map(({ id }) => id)).toEqual(['midi']);
     expect(matching(packages, 'TPOS').map(({ id }) => id)).toEqual(['midi']);
     expect(matching(packages, 'dice').map(({ id }) => id)).toEqual(['dice']);
+  });
+});
+
+describe('in words', () => {
+  test('says which builds a package declares, and its tags', () => {
+    expect(compatibilityText({ minimum: '13', verified: '14.368' })).toBe('minimum 13, verified 14.368');
+    expect(compatibilityText({ maximum: '14' })).toBe('maximum 14');
+    expect(compatibilityText({})).toBe('Declares no builds');
+    expect(['audio-sound', 'maps'].map(tagText)).toEqual(['Audio Sound', 'Maps']);
   });
 });

@@ -43,6 +43,24 @@ describe('SetupState', () => {
     expect(unlisted.listings.module).toBeNull();
   });
 
+  test('narrows each listing as the user says, hiding old packages and premium ones not owned at first', () => {
+    const setup = new SetupState({
+      load: () => Promise.resolve(OVERVIEW),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: noUpdates,
+      installModule: noInstall,
+    });
+    expect(setup.installFilters.module).toEqual({ hideBehind: true, showUnowned: false });
+
+    setup.setInstallFilters('module', { showUnowned: true });
+
+    expect(setup.installFilters).toEqual({
+      module: { hideBehind: true, showUnowned: true },
+      system: { hideBehind: true, showUnowned: false },
+    });
+  });
+
   test('reads the installation, saying while it does', async () => {
     let finish = (): void => undefined;
     const setup = new SetupState({

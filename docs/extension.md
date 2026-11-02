@@ -279,6 +279,19 @@ installed, or for any. A game system's group of modules offers those for it, and
 system. A search finds a package by its title, ID or author. The list shows enough packages to fill the panel, and
 more as it is scrolled down.
 
+Two filters narrow it, each kept for the session, apart for game systems and for modules:
+
+- **Hide … more than one generation behind the plan's build**, on at first, hides what was made for an older
+  generation of Foundry VTT: one verified on, or, if it says none, requiring at least, a generation more than one
+  behind, such as 12 or 0.6.6 on a 14 build. Many old packages declare no maximum, so would seem to run on every build
+  since.
+- **Show premium … I do not own**, off at first, shows premium packages that Foundry cannot install for you. They
+  cannot be added.
+
+Each package has a drawer, **Details of <title>**, of what Foundry's listing says of it: its description, as plain
+text, authors, newest version, the Foundry VTT builds it declares, the game systems a module is for, its tags, whether
+it is premium or exclusive content, and its web page.
+
 **Add <title> to the plan** looks up the package's releases, from the same sources as the updates, and the plan takes
 the newest version that fits with its other choices, and with what that version requires, which comes in with it. Its
 row says it is not installed. If no version fits, the section says why, in the resolver's words. **Take <title> out of

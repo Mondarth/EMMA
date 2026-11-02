@@ -267,17 +267,32 @@ describe('listPackages', () => {
               id: 'midi',
               title: 'Midi QOL',
               version: '13.0.1',
-              authors: [{ name: 'tposney' }],
+              authors: [{ name: 'tposney' }, { name: 'Helper' }, 'odd'],
               compatibility: { minimum: '14', verified: 14.368, maximum: null },
               relationships: { systems: [{ id: 'dnd5e' }] },
               protected: false,
+              exclusive: true,
+              description:
+                '<p>Automates\n  <b>combat</b>.</p><script>alert(1)</script><img src="x" onerror="alert(2)">',
+              url: 'https://example.org/midi',
+              tags: ['combat', 7, 'automation'],
             },
           ],
           [
             'dice',
             { id: 'dice', title: 'Dice', version: '1.0.0', authors: [{ name: '' }], protected: true, owned: true },
           ],
-          ['paid', { id: 'paid', title: 'Paid', version: '2.0.0', protected: true }],
+          [
+            'paid',
+            {
+              id: 'paid',
+              title: 'Paid',
+              version: '2.0.0',
+              protected: true,
+              url: 'javascript:alert(1)',
+              description: ' ',
+            },
+          ],
           ['broken', { id: 'broken' }],
         ]),
       ),
@@ -286,7 +301,16 @@ describe('listPackages', () => {
     Object.assign(game, { getPackages });
 
     await expect(listPackages(game as never, 'module')).resolves.toEqual([
-      { type: 'module', id: 'dice', title: 'Dice', version: '1.0.0', compatibility: {}, systems: [], unowned: false },
+      {
+        type: 'module',
+        id: 'dice',
+        title: 'Dice',
+        version: '1.0.0',
+        compatibility: {},
+        systems: [],
+        unowned: false,
+        premium: true,
+      },
       {
         type: 'module',
         id: 'midi',
@@ -296,8 +320,24 @@ describe('listPackages', () => {
         compatibility: { minimum: '14', verified: '14.368' },
         systems: ['dnd5e'],
         unowned: false,
+        // Its description's text alone: what the HTML would run or load is gone.
+        description: 'Automates combat.',
+        authors: ['tposney', 'Helper'],
+        url: 'https://example.org/midi',
+        tags: ['combat', 'automation'],
+        exclusive: true,
       },
-      { type: 'module', id: 'paid', title: 'Paid', version: '2.0.0', compatibility: {}, systems: [], unowned: true },
+      // A web page that is not one is left out.
+      {
+        type: 'module',
+        id: 'paid',
+        title: 'Paid',
+        version: '2.0.0',
+        compatibility: {},
+        systems: [],
+        unowned: true,
+        premium: true,
+      },
     ]);
     expect(getPackages).toHaveBeenCalledWith({ type: 'module' });
     // A system names no systems.

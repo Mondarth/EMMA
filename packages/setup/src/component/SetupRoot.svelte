@@ -9,6 +9,7 @@
   import type { Layout } from '../foundry/preferences';
   import { readLayout, writeLayout } from '../foundry/preferences';
   import { EXTENSION_RELEASES } from '../foundry/setup-kit';
+  import type { InstallFilters } from '../lib/install';
   import { installable, keptSystems } from '../lib/install';
   import { UNINSTALL } from '../lib/plans';
   import { stepText } from '../lib/run';
@@ -128,14 +129,27 @@
   /** The packages on Foundry's listing that fit the installation and the plan, as the selected group shows them. */
   const installablePackages = $derived.by(() => {
     const listing = installType === undefined ? null : setup.listings[installType];
-    if (overview === null || typeof listing !== 'object' || listing === null) return [];
+    if (installType === undefined || overview === null || typeof listing !== 'object' || listing === null) return [];
     const kept = keptSystems(overview, updates.picks);
-    const fits = installable(listing, overview, { core: updates.chosenOf('core') ?? overview.core, systems: kept });
+    const fits = installable(
+      listing,
+      overview,
+      { core: updates.chosenOf('core') ?? overview.core, systems: kept },
+      setup.installFilters[installType],
+    );
     // A system's group offers the modules for it, and the universal group those for any system.
     if (selection.kind !== 'group') return fits;
     const { system } = selection;
     return fits.filter(pkg => (system === undefined ? pkg.systems.length === 0 : pkg.systems.includes(system)));
   });
+  /**
+   * Change how the user narrows what a listing offers.
+   * @param type - Which listing
+   * @param change - The filters that change
+   */
+  function filterInstall(type: 'module' | 'system', change: Partial<InstallFilters>): void {
+    setup.setInstallFilters(type, change);
+  }
   // What is selected, if it is still there: after reading again, a world may have gone.
   const world = $derived(
     selection.kind === 'world' ? overview?.worlds.find(({ world: { id } }) => id === selection.world) : undefined,
@@ -200,7 +214,11 @@
                 type={installType}
                 listing={setup.listings[installType]}
                 packages={installablePackages}
+                filters={setup.installFilters[installType]}
                 {updates}
+                onFilter={(change: Partial<InstallFilters>) => {
+                  filterInstall(installType, change);
+                }}
                 onShow={(type: 'module' | 'system') => {
                   void setup.loadListing(type);
                 }} />

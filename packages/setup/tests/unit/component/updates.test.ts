@@ -873,6 +873,65 @@ describe('installing anew, by group', () => {
     expect(section).not.toHaveTextContent('anywhere');
   });
 
+  test('filters out old packages and premium ones not owned unless asked, and shows what the listing says', async () => {
+    const user = await listing(() =>
+      Promise.resolve([
+        {
+          ...listed('fresh'),
+          title: 'Fresh',
+          description: 'Rolls dice.',
+          authors: ['Ann', 'Bo'],
+          compatibility: { minimum: '13', verified: '14.368' },
+          tags: ['dice-rolls'],
+          url: 'https://example.org/fresh',
+          exclusive: true,
+        },
+        { ...listed('ancient', ['dnd5e']), title: 'Ancient', compatibility: { minimum: '0.6.6' }, premium: true },
+        { ...listed('paid'), title: 'Paid', unowned: true, premium: true },
+      ]),
+    );
+
+    await user.click(within(row(/^Modules/)).getByText('Modules'));
+    const section = await screen.findByRole('region', { name: 'Install a module' });
+    await vi.waitFor(() => {
+      expect(within(section).getByRole('status')).toHaveTextContent('Showing 1 of 1');
+    });
+    const hide = within(section).getByRole('checkbox', {
+      name: "Hide modules more than one generation behind the plan's build",
+    });
+    const premium = within(section).getByRole('checkbox', { name: 'Show premium modules I do not own' });
+    expect(hide).toBeChecked();
+    expect(premium).not.toBeChecked();
+
+    await user.click(hide);
+    await user.click(premium);
+    expect(within(section).getByRole('status')).toHaveTextContent('Showing 3 of 3');
+    // One not owned cannot be added.
+    expect(within(section).queryByRole('button', { name: 'Add Paid to the plan' })).toBeNull();
+    expect(section).toHaveTextContent('Premium content you do not own, so Foundry cannot install it.');
+
+    const fresh = within(section).getByText('Details of Fresh').closest('details');
+    if (fresh === null) throw new Error('No details of Fresh');
+    await user.click(within(fresh).getByText('Details of Fresh'));
+    expect(fresh).toHaveAttribute('open');
+    expect(fresh).toHaveTextContent(
+      'Description Rolls dice. Authors Ann, Bo Newest version 1.0.0 Foundry VTT minimum 13, verified 14.368 ' +
+        'Game systems Any Tags Dice Rolls Content Exclusive Web page https://example.org/fresh',
+    );
+    expect(within(fresh).getByRole('link', { name: 'https://example.org/fresh' })).toHaveAttribute('target', '_blank');
+    expect(within(section).getByText('Details of Ancient').closest('details')).toHaveTextContent(
+      'Foundry VTT minimum 0.6.6 Game systems dnd5e Content Premium, owned',
+    );
+    expect(within(section).getByText('Details of Paid').closest('details')).toHaveTextContent('Premium, not owned');
+    // Each type keeps its own filters.
+    await user.click(within(row(/^Game systems/)).getByText('Game systems'));
+    expect(
+      await screen.findByRole('checkbox', {
+        name: "Hide game systems more than one generation behind the plan's build",
+      }),
+    ).toBeChecked();
+  });
+
   test('offers the modules for a game system the plan installs', async () => {
     // Pathfinder is not installed; the planner can add it.
     const pathfinder: PackageUpdate = { key: 'system:pf2e', installed: 'none', newest: '7.0.0', versions: ['7.0.0'] };

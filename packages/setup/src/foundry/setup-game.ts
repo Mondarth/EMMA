@@ -278,6 +278,18 @@ export interface ListedPackage {
   readonly systems: readonly string[];
   /** Whether it is a premium package the user does not own, which Foundry cannot install for them. */
   readonly unowned: boolean;
+  /** Its description, as plain text. */
+  readonly description?: string;
+  /** All its authors' names. */
+  readonly authors?: readonly string[];
+  /** Its project's web page. */
+  readonly url?: string;
+  /** The listing's tags for it, such as `maps` or `combat`. */
+  readonly tags?: readonly string[];
+  /** Whether it is premium content, sold through Foundry. */
+  readonly premium?: true;
+  /** Whether it is exclusive content. */
+  readonly exclusive?: true;
 }
 
 /**
@@ -310,18 +322,44 @@ function toListed(entry: unknown, type: 'module' | 'system'): ListedPackage | un
     const value = field(compatibility, name);
     return typeof value === 'string' || typeof value === 'number' ? { [name]: String(value) } : {};
   };
-  const authors = field(data, 'authors');
-  const author = Array.isArray(authors) ? field(authors[0], 'name') : undefined;
+  const names = field(data, 'authors');
+  const authors = (Array.isArray(names) ? names : [])
+    .map(person => field(person, 'name'))
+    .filter((name): name is string => typeof name === 'string' && name !== '');
+  const [author] = authors;
+  const description = field(data, 'description');
+  const text = typeof description === 'string' ? plainText(description) : '';
+  const url = field(data, 'url');
+  const tags = field(data, 'tags');
+  const tagList = (Array.isArray(tags) ? tags : []).filter((tag): tag is string => typeof tag === 'string');
   return {
     type,
     id: described.id,
     title: described.title,
     version: described.version,
-    ...(typeof author === 'string' && author !== '' && { author }),
+    ...(author !== undefined && { author }),
     compatibility: { ...version('minimum'), ...version('verified'), ...version('maximum') },
     systems: type === 'module' ? relatedIds(field(field(data, 'relationships'), 'systems')) : [],
     unowned: data.protected === true && data.owned !== true,
+    ...(text !== '' && { description: text }),
+    ...(authors.length > 0 && { authors }),
+    ...(typeof url === 'string' && /^https?:\/\//i.test(url) && { url }),
+    ...(tagList.length > 0 && { tags: tagList }),
+    ...(data.protected === true && { premium: true as const }),
+    ...(data.exclusive === true && { exclusive: true as const }),
   };
+}
+
+/**
+ * The text of a package's description, which its manifest gives as HTML. It is parsed apart from the page, so nothing in
+ * it runs or loads, and only its text is kept, without that of its scripts and styles.
+ * @param html - The description
+ * @returns Its text, with its runs of white space made single spaces
+ */
+function plainText(html: string): string {
+  const parsed = new DOMParser().parseFromString(html, 'text/html');
+  for (const code of parsed.body.querySelectorAll('script, style')) code.remove();
+  return parsed.body.textContent.replace(/\s+/g, ' ').trim();
 }
 
 /** What `game.installPackage` is given. */

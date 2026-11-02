@@ -4,6 +4,8 @@
  */
 import type { PendingPlan } from '../foundry/preferences';
 import type { CoreTarget, CoreUpdateState, ListedPackage, SnapshotSpace } from '../foundry/setup-game';
+import type { InstallFilters } from '../lib/install';
+import { DEFAULT_FILTERS } from '../lib/install';
 import type { Overview } from '../lib/overview';
 import type { RunStep, StepState } from '../lib/run';
 import { runSteps } from '../lib/run';
@@ -103,6 +105,11 @@ export class SetupState {
   resumedOn = $state<string | null>(null);
   /** Foundry's listings of the game systems and modules that may be installed, once read, for the session. */
   listings = $state.raw<Readonly<Record<'module' | 'system', ListingState>>>({ module: null, system: null });
+  /** How the user narrows what each listing offers, for the session. */
+  installFilters = $state.raw<Readonly<Record<'module' | 'system', InstallFilters>>>({
+    module: DEFAULT_FILTERS,
+    system: DEFAULT_FILTERS,
+  });
 
   /**
    * Whether packages can be installed anew here.
@@ -204,6 +211,15 @@ export class SetupState {
       listing = 'failed';
     }
     this.listings = { ...this.listings, [type]: listing };
+  }
+
+  /**
+   * Change how the user narrows what a listing offers.
+   * @param type - Which listing
+   * @param change - The filters that change
+   */
+  setInstallFilters(type: 'module' | 'system', change: Partial<InstallFilters>): void {
+    this.installFilters = { ...this.installFilters, [type]: { ...this.installFilters[type], ...change } };
   }
 
   /**
