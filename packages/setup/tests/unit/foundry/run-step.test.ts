@@ -80,7 +80,14 @@ describe('runStep', () => {
       title: 'Old',
     });
 
-    expect(events).toEqual(['post {"action":"uninstallPackage","type":"module","id":"old"}', 'forget old', 'reload']);
+    // Through the guard, as the guard refuses Foundry's own uninstalls.
+    expect(events).toEqual([
+      'allowing',
+      'post {"action":"uninstallPackage","type":"module","id":"old"}',
+      'forget old',
+      'reload',
+      'guarding',
+    ]);
     expect(game.post).toHaveBeenCalledWith(expect.anything(), { notify: false });
     vi.unstubAllGlobals();
   });

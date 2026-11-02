@@ -106,3 +106,25 @@ export function newerIn(resolver: KitResolver): (a: string, b: string) => boolea
   const unprefixed = (version: string) => version.replace(/^[vV](?=\d)/, '');
   return (a, b) => resolver.isNewerVersion(unprefixed(a), unprefixed(b));
 }
+
+/**
+ * Keeps the packages locked in Foundry as they are, as Foundry refuses to update or uninstall them: their installed
+ * releases alone may be chosen.
+ * @param resolver - The resolver
+ * @param overview - The installation
+ * @returns Whether a release may be chosen: one of a package not locked, or the locked one's installed release
+ */
+export function keepsLocked(resolver: KitResolver, overview: Overview): (release: Release) => boolean {
+  const locked = new Map<PackageKey, string>([
+    ...overview.systems
+      .filter(({ locked: isLocked }) => isLocked === true)
+      .map(({ id, version }) => [resolver.packageKey({ type: 'system', id }), version] as const),
+    ...overview.modules
+      .filter(({ module: { locked: isLocked } }) => isLocked === true)
+      .map(({ module: { id, version } }) => [resolver.packageKey({ type: 'module', id }), version] as const),
+  ]);
+  return release => {
+    const version = locked.get(resolver.packageKey(release.package));
+    return version === undefined || resolver.sameVersion(version, release.version);
+  };
+}

@@ -25,6 +25,7 @@
   import SystemPanel from './SystemPanel.svelte';
   import CoreStep from './CoreStep.svelte';
   import InstallSection from './InstallSection.svelte';
+  import LockSection from './LockSection.svelte';
   import UninstallSection from './UninstallSection.svelte';
   import UpdatePlan from './UpdatePlan.svelte';
   import WorldPanel from './WorldPanel.svelte';
@@ -167,6 +168,23 @@
   );
 </script>
 
+{#snippet lock(key: string)}
+  {@const id = key.slice(key.indexOf(':') + 1)}
+  {@const pkg = key.startsWith('system:')
+    ? overview?.systems.find(system => system.id === id)
+    : overview?.modules.find(({ module: installed }) => installed.id === id)?.module}
+  {#if pkg !== undefined && setup.canLock}
+    <LockSection
+      title={pkg.title}
+      version={pkg.version}
+      locked={pkg.locked === true}
+      disabled={updates.locked || setup.running}
+      onLock={(locking: boolean) => {
+        void setup.setLocked(key, locking);
+      }} />
+  {/if}
+{/snippet}
+
 {#snippet uninstall(key: string)}
   {@const offer = updates.uninstallOf(key)}
   {#if offer !== undefined}
@@ -216,12 +234,14 @@
               detail={moduleDetail(overview, selection.module, selection.world)}
               blocked={updates.blockedOf(`module:${selection.module}`)}
               explained={updates.explainedOf(`module:${selection.module}`)} />
+            {@render lock(`module:${selection.module}`)}
             {@render uninstall(`module:${selection.module}`)}
           {:else if selection.kind === 'system'}
             <SystemPanel
               detail={systemDetail(overview, selection.system, selection.world)}
               blocked={updates.blockedOf(`system:${selection.system}`)}
               explained={updates.explainedOf(`system:${selection.system}`)} />
+            {@render lock(`system:${selection.system}`)}
             {@render uninstall(`system:${selection.system}`)}
           {:else if selection.kind === 'systems' || selection.kind === 'modules' || selection.kind === 'group'}
             <GroupPanel detail={groupDetail(overview, selection)} />

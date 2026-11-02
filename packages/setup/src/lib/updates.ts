@@ -44,7 +44,7 @@ import { format, localize } from './i18n';
 import type { Planner, UpdateHold } from './plans';
 import { createPlanner } from './plans';
 import type { Use, WorldUses } from './setups';
-import { newerIn, newestFirst, oldest, runsOn, unique, usedBy } from './setups';
+import { keepsLocked, newerIn, newestFirst, oldest, runsOn, unique, usedBy } from './setups';
 
 import type { Overview } from './overview';
 
@@ -204,12 +204,13 @@ export async function findUpdates(inputs: UpdateInputs): Promise<UpdateSearch> {
   const declarations = {
     installed: [...installed].map(([key, version]) => ({ package: key, version })),
   };
+  const unlocked = keepsLocked(resolver, overview);
   const atLeastInstalled = (from: Universe): Universe => ({
-    // An update never goes back.
+    // An update never goes back, nor changes a package locked in Foundry.
     core: from.core.filter(build => !newer(core, build.version)),
     releases: from.releases.filter(release => {
       const version = installed.get(packageKey(release.package));
-      return version === undefined || !newer(version, release.version);
+      return (version === undefined || !newer(version, release.version)) && unlocked(release);
     }),
   });
   let universe = atLeastInstalled(inputs.universe);

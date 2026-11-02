@@ -161,6 +161,13 @@
         <span class="emma-tree-toggle"></span>
       {/if}
       <span class="emma-tree-title">{row.title}</span>
+      {#if row.locked}
+        <i
+          class="fa-solid fa-lock emma-tree-locked"
+          role="img"
+          aria-label={localize('Lock.Tree')}
+          data-tooltip={localize('Lock.Tree')}></i>
+      {/if}
       {#if removing}
         <span class="emma-tree-uninstall">{localize('Update.Uninstall')}</span>
       {:else if updates !== undefined && update !== undefined && key !== undefined && row.installed === true}
@@ -214,6 +221,11 @@
   .emma-tree-pending .emma-tree-version,
   .emma-tree-pending .emma-status {
     color: inherit;
+  }
+
+  .emma-tree-locked {
+    font-size: 0.8em;
+    opacity: 0.8;
   }
 
   .emma-tree-pending-label {

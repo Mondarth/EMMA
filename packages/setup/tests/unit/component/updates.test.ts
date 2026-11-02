@@ -1798,3 +1798,53 @@ describe('taking changes out of the plan', () => {
     });
   });
 });
+
+describe('locking a package', () => {
+  test('locks and unlocks it from its panel, reading the installation again, and marks it in the tree', async () => {
+    let locked = false;
+    const overviewOf = () =>
+      buildOverview(
+        installation({
+          worlds: [{ id: 'a', title: 'Alpha', system: 'dnd5e' }],
+          modules: [{ ...installedModule('lib', 'Library', '1.0.0'), ...(locked && { locked: true as const }) }],
+        }),
+        new Map([['a', recorded(record('a', { modules: [{ id: 'lib', title: 'Library', version: '1.0.0' }] }))]]),
+      );
+    const lockPackage = vi.fn((_type: 'module' | 'system', _id: string, lock: boolean) => {
+      locked = lock;
+      return Promise.resolve();
+    });
+    const setup = new SetupState({
+      load: () => Promise.resolve(overviewOf()),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: findingBlocked(),
+      installModule: noInstall,
+      lockPackage,
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    const user = userEvent.setup();
+
+    const toggle = row(/Universal/).querySelector('.emma-tree-toggle');
+    if (toggle === null) throw new Error('No universal group to open');
+    await user.click(toggle);
+    await user.click(within(row(/Library 1\.0\.0/)).getByText('Library'));
+    const section = screen.getByRole('region', { name: 'Lock' });
+    expect(section).toHaveTextContent('Locking Library keeps it at 1.0.0');
+
+    await user.click(within(section).getByRole('button', { name: 'Lock Library at 1.0.0' }));
+
+    expect(lockPackage).toHaveBeenCalledWith('module', 'lib', true);
+    await vi.waitFor(() => {
+      expect(screen.getByRole('region', { name: 'Lock' })).toHaveTextContent('Library is locked in Foundry at 1.0.0.');
+    });
+    expect(screen.getAllByRole('img', { name: 'Locked in Foundry' }).length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole('button', { name: 'Unlock Library' }));
+    expect(lockPackage).toHaveBeenLastCalledWith('module', 'lib', false);
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('img', { name: 'Locked in Foundry' })).toBeNull();
+    });
+  });
+});

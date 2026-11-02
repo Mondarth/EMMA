@@ -83,11 +83,13 @@ With EMMA open, the setup screen changes in two ways.
 
 **EMMA's button** joins the menu at the top of the screen, beside Foundry's own. It opens EMMA's window.
 
-**Foundry's own installs and updates are disabled**: the **Install** button, **Update All**, and the update button on
-each package are greyed out, and say that EMMA manages packages on this screen if chosen. That keeps packages from
-changing behind EMMA's back. Uninstalling packages, and creating and launching worlds, are not affected. To let Foundry
-install and update packages again, select the root of EMMA's tree and check **Let Foundry install and update packages
-here**. The browser remembers the choice for that server.
+**Foundry's own installs, updates, uninstalls and locks are disabled**: the **Install** button, **Update All**, and the
+update button on each package are greyed out, and say that EMMA manages packages on this screen if chosen. So do
+**Uninstall**, **Lock** and **Unlock** in the package menu of a game system or module, before Foundry asks anything.
+That keeps packages from changing behind EMMA's back; EMMA's own uninstall and lock are the ways in. Worlds are not
+affected: uninstalling, locking, creating and launching them. To let Foundry install and update packages again, select
+the root of EMMA's tree and check **Let Foundry install and update packages here**. The browser remembers the choice
+for that server.
 
 ### The installation tree
 
@@ -339,6 +341,16 @@ manifest, at the version it gives now: the newest release found from it, and, wh
 lists the package, only at the version the listing gives. Older versions found from it cannot be installed, as the
 manifest no longer gives them, so such a package has only the version installed and the latest to choose between.
 What its download gives may also change under the same version.
+
+### Locking
+
+A game system or module locked in Foundry has a lock beside it in the tree. EMMA keeps it as it is installed, as
+Foundry refuses to update or uninstall it: none of its other versions is offered, an update of another package that
+needs it changed is not either, and it cannot be uninstalled.
+
+The panel of each installed game system and module has a **Lock** section: **Lock <title> at <version>**, or **Unlock
+<title>**, which locks or unlocks it in Foundry at once, as Foundry's own package menu does, and reads the installation
+again. A choice of the package in the plan goes once it is locked.
 
 ### Uninstalling
 

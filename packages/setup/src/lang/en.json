@@ -309,5 +309,13 @@
     "NoCors": "{host} could not be reached, or does not let a browser read it (it sends no CORS headers), and this build of EMMA has no proxy to read it through.",
     "Budget": "EMMA has made as many requests as it may this session. Read the installation again later.",
     "NotJson": "What the URL gives is not a manifest's JSON."
+  },
+  "Lock": {
+    "Heading": "Lock",
+    "Locked": "{title} is locked in Foundry at {version}. EMMA keeps it as it is: no plan updates or uninstalls it, and neither does Foundry.",
+    "Unlocked": "Locking {title} keeps it at {version}: neither Foundry nor EMMA's plans update or uninstall it until it is unlocked. It is locked at once, as in Foundry's own package menu.",
+    "Lock": "Lock {title} at {version}",
+    "Unlock": "Unlock {title}",
+    "Tree": "Locked in Foundry"
   }
 }

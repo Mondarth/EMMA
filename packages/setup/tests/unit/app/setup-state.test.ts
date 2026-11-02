@@ -61,6 +61,28 @@ describe('SetupState', () => {
     });
   });
 
+  test('locks a package only where it can, while no plan runs, reading the installation again once it has', async () => {
+    const load = vi.fn(() => Promise.resolve(OVERVIEW));
+    const options = { load, guardOn: true, onGuardChange: vi.fn(), findUpdates: noUpdates, installModule: noInstall };
+    const without = new SetupState(options);
+    expect(without.canLock).toBe(false);
+    await expect(without.setLocked('module:lib', true)).resolves.toBe(false);
+
+    const lockPackage = vi.fn(() => Promise.resolve());
+    const setup = new SetupState({ ...options, lockPackage });
+    expect(setup.canLock).toBe(true);
+    await expect(setup.setLocked('system:dnd5e', true)).resolves.toBe(true);
+    expect(lockPackage).toHaveBeenCalledWith('system', 'dnd5e', true);
+    expect(load).toHaveBeenCalledOnce();
+
+    setup.updates.locked = true;
+    await expect(setup.setLocked('module:lib', false)).resolves.toBe(false);
+    setup.updates.locked = false;
+    lockPackage.mockRejectedValueOnce(new Error('No such package'));
+    await expect(setup.setLocked('module:lib', false)).resolves.toBe(false);
+    expect(load).toHaveBeenCalledOnce();
+  });
+
   test('reads the installation, saying while it does', async () => {
     let finish = (): void => undefined;
     const setup = new SetupState({

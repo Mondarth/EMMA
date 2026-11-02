@@ -99,6 +99,11 @@ export interface SetupGame {
   installDependencies?: (pkg: unknown) => Promise<unknown>;
   /** Foundry's listing of the packages of a type that may be installed, by ID, as its Install dialog shows it. */
   getPackages?: (options: { readonly type: 'module' | 'system' }) => Promise<unknown>;
+  /**
+   * Asks the user to confirm uninstalling a package, a world among them, as Foundry's **Uninstall** does, and
+   * uninstalls it through {@link post} if they do.
+   */
+  uninstallPackage?: (pkg: { readonly type?: unknown; readonly id?: unknown }) => Promise<unknown>;
   /** Reads what is installed from the server again, and shows it, as Foundry does after uninstalling a package. */
   reload?: () => Promise<unknown>;
   /** Makes a snapshot of the installation, as **Manage Backups** does, with a note; it says itself if it fails. */
@@ -250,6 +255,34 @@ export async function uninstallPackage(game: SetupGame, type: 'module' | 'system
   const forget = field(field(kind, type), 'uninstall');
   if (typeof forget === 'function') (forget as (id: string) => void).call(field(kind, type), id);
   await game.reload?.();
+}
+
+/**
+ * Lock a game system or module in Foundry, or unlock it, as Foundry's own **Lock** and **Unlock** do: a locked package
+ * cannot be updated or uninstalled, by Foundry or by EMMA.
+ *
+ * FRAGILE: Foundry offers this only from its package menu. Checked on Foundry 14.368: it posts
+ * `{ action: "lockPackage", type, id, shouldLock }`, which throws if the server refuses, then sets the package's
+ * `locked` and renders its package list, `ui.setupPackages`.
+ * @param game - The setup screen's `game`
+ * @param type - The package's type
+ * @param id - The package's ID
+ * @param lock - Whether to lock it, or unlock it
+ * @returns Once done
+ * @throws {Error} If the server refuses, saying why
+ */
+export async function lockPackage(
+  game: SetupGame,
+  type: 'module' | 'system',
+  id: string,
+  lock: boolean,
+): Promise<void> {
+  await game.post({ action: 'lockPackage', type, id, shouldLock: lock }, { notify: false });
+  const pkg = Array.from(type === 'system' ? game.systems : game.modules).find(entry => field(entry, 'id') === id);
+  if (typeof pkg === 'object' && pkg !== null) Reflect.set(pkg, 'locked', lock);
+  const list = field(field(globalThis, 'ui'), 'setupPackages');
+  const render = field(list, 'render');
+  if (typeof render === 'function') (render as () => unknown).call(list);
 }
 
 /**

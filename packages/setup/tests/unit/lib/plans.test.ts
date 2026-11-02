@@ -340,6 +340,40 @@ describe('installing anew', () => {
   });
 });
 
+describe('a package locked in Foundry', () => {
+  test('is kept at its installed release, whatever is found or looked up later', async () => {
+    const overview = buildOverview(
+      installation({
+        worlds: [],
+        modules: [{ ...installedModule('lib', 'LIB', '1.0.0'), locked: true }],
+        systems: [{ id: 'dnd5e', title: 'D&D 5e', version: '5.3.3', locked: true }],
+      }),
+      new Map(),
+    );
+    const plans = createPlanner({
+      resolver: KIT.resolver,
+      overview,
+      universe: { core: CORES, releases: [...DND, release('module:lib', '1.0.0'), release('module:lib', '2.0.0')] },
+      load: () => Promise.resolve([]),
+      policy: { verified: 'ignore', systemCompatibility: 'require', missingCompatibility: 'reject' },
+      coreTitle: 'Foundry VTT',
+      lookUp: () =>
+        Promise.resolve([
+          release('module:dice', '1.0.0', { requires: { lib: { minimum: '2.0.0' } } }),
+          release('module:lib', '3.0.0'),
+        ]),
+    });
+    expect(plans.candidates('module:lib')).toEqual([]);
+    // D&D 5e 6.0.6 is found, but D&D 5e is locked at 5.3.3.
+    expect(plans.candidates('system:dnd5e')).toEqual([]);
+
+    await plans.add('module:dice');
+
+    expect(plans.candidates('module:lib')).toEqual([]);
+    await expect(plans.complete(picks(['module:dice', '1.0.0']))).resolves.toMatchObject({ ok: false });
+  });
+});
+
 describe('the changes a change is needed through', () => {
   /**
    * DAE 2.0.0 runs in D&D 5e 6 alone. Midi 1.0.0, installed, requires DAE 1.0.0 or later, which 2.0.0 is, but does not
