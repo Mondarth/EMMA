@@ -221,7 +221,15 @@ describe('createPlanner', () => {
     const plans = planner([['midi', '1.0.0']], { a: [['midi', '1.0.0']] }, [...DND, ...MIDI]);
 
     await expect(plans.plan(picks(['system:dnd5e', '6.0.6']))).resolves.toEqual([
-      { key: 'core', installed: '14.368', version: '14.369', by: { package: 'system:dnd5e', version: '6.0.6' } },
+      // Regression: Foundry VTT read as needed by D&D 5e 6.0.6, which takes 14.367, though Midi 2.0.0, which D&D 5e
+      // 6.0.6 needs, is what needs 14.369.
+      {
+        key: 'core',
+        installed: '14.368',
+        version: '14.369',
+        by: { package: 'system:dnd5e', version: '6.0.6' },
+        through: [{ package: 'module:midi', version: '2.0.0' }],
+      },
       {
         key: 'system:dnd5e',
         installed: '5.3.3',
@@ -337,6 +345,41 @@ describe('installing anew', () => {
     await expect(planner([], { a: [] }, DND, [], () => Promise.resolve([])).add('module:dice')).resolves.toBe(false);
     await expect(planner([], { a: [] }, DND, [], () => Promise.resolve(DICE)).add('system:none')).resolves.toBe(false);
     await expect(planner([], { a: [] }, DND).add('system:dnd5e')).resolves.toBe(true);
+  });
+});
+
+describe('the changes Foundry VTT leads to', () => {
+  test("names Foundry VTT's change where a choice needs a newer build, which an installed module does not run on", async () => {
+    // App 2.0.0 needs 14.370, which Old 1.0.0, installed, does not run on, though Old 2.0.0 does.
+    const plans = planner(
+      [
+        ['app', '1.0.0'],
+        ['old', '1.0.0'],
+      ],
+      {
+        a: [
+          ['app', '1.0.0'],
+          ['old', '1.0.0'],
+        ],
+      },
+      [
+        ...DND,
+        release('module:app', '1.0.0'),
+        release('module:app', '2.0.0', { core: { minimum: '14.370', verified: '14' } }),
+        release('module:old', '1.0.0', { core: { minimum: '14', verified: '14', maximum: '14.369' } }),
+        release('module:old', '2.0.0'),
+      ],
+    );
+
+    const plan = await plans.plan(picks(['module:app', '2.0.0']));
+
+    expect(plan?.find(({ key }) => key === 'module:old')).toMatchObject({
+      version: '2.0.0',
+      by: { package: 'module:app', version: '2.0.0' },
+      through: [{ package: 'core', version: '14.370' }],
+    });
+    // Foundry VTT itself is needed by App directly, which needs its build.
+    expect(plan?.find(({ key }) => key === 'core')).not.toHaveProperty('through');
   });
 });
 
