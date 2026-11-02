@@ -73,6 +73,47 @@ export function writeLayout(layout: Layout): void {
   }
 }
 
+/** The key the window's place and size are kept under, in the browser's local storage. */
+export const GEOMETRY_KEY = 'mondarth-emma.setup.geometry';
+
+/** Where the window is, and how big, in pixels, as Foundry positions it. */
+export interface Geometry {
+  readonly left: number;
+  readonly top: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+/**
+ * Where the user left the window; none if it was never moved or resized, or the storage cannot be read. Foundry keeps
+ * a window on the screen, so a place off a smaller screen is moved onto it.
+ * @returns The window's place and size, or `null`
+ */
+export function readGeometry(): Geometry | null {
+  try {
+    const kept: unknown = JSON.parse(localStorage.getItem(GEOMETRY_KEY) ?? 'null');
+    if (typeof kept !== 'object' || kept === null) return null;
+    const { left, top, width, height } = kept as Record<string, unknown>;
+    const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+    if (!finite(left) || !finite(top) || !finite(width) || !finite(height) || width <= 0 || height <= 0) return null;
+    return { left, top, width, height };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Keep the window's place and size. Kept for this visit only if the storage cannot be written.
+ * @param geometry - Where the window is, and how big
+ */
+export function writeGeometry(geometry: Geometry): void {
+  try {
+    localStorage.setItem(GEOMETRY_KEY, JSON.stringify(geometry));
+  } catch {
+    // As for the guard's setting.
+  }
+}
+
 /** The key the plan left for after Foundry VTT's update is kept under. */
 export const PENDING_PLAN_KEY = 'mondarth-emma.setup.pending-plan';
 
