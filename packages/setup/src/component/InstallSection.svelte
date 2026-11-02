@@ -12,7 +12,7 @@
   import type { ListedPackage } from '../foundry/setup-game';
   import { format, localize } from '../lib/i18n';
   import type { InstallFilters } from '../lib/install';
-  import { compatibilityText, matching, tagText } from '../lib/install';
+  import { compatibilityText, matching, tagsAmong, tagText, toggleTag, UNTAGGED, withTags } from '../lib/install';
 
   interface Props {
     type: 'module' | 'system';
@@ -42,7 +42,9 @@
   let query = $state('');
   /** How adding each package went, by its key, while it is added or once it could not be. */
   const added = new SvelteMap<string, 'adding' | Exclude<InstallResult, { ok: true }>>();
-  const found = $derived(matching(packages, query));
+  /** The tags among the modules, each a badge to turn on or off; game systems have none. */
+  const tags = $derived(type === 'module' ? tagsAmong(packages) : []);
+  const found = $derived(matching(withTags(packages, filters.offTags), query));
   /** How many of those are shown: a batch, and another each time the end of the list comes into view. */
   let shown = $state(BATCH);
   /** Just past the last package shown, while more are found. */
@@ -119,6 +121,25 @@
           }} />
         {localize(`Install.ShowUnowned${plural}`)}
       </label>
+      {#if tags.length > 0}
+        <div class="emma-install-tags" role="group" aria-label={localize('Install.Tags')}>
+          {#each tags as tag (tag)}
+            {@const on = !filters.offTags.includes(tag)}
+            <button
+              type="button"
+              class={['emma-install-tag', { 'emma-install-tag-on': on }]}
+              aria-pressed={on}
+              onclick={event => {
+                onFilter({ offTags: toggleTag(tags, filters.offTags, tag, event.shiftKey) });
+                shown = BATCH;
+              }}>
+              <i class={['fa-solid', on ? 'fa-check' : 'fa-xmark']} aria-hidden="true"></i>
+              {tag === UNTAGGED ? localize('Install.Untagged') : tagText(tag)}
+            </button>
+          {/each}
+        </div>
+        <p class="emma-install-hint">{localize('Install.TagsHint')}</p>
+      {/if}
     </fieldset>
     <p role="status">
       {format('Install.Shown', { shown: String(Math.min(found.length, shown)), count: String(found.length) })}
@@ -252,6 +273,28 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  .emma-install-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+
+  /* On or off shows by the mark and the border as well as by the colour. */
+  .emma-install .emma-install-tag {
+    flex: 0 0 auto;
+    padding: 0 0.5rem;
+    line-height: 1.6;
+    border: 1px dashed var(--color-border, #777);
+    border-radius: 1rem;
+    background: transparent;
+    font-size: 0.85em;
+  }
+
+  .emma-install .emma-install-tag-on {
+    border-style: solid;
+    background: var(--color-warm-2, rgba(255, 100, 0, 0.25));
   }
 
   .emma-install-unowned {

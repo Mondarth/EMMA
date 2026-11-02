@@ -51,13 +51,13 @@ describe('SetupState', () => {
       findUpdates: noUpdates,
       installModule: noInstall,
     });
-    expect(setup.installFilters.module).toEqual({ hideBehind: true, showUnowned: false });
+    expect(setup.installFilters.module).toEqual({ hideBehind: true, showUnowned: false, offTags: [] });
 
     setup.setInstallFilters('module', { showUnowned: true });
 
     expect(setup.installFilters).toEqual({
-      module: { hideBehind: true, showUnowned: true },
-      system: { hideBehind: true, showUnowned: false },
+      module: { hideBehind: true, showUnowned: true, offTags: [] },
+      system: { hideBehind: true, showUnowned: false, offTags: [] },
     });
   });
 

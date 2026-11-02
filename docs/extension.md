@@ -291,6 +291,9 @@ Two filters narrow it, each kept for the session, apart for game systems and for
   since.
 - **Show premium … I do not own**, off at first, shows premium packages that Foundry cannot install for you. They
   cannot be added.
+- For modules, a badge for each tag on Foundry's listing, and **Untagged** for those it gives none, all on at first. A
+  module shows if any of its tags is on. A click turns a tag on or off; a shift-click turns every other tag off first,
+  so on a tag that is off it shows that tag alone, and on one that is on it turns every tag off.
 
 Each package has a drawer, **Details of <title>**, of what Foundry's listing says of it: its description, as plain
 text, authors, newest version, the Foundry VTT builds it declares, the game systems a module is for, its tags, whether

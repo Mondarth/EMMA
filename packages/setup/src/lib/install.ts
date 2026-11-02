@@ -27,10 +27,64 @@ export interface InstallFilters {
   readonly hideBehind: boolean;
   /** Whether to show premium packages the user does not own, which cannot be added. */
   readonly showUnowned: boolean;
+  /** The tags turned off, {@link UNTAGGED} among them for packages without tags: a package shows if any of its own is on. */
+  readonly offTags: readonly string[];
 }
 
-/** What is hidden unless the user says otherwise. */
-export const DEFAULT_FILTERS: InstallFilters = { hideBehind: true, showUnowned: false };
+/** What is hidden unless the user says otherwise: every tag is on. */
+export const DEFAULT_FILTERS: InstallFilters = { hideBehind: true, showUnowned: false, offTags: [] };
+
+/** The tag filter's name for packages the listing gives no tags. */
+export const UNTAGGED = '';
+
+/**
+ * A package's tags, as the tag filter has them.
+ * @param pkg - The package
+ * @returns Its tags, or {@link UNTAGGED} alone if it has none
+ */
+function tagsOf(pkg: ListedPackage): readonly string[] {
+  return pkg.tags === undefined || pkg.tags.length === 0 ? [UNTAGGED] : pkg.tags;
+}
+
+/**
+ * The tags among some packages, by name, with {@link UNTAGGED} last if any has none.
+ * @param packages - The packages
+ * @returns The tags
+ */
+export function tagsAmong(packages: readonly ListedPackage[]): string[] {
+  const tags = [...new Set(packages.flatMap(tagsOf))];
+  return [
+    ...tags.filter(tag => tag !== UNTAGGED).sort((a, b) => a.localeCompare(b)),
+    ...tags.filter(tag => tag === UNTAGGED),
+  ];
+}
+
+/**
+ * The packages with a tag that is on.
+ * @param packages - The packages
+ * @param offTags - The tags turned off
+ * @returns Those with any tag on, all of them while none is off
+ */
+export function withTags(packages: readonly ListedPackage[], offTags: readonly string[]): readonly ListedPackage[] {
+  if (offTags.length === 0) return packages;
+  return packages.filter(pkg => tagsOf(pkg).some(tag => !offTags.includes(tag)));
+}
+
+/**
+ * Toggle a tag, as a click on its badge does. A plain click turns it on or off. A shift-click turns every other tag
+ * off and toggles it as a plain click does: so on a tag that is on it turns every tag off, and on one that is off it
+ * leaves that one alone on.
+ * @param tags - Every tag shown
+ * @param offTags - The tags turned off
+ * @param tag - The tag clicked
+ * @param alone - Whether shift was held
+ * @returns The tags turned off after
+ */
+export function toggleTag(tags: readonly string[], offTags: readonly string[], tag: string, alone: boolean): string[] {
+  const on = !offTags.includes(tag);
+  const others = alone ? tags.filter(other => other !== tag) : offTags.filter(other => other !== tag);
+  return on ? [...others, tag] : others;
+}
 
 /**
  * A Foundry version as numbers: its generation, and its build if it names one.

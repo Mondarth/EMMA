@@ -932,6 +932,61 @@ describe('installing anew, by group', () => {
     ).toBeChecked();
   });
 
+  test('filters modules by tag: a click toggles one, a shift-click shows one alone or turns all off', async () => {
+    const user = await listing(type =>
+      Promise.resolve(
+        type === 'module'
+          ? [{ ...listed('maps'), tags: ['maps', 'art'] }, { ...listed('dice'), tags: ['dice-rolls'] }, listed('plain')]
+          : [{ ...listed('pf2e'), type, tags: ['rules'] }],
+      ),
+    );
+    await user.click(within(row(/^Modules/)).getByText('Modules'));
+    const section = await screen.findByRole('region', { name: 'Install a module' });
+    const tags = await within(section).findByRole('group', { name: 'Tags' });
+    const badge = (name: string) => within(tags).getByRole('button', { name });
+    const status = () => within(section).getByRole('status');
+
+    expect(
+      within(tags)
+        .getAllByRole('button')
+        .map(button => button.textContent.trim()),
+    ).toEqual(['Art', 'Dice Rolls', 'Maps', 'Untagged']);
+    expect(
+      within(tags)
+        .getAllByRole('button')
+        .every(button => button.getAttribute('aria-pressed') === 'true'),
+    ).toBe(true);
+    expect(status()).toHaveTextContent('Showing 3 of 3');
+
+    await user.click(badge('Untagged'));
+    expect(badge('Untagged')).toHaveAttribute('aria-pressed', 'false');
+    expect(status()).toHaveTextContent('Showing 2 of 2');
+    await user.click(badge('Maps'));
+    // Maps still has Art on.
+    expect(status()).toHaveTextContent('Showing 2 of 2');
+
+    await user.keyboard('{Shift>}');
+    await user.click(badge('Dice Rolls'));
+    await user.keyboard('{/Shift}');
+    expect(status()).toHaveTextContent('Showing 0 of 0');
+    expect(
+      within(tags)
+        .getAllByRole('button')
+        .some(button => button.getAttribute('aria-pressed') === 'true'),
+    ).toBe(false);
+
+    await user.keyboard('{Shift>}');
+    await user.click(badge('Art'));
+    await user.keyboard('{/Shift}');
+    expect(status()).toHaveTextContent('Showing 1 of 1');
+    expect(section).toHaveTextContent('maps');
+
+    // Game systems have no tag filter.
+    await user.click(within(row(/^Game systems/)).getByText('Game systems'));
+    const systems = await screen.findByRole('region', { name: 'Install a game system' });
+    expect(within(systems).queryByRole('group', { name: 'Tags' })).toBeNull();
+  });
+
   test('offers the modules for a game system the plan installs', async () => {
     // Pathfinder is not installed; the planner can add it, and plans it with no version installed.
     const pathfinder: PackageUpdate = { key: 'system:pf2e', installed: 'none', newest: '7.0.0', versions: ['7.0.0'] };

@@ -9,7 +9,11 @@ import {
   keptSystems,
   matching,
   pendingPackages,
+  tagsAmong,
   tagText,
+  toggleTag,
+  UNTAGGED,
+  withTags,
 } from '../../../src/lib/install';
 import { buildOverview } from '../../../src/lib/overview';
 import { installation, installedModule } from '../../mocks/fixtures';
@@ -104,9 +108,9 @@ describe('installable', () => {
     const ids = (filters: Parameters<typeof installable>[3]) =>
       installable(listing, OVERVIEW, target, filters).map(({ id }) => id);
 
-    expect(ids({ hideBehind: true, showUnowned: false })).toEqual(['any']);
-    expect(ids({ hideBehind: false, showUnowned: false })).toEqual(['any', 'ancient']);
-    expect(ids({ hideBehind: true, showUnowned: true })).toEqual(['any', 'premium']);
+    expect(ids({ hideBehind: true, showUnowned: false, offTags: [] })).toEqual(['any']);
+    expect(ids({ hideBehind: false, showUnowned: false, offTags: [] })).toEqual(['any', 'ancient']);
+    expect(ids({ hideBehind: true, showUnowned: true, offTags: [] })).toEqual(['any', 'premium']);
   });
 });
 
@@ -154,6 +158,41 @@ describe('pendingPackages', () => {
       { key: 'module:maps', title: 'MODULE:MAPS', version: '1.1.0', systems: ['pf2e'] },
       { key: 'module:unlisted', title: 'MODULE:UNLISTED', version: '2.0.0', systems: [] },
     ]);
+  });
+});
+
+describe('tags', () => {
+  const PACKAGES = [
+    listed('maps', { tags: ['maps', 'art'] }),
+    listed('dice', { tags: ['dice'] }),
+    listed('plain'),
+    listed('empty', { tags: [] }),
+  ];
+
+  test('finds the tags among packages, by name, with those without tags last', () => {
+    expect(tagsAmong(PACKAGES)).toEqual(['art', 'dice', 'maps', UNTAGGED]);
+    expect(tagsAmong(PACKAGES.slice(0, 2))).toEqual(['art', 'dice', 'maps']);
+  });
+
+  test('shows a package while any of its tags is on', () => {
+    const ids = (off: readonly string[]) => withTags(PACKAGES, off).map(({ id }) => id);
+
+    expect(withTags(PACKAGES, [])).toBe(PACKAGES);
+    expect(ids(['art'])).toEqual(['maps', 'dice', 'plain', 'empty']);
+    expect(ids(['art', 'maps'])).toEqual(['dice', 'plain', 'empty']);
+    expect(ids([UNTAGGED])).toEqual(['maps', 'dice']);
+    expect(ids(['art', 'dice', 'maps', UNTAGGED])).toEqual([]);
+  });
+
+  test('toggles a tag on a click, and on a shift-click turns the others off first', () => {
+    const all = ['art', 'dice', 'maps'];
+
+    expect(toggleTag(all, [], 'dice', false)).toEqual(['dice']);
+    expect(toggleTag(all, ['dice', 'art'], 'dice', false)).toEqual(['art']);
+    // Shift on a tag that is on: every tag off.
+    expect(toggleTag(all, ['art'], 'dice', true).sort()).toEqual(all);
+    // Shift on a tag that is off: it alone on.
+    expect(toggleTag(all, ['dice', 'maps'], 'dice', true)).toEqual(['art', 'maps']);
   });
 });
 
