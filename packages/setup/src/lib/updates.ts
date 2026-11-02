@@ -206,8 +206,10 @@ export async function findUpdates(inputs: UpdateInputs): Promise<UpdateSearch> {
   };
   const unlocked = keepsLocked(resolver, overview);
   const atLeastInstalled = (from: Universe): Universe => ({
-    // An update never goes back, nor changes a package locked in Foundry.
-    core: from.core.filter(build => !newer(core, build.version)),
+    // An update never goes back, nor changes a package locked in Foundry, nor Foundry VTT locked in EMMA.
+    core: from.core.filter(
+      build => !newer(core, build.version) && (overview.coreLocked !== true || sameVersion(build.version, core)),
+    ),
     releases: from.releases.filter(release => {
       const version = installed.get(packageKey(release.package));
       return (version === undefined || !newer(version, release.version)) && unlocked(release);

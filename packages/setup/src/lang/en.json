@@ -316,6 +316,9 @@
     "Unlocked": "Locking {title} keeps it at {version}: neither Foundry nor EMMA's plans update or uninstall it until it is unlocked. It is locked at once, as in Foundry's own package menu.",
     "Lock": "Lock {title} at {version}",
     "Unlock": "Unlock {title}",
-    "Tree": "Locked in Foundry"
+    "Tree": "Locked in Foundry",
+    "CoreLocked": "EMMA keeps {title} at {version}: no plan updates it, though plans still update the game systems and modules that run on it. This is EMMA's own lock, as Foundry has none for itself; Foundry's own Update Software is not stopped by it.",
+    "CoreUnlocked": "Locking {title} in EMMA keeps it at {version}: no plan updates it, though plans still update the game systems and modules that run on it. Foundry has no lock for itself, so this is EMMA's own.",
+    "TreeCore": "Locked in EMMA"
   }
 }

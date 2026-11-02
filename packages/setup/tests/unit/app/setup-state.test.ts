@@ -83,6 +83,25 @@ describe('SetupState', () => {
     expect(load).toHaveBeenCalledOnce();
   });
 
+  test('locks Foundry VTT in EMMA only where it can, while no plan runs, reading the installation again', async () => {
+    const load = vi.fn(() => Promise.resolve(OVERVIEW));
+    const options = { load, guardOn: true, onGuardChange: vi.fn(), findUpdates: noUpdates, installModule: noInstall };
+    const without = new SetupState(options);
+    expect(without.canLockCore).toBe(false);
+    await expect(without.setCoreLocked(true)).resolves.toBe(false);
+
+    const lockCore = vi.fn();
+    const setup = new SetupState({ ...options, lockCore });
+    expect(setup.canLockCore).toBe(true);
+    await expect(setup.setCoreLocked(true)).resolves.toBe(true);
+    expect(lockCore).toHaveBeenCalledWith(true);
+    expect(load).toHaveBeenCalledOnce();
+
+    setup.updates.locked = true;
+    await expect(setup.setCoreLocked(false)).resolves.toBe(false);
+    expect(lockCore).toHaveBeenCalledOnce();
+  });
+
   test('reads the installation, saying while it does', async () => {
     let finish = (): void => undefined;
     const setup = new SetupState({

@@ -162,11 +162,8 @@
       {/if}
       <span class="emma-tree-title">{row.title}</span>
       {#if row.locked}
-        <i
-          class="fa-solid fa-lock emma-tree-locked"
-          role="img"
-          aria-label={localize('Lock.Tree')}
-          data-tooltip={localize('Lock.Tree')}></i>
+        {@const lockedBy = localize(row.selection.kind === 'root' ? 'Lock.TreeCore' : 'Lock.Tree')}
+        <i class="fa-solid fa-lock emma-tree-locked" role="img" aria-label={lockedBy} data-tooltip={lockedBy}></i>
       {/if}
       {#if removing}
         <span class="emma-tree-uninstall">{localize('Update.Uninstall')}</span>

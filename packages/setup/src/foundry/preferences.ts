@@ -30,6 +30,35 @@ export function writeGuardOn(on: boolean): void {
   }
 }
 
+/** The key whether EMMA keeps Foundry VTT at the build installed is kept under. */
+export const CORE_LOCK_KEY = 'mondarth-emma.setup.core-lock';
+
+/**
+ * Whether EMMA keeps Foundry VTT at the build installed: EMMA's own lock, as Foundry has none for itself. Off unless
+ * switched on; off also when the storage cannot be read.
+ * @returns `true` if it is locked
+ */
+export function readCoreLocked(): boolean {
+  try {
+    return localStorage.getItem(CORE_LOCK_KEY) === 'locked';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Keep whether EMMA keeps Foundry VTT at the build installed. Kept for this visit only if the storage cannot be written.
+ * @param locked - Whether it is locked
+ */
+export function writeCoreLocked(locked: boolean): void {
+  try {
+    if (locked) localStorage.setItem(CORE_LOCK_KEY, 'locked');
+    else localStorage.removeItem(CORE_LOCK_KEY);
+  } catch {
+    // As for the guard's setting.
+  }
+}
+
 /** The key the panels' sizes are kept under. */
 export const LAYOUT_KEY = 'mondarth-emma.setup.layout';
 

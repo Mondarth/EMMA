@@ -38,6 +38,8 @@ export interface InstalledWorld {
 export interface Installation {
   /** The Foundry version, such as `14.368`. */
   readonly core: string;
+  /** Whether EMMA keeps Foundry VTT at that version, as the user locked it in EMMA: Foundry has no lock for itself. */
+  readonly coreLocked?: true;
   readonly worlds: readonly InstalledWorld[];
   readonly modules: readonly InstalledModule[];
   readonly systems: readonly InstalledPackage[];

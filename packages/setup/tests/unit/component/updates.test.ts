@@ -1848,3 +1848,40 @@ describe('locking a package', () => {
     });
   });
 });
+
+describe('locking Foundry VTT in EMMA', () => {
+  test('locks and unlocks it from the root panel, reading the installation again, and marks it in the tree', async () => {
+    let locked = false;
+    const lockCore = vi.fn((lock: boolean) => {
+      locked = lock;
+    });
+    const setup = new SetupState({
+      load: () =>
+        Promise.resolve(buildOverview(installation({ ...(locked && { coreLocked: true as const }) }), new Map())),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: findingBlocked(),
+      installModule: noInstall,
+      lockCore,
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    const user = userEvent.setup();
+    const section = () => screen.getByRole('region', { name: 'Lock' });
+    expect(section()).toHaveTextContent('Locking Foundry VTT in EMMA keeps it at 14.368');
+
+    await user.click(within(section()).getByRole('button', { name: 'Lock Foundry VTT at 14.368' }));
+
+    expect(lockCore).toHaveBeenCalledWith(true);
+    await vi.waitFor(() => {
+      expect(section()).toHaveTextContent('EMMA keeps Foundry VTT at 14.368');
+    });
+    expect(within(row(/^Foundry VTT/)).getByRole('img', { name: 'Locked in EMMA' })).toBeInTheDocument();
+
+    await user.click(within(section()).getByRole('button', { name: 'Unlock Foundry VTT' }));
+    expect(lockCore).toHaveBeenLastCalledWith(false);
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('img', { name: 'Locked in EMMA' })).toBeNull();
+    });
+  });
+});
