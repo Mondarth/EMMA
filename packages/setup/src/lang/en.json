@@ -162,7 +162,10 @@
     "SnapshotSpace": "Needs about {required}; {available} free",
     "NotEnough": "Not enough space: needs about {required}, {available} free",
     "BackupSpace": "Size not known; {available} free",
-    "BackupSizeUnknown": "Size not known"
+    "BackupSizeUnknown": "Size not known",
+    "Remove": "Take out",
+    "TakeOut": "Take {title} out of the plan",
+    "TakeOutHint": "Take {title} out of the plan, keeping what it brought in. Shift-click to take that out too, but for what another change still needs."
   },
   "Install": {
     "Systems": "Install a game system",

@@ -522,10 +522,37 @@ export class UpdateState {
    * @returns Whether it was taken out
    */
   async forget(key: PackageKey): Promise<boolean> {
+    return this.takeOut(key, true);
+  }
+
+  /**
+   * Whether a change in the plan can be taken out by itself: one chosen, or added against EMMA's advice, but not one
+   * that only another needs.
+   * @param key - The package's key
+   * @returns `true` if it can
+   */
+  canTakeOut(key: PackageKey): boolean {
+    return this.#picks.has(key) || this.#forced.has(key);
+  }
+
+  /**
+   * Take a change out of the plan, as its row's button does. Alone, what it brought in stays, chosen at the versions
+   * the plan has, so that the rest of the plan stands as it is; with what it needs, that goes too, unless another
+   * change needs it still.
+   * @param key - The package's key
+   * @param withNeeds - Whether what it brought in goes with it
+   * @returns Whether it was taken out
+   */
+  async takeOut(key: PackageKey, withNeeds: boolean): Promise<boolean> {
+    if (!this.locked && this.#forced.has(key)) {
+      this.#forced.delete(key);
+      return true;
+    }
     const search = this.search;
     const overview = this.#overview;
     if (search === null || overview === null || this.locked || !this.#picks.has(key)) return false;
-    const picks = withChoice(this.#picks, key, null);
+    let picks = withChoice(this.#picks, key, null);
+    if (!withNeeds) for (const entry of this.#broughtIn(key)) picks = withChoice(picks, entry.key, entry.version);
     // Taking out an uninstall may break another, as of a module the plan's other uninstall needs gone.
     const allowed = this.#uninstallsAllowed(overview, picks);
     const plan = !allowed ? undefined : picks.size === 0 ? [] : await search.planner.plan(picks);
@@ -534,6 +561,25 @@ export class UpdateState {
     for (const [picked, to] of picks) this.#picks.set(picked, to);
     this.plan = plan;
     return true;
+  }
+
+  /**
+   * The changes in the plan that a change brought in: those it needs, and those they need in turn.
+   * @param key - The change's package
+   * @returns Them
+   */
+  #broughtIn(key: PackageKey): PlanEntry[] {
+    const found: PlanEntry[] = [];
+    const isNeeder = (needer: PackageKey) => needer === key || found.some(entry => entry.key === needer);
+    let grew = true;
+    while (grew) {
+      const more = this.plan.filter(
+        entry => entry.by !== undefined && isNeeder(entry.by.package) && !found.includes(entry),
+      );
+      found.push(...more);
+      grew = more.length > 0;
+    }
+    return found;
   }
 
   /**

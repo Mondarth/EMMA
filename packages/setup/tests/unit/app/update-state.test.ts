@@ -4,7 +4,7 @@ import { UpdateState } from '../../../src/app/update-state.svelte';
 import { KitUnavailable } from '../../../src/foundry/setup-kit';
 import { buildOverview } from '../../../src/lib/overview';
 import type { ManifestRead, PackageUpdate, UpdateSearch } from '../../../src/lib/updates';
-import type { Planner } from '../../../src/lib/plans';
+import type { PlanEntry, Planner } from '../../../src/lib/plans';
 import { UNINSTALL } from '../../../src/lib/plans';
 import { alone, installation, installedModule, release } from '../../mocks/fixtures';
 
@@ -810,5 +810,110 @@ describe('installing from a manifest URL', () => {
     const now = buildOverview(installation({ modules: [installedModule('dice', 'Dice', '9.0.0')] }), new Map());
     await updates.searchFor(now);
     expect(updates.forced).toEqual([]);
+  });
+});
+
+describe('taking a change out of the plan', () => {
+  const TOOL: PackageUpdate = { key: 'module:tool', installed: '1.0.0', newest: '3.0.0', versions: ['3.0.0', '1.0.0'] };
+  const MAPS: PackageUpdate = { key: 'module:maps', installed: '1.0.0', newest: '2.0.0', versions: ['2.0.0', '1.0.0'] };
+
+  /**
+   * The state, searched, with a planner in which App 2.0.0 and Tool 3.0.0 each need Library 1.1.0, and Library 1.1.0
+   * needs Maps 2.0.0, unless chosen.
+   * @returns The state
+   */
+  async function searched(): Promise<UpdateState> {
+    const base = alone(APP, LIB, TOOL, MAPS);
+    const planner: Planner = {
+      ...base,
+      plan: picks => {
+        const entries: PlanEntry[] = [...picks].map(([key, version]) => ({ key, installed: '1.0.0', version }));
+        const needer = [...picks].find(
+          ([key, version]) => (key === 'module:app' && version === '2.0.0') || key === 'module:tool',
+        );
+        if (needer !== undefined && !picks.has('module:lib')) {
+          entries.push({
+            key: 'module:lib',
+            installed: '1.0.0',
+            version: '1.1.0',
+            by: { package: needer[0], version: needer[1] },
+          });
+        }
+        if ((needer !== undefined || picks.get('module:lib') === '1.1.0') && !picks.has('module:maps')) {
+          entries.push({
+            key: 'module:maps',
+            installed: '1.0.0',
+            version: '2.0.0',
+            by: { package: 'module:lib', version: '1.1.0' },
+          });
+        }
+        return Promise.resolve(entries);
+      },
+    };
+    const updates = new UpdateState(() => Promise.resolve({ ...finding(APP, LIB, TOOL, MAPS), planner }));
+    await updates.searchFor(OVERVIEW);
+    return updates;
+  }
+
+  /**
+   * What the plan holds.
+   * @param updates - The state
+   * @returns Each change as `<key>@<version>`, with `<` and its needer if another needs it
+   */
+  const held = (updates: UpdateState) =>
+    updates.plan.map(({ key, version, by }) => `${key}@${version}${by === undefined ? '' : ` < ${by.package}`}`);
+
+  test('takes a change out alone, keeping what it brought in, chosen as the plan has it', async () => {
+    const updates = await searched();
+    await updates.choose('module:app', '2.0.0');
+    expect(held(updates)).toEqual([
+      'module:app@2.0.0',
+      'module:lib@1.1.0 < module:app',
+      'module:maps@2.0.0 < module:lib',
+    ]);
+    // What another change needs cannot be taken out by itself.
+    expect(updates.canTakeOut('module:app')).toBe(true);
+    expect(updates.canTakeOut('module:lib')).toBe(false);
+    await expect(updates.takeOut('module:lib', false)).resolves.toBe(false);
+
+    await expect(updates.takeOut('module:app', false)).resolves.toBe(true);
+
+    expect(updates.picks).toEqual([
+      ['module:lib', '1.1.0'],
+      ['module:maps', '2.0.0'],
+    ]);
+    expect(held(updates)).toEqual(['module:lib@1.1.0', 'module:maps@2.0.0']);
+  });
+
+  test('takes a change out with what it brought in, but for what another change still needs', async () => {
+    const updates = await searched();
+    await updates.choose('module:app', '2.0.0');
+    await expect(updates.takeOut('module:app', true)).resolves.toBe(true);
+    expect(updates.plan).toEqual([]);
+
+    await updates.choose('module:app', '2.0.0');
+    await updates.choose('module:tool', '3.0.0');
+    await expect(updates.takeOut('module:app', true)).resolves.toBe(true);
+    expect(held(updates)).toEqual([
+      'module:tool@3.0.0',
+      'module:lib@1.1.0 < module:tool',
+      'module:maps@2.0.0 < module:lib',
+    ]);
+  });
+
+  test('takes out what was added against advice, and nothing while the plan runs', async () => {
+    const updates = await searched();
+    const install = { key: 'module:dice', title: 'Dice', version: '1.0.0', manifest: 'https://example.org/dice.json' };
+    updates.force(install);
+    expect(updates.canTakeOut('module:dice')).toBe(true);
+    await expect(updates.takeOut('module:dice', false)).resolves.toBe(true);
+    expect(updates.forced).toEqual([]);
+
+    await updates.choose('module:app', '2.0.0');
+    updates.force(install);
+    updates.locked = true;
+    await expect(updates.takeOut('module:app', false)).resolves.toBe(false);
+    await expect(updates.takeOut('module:dice', true)).resolves.toBe(false);
+    expect(updates.forced).toHaveLength(1);
   });
 });

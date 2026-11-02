@@ -207,6 +207,11 @@ changes with its installed and new versions, and, for one a choice brings in, wh
 the changes in the order they are to be installed: Foundry VTT first, then the game systems, then the modules, each after
 the modules in the plan it requires.
 
+Each change chosen has **−** at the right of its row, **Take <title> out of the plan**. A change another needs has
+none: it is locked in while that change is in the plan. A click takes out that change alone: what it brought in stays,
+chosen at the versions the plan has, so the rest of the plan is as it was. A shift-click takes out what it brought in
+too, but for what another change still needs.
+
 Before the changes, under **Keep first**, the plan offers what Foundry's **Manage Backups** makes by hand:
 
 - a **snapshot of the installation**, unchecked unless the plan changes Foundry VTT, when EMMA checks it as a strong
