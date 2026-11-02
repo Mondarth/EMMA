@@ -1,11 +1,12 @@
 import { render, screen, within } from '@testing-library/svelte';
 import { describe, expect, test } from 'vitest';
 
+import GroupPanel from '../../../src/component/GroupPanel.svelte';
 import ModulePanel from '../../../src/component/ModulePanel.svelte';
 import RootPanel from '../../../src/component/RootPanel.svelte';
 import SystemPanel from '../../../src/component/SystemPanel.svelte';
 import WorldPanel from '../../../src/component/WorldPanel.svelte';
-import { moduleDetail, systemDetail } from '../../../src/lib/details';
+import { groupDetail, moduleDetail, systemDetail } from '../../../src/lib/details';
 import { buildOverview } from '../../../src/lib/overview';
 import { installation, installedModule, record, recorded } from '../../mocks/fixtures';
 
@@ -37,6 +38,21 @@ const NEME = buildOverview(
     ],
   ]),
 );
+
+describe('GroupPanel', () => {
+  test('lists what a group holds in a list ten entries high that can be scrolled from the keyboard', () => {
+    render(GroupPanel, { detail: groupDetail(NEME, { kind: 'group' }) });
+
+    const list = screen.getByRole('list', { name: 'Universal' });
+    expect(list).toHaveClass('emma-group-items');
+    expect(list).toHaveAttribute('tabindex', '0');
+    expect(
+      within(list)
+        .getAllByRole('listitem')
+        .map(item => item.textContent.trim()),
+    ).toEqual([expect.stringMatching(/^EMMA/), expect.stringMatching(/^libWrapper/)]);
+  });
+});
 
 describe('SystemPanel', () => {
   test('notes a world that last ran with another version of a game system', () => {
