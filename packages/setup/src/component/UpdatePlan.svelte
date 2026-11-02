@@ -206,11 +206,13 @@
         <th scope="col">{localize('Update.Installed')}</th>
         <th scope="col">{localize('Update.Chosen')}</th>
         <th scope="col">{localize('Update.Manifest')}</th>
+        <th scope="col" aria-label={localize('Plan.Remove')}></th>
       </tr>
     </thead>
     <tbody>
       {#each updates.choices as choice (choice.key)}
         {@const older = choice.key === 'core' ? newerCore : undefined}
+        {@const name = titles.get(choice.key) ?? updates.titleOf(choice.key)}
         <tr class={[choice.forced && 'emma-plan-forced']}>
           <th scope="row">
             {#if choice.key === 'core' && coreBlocked !== undefined}
@@ -220,7 +222,7 @@
                 aria-label={format('Plan.CoreBlocked', { reason: coreBlocked })}
                 data-tooltip={coreBlocked}></i>
             {/if}
-            {titles.get(choice.key) ?? updates.titleOf(choice.key)}{@render stateOf(choice.key)}
+            {name}{@render stateOf(choice.key)}
           </th>
           <td>
             {#if choice.installed === undefined}
@@ -236,7 +238,16 @@
               <span class={[older !== undefined && 'emma-plan-older']}>{choice.chosen}</span>
             {/if}
             {#if choice.by !== undefined}
-              <span class="emma-plan-needed">{format('Update.NeededBy', choice.by)}</span>
+              <span class="emma-plan-needed">
+                {choice.through === undefined
+                  ? format('Update.NeededBy', choice.by)
+                  : format('Update.NeededThrough', {
+                      ...choice.by,
+                      through: new Intl.ListFormat('en').format(
+                        choice.through.map(({ title, version }) => `${title} ${version}`),
+                      ),
+                    })}
+              </span>
             {/if}
             {#if choice.forced}
               <span class="emma-plan-against">
@@ -275,6 +286,20 @@
               <span class="emma-plan-missing">{localize('Update.NoManifest')}</span>
             {/if}
           </td>
+          <td class="emma-plan-remove">
+            {#if updates.canTakeOut(choice.key)}
+              <button
+                type="button"
+                aria-label={format('Plan.TakeOut', { title: name })}
+                data-tooltip={format('Plan.TakeOutHint', { title: name })}
+                disabled={running || updates.locked}
+                onclick={event => {
+                  void updates.takeOut(choice.key, event.shiftKey);
+                }}>
+                <i class="fa-solid fa-minus" aria-hidden="true"></i>
+              </button>
+            {/if}
+          </td>
         </tr>
       {/each}
     </tbody>
@@ -300,6 +325,17 @@
     display: block;
     font-size: 0.85em;
     font-weight: bold;
+  }
+
+  .emma-plan-remove {
+    width: 1%;
+    text-align: right;
+  }
+
+  .emma-plan-remove button {
+    width: auto;
+    padding: 0 0.4rem;
+    line-height: 1.6;
   }
 
   .emma-plan-needed {

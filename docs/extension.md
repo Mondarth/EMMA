@@ -203,9 +203,18 @@ manifest URL for that version alone, which EMMA needs to install it: it is marke
 tooltip and the panel say why, and it can never be chosen, nor does a plan ever bring it in. Nor is such a version ever
 the update offered; when it is the newest, its red arrow says so. The installed versions need none. A version chosen is never changed to suit another. Choosing a version brings in whatever else it needs, from the fewest changes that work: a world's other packages
 stay as they are where they can, and Foundry VTT moves only as far as it must. Choosing a version other than the installed one opens the **Update plan** below the tree and the panel, the full width of the window, listing each package that
-changes with its installed and new versions, and, for one a choice brings in, which choice needs it. The plan lists
+changes with its installed and new versions, and, for one a choice brings in, which choice needs it, and, where the
+choice does not name it itself, the changes it is needed through: "needed for DAE 14.6.0, through D&D 5e 5.4.0", for a
+module whose installed version does not run in the new game system DAE needs. The plan lists
 the changes in the order they are to be installed: Foundry VTT first, then the game systems, then the modules, each after
 the modules in the plan it requires.
+
+Each change chosen has **−** at the right of its row, **Take <title> out of the plan**. A change another needs has
+none: it is locked in while that change is in the plan. A click takes out that change alone: what it brought in stays,
+chosen at the versions the plan has, so the rest of the plan is as it was; what another change still needs stays
+needed by it, locked in. A shift-click takes out what it brought in
+too, but for what another change still needs. So does a click on a change in a ring of changes that need each other,
+such as a module, a module it requires and the game system they run in, each newer: alone, it would only come back.
 
 Before the changes, under **Keep first**, the plan offers what Foundry's **Manage Backups** makes by hand:
 

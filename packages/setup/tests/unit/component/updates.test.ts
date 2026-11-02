@@ -279,8 +279,8 @@ describe('updates in the window', () => {
         .getAllByRole('row')
         .map(item => Array.from(item.querySelectorAll('th, td'), cell => cell.textContent.trim())),
     ).toEqual([
-      ['Package', 'Installed', 'Chosen', 'Manifest URL'],
-      ['D&D 5e', '5.3.3', '5.4.0', 'https://example.org/system:dnd5e/5.4.0/module.json'],
+      ['Package', 'Installed', 'Chosen', 'Manifest URL', ''],
+      ['D&D 5e', '5.3.3', '5.4.0', 'https://example.org/system:dnd5e/5.4.0/module.json', ''],
     ]);
     expect(screen.getByRole('separator', { name: 'Resize the update plan' })).toBeInTheDocument();
 
@@ -399,8 +399,8 @@ describe('updates in the window', () => {
         .slice(1)
         .map(item => Array.from(item.querySelectorAll('th, td'), cell => cell.textContent.replace(/\s+/g, ' ').trim())),
     ).toEqual([
-      ['D&D 5e', '5.3.3', '5.4.0', 'https://example.org/dnd5e/5.4.0/system.json'],
-      ['Library', '1.0.0', '2.0.0 needed by D&D 5e 5.4.0', 'https://example.org/lib/2.0.0/module.json'],
+      ['D&D 5e', '5.3.3', '5.4.0', 'https://example.org/dnd5e/5.4.0/system.json', ''],
+      ['Library', '1.0.0', '2.0.0 needed by D&D 5e 5.4.0', 'https://example.org/lib/2.0.0/module.json', ''],
     ]);
 
     // The library's versions for D&D 5e 5.3 no longer work with what is chosen: listed, locked, saying what is in the way.
@@ -1653,5 +1653,129 @@ describe("the plan's snapshot and backups", () => {
     const { plan } = await planning('module:lib', '1.5.0');
 
     expect(keptRows(plan).map(([, space]) => space)).toEqual(['Space not known', 'Size not known']);
+  });
+});
+
+describe('the changes a change is needed through', () => {
+  test('names them after the choice that needs it', async () => {
+    const base = alone(...UPDATES);
+    // Choosing Library 2.0.0 brings in D&D 5e 5.4.0, as if through a change to Library itself.
+    const planner = {
+      ...base,
+      plan: async (picks: ReadonlyMap<string, string>) => [
+        ...((await base.plan(picks)) ?? []),
+        {
+          key: 'system:dnd5e',
+          installed: '5.3.3',
+          version: '5.4.0',
+          by: { package: 'module:lib', version: '2.0.0' },
+          through: [{ package: 'module:lib', version: '2.0.0' }],
+        },
+      ],
+    };
+    const setup = new SetupState({
+      load: () => Promise.resolve(OVERVIEW),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: () =>
+        Promise.resolve({
+          updates: new Map(UPDATES.map(update => [update.key, update])),
+          blocked: new Map(),
+          unresolved: [],
+          judge,
+          planner,
+        }),
+      installModule: noInstall,
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    await vi.waitFor(() => {
+      expect(setup.updates.status).toBe('found');
+    });
+
+    await setup.updates.choose('module:lib', '2.0.0');
+
+    const plan = await screen.findByRole('region', { name: 'Update plan' });
+    expect(plan).toHaveTextContent('5.4.0 needed for Library 2.0.0, through Library 2.0.0');
+  });
+});
+
+describe('taking changes out of the plan', () => {
+  test('offers - on each change chosen, taking it out alone, or with what it needs on a shift-click', async () => {
+    const base = alone(...UPDATES);
+    const planner = {
+      ...base,
+      // Library 2.0.0 needs D&D 5e 5.4.0, unless that is chosen.
+      plan: async (picks: ReadonlyMap<string, string>) => {
+        const entries = (await base.plan(picks)) ?? [];
+        return picks.get('module:lib') === '2.0.0' && !picks.has('system:dnd5e')
+          ? [
+              ...entries,
+              {
+                key: 'system:dnd5e',
+                installed: '5.3.3',
+                version: '5.4.0',
+                by: { package: 'module:lib', version: '2.0.0' },
+              },
+            ]
+          : entries;
+      },
+    };
+    const setup = new SetupState({
+      load: () => Promise.resolve(OVERVIEW),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: () =>
+        Promise.resolve({
+          updates: new Map(UPDATES.map(update => [update.key, update])),
+          blocked: new Map(),
+          unresolved: [],
+          judge,
+          planner,
+        }),
+      installModule: noInstall,
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    await vi.waitFor(() => {
+      expect(setup.updates.status).toBe('found');
+    });
+    const user = userEvent.setup();
+    const changes = () => changesIn(screen.getByRole('region', { name: 'Update plan' }));
+    const titles = () =>
+      changes()
+        .getAllByRole('row')
+        .slice(1)
+        .map(tr => within(tr).getByRole('rowheader').textContent.trim());
+
+    await setup.updates.choose('module:lib', '2.0.0');
+    await vi.waitFor(() => {
+      expect(titles()).toEqual(['Library', 'D&D 5e']);
+    });
+    // What Library needs is locked in: it cannot be taken out by itself.
+    expect(changes().queryByRole('button', { name: 'Take D&D 5e out of the plan' })).toBeNull();
+    const library = changes().getByRole('button', { name: 'Take Library out of the plan' });
+    expect(library).toHaveAttribute(
+      'data-tooltip',
+      'Take Library out of the plan, keeping what it brought in, unless that would only bring it back. Shift-click to take that out too, but for what another change still needs.',
+    );
+
+    await user.click(library);
+    await vi.waitFor(() => {
+      expect(titles()).toEqual(['D&D 5e']);
+    });
+    expect(setup.updates.picks).toEqual([['system:dnd5e', '5.4.0']]);
+
+    await setup.updates.choose('module:lib', '2.0.0');
+    await setup.updates.takeOut('system:dnd5e', false);
+    await vi.waitFor(() => {
+      expect(titles()).toEqual(['Library', 'D&D 5e']);
+    });
+    await user.keyboard('{Shift>}');
+    await user.click(changes().getByRole('button', { name: 'Take Library out of the plan' }));
+    await user.keyboard('{/Shift}');
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('region', { name: 'Update plan' })).toBeNull();
+    });
   });
 });

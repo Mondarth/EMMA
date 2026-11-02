@@ -32,6 +32,8 @@ export interface UpdateChoice {
   readonly chosen: string;
   /** The version chosen that needs it, by its package's title; none for a version chosen. */
   readonly by?: { readonly title: string; readonly version: string };
+  /** The other changes it is needed through, from that choice, by their packages' titles (see {@link PlanEntry}). */
+  readonly through?: readonly { readonly title: string; readonly version: string }[];
   /** The manifest URL to install it from; none for Foundry VTT, or if none is found. */
   readonly manifest?: string;
   /** Whether the user added it against EMMA's advice, so that the plan installs it as given, without resolving it. */
@@ -166,13 +168,16 @@ export class UpdateState {
   readonly choices: readonly UpdateChoice[] = $derived([
     ...this.plan
       .filter(({ key }) => !this.#forced.has(key))
-      .map(({ key, installed, version, by, manifest }) => ({
+      .map(({ key, installed, version, by, through, manifest }) => ({
         key,
         ...(installed !== undefined && { installed }),
         chosen: version,
         ...(manifest !== undefined && { manifest }),
         ...(by !== undefined && {
           by: { title: this.titleOf(by.package), version: by.version },
+        }),
+        ...(through !== undefined && {
+          through: through.map(step => ({ title: this.titleOf(step.package), version: step.version })),
         }),
       })),
     ...[...this.#forced.values()].map(({ key, version, manifest }) => ({
@@ -522,18 +527,80 @@ export class UpdateState {
    * @returns Whether it was taken out
    */
   async forget(key: PackageKey): Promise<boolean> {
+    return this.takeOut(key, true);
+  }
+
+  /**
+   * Whether a change in the plan can be taken out by itself: one chosen, or added against EMMA's advice, but not one
+   * that only another needs.
+   * @param key - The package's key
+   * @returns `true` if it can
+   */
+  canTakeOut(key: PackageKey): boolean {
+    return this.#picks.has(key) || this.#forced.has(key);
+  }
+
+  /**
+   * Take a change out of the plan, as its row's button does. Alone, what it brought in stays: chosen at the versions the
+   * plan has, so that the rest of the plan stands as it is, but for what another change still needs, which stays as
+   * needed by it. With what it needs, that goes too, unless another change needs it still; and so it does alone, where
+   * what it brought in would only bring it straight back.
+   * @param key - The package's key
+   * @param withNeeds - Whether what it brought in goes with it
+   * @returns Whether it was taken out
+   */
+  async takeOut(key: PackageKey, withNeeds: boolean): Promise<boolean> {
+    if (!this.locked && this.#forced.has(key)) {
+      this.#forced.delete(key);
+      return true;
+    }
     const search = this.search;
     const overview = this.#overview;
     if (search === null || overview === null || this.locked || !this.#picks.has(key)) return false;
-    const picks = withChoice(this.#picks, key, null);
+    let picks = withChoice(this.#picks, key, null);
+    if (!withNeeds) {
+      const brought = this.#broughtIn(key);
+      for (const entry of brought) picks = withChoice(picks, entry.key, entry.version);
+      // What another change still needs comes in again as needed, at the same version, so it is not kept as chosen,
+      // and stays locked in.
+      for (const entry of brought) {
+        const without = withChoice(picks, entry.key, null);
+        const planned = await search.planner.plan(without);
+        if (planned?.some(({ key: other, version }) => other === entry.key && version === entry.version) === true) {
+          picks = without;
+        }
+      }
+    }
     // Taking out an uninstall may break another, as of a module the plan's other uninstall needs gone.
     const allowed = this.#uninstallsAllowed(overview, picks);
     const plan = !allowed ? undefined : picks.size === 0 ? [] : await search.planner.plan(picks);
     if (plan === undefined || search !== this.search) return false;
+    // A change in a ring of changes that need each other, as each brings the next in, would only come straight back:
+    // it goes with what it brought in.
+    if (!withNeeds && plan.some(entry => entry.key === key)) return this.takeOut(key, true);
     this.#picks.clear();
     for (const [picked, to] of picks) this.#picks.set(picked, to);
     this.plan = plan;
     return true;
+  }
+
+  /**
+   * The changes in the plan that a change brought in: those it needs, and those they need in turn.
+   * @param key - The change's package
+   * @returns Them
+   */
+  #broughtIn(key: PackageKey): PlanEntry[] {
+    const found: PlanEntry[] = [];
+    const isNeeder = (needer: PackageKey) => needer === key || found.some(entry => entry.key === needer);
+    let grew = true;
+    while (grew) {
+      const more = this.plan.filter(
+        entry => entry.by !== undefined && isNeeder(entry.by.package) && !found.includes(entry),
+      );
+      found.push(...more);
+      grew = more.length > 0;
+    }
+    return found;
   }
 
   /**

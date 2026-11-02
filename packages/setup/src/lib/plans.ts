@@ -19,6 +19,7 @@
  * what a version needs, and why a set of choices cannot be completed, naming the installed packages by their titles.
  */
 import type {
+  Compatibility,
   ExplanationMessages,
   PackageKey,
   PackageRef,
@@ -80,6 +81,12 @@ export interface PlanEntry {
   readonly version: string;
   /** The choice that needs it; none for a version chosen. */
   readonly by?: PackageVersion;
+  /**
+   * The other changes it is needed through, from the choice that needs it, in order, where the choice does not name it
+   * itself: as a module needed only because a game system the choice needs changes. None where the choice names it, or
+   * where no such changes are found.
+   */
+  readonly through?: readonly PackageVersion[];
   /** The manifest URL to install the version from, one for that version alone; none for Foundry VTT, or if none is found. */
   readonly manifest?: string;
 }
@@ -298,6 +305,76 @@ export function createPlanner(inputs: PlannerInputs): Planner {
     );
   const releaseOf = (key: PackageKey, version: string) =>
     universe.releases.find(release => packageKey(release.package) === key && sameVersion(release.version, version));
+  /**
+   * Whether a version is within a relationship's bounds, read exactly, as Foundry reads them: from its minimum, and up
+   * to its maximum. Bounds it does not give are no limit.
+   * @param bounds - The relationship's bounds
+   * @param version - The version
+   * @returns `true` if it is within them
+   */
+  const within = (bounds: Compatibility | undefined, version: string): boolean => {
+    const { minimum, maximum } = bounds ?? {};
+    return !(minimum !== undefined && newer(minimum, version)) && !(maximum !== undefined && newer(version, maximum));
+  };
+  /**
+   * How the changes of a plan lead to each other. A change to one package leads to a change to another where a
+   * relationship between them no longer holds: one the first's version in the plan declares, of a version of the
+   * second it does not take, or one the second's installed version declares, which does not take the first's new
+   * version. A relationship that still holds leads nowhere, though it names the package.
+   * @param versions - The plan's versions, by package
+   * @returns The changes between a choice and a change it needs, along the shortest way from one to the other
+   */
+  const chains = (versions: ReadonlyMap<PackageKey, string>) => {
+    /**
+     * Whether a package's release has a relationship with another package that a version of that package breaks.
+     * @param key - The package
+     * @param version - The release's version; none if it is not installed
+     * @param other - The other package
+     * @param at - The other's version; none if it is not installed, which breaks a requirement
+     * @returns `true` if the relationship breaks
+     */
+    const breaks = (key: PackageKey, version: string | undefined, other: PackageKey, at: string | undefined) => {
+      const release = version === undefined || key === CORE ? undefined : releaseOf(key, version);
+      if (release === undefined) return false;
+      const { requires, systems, conflicts } = release.relationships;
+      const of = ({ package: ref }: { readonly package: PackageRef }) => packageKey(ref) === other;
+      return (
+        [...requires, ...systems].some(
+          related => of(related) && (at === undefined || !within(related.compatibility, at)),
+        ) || conflicts.some(related => of(related) && at !== undefined && within(related.compatibility, at))
+      );
+    };
+    const changed = [...versions.keys()].filter(key => key !== CORE);
+    const next = new Map(
+      changed.map(key => [
+        key,
+        changed.filter(
+          other =>
+            other !== key &&
+            (breaks(key, versions.get(key), other, installed.get(other)) ||
+              breaks(other, installed.get(other), key, versions.get(key))),
+        ),
+      ]),
+    );
+    return (from: PackageKey, to: PackageKey): PackageVersion[] => {
+      // Breadth first, so that the way found is a shortest.
+      const came = new Map<PackageKey, PackageKey>();
+      const queue = [from];
+      for (let at = queue.shift(); at !== undefined && at !== to; at = queue.shift()) {
+        for (const other of next.get(at) ?? []) {
+          if (other === from || came.has(other)) continue;
+          came.set(other, at);
+          queue.push(other);
+        }
+      }
+      const way: PackageVersion[] = [];
+      for (let at = came.get(to); at !== undefined && at !== from; at = came.get(at)) {
+        way.unshift({ package: at, version: versions.get(at) ?? '' });
+      }
+      return way;
+    };
+  };
+
   // The same choices are completed again as lists open and close.
   const completions = new Map<string, Promise<Completion>>();
   // The resolver's words, naming the installed packages by their titles.
@@ -520,8 +597,10 @@ export function createPlanner(inputs: PlannerInputs): Planner {
         }
         versions = completion.versions;
       }
+      const chainOf = chains(versions);
       const entry = (key: PackageKey, version: string): PlanEntry => {
         const needer = picks.has(key) ? undefined : by.get(key);
+        const through = needer === undefined ? [] : chainOf(needer.package, key);
         const manifest = key === CORE || version === UNINSTALL ? undefined : releaseOf(key, version)?.versionManifest;
         const from = installed.get(key);
         return {
@@ -529,6 +608,7 @@ export function createPlanner(inputs: PlannerInputs): Planner {
           ...(from !== undefined && { installed: from }),
           version,
           ...(needer !== undefined && { by: needer }),
+          ...(through.length > 0 && { through }),
           ...(manifest !== undefined && { manifest }),
         };
       };
