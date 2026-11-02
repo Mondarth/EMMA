@@ -184,6 +184,8 @@ describe('visibleRows', () => {
       title: 'Library',
       version: '1.0.0',
       installed: true,
+      // App requires it, so A will need it.
+      status: { kind: 'package', value: 'same' },
       expandable: false,
       parent: app,
     });
@@ -211,7 +213,9 @@ describe('visibleRows', () => {
       version: '2.0.0',
       expandable: true,
     });
-    expect(rowOf(rows, `${groups[1]}/module:app`)).not.toHaveProperty('status');
+    // A world runs App, so it is in use; none runs Both.
+    expect(rowOf(rows, `${groups[1]}/module:app`)).toHaveProperty('status', { kind: 'package', value: 'same' });
+    expect(rowOf(rows, `${groups[1]}/module:both`)).not.toHaveProperty('status');
   });
 
   test('shows the requirements by title, those not installed too, and never a module again under itself', () => {

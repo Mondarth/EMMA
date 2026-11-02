@@ -12,13 +12,16 @@
     "Systems": "Game systems",
     "Modules": "Modules",
     "Universal": "Universal",
-    "Pending": "Pending"
+    "Pending": "Pending",
+    "InUse": "In use"
   },
   "Status": {
     "matches": "Matches its record",
     "differs": "Changed since it last ran",
     "unrecorded": "No record",
-    "unreadable": "Record unreadable"
+    "unreadable": "Record unreadable",
+    "Current": "Current state",
+    "Planned": "Planned update: the plan changes this"
   },
   "Module": {
     "same": "Installed",
