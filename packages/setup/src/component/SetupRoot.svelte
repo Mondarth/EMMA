@@ -24,6 +24,7 @@
   import Splitter from './Splitter.svelte';
   import SystemPanel from './SystemPanel.svelte';
   import CoreStep from './CoreStep.svelte';
+  import BestSection from './BestSection.svelte';
   import InstallSection from './InstallSection.svelte';
   import LockSection from './LockSection.svelte';
   import UninstallSection from './UninstallSection.svelte';
@@ -271,6 +272,7 @@
               onGuardChange={(on: boolean) => {
                 setup.setGuardOn(on);
               }} />
+            <BestSection {updates} disabled={updates.locked || setup.running} />
             {#if setup.canLockCore}
               <LockSection
                 core
