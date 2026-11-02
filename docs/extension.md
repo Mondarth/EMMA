@@ -213,7 +213,8 @@ Each change chosen has **−** at the right of its row, **Take <title> out of th
 none: it is locked in while that change is in the plan. A click takes out that change alone: what it brought in stays,
 chosen at the versions the plan has, so the rest of the plan is as it was; what another change still needs stays
 needed by it, locked in. A shift-click takes out what it brought in
-too, but for what another change still needs.
+too, but for what another change still needs. So does a click on a change in a ring of changes that need each other,
+such as a module, a module it requires and the game system they run in, each newer: alone, it would only come back.
 
 Before the changes, under **Keep first**, the plan offers what Foundry's **Manage Backups** makes by hand:
 

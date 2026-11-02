@@ -166,7 +166,7 @@
     "BackupSizeUnknown": "Size not known",
     "Remove": "Take out",
     "TakeOut": "Take {title} out of the plan",
-    "TakeOutHint": "Take {title} out of the plan, keeping what it brought in. Shift-click to take that out too, but for what another change still needs."
+    "TakeOutHint": "Take {title} out of the plan, keeping what it brought in, unless that would only bring it back. Shift-click to take that out too, but for what another change still needs."
   },
   "Install": {
     "Systems": "Install a game system",

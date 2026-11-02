@@ -900,6 +900,53 @@ describe('taking a change out of the plan', () => {
     ]);
   });
 
+  test('takes a change in a ring of changes that need each other out with them, as alone it would come back', async () => {
+    // Midi 2.0.0 needs DAE 2.0.0, which needs D&D 5e 6.0.0, which needs Midi 2.0.0: any one brings in the others.
+    const RING = ['module:midi', 'module:dae', 'system:dnd5e'];
+    const AT: Readonly<Record<string, string>> = {
+      'module:midi': '2.0.0',
+      'module:dae': '2.0.0',
+      'system:dnd5e': '6.0.0',
+    };
+    const base = alone(APP);
+    const planner: Planner = {
+      ...base,
+      candidates: key => (AT[key] === undefined ? base.candidates(key) : [AT[key]]),
+      plan: picks => {
+        const chosen = [...picks.keys()];
+        const first = chosen.find(key => RING.includes(key));
+        const entries: PlanEntry[] = chosen.map(key => ({ key, installed: '1.0.0', version: picks.get(key) ?? '' }));
+        if (first !== undefined) {
+          for (const key of RING.filter(other => !picks.has(other))) {
+            entries.push({
+              key,
+              installed: '1.0.0',
+              version: AT[key] ?? '',
+              by: { package: first, version: AT[first] ?? '' },
+            });
+          }
+        }
+        return Promise.resolve(entries);
+      },
+    };
+    const MIDI: PackageUpdate = {
+      key: 'module:midi',
+      installed: '1.0.0',
+      newest: '2.0.0',
+      versions: ['2.0.0', '1.0.0'],
+    };
+    const updates = new UpdateState(() => Promise.resolve({ ...finding(APP, MIDI), planner }));
+    await updates.searchFor(OVERVIEW);
+    await updates.choose('module:midi', '2.0.0');
+    await updates.choose('module:app', '2.0.0');
+    expect(updates.plan.map(({ key }) => key)).toEqual(['module:midi', 'module:app', 'module:dae', 'system:dnd5e']);
+
+    await expect(updates.takeOut('module:midi', false)).resolves.toBe(true);
+
+    expect(updates.picks).toEqual([['module:app', '2.0.0']]);
+    expect(updates.plan.map(({ key }) => key)).toEqual(['module:app']);
+  });
+
   test('takes out what was added against advice, and nothing while the plan runs', async () => {
     const updates = await searched();
     const install = { key: 'module:dice', title: 'Dice', version: '1.0.0', manifest: 'https://example.org/dice.json' };

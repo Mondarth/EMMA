@@ -543,7 +543,8 @@ export class UpdateState {
   /**
    * Take a change out of the plan, as its row's button does. Alone, what it brought in stays: chosen at the versions the
    * plan has, so that the rest of the plan stands as it is, but for what another change still needs, which stays as
-   * needed by it. With what it needs, that goes too, unless another change needs it still.
+   * needed by it. With what it needs, that goes too, unless another change needs it still; and so it does alone, where
+   * what it brought in would only bring it straight back.
    * @param key - The package's key
    * @param withNeeds - Whether what it brought in goes with it
    * @returns Whether it was taken out
@@ -574,6 +575,9 @@ export class UpdateState {
     const allowed = this.#uninstallsAllowed(overview, picks);
     const plan = !allowed ? undefined : picks.size === 0 ? [] : await search.planner.plan(picks);
     if (plan === undefined || search !== this.search) return false;
+    // A change in a ring of changes that need each other, as each brings the next in, would only come straight back:
+    // it goes with what it brought in.
+    if (!withNeeds && plan.some(entry => entry.key === key)) return this.takeOut(key, true);
     this.#picks.clear();
     for (const [picked, to] of picks) this.#picks.set(picked, to);
     this.plan = plan;

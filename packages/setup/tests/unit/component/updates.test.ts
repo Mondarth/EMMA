@@ -1757,7 +1757,7 @@ describe('taking changes out of the plan', () => {
     const library = changes().getByRole('button', { name: 'Take Library out of the plan' });
     expect(library).toHaveAttribute(
       'data-tooltip',
-      'Take Library out of the plan, keeping what it brought in. Shift-click to take that out too, but for what another change still needs.',
+      'Take Library out of the plan, keeping what it brought in, unless that would only bring it back. Shift-click to take that out too, but for what another change still needs.',
     );
 
     await user.click(library);
