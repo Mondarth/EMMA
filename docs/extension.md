@@ -276,7 +276,8 @@ Foundry's own package listing, which EMMA reads as Foundry's Install dialog does
 proxy. It offers those that fit the installation and the plan: not installed, not a premium package the user does not
 own, whose newest version runs on the plan's Foundry VTT build, and, for a module, for a game system that stays
 installed, or for any. A game system's group of modules offers those for it, and the universal group those for any
-system. A search finds a package by its title, ID or author.
+system. A search finds a package by its title, ID or author. The list shows enough packages to fill the panel, and
+more as it is scrolled down.
 
 **Add <title> to the plan** looks up the package's releases, from the same sources as the updates, and the plan takes
 the newest version that fits with its other choices, and with what that version requires, which comes in with it. Its

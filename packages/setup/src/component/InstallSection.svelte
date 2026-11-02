@@ -28,14 +28,36 @@
     onShow(type);
   });
 
-  /** The most packages shown at once. */
-  const SHOWN = 25;
+  /** How many more packages are shown each time the end of the list comes into view. */
+  const BATCH = 25;
 
   const uid = $props.id();
   let query = $state('');
   /** How adding each package went, by its key, while it is added or once it could not be. */
   const added = new SvelteMap<string, 'adding' | Exclude<InstallResult, { ok: true }>>();
   const found = $derived(matching(packages, query));
+  /** How many of those are shown: a batch, and another each time the end of the list comes into view. */
+  let shown = $state(BATCH);
+  /** Just past the last package shown, while more are found. */
+  let end = $state<HTMLElement | null>(null);
+
+  // Shows another batch while the end of the list is in view, until the panel is filled, then as it is scrolled down.
+  // An observer reports whether its target is in view when it starts, so one is started for each batch: the end may
+  // still be in view after one is shown.
+  $effect(() => {
+    if (end === null) return;
+    const batch = shown;
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries.some(({ isIntersecting }) => isIntersecting)) shown = batch + BATCH;
+      },
+      { rootMargin: '0px 0px 200px 0px' },
+    );
+    observer.observe(end);
+    return () => {
+      observer.disconnect();
+    };
+  });
 
   /**
    * Add a package to the plan.
@@ -65,13 +87,14 @@
         value={query}
         oninput={event => {
           query = event.currentTarget.value;
+          shown = BATCH;
         }} />
     </label>
     <p role="status">
-      {format('Install.Shown', { shown: String(Math.min(found.length, SHOWN)), count: String(found.length) })}
+      {format('Install.Shown', { shown: String(Math.min(found.length, shown)), count: String(found.length) })}
     </p>
     <ul>
-      {#each found.slice(0, SHOWN) as pkg (pkg.id)}
+      {#each found.slice(0, shown) as pkg (pkg.id)}
         {@const key = `${pkg.type}:${pkg.id}`}
         {@const planned = updates.chosenOf(key)}
         {@const state = added.get(key)}
@@ -112,6 +135,9 @@
         </li>
       {/each}
     </ul>
+    {#if found.length > shown}
+      <div class="emma-install-end" bind:this={end}></div>
+    {/if}
   {/if}
 </section>
 
@@ -141,6 +167,10 @@
 
   .emma-install-failed {
     color: var(--color-level-error, #c00);
+  }
+
+  .emma-install-end {
+    height: 1px;
   }
 
   .emma-install button {

@@ -869,6 +869,70 @@ describe('installing anew, by group', () => {
     expect(section).not.toHaveTextContent('anywhere');
   });
 
+  test('shows more of the list as its end comes into view, and starts again on a search', async () => {
+    // An observer that reports only when told to, as if the panel were filled, or scrolled to the end of the list.
+    const observers: { callback: IntersectionObserverCallback; target?: Element; disconnected: boolean }[] = [];
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        readonly #entry: (typeof observers)[number];
+        constructor(callback: IntersectionObserverCallback) {
+          this.#entry = { callback, disconnected: false };
+          observers.push(this.#entry);
+        }
+        observe(target: Element): void {
+          this.#entry.target = target;
+        }
+        disconnect(): void {
+          this.#entry.disconnected = true;
+        }
+      },
+    );
+    /**
+     * Report to the observer watching whether the end of the list is in view.
+     * @param inView - Whether it is
+     */
+    const report = (inView: boolean): void => {
+      const watching = observers.filter(({ disconnected }) => !disconnected);
+      expect(watching).toHaveLength(1);
+      const [{ callback, target } = { callback: () => undefined }] = watching;
+      if (target === undefined) throw new Error('Nothing observed');
+      callback(
+        [{ isIntersecting: inView, target } as unknown as IntersectionObserverEntry],
+        {} as unknown as IntersectionObserver,
+      );
+    };
+    try {
+      const user = await listing(() =>
+        Promise.resolve(Array.from({ length: 60 }, (_, index) => listed(`mod-${String(index).padStart(2, '0')}`))),
+      );
+
+      await user.click(within(row(/^Modules/)).getByText('Modules'));
+      const section = await screen.findByRole('region', { name: 'Install a module' });
+      await vi.waitFor(() => {
+        expect(within(section).getByRole('status')).toHaveTextContent('Showing 25 of 60');
+      });
+      report(false);
+      expect(within(section).getByRole('status')).toHaveTextContent('Showing 25 of 60');
+      report(true);
+      await vi.waitFor(() => {
+        expect(within(section).getByRole('status')).toHaveTextContent('Showing 50 of 60');
+      });
+      report(true);
+      await vi.waitFor(() => {
+        expect(within(section).getByRole('status')).toHaveTextContent('Showing 60 of 60');
+      });
+      expect(section).toHaveTextContent('mod-59');
+      // All are shown, so nothing is watched.
+      expect(observers.every(({ disconnected }) => disconnected)).toBe(true);
+
+      await user.type(within(section).getByRole('searchbox', { name: 'Search' }), 'mod');
+      expect(within(section).getByRole('status')).toHaveTextContent('Showing 25 of 60');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   test("says when Foundry's listing cannot be read", async () => {
     const user = await listing(() => Promise.reject(new Error('offline')));
 
