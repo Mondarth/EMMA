@@ -1,7 +1,8 @@
 /**
  * Carries out one step of an update plan on the setup screen, through Foundry's own methods, as its buttons do:
- * `game.createSnapshot` and `game.createBackup` as **Manage Backups** calls them, and `game.installPackage` as its
- * Install button does, with the guard letting it through. Checked on Foundry 14.368.
+ * `game.createSnapshot` and `game.createBackup` as **Manage Backups** calls them, `game.installPackage` as its
+ * Install button does, with the guard letting it through, and uninstalling as its **Uninstall** does once the user
+ * confirms it (see `uninstallPackage`). Checked on Foundry 14.368.
  *
  * A package is installed without Foundry's dependency dialog: the plan has every package a change needs already, in
  * the order to install them.
@@ -10,6 +11,7 @@ import { format, localize } from '../lib/i18n';
 import type { RunStep } from '../lib/run';
 import type { Guard } from './guard';
 import type { SetupGame } from './setup-game';
+import { uninstallPackage } from './setup-game';
 
 /**
  * Carry out a step.
@@ -43,6 +45,9 @@ export async function runStep(game: SetupGame, guard: Guard, step: Exclude<RunSt
       await guard.allowing(() =>
         installPackage.call(game, { type: step.type, id: step.id, manifest, dependencies: false, notify: false }),
       );
+      return;
     }
+    case 'uninstall':
+      await uninstallPackage(game, step.type, step.id);
   }
 }

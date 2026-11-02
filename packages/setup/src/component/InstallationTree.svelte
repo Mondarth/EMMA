@@ -4,7 +4,7 @@
 
   A package with an update on offer has a blue arrow to the left of each of its rows, and one with a newer version EMMA
   cannot offer a red one beside it; a collapsed row that hides either has the same arrow, fainter. In Update mode, each row that shows its installed version offers its versions in a list instead, each in
-  the colour of EMMA's badge for it, as the EMMA module's version lists are.
+  the colour of EMMA's badge for it, as the EMMA module's version lists are; one the plan uninstalls says so instead.
 -->
 <script lang="ts">
   import { tick } from 'svelte';
@@ -12,6 +12,7 @@
 
   import type { UpdateState } from '../app/update-state.svelte';
   import { localize } from '../lib/i18n';
+  import { UNINSTALL } from '../lib/plans';
   import type { Overview } from '../lib/overview';
   import type { TreeRow } from '../lib/tree';
   import { INITIALLY_EXPANDED, moveFor, packageOf, visibleRows } from '../lib/tree';
@@ -116,6 +117,7 @@
     {@const key = packageOf(row.selection)}
     {@const update = key === undefined ? undefined : updates?.updateOf(key)}
     {@const blocked = key !== undefined && updates?.blockedOf(key) !== undefined}
+    {@const removing = key !== undefined && row.installed === true && updates?.chosenOf(key) === UNINSTALL}
     {@const hidden = updates !== undefined && anyOf(row.hides, under => updates.updateOf(under) !== undefined)}
     {@const hiddenBlocked = updates !== undefined && anyOf(row.hides, under => updates.blockedOf(under) !== undefined)}
     <li
@@ -155,7 +157,9 @@
         <span class="emma-tree-toggle"></span>
       {/if}
       <span class="emma-tree-title">{row.title}</span>
-      {#if updates !== undefined && update !== undefined && key !== undefined && row.installed === true}
+      {#if removing}
+        <span class="emma-tree-uninstall">{localize('Update.Uninstall')}</span>
+      {:else if updates !== undefined && update !== undefined && key !== undefined && row.installed === true}
         <VersionPicker
           title={row.title}
           chosen={updates.optionOf(key, updates.chosenOf(key) ?? update.installed)}
@@ -182,6 +186,11 @@
 </ul>
 
 <style>
+  .emma-tree-uninstall {
+    color: var(--color-level-error, #c00);
+    font-weight: bold;
+  }
+
   .emma-tree {
     list-style: none;
     margin: 0;

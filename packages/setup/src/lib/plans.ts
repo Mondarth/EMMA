@@ -26,6 +26,7 @@ import type {
   Release,
   Requirements,
   Resolution,
+  Setup,
   Universe,
 } from '@mondarth/fvtt-resolver';
 
@@ -35,6 +36,12 @@ import { format, localize } from './i18n';
 import type { Overview } from './overview';
 import type { WorldUses } from './setups';
 import { newerIn, newestFirst, runsOn, usedBy } from './setups';
+
+/**
+ * The version a package is chosen at to uninstall it. A plan uninstalls such a package only if nothing it keeps needs
+ * it: no world's setup, and no version chosen, may have it.
+ */
+export const UNINSTALL = 'uninstall';
 
 /**
  * Why a world holds a package's update back:
@@ -67,6 +74,7 @@ export type Completion =
 export interface PlanEntry {
   readonly key: PackageKey;
   readonly installed: string;
+  /** The version to install, or {@link UNINSTALL}. */
   readonly version: string;
   /** The choice that needs it; none for a version chosen. */
   readonly by?: PackageVersion;
@@ -168,7 +176,8 @@ export function keepChoices(
 
 /**
  * A plan's changes in the order to install them: Foundry VTT, then the game systems, then the modules, each after the
- * modules in the plan it requires. Otherwise they keep their order, the choices first.
+ * modules in the plan it requires, then what is uninstalled, once nothing needs it. Otherwise they keep their order, the
+ * choices first.
  * @param entries - The changes
  * @param requiresOf - The packages a change's version requires
  * @returns The changes, in order
@@ -177,15 +186,16 @@ export function installOrder(
   entries: readonly PlanEntry[],
   requiresOf: (entry: PlanEntry) => readonly PackageKey[],
 ): PlanEntry[] {
-  const rank = (key: PackageKey) => (key === 'core' ? 0 : key.startsWith('system:') ? 1 : 2);
-  const ranked = [...entries].sort((a, b) => rank(a.key) - rank(b.key));
+  const rank = ({ key, version }: PlanEntry) =>
+    version === UNINSTALL ? 3 : key === 'core' ? 0 : key.startsWith('system:') ? 1 : 2;
+  const ranked = [...entries].sort((a, b) => rank(a) - rank(b));
   const byKey = new Map(entries.map(entry => [entry.key, entry]));
   const ordered: PlanEntry[] = [];
   const seen = new Set<PackageKey>();
   const visit = (entry: PlanEntry): void => {
     if (seen.has(entry.key)) return;
     seen.add(entry.key);
-    if (rank(entry.key) === 2) {
+    if (rank(entry) === 2) {
       for (const required of requiresOf(entry)) {
         const other = byKey.get(required);
         if (other !== undefined) visit(other);
@@ -350,13 +360,25 @@ export function createPlanner(inputs: PlannerInputs): Planner {
    * @returns The completion
    */
   async function completeAt(picks: ReadonlyMap<PackageKey, string>): Promise<Completion> {
-    const pins = new Map(picks);
+    const removed = new Set([...picks].filter(([, version]) => version === UNINSTALL).map(([key]) => key));
+    const pins = new Map([...picks].filter(([key]) => !removed.has(key)));
     // The packages chosen that no recorded world uses, each set up on its own.
-    const alone = [...picks.keys()].filter(key => key !== CORE && !usedByRecorded.has(key));
+    const alone = [...pins.keys()].filter(key => key !== CORE && !usedByRecorded.has(key));
+    /**
+     * Why a setup cannot be had: it has a package the plan uninstalls.
+     * @param setup - The setup
+     * @param world - Whose it is, by title
+     * @returns Why, one sentence to a line; none if it has none
+     */
+    const needsRemoved = (setup: Setup, world: string): string[] =>
+      [setup.system, ...setup.modules]
+        .map(release => packageKey(release.package))
+        .filter(key => removed.has(key))
+        .map(key => format('Explain.Uninstalled', { world, package: titles.get(key) ?? key }));
     for (let round = 0; round < MAX_ROUNDS; round++) {
       for (const world of unrecorded) {
         const chosen = pins.get(world.system);
-        if (chosen !== undefined && !sameVersion(chosen, world.version)) {
+        if (removed.has(world.system) || (chosen !== undefined && !sameVersion(chosen, world.version))) {
           return { ok: false, hold: { reason: 'unrecorded', world: { id: world.id, title: world.title } } };
         }
       }
@@ -368,6 +390,8 @@ export function createPlanner(inputs: PlannerInputs): Planner {
         const resolution = await setupFor(worldRequirements(world.uses, pins));
         const hold: UpdateHold = { reason: 'inconsistent', world: { id: world.id, title: world.title } };
         if (!resolution.ok) return { ok: false, hold, explanation: explained(resolution, world.title) };
+        const missing = needsRemoved(resolution.setup, world.title);
+        if (missing.length > 0) return { ok: false, hold, explanation: missing };
         note(CORE, resolution.setup.core);
         for (const release of [resolution.setup.system, ...resolution.setup.modules]) {
           note(packageKey(release.package), release.version);
@@ -393,7 +417,7 @@ export function createPlanner(inputs: PlannerInputs): Planner {
         const pinned = pins.get(CORE);
         // Preferred rather than pinned, as a pin would bring a package in that the version does not need.
         const preferred = [...installed]
-          .filter(([other]) => other !== key && other !== CORE)
+          .filter(([other]) => other !== key && other !== CORE && !removed.has(other))
           .map(([other, from]) => ({ package: other, version: pins.get(other) ?? from }));
         const requirements = {
           require: [{ package: key }],
@@ -404,7 +428,7 @@ export function createPlanner(inputs: PlannerInputs): Planner {
         // A version chosen is never moved to meet what this one needs: found otherwise, it is pinned, to say why not.
         const moved = resolution.ok
           ? [resolution.setup.system, ...resolution.setup.modules].flatMap(release => {
-              const chosen = picks.get(packageKey(release.package));
+              const chosen = pins.get(packageKey(release.package));
               return chosen === undefined || sameVersion(chosen, release.version)
                 ? []
                 : [{ package: packageKey(release.package), version: chosen }];
@@ -412,6 +436,8 @@ export function createPlanner(inputs: PlannerInputs): Planner {
           : [];
         if (moved.length > 0) resolution = await setupFor({ ...requirements, pins: [...requirements.pins, ...moved] });
         if (!resolution.ok) return { ok: false, explanation: explained(resolution, localize('Explain.Plan')) };
+        const missing = needsRemoved(resolution.setup, localize('Explain.Plan'));
+        if (missing.length > 0) return { ok: false, explanation: missing };
         note(CORE, resolution.setup.core);
         for (const release of [resolution.setup.system, ...resolution.setup.modules]) {
           note(packageKey(release.package), release.version);
@@ -476,7 +502,7 @@ export function createPlanner(inputs: PlannerInputs): Planner {
       }
       const entry = (key: PackageKey, version: string): PlanEntry => {
         const needer = picks.has(key) ? undefined : by.get(key);
-        const manifest = key === CORE ? undefined : releaseOf(key, version)?.versionManifest;
+        const manifest = key === CORE || version === UNINSTALL ? undefined : releaseOf(key, version)?.versionManifest;
         return {
           key,
           installed: installed.get(key) ?? version,

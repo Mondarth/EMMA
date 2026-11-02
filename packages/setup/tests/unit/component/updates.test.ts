@@ -706,6 +706,85 @@ describe("the panels' sizes", () => {
   });
 });
 
+describe('uninstalling', () => {
+  test('uninstalls a module nothing needs, in the plan and in a run, and refuses one a world runs', async () => {
+    const spare: PackageUpdate = { key: 'module:spare', installed: '1.0.0', newest: '1.0.0', versions: ['1.0.0'] };
+    const runStep = vi.fn(() => Promise.resolve());
+    const setup = new SetupState({
+      load: () =>
+        Promise.resolve(
+          buildOverview(
+            installation({
+              worlds: [{ id: 'a', title: 'Alpha', system: 'dnd5e' }],
+              modules: [installedModule('lib', 'Library', '1.0.0'), installedModule('spare', 'Spare', '1.0.0')],
+            }),
+            new Map([['a', recorded(record('a', { modules: [{ id: 'lib', title: 'Library', version: '1.0.0' }] }))]]),
+          ),
+        ),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: () =>
+        Promise.resolve({
+          updates: new Map(UPDATES.map(update => [update.key, update])),
+          blocked: new Map(),
+          unresolved: [],
+          judge,
+          // Spare has no update on offer, but the planner knows it is installed.
+          planner: alone(...UPDATES, spare),
+        }),
+      installModule: noInstall,
+      runStep,
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    await vi.waitFor(() => {
+      expect(setup.updates.status).toBe('found');
+    });
+    const user = userEvent.setup();
+
+    await user.click(within(row(/Universal/)).getByText('Universal'));
+    await user.keyboard('{ArrowRight}');
+    await user.click(within(row(/^Spare/)).getByText('Spare'));
+    const section = screen.getByRole('region', { name: 'Uninstall' });
+    expect(section).toHaveTextContent('cannot be undone');
+    await user.click(within(section).getByRole('button', { name: 'Uninstall Spare' }));
+
+    const plan = await screen.findByRole('region', { name: 'Update plan' });
+    expect(changesIn(plan).getAllByRole('row')[1]).toHaveTextContent(
+      /^Spare\s*1\.0\.0\s*Uninstall\s*Nothing to install$/,
+    );
+    expect(row(/^Spare/)).toHaveTextContent('Uninstall');
+    expect(within(section).getByText('The plan uninstalls Spare.')).toBeInTheDocument();
+
+    await user.click(within(plan).getByRole('button', { name: 'Run plan' }));
+    expect(within(plan).getByRole('alertdialog')).toHaveTextContent('uninstall Spare');
+    await user.click(within(plan).getByRole('button', { name: 'Run' }));
+    await vi.waitFor(() => {
+      expect(runStep).toHaveBeenCalledWith({
+        kind: 'uninstall',
+        key: 'module:spare',
+        type: 'module',
+        id: 'spare',
+        title: 'Spare',
+      });
+    });
+    await vi.waitFor(() => {
+      expect(setup.run?.over).toBe(true);
+    });
+
+    // Run, the plan is read again: here nothing was uninstalled, so it is kept, and can be taken back.
+    await user.click(
+      within(screen.getByRole('region', { name: 'Uninstall' })).getByRole('button', { name: 'Keep Spare installed' }),
+    );
+    expect(screen.queryByRole('region', { name: 'Update plan' })).toBeNull();
+
+    await user.click(within(row(/^Update available Library/)).getByText('Library'));
+    const refused = screen.getByRole('region', { name: 'Uninstall' });
+    expect(refused).toHaveTextContent('EMMA cannot uninstall Library, as it would break what uses it: Alpha runs it.');
+    expect(within(refused).getByRole('button', { name: 'Uninstall Library' })).toBeDisabled();
+  });
+});
+
 describe("the plan's snapshot and backups", () => {
   /**
    * Render EMMA's window content, with the updates of {@link UPDATES} and Foundry VTT, and a choice made.

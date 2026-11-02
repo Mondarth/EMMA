@@ -3,7 +3,7 @@
   changes: a snapshot of the installation, and a backup of each world that uses a package the plan changes, each with a
   box to check and the note Foundry keeps with it, and the space a snapshot needs and the space free. Then each package
   whose chosen version differs from the one installed, with both, in the order they are to be installed, and the
-  manifest URL that installs the version chosen. **Run plan** asks to confirm, listing the steps, then runs them, each
+  manifest URL that installs the version chosen, then each package to uninstall. **Run plan** asks to confirm, listing the steps, then runs them, each
   row saying how far its step has got.
 -->
 <script lang="ts">
@@ -11,6 +11,7 @@
   import type { NewerCore, UpdateState } from '../app/update-state.svelte';
   import { format, formatSize, localize } from '../lib/i18n';
   import type { Overview } from '../lib/overview';
+  import { UNINSTALL } from '../lib/plans';
   import { runSteps, stepText } from '../lib/run';
   import type { Safeguard } from '../lib/safeguards';
 
@@ -223,7 +224,11 @@
           </th>
           <td>{choice.installed}</td>
           <td>
-            <span class={[older !== undefined && 'emma-plan-older']}>{choice.chosen}</span>
+            {#if choice.chosen === UNINSTALL}
+              <span class="emma-plan-uninstall">{localize('Update.Uninstall')}</span>
+            {:else}
+              <span class={[older !== undefined && 'emma-plan-older']}>{choice.chosen}</span>
+            {/if}
             {#if choice.by !== undefined}
               <span class="emma-plan-needed">{format('Update.NeededBy', choice.by)}</span>
             {/if}
@@ -248,7 +253,9 @@
             {/if}
           </td>
           <td class="emma-plan-manifest">
-            {#if choice.manifest !== undefined}
+            {#if choice.chosen === UNINSTALL}
+              <span class="emma-plan-note">{localize('Update.NothingToInstall')}</span>
+            {:else if choice.manifest !== undefined}
               <a href={choice.manifest} target="_blank" rel="noopener noreferrer">{choice.manifest}</a>
             {:else if choice.key === 'core'}
               <span class="emma-plan-note">{localize('Update.CoreManifest')}</span>
@@ -283,6 +290,12 @@
   .emma-plan-state {
     margin-left: 0.5rem;
     font-size: 0.85em;
+  }
+
+  .emma-plan-uninstall {
+    color: var(--color-level-error, #c00);
+    font-family: var(--font-primary, sans-serif);
+    font-weight: bold;
   }
 
   .emma-plan-older {

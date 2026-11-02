@@ -84,6 +84,8 @@ export interface PackageData {
   manifest?: string | undefined;
   /** Its manifest's flags, as the EMMA module names its setup kit in. */
   flags?: unknown;
+  /** Whether it is locked in Foundry. */
+  locked?: boolean | undefined;
 }
 
 /** A world as `game.worlds` holds it. */

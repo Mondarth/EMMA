@@ -11,9 +11,11 @@ import { KitUnavailable } from '../foundry/setup-kit';
 import { format, localize, today } from '../lib/i18n';
 import type { Overview } from '../lib/overview';
 import type { PlanEntry, Planner } from '../lib/plans';
-import { keepChoices, withChoice } from '../lib/plans';
+import { UNINSTALL, keepChoices, withChoice } from '../lib/plans';
 import type { Safeguard, SafeguardEdit } from '../lib/safeguards';
 import { safeguardsFor } from '../lib/safeguards';
+import type { UninstallEffects } from '../lib/uninstall';
+import { uninstallEffects } from '../lib/uninstall';
 import type { BlockedUpdate, PackageUpdate, UpdateSearch, VersionOption } from '../lib/updates';
 
 /**
@@ -31,6 +33,15 @@ export interface UpdateChoice {
   readonly by?: { readonly title: string; readonly version: string };
   /** The manifest URL to install it from; none for Foundry VTT, or if none is found. */
   readonly manifest?: string;
+}
+
+/** Uninstalling a package, as its panel offers it: what it would break, and whether the plan uninstalls it. */
+export interface UninstallOffer {
+  /** The version installed, which choosing takes the uninstall back. */
+  readonly installed: string;
+  readonly effects: UninstallEffects;
+  /** Whether the plan uninstalls it. */
+  readonly planned: boolean;
 }
 
 /** A version a package's panel explains: one the user is looking at in its list, or else the one chosen. */
@@ -139,7 +150,7 @@ export class UpdateState {
   /**
    * Search for the updates of an installation, as it was read. A failure is kept in {@link status}, never thrown, and
    * a search that cannot be made in {@link problem} too, with what was found before dropped. A choice the new search
-   * no longer offers is dropped.
+   * no longer offers is dropped, as is an uninstall of a package no longer installed.
    * @param overview - The installation
    * @returns Once found, or failed
    */
@@ -154,8 +165,13 @@ export class UpdateState {
       this.problem = null;
       this.status = 'found';
       this.#listed = {};
-      // The choices are kept that the new search still offers, and planned again.
-      const picks = keepChoices(this.#picks, (key, version) => found.planner.candidates(key).includes(version));
+      // The choices are kept that the new search still offers, and planned again: an uninstall, while the package is
+      // installed still, and every uninstall may still be made.
+      let picks = keepChoices(this.#picks, (key, version) =>
+        version === UNINSTALL ? this.#installedOf(key) !== undefined : found.planner.candidates(key).includes(version),
+      );
+      if (!this.#uninstallsAllowed(overview, picks))
+        picks = keepChoices(picks, (_key, version) => version !== UNINSTALL);
       const plan = picks.size === 0 ? [] : await found.planner.plan(picks);
       if (search !== this.#searches) return;
       this.#picks.clear();
@@ -264,7 +280,7 @@ export class UpdateState {
    * @returns The versions chosen
    */
   #picksWith(key: PackageKey, version: string): ReadonlyMap<PackageKey, string> {
-    const takeBack = version === this.updateOf(key)?.installed && this.#picks.has(key);
+    const takeBack = version === this.#installedOf(key) && this.#picks.has(key);
     return withChoice(this.#picks, key, takeBack ? null : version);
   }
 
@@ -364,10 +380,13 @@ export class UpdateState {
   async choose(key: PackageKey, version: string): Promise<boolean> {
     if (this.locked) return false;
     const search = this.search;
-    const installed = this.updateOf(key)?.installed;
-    if (search === null || installed === undefined) return false;
-    if (version !== installed && !search.planner.candidates(key).includes(version)) return false;
+    const overview = this.#overview;
+    const installed = this.#installedOf(key);
+    if (search === null || overview === null || installed === undefined) return false;
+    const offered = version === installed || version === UNINSTALL || search.planner.candidates(key).includes(version);
+    if (!offered || (version === UNINSTALL && key === 'core')) return false;
     const picks = this.#picksWith(key, version);
+    if (!this.#uninstallsAllowed(overview, picks)) return false;
     this.planning = true;
     try {
       const plan = await search.planner.plan(picks);
@@ -379,6 +398,62 @@ export class UpdateState {
     } finally {
       this.planning = false;
     }
+  }
+
+  /**
+   * Uninstalling a game system or module, as its panel offers it.
+   * @param key - The package's key
+   * @returns What it would break, and whether the plan uninstalls it; none for a package not installed, or before the
+   *   search has found anything
+   */
+  uninstallOf(key: PackageKey): UninstallOffer | undefined {
+    const overview = this.#overview;
+    const installed = this.#installedOf(key);
+    if (overview === null || key === 'core' || installed === undefined) return undefined;
+    return {
+      installed,
+      effects: uninstallEffects(overview, key, this.#removing(this.#picks, key)),
+      planned: this.#picks.get(key) === UNINSTALL,
+    };
+  }
+
+  /**
+   * The version of a package installed, whether it has an update or not.
+   * @param key - The package's key
+   * @returns The version; none for a package not installed
+   */
+  #installedOf(key: PackageKey): string | undefined {
+    const update = this.updateOf(key)?.installed;
+    if (update !== undefined) return update;
+    const overview = this.#overview;
+    const id = key.slice(key.indexOf(':') + 1);
+    return key.startsWith('system:')
+      ? overview?.systems.find(system => system.id === id)?.version
+      : overview?.modules.find(({ module: installed }) => installed.id === id)?.module.version;
+  }
+
+  /**
+   * The packages a set of choices uninstalls, but one.
+   * @param picks - The versions chosen
+   * @param key - The one left out
+   * @returns Their keys, in the order chosen
+   */
+  #removing(picks: ReadonlyMap<PackageKey, string>, key: PackageKey): PackageKey[] {
+    return [...picks].filter(([other, version]) => other !== key && version === UNINSTALL).map(([other]) => other);
+  }
+
+  /**
+   * Whether every package a set of choices uninstalls may be uninstalled, as standard mode allows: none that would break
+   * something known (see `lib/uninstall.ts`).
+   * @param overview - The installation
+   * @param picks - The versions chosen
+   * @returns Whether they may
+   */
+  #uninstallsAllowed(overview: Overview, picks: ReadonlyMap<PackageKey, string>): boolean {
+    return [...picks].every(
+      ([key, version]) =>
+        version !== UNINSTALL || uninstallEffects(overview, key, this.#removing(picks, key)).blocks.length === 0,
+    );
   }
 
   /**

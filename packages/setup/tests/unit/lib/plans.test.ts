@@ -4,7 +4,7 @@ import { describe, expect, test } from 'vitest';
 import type { RecordState } from '../../../src/foundry/records';
 import { buildOverview } from '../../../src/lib/overview';
 import type { PlanEntry } from '../../../src/lib/plans';
-import { createPlanner, installOrder, keepChoices, toldOfWorld, withChoice } from '../../../src/lib/plans';
+import { UNINSTALL, createPlanner, installOrder, keepChoices, toldOfWorld, withChoice } from '../../../src/lib/plans';
 import { installation, installedModule, record, recorded, release } from '../../mocks/fixtures';
 import { KIT } from '../../mocks/kit';
 
@@ -272,6 +272,72 @@ describe('createPlanner', () => {
   });
 });
 
+describe('uninstalling', () => {
+  /** A library, and an app whose 1.0.0 needs nothing and whose 2.0.0 requires the library. */
+  const APPS = [
+    ...DND,
+    release('module:lib', '1.0.0'),
+    release('module:app', '1.0.0'),
+    release('module:app', '2.0.0', { requires: { lib: {} } }),
+    release('module:extra', '1.0.0', { requires: { lib: {} } }),
+  ];
+
+  test('uninstalls a package nothing needs, last, with nothing to install it from', async () => {
+    const plans = planner(
+      [
+        ['lib', '1.0.0'],
+        ['app', '1.0.0'],
+      ],
+      { a: [['app', '1.0.0']] },
+      APPS,
+    );
+
+    await expect(plans.complete(picks(['module:lib', UNINSTALL]))).resolves.toEqual({
+      ok: true,
+      versions: new Map([['module:lib', UNINSTALL]]),
+    });
+    await expect(plans.plan(picks(['module:lib', UNINSTALL], ['system:dnd5e', '6.0.6']))).resolves.toEqual([
+      expect.objectContaining({ key: 'system:dnd5e', version: '6.0.6' }),
+      { key: 'module:lib', installed: '1.0.0', version: UNINSTALL },
+    ]);
+  });
+
+  test("cannot uninstall a package a world's setup would need, saying so", async () => {
+    const plans = planner(
+      [
+        ['lib', '1.0.0'],
+        ['app', '1.0.0'],
+      ],
+      { a: [['app', '1.0.0']] },
+      APPS,
+    );
+
+    await expect(plans.complete(picks(['module:app', '2.0.0'], ['module:lib', UNINSTALL]))).resolves.toEqual({
+      ok: false,
+      hold: { reason: 'inconsistent', world: { id: 'a', title: 'a' } },
+      explanation: ['a needs LIB, which the plan uninstalls'],
+    });
+  });
+
+  test('cannot uninstall a package a version chosen that no world uses would need', async () => {
+    const plans = planner([['lib', '1.0.0']], { a: [] }, APPS);
+
+    await expect(plans.complete(picks(['module:extra', '1.0.0'], ['module:lib', UNINSTALL]))).resolves.toEqual({
+      ok: false,
+      explanation: ['the plan needs LIB, which the plan uninstalls'],
+    });
+  });
+
+  test('cannot uninstall the game system of a world without a record', async () => {
+    const plans = planner([], {}, DND, ['b']);
+
+    await expect(plans.complete(picks(['system:dnd5e', UNINSTALL]))).resolves.toEqual({
+      ok: false,
+      hold: { reason: 'unrecorded', world: { id: 'b', title: 'b' } },
+    });
+  });
+});
+
 describe('the order to install a plan in', () => {
   /**
    * A change in a plan.
@@ -309,6 +375,15 @@ describe('the order to install a plan in', () => {
       'module:dae',
       'module:covens',
     ]);
+  });
+
+  test('uninstalls last', () => {
+    const order = installOrder(
+      [{ key: 'module:old', installed: '1.0.0', version: UNINSTALL }, entry('module:midi'), entry('core')],
+      () => [],
+    );
+
+    expect(order.map(({ key }) => key)).toEqual(['core', 'module:midi', 'module:old']);
   });
 });
 

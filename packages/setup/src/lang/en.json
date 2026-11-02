@@ -79,7 +79,8 @@
     "Needs": "{world} needs {package}",
     "Installed": "the plan has {package}",
     "Fails": "{world} cannot keep working",
-    "Plan": "the plan"
+    "Plan": "the plan",
+    "Uninstalled": "{world} needs {package}, which the plan uninstalls"
   },
   "Update": {
     "Searching": "Looking for updates…",
@@ -125,6 +126,8 @@
     "Chosen": "Chosen",
     "Manifest": "Manifest URL",
     "CoreManifest": "Foundry VTT updates itself",
+    "Uninstall": "Uninstall",
+    "NothingToInstall": "Nothing to install",
     "NoManifest": "None found for this version",
     "Clear": "Clear choices",
     "NeedsModule": "Finding updates needs the EMMA module installed.",
@@ -160,6 +163,22 @@
     "BackupSpace": "Size not known; {available} free",
     "BackupSizeUnknown": "Size not known"
   },
+  "Uninstall": {
+    "Heading": "Uninstall",
+    "Button": "Uninstall {title}",
+    "Keep": "Keep {title} installed",
+    "Planned": "The plan uninstalls {title}.",
+    "NoUndo": "Uninstalling deletes it from the server, with any data it keeps there, and cannot be undone. A snapshot keeps a copy.",
+    "Refused": "EMMA cannot uninstall {title}, as it would break what uses it:",
+    "Locked": "It is locked in Foundry.",
+    "WorldSystem": "{world} uses it as its game system.",
+    "WorldRuns": "{world} runs it.",
+    "WorldNeeds": "{world} will need it when next run.",
+    "Required": "{module} requires it.",
+    "Warnings": "EMMA cannot tell whether uninstalling it breaks these:",
+    "Unrecorded": "{world} has no record, so it may run it.",
+    "Orphaned": "{module} is left with no game system it runs in."
+  },
   "Run": {
     "Run": "Run plan",
     "Confirm": "Run the plan? EMMA will, in order:",
@@ -168,6 +187,7 @@
     "StepSnapshot": "make a snapshot of the installation",
     "StepBackup": "back up {world}",
     "StepInstall": "install {title} {version}",
+    "StepUninstall": "uninstall {title}",
     "StepCore": "stop before updating Foundry VTT to {version}: the steps after it wait for another run",
     "State": {
       "waiting": "Waiting",

@@ -4,7 +4,8 @@ import { UpdateState } from '../../../src/app/update-state.svelte';
 import { KitUnavailable } from '../../../src/foundry/setup-kit';
 import { buildOverview } from '../../../src/lib/overview';
 import type { PackageUpdate, UpdateSearch } from '../../../src/lib/updates';
-import { alone, installation } from '../../mocks/fixtures';
+import { UNINSTALL } from '../../../src/lib/plans';
+import { alone, installation, installedModule } from '../../mocks/fixtures';
 
 const OVERVIEW = buildOverview(installation(), new Map());
 
@@ -159,6 +160,110 @@ describe('UpdateState', () => {
     });
     expect(options[0]?.badge?.text).toBe('module:app 1.5.0 with 1.1.0');
     expect(options[1]).not.toHaveProperty('conflict');
+  });
+
+  describe('uninstalling', () => {
+    /** App requires Library; Solo has no update on offer. */
+    const INSTALLED = buildOverview(
+      installation({
+        modules: [
+          installedModule('app', 'App', '1.0.0', { requires: ['lib'] }),
+          installedModule('lib', 'Library', '1.0.0'),
+          installedModule('solo', 'Solo', '3.0.0'),
+        ],
+      }),
+      new Map(),
+    );
+
+    /**
+     * The state, searched for the installation, with App and Library on offer.
+     * @returns The state
+     */
+    async function searched(): Promise<UpdateState> {
+      const updates = new UpdateState(() => Promise.resolve(finding(APP, LIB)));
+      await updates.searchFor(INSTALLED);
+      return updates;
+    }
+
+    test('offers nothing before a search, for Foundry VTT, or for a package not installed', async () => {
+      expect(new UpdateState(() => Promise.resolve(finding(APP))).uninstallOf('module:app')).toBeUndefined();
+      const updates = await searched();
+      expect(updates.uninstallOf('core')).toBeUndefined();
+      expect(updates.uninstallOf('module:none')).toBeUndefined();
+      expect(updates.uninstallOf('system:none')).toBeUndefined();
+      await expect(updates.choose('core', UNINSTALL)).resolves.toBe(false);
+    });
+
+    test('uninstalls a package, with an update or not, and takes it back by choosing the installed version', async () => {
+      const updates = await searched();
+      expect(updates.uninstallOf('system:dnd5e')).toMatchObject({ installed: '5.3.3', planned: false });
+
+      await expect(updates.choose('module:solo', UNINSTALL)).resolves.toBe(true);
+
+      expect(updates.uninstallOf('module:solo')).toEqual({
+        installed: '3.0.0',
+        effects: { blocks: [], warnings: [] },
+        planned: true,
+      });
+      expect(updates.chosenOf('module:solo')).toBe(UNINSTALL);
+      expect(updates.choices).toContainEqual(expect.objectContaining({ key: 'module:solo', chosen: UNINSTALL }));
+
+      await expect(updates.choose('module:solo', '3.0.0')).resolves.toBe(true);
+      expect(updates.plan).toEqual([]);
+    });
+
+    test('refuses an uninstall that would break something, until what breaks is uninstalled too', async () => {
+      const updates = await searched();
+      expect(updates.uninstallOf('module:lib')?.effects.blocks).toEqual([{ kind: 'required', by: 'App' }]);
+
+      await expect(updates.choose('module:lib', UNINSTALL)).resolves.toBe(false);
+      await expect(updates.choose('module:app', UNINSTALL)).resolves.toBe(true);
+      expect(updates.uninstallOf('module:lib')?.effects.blocks).toEqual([]);
+      await expect(updates.choose('module:lib', UNINSTALL)).resolves.toBe(true);
+
+      // Keeping App would break Library's uninstall, so it is refused while Library's stands.
+      await expect(updates.choose('module:app', '1.0.0')).resolves.toBe(false);
+      expect(updates.chosenOf('module:app')).toBe(UNINSTALL);
+    });
+
+    test('keeps an uninstall through a new search while the package is installed and may still go', async () => {
+      const updates = await searched();
+      await updates.choose('module:solo', UNINSTALL);
+
+      await updates.searchFor(INSTALLED);
+      expect(updates.chosenOf('module:solo')).toBe(UNINSTALL);
+
+      // Gone, it is dropped.
+      const without = buildOverview(
+        installation({
+          modules: INSTALLED.modules.map(({ module: installed }) => installed).filter(({ id }) => id !== 'solo'),
+        }),
+        new Map(),
+      );
+      await updates.searchFor(without);
+      expect(updates.plan).toEqual([]);
+    });
+
+    test('drops the uninstalls a new search finds would break something', async () => {
+      const updates = await searched();
+      await updates.choose('module:solo', UNINSTALL);
+      await updates.choose('module:app', '2.0.0');
+      // Since read, App requires Solo.
+      const needing = buildOverview(
+        installation({
+          modules: [
+            installedModule('app', 'App', '1.0.0', { requires: ['lib', 'solo'] }),
+            installedModule('lib', 'Library', '1.0.0'),
+            installedModule('solo', 'Solo', '3.0.0'),
+          ],
+        }),
+        new Map(),
+      );
+
+      await updates.searchFor(needing);
+
+      expect(updates.picks).toEqual([['module:app', '2.0.0']]);
+    });
   });
 
   describe('newerCore', () => {

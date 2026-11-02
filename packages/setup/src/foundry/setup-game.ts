@@ -14,6 +14,8 @@ export interface InstalledPackage {
   readonly id: string;
   readonly title: string;
   readonly version: string;
+  /** Whether it is locked in Foundry, which then refuses to update or uninstall it. */
+  readonly locked?: true;
 }
 
 /** An installed module, with what its manifest says it needs. */
@@ -95,6 +97,8 @@ export interface SetupGame {
   installPackage?: (options: PackageInstall) => Promise<unknown>;
   /** Asks the user whether to install a package's missing dependencies, and installs those chosen. */
   installDependencies?: (pkg: unknown) => Promise<unknown>;
+  /** Reads what is installed from the server again, and shows it, as Foundry does after uninstalling a package. */
+  reload?: () => Promise<unknown>;
   /** Makes a snapshot of the installation, as **Manage Backups** does, with a note; it says itself if it fails. */
   createSnapshot?: (options: { readonly note?: string }) => Promise<unknown>;
   /** Backs a package up, such as a world, with a note; whether it did. */
@@ -224,6 +228,40 @@ function record(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
 }
 
+/**
+ * Uninstall a game system or module, as Foundry's **Uninstall** does once the user confirms it: the server deletes it,
+ * then the setup screen forgets it, and reads what is installed again.
+ *
+ * FRAGILE: Foundry's `game.uninstallPackage` asks the user itself, so the steps it takes after asking are taken here.
+ * Checked on Foundry 14.368: it posts `{ action: "uninstallPackage", type, id }`, which throws if the server refuses;
+ * then `foundry.packages.PACKAGE_TYPES[type].uninstall(id)` drops the package from `game.data` and from `game.modules`
+ * or `game.systems`, and `game.reload()` reads the rest again.
+ * @param game - The setup screen's `game`
+ * @param type - The package's type
+ * @param id - The package's ID
+ * @returns Once uninstalled
+ * @throws {Error} If the server refuses, saying why
+ */
+export async function uninstallPackage(game: SetupGame, type: 'module' | 'system', id: string): Promise<void> {
+  await game.post({ action: 'uninstallPackage', type, id }, { notify: false });
+  const kind = field(field(field(globalThis, 'foundry'), 'packages'), 'PACKAGE_TYPES');
+  const forget = field(field(kind, type), 'uninstall');
+  if (typeof forget === 'function') (forget as (id: string) => void).call(field(kind, type), id);
+  await game.reload?.();
+}
+
+/**
+ * A field of a value, read with care.
+ * @param value - Any value
+ * @param name - The field's name
+ * @returns The field, or `undefined` if the value is not an object or function
+ */
+function field(value: unknown, name: string): unknown {
+  return (typeof value === 'object' && value !== null) || typeof value === 'function'
+    ? (Reflect.get(value, name) as unknown)
+    : undefined;
+}
+
 /** What `game.installPackage` is given. */
 export interface PackageInstall {
   readonly type: 'module' | 'system';
@@ -348,9 +386,9 @@ function toWorld(world: unknown): InstalledWorld | undefined {
  */
 function toPackage(pkg: unknown): InstalledPackage | undefined {
   if (typeof pkg !== 'object' || pkg === null) return undefined;
-  const { id, title, version } = pkg as Record<string, unknown>;
+  const { id, title, version, locked } = pkg as Record<string, unknown>;
   return typeof id === 'string' && typeof title === 'string' && typeof version === 'string'
-    ? { id, title, version }
+    ? { id, title, version, ...(locked === true && { locked }) }
     : undefined;
 }
 
