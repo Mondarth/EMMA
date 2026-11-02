@@ -15,6 +15,7 @@ import {
   checkSnapshotSpace,
   listPackages,
   readCoreUpdate,
+  readIndex,
   readInstallation,
   readManifests,
   setupGame,
@@ -88,6 +89,7 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
         catalogue: revealCatalogue(__EMMA_DEFAULT_CATALOGUE__),
         proxy: revealProxy(__EMMA_DEFAULT_PROXY__),
         clientVersion: __EMMA_EXTENSION_VERSION__,
+        index: () => readIndex(game),
       });
       return findUpdates({ resolver: kit.resolver, badges: kit.badges, overview, universe, load, lookUp });
     },

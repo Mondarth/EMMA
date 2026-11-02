@@ -59,6 +59,29 @@ describe('lookUpReleases', () => {
     await expect(found.load([])).resolves.toEqual([]);
   });
 
+  test('installs from a "latest" manifest at the version it gives, where the index agrees or cannot be read', async () => {
+    const url = 'https://packages.example.test/app/module.json';
+    const installed: InstalledManifests = { core: CORE, manifests: [moduleManifest('app', '1.0.0', url)] };
+    const send = answering({
+      [url]: { id: 'app', title: 'App', version: '2.0.0', compatibility: { minimum: '14', verified: '14' } },
+    });
+    const newest = async (index?: () => Promise<ReadonlyMap<string, string>>) => {
+      const found = await lookUpReleases(installed, {
+        kit: KIT,
+        catalogue: null,
+        proxy: null,
+        fetch: send,
+        ...(index !== undefined && { index }),
+      });
+      return found.universe.releases.find(({ version }) => version === '2.0.0')?.versionManifest;
+    };
+
+    await expect(newest()).resolves.toBe(url);
+    await expect(newest(() => Promise.resolve(new Map([['module:app', '2.0.0']])))).resolves.toBe(url);
+    await expect(newest(() => Promise.resolve(new Map([['module:app', '2.1.0']])))).resolves.toBeUndefined();
+    await expect(newest(() => Promise.reject(new Error('offline')))).resolves.toBe(url);
+  });
+
   test('looks up more packages from the same sources, as one to install anew', async () => {
     const installed: InstalledManifests = { core: CORE, manifests: [] };
     const send = answering({});

@@ -310,6 +310,17 @@ export async function listPackages(game: SetupGame, type: 'module' | 'system'): 
 }
 
 /**
+ * The newest version of each game system and module Foundry's listing gives, as the index a "latest" manifest's version
+ * is checked against (see `lib/latest.ts`).
+ * @param game - The setup screen's `game`
+ * @returns The versions, by package key
+ */
+export async function readIndex(game: SetupGame): Promise<Map<string, string>> {
+  const listed = await Promise.all([listPackages(game, 'system'), listPackages(game, 'module')]);
+  return new Map(listed.flat().map(({ type, id, version }) => [`${type}:${id}`, version]));
+}
+
+/**
  * Describe a package on Foundry's listing.
  * @param entry - Its data
  * @param type - Its type

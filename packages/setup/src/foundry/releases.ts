@@ -19,6 +19,8 @@ import type { DefaultCatalogue } from '@mondarth/emma-core/default-catalogue';
 import type { DefaultProxy } from '@mondarth/emma-core/default-proxy';
 import type { SetupKit } from '@mondarth/emma-core/setup-kit';
 
+import { acceptLatest } from '../lib/latest';
+
 import type { CoreBuild, InstalledManifests } from './setup-game';
 
 /** The releases found, and how to load more as the resolver needs them. */
@@ -66,6 +68,11 @@ export interface LookupOptions {
   readonly clientVersion?: string | null;
   /** Fetches; the browser's by default. */
   readonly fetch?: typeof globalThis.fetch;
+  /**
+   * The newest version of each package Foundry's index lists, by key, against which a "latest" manifest's version is
+   * checked (see `lib/latest.ts`); none by default, or if it cannot be read.
+   */
+  readonly index?: () => Promise<ReadonlyMap<PackageKey, string>>;
 }
 
 /** The most requests one lookup makes, to stay within GitHub's limit of 60 an hour without a proxy. */
@@ -153,6 +160,11 @@ function coreRelease(build: CoreBuild): CoreRelease {
  */
 export async function lookUpReleases(installed: InstalledManifests, options: LookupOptions): Promise<ReleaseLookup> {
   const { kit, catalogue, proxy, clientVersion = null } = options;
+  const index = await (options.index?.() ?? Promise.resolve(new Map<PackageKey, string>())).catch(
+    () => new Map<PackageKey, string>(),
+  );
+  // A "latest" manifest is installable at the version it gives now, in each batch of releases found.
+  const latest = (found: readonly Release[]) => acceptLatest(kit.resolver, found, index);
   const { CORE, packageKey, sameVersion } = kit.resolver;
   const {
     catalogueSource,
@@ -255,13 +267,15 @@ export async function lookUpReleases(installed: InstalledManifests, options: Loo
       .map(gap => gap.package),
   );
   return {
-    universe: { core: builds, releases: [...releases, ...missing.flat()] },
-    load: needs => set.load(needs),
+    universe: { core: builds, releases: latest([...releases, ...missing.flat()]) },
+    load: async needs => latest(await set.load(needs)),
     // A set cannot be given more manifest URLs once made, so a lookup with them has its own, on the same client, so with
     // the same cache and budget of requests.
     lookUp: async (packages, more = {}) =>
-      (await (Object.keys(more).length === 0 ? set : sourcesWith({ ...declared, ...more })).universe(packages))
-        .releases,
+      latest(
+        (await (Object.keys(more).length === 0 ? set : sourcesWith({ ...declared, ...more })).universe(packages))
+          .releases,
+      ),
     unavailable,
     unreached: [...refs.map(packageKey).filter(key => failed.has(key)), ...(cores?.ok === false ? [CORE] : [])],
   };
