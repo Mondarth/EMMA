@@ -217,9 +217,9 @@ say what a world's backup needs, so its row gives the space free alone. What is 
 **Run plan** lists the steps and asks to confirm them, then runs them in order:
 
 1. the snapshot and backups checked, as Foundry's **Manage Backups** makes them;
-2. each package change, installed from the manifest URL of the version chosen, as Foundry's Install button installs
-   one; the guard lets EMMA's installs through. Foundry's dependency dialog is not shown, as the plan already has
-   what each change needs;
+2. each package change, a package installed anew among them, installed from the manifest URL of the version chosen,
+   as Foundry's Install button installs one; the guard lets EMMA's installs through. Foundry's dependency dialog is
+   not shown, as the plan already has what each change needs;
 3. each package to uninstall, last, once nothing installed needs it (see [Uninstalling](#uninstalling)).
 
 Each row says how far its step has got, and the footer how the run went. A run stops at the first step that fails,
@@ -268,6 +268,24 @@ declares, Foundry's package listing, and GitHub's and GitLab's lists of releases
 A browser cannot read Foundry's listing or the manifests attached to GitHub releases itself, which the proxy lets it
 do. Without the proxy, as in a development build, a version found only in a release list says nothing of the Foundry
 VTT versions it works with, and is not offered.
+
+### Installing
+
+The panels of the **Game systems** and **Modules** groups have an **Install** section below them, of the packages on
+Foundry's own package listing, which EMMA reads as Foundry's Install dialog does, through the server, so it needs no
+proxy. It offers those that fit the installation and the plan: not installed, not a premium package the user does not
+own, whose newest version runs on the plan's Foundry VTT build, and, for a module, for a game system that stays
+installed, or for any. A game system's group of modules offers those for it, and the universal group those for any
+system. A search finds a package by its title, ID or author.
+
+**Add <title> to the plan** looks up the package's releases, from the same sources as the updates, and the plan takes
+the newest version that fits with its other choices, and with what that version requires, which comes in with it. Its
+row says it is not installed. If no version fits, the section says why, in the resolver's words. **Take <title> out of
+the plan** takes it out again, with what it brought in.
+
+Foundry's listing gives each package's newest version alone, without the modules it requires, and looking up every
+listed package's releases would take thousands of requests. So the section filters by what the listing says, and a
+package whose newest version does not fit is not offered, even if an older version would.
 
 ### Uninstalling
 

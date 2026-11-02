@@ -6,7 +6,8 @@ import type { SetupStateOptions } from '../../../src/app/setup-state.svelte';
 import { SetupState } from '../../../src/app/setup-state.svelte';
 import SetupRoot from '../../../src/component/SetupRoot.svelte';
 import { LAYOUT_KEY } from '../../../src/foundry/preferences';
-import type { CoreTarget, CoreUpdateState } from '../../../src/foundry/setup-game';
+import { MODULES } from '../../../src/lib/tree';
+import type { CoreTarget, CoreUpdateState, ListedPackage } from '../../../src/foundry/setup-game';
 import type { KitProblem } from '../../../src/foundry/setup-kit';
 import { EXTENSION_RELEASES, KitUnavailable } from '../../../src/foundry/setup-kit';
 import { buildOverview } from '../../../src/lib/overview';
@@ -703,6 +704,181 @@ describe("the panels' sizes", () => {
     await fireEvent.pointerCancel(tree, { pointerId: 1 });
     await fireEvent.pointerMove(tree, { clientX: 300, pointerId: 1 });
     expect(tree).toHaveAttribute('aria-valuenow', '85');
+  });
+});
+
+describe('installing anew', () => {
+  test("offers what fits from Foundry's listing, adds one to the plan at the newest version that fits, and takes it out", async () => {
+    const base = alone(...UPDATES);
+    const planner = {
+      ...base,
+      add: (key: string) => Promise.resolve(key === 'module:dice' || key === 'module:stuck'),
+      candidates: (key: string) =>
+        key === 'module:dice' ? ['2.0.0', '1.0.0'] : key === 'module:stuck' ? ['1.0.0'] : base.candidates(key),
+      complete: (picks: ReadonlyMap<string, string>) =>
+        picks.has('module:stuck') || picks.get('module:dice') === '2.0.0'
+          ? Promise.resolve({ ok: false as const, explanation: ['Alpha cannot keep working.'] })
+          : base.complete(picks),
+      plan: async (picks: ReadonlyMap<string, string>) =>
+        (await base.plan(picks))?.map(entry =>
+          entry.key === 'module:dice'
+            ? { key: entry.key, version: entry.version, manifest: 'https://example.org/dice/module.json' }
+            : entry,
+        ),
+    };
+    const listPackages = vi.fn((type: 'module' | 'system') =>
+      Promise.resolve(
+        type === 'module'
+          ? [
+              {
+                type,
+                id: 'dice',
+                title: 'Dice',
+                version: '2.0.0',
+                author: 'Someone',
+                compatibility: {},
+                systems: [],
+                unowned: false,
+              },
+              { type, id: 'stuck', title: 'Stuck', version: '1.0.0', compatibility: {}, systems: [], unowned: false },
+              { type, id: 'lib', title: 'Library', version: '2.0.0', compatibility: {}, systems: [], unowned: false },
+              { type, id: 'paid', title: 'Paid', version: '1.0.0', compatibility: {}, systems: [], unowned: true },
+            ]
+          : [],
+      ),
+    );
+    const setup = new SetupState({
+      load: () => Promise.resolve(OVERVIEW),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: () =>
+        Promise.resolve({
+          updates: new Map(UPDATES.map(update => [update.key, update])),
+          blocked: new Map(),
+          unresolved: [],
+          judge,
+          planner,
+        }),
+      installModule: noInstall,
+      runStep: () => Promise.resolve(),
+      listPackages,
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    await vi.waitFor(() => {
+      expect(setup.updates.status).toBe('found');
+    });
+    const user = userEvent.setup();
+
+    await user.click(within(row(/^Modules/)).getByText('Modules'));
+    const section = await screen.findByRole('region', { name: 'Install a module' });
+    // Library is installed, and Paid not owned.
+    await vi.waitFor(() => {
+      expect(within(section).getByRole('status')).toHaveTextContent('Showing 2 of 2');
+    });
+    await user.type(within(section).getByRole('searchbox', { name: 'Search' }), 'some');
+    expect(within(section).getByRole('status')).toHaveTextContent('Showing 1 of 1');
+    expect(section).toHaveTextContent('Dice by Someone newest 2.0.0');
+
+    await user.click(within(section).getByRole('button', { name: 'Add Dice to the plan' }));
+
+    const plan = await screen.findByRole('region', { name: 'Update plan' });
+    expect(changesIn(plan).getAllByRole('row')[1]).toHaveTextContent(/^Dice\s*Not installed\s*1\.0\.0/);
+    expect(section).toHaveTextContent('In the plan at 1.0.0');
+
+    await user.click(within(section).getByRole('button', { name: 'Take Dice out of the plan' }));
+    expect(screen.queryByRole('region', { name: 'Update plan' })).toBeNull();
+
+    await user.clear(within(section).getByRole('searchbox', { name: 'Search' }));
+    await user.click(within(section).getByRole('button', { name: 'Add Stuck to the plan' }));
+    await vi.waitFor(() => {
+      expect(section).toHaveTextContent(
+        'No version of it fits the installation and the plan. Alpha cannot keep working.',
+      );
+    });
+
+    // A system's group of modules offers those for it; the game systems offer systems.
+    await user.click(within(row(/^Game systems/)).getByText('Game systems'));
+    expect(await screen.findByRole('region', { name: 'Install a game system' })).toHaveTextContent('Showing 0 of 0');
+    expect(listPackages).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('installing anew, by group', () => {
+  /**
+   * Render EMMA's window content, with a listing of modules.
+   * @param listPackages - How the listing is read
+   * @returns A user to act with
+   */
+  async function listing(listPackages: (type: 'module' | 'system') => Promise<readonly ListedPackage[]>) {
+    // Tools is for D&D 5e alone, so the modules have a group for it.
+    const overview = buildOverview(
+      installation({
+        modules: [
+          installedModule('lib', 'Library', '1.0.0'),
+          installedModule('tools', 'Tools', '1.0.0', { systems: ['dnd5e'] }),
+        ],
+      }),
+      new Map(),
+    );
+    const setup = new SetupState({
+      load: () => Promise.resolve(overview),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: findingBlocked(),
+      installModule: noInstall,
+      runStep: () => Promise.resolve(),
+      listPackages,
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    await vi.waitFor(() => {
+      expect(setup.updates.status).toBe('found');
+    });
+    return userEvent.setup();
+  }
+
+  /**
+   * A module on Foundry's listing.
+   * @param id - Its ID
+   * @param systems - The systems it is for
+   * @returns The module
+   */
+  const listed = (id: string, systems: readonly string[] = []): ListedPackage => ({
+    type: 'module',
+    id,
+    title: id,
+    version: '1.0.0',
+    compatibility: {},
+    systems,
+    unowned: false,
+  });
+
+  test("offers in a game system's group the modules for it, and in the universal group those for any", async () => {
+    const user = await listing(() => Promise.resolve([listed('anywhere'), listed('dnd-only', ['dnd5e'])]));
+
+    await user.click(within(row(/Universal/)).getByText('Universal'));
+    expect(await screen.findByRole('region', { name: 'Install a module' })).toHaveTextContent('anywhere');
+    expect(screen.getByRole('region', { name: 'Install a module' })).not.toHaveTextContent('dnd-only');
+
+    const group = document.querySelector(`[data-key="${MODULES}/system:dnd5e"]`);
+    if (!(group instanceof HTMLElement)) throw new Error('No group for D&D 5e');
+    await user.click(within(group).getByText('D&D 5e'));
+    const section = screen.getByRole('region', { name: 'Install a module' });
+    expect(section).toHaveTextContent('dnd-only');
+    expect(section).not.toHaveTextContent('anywhere');
+  });
+
+  test("says when Foundry's listing cannot be read", async () => {
+    const user = await listing(() => Promise.reject(new Error('offline')));
+
+    await user.click(within(row(/^Modules/)).getByText('Modules'));
+
+    await vi.waitFor(() => {
+      expect(screen.getByRole('region', { name: 'Install a module' })).toHaveTextContent(
+        "Could not read Foundry's package listing.",
+      );
+    });
   });
 });
 

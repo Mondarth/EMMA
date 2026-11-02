@@ -21,6 +21,7 @@
 import type {
   ExplanationMessages,
   PackageKey,
+  PackageRef,
   PackageVersion,
   Policy,
   Release,
@@ -73,7 +74,8 @@ export type Completion =
 /** A change in a plan. */
 export interface PlanEntry {
   readonly key: PackageKey;
-  readonly installed: string;
+  /** The version installed; none for a package the plan installs anew. */
+  readonly installed?: string;
   /** The version to install, or {@link UNINSTALL}. */
   readonly version: string;
   /** The choice that needs it; none for a version chosen. */
@@ -100,12 +102,19 @@ export interface Planner {
    */
   plan(picks: ReadonlyMap<PackageKey, string>): Promise<readonly PlanEntry[] | undefined>;
   /**
-   * The versions of a package that may be chosen: those newer than the installed one, newest first, that are listed,
-   * not pre-releases, and run on a Foundry build from the installed one up.
+   * The versions of a package that may be chosen: those newer than the installed one, or any of a package not
+   * installed once {@link add}ed, newest first, that run on a Foundry build from the installed one up.
    * @param key - The package, or `core`
    * @returns The versions
    */
   candidates(key: PackageKey): readonly string[];
+  /**
+   * Look up the releases of a package not installed, so that it can be chosen, as for installing it. Once found, they
+   * are kept, with those of the packages they need loaded as they are needed.
+   * @param key - The package
+   * @returns Whether any release of it is known
+   */
+  add(key: PackageKey): Promise<boolean>;
   /**
    * What a version of a package needs, as its manifest declares it: the Foundry builds it runs on, the packages it
    * requires, the game systems it runs in, and those it conflicts with.
@@ -137,6 +146,8 @@ export interface PlannerInputs {
   /** Every release found, from the installed versions up, and Foundry's builds from the installed one up. */
   readonly universe: Universe;
   readonly load: (needs: readonly Release[]) => Promise<readonly Release[]>;
+  /** Look up the releases of packages not installed; none are found without it. */
+  readonly lookUp?: (packages: readonly PackageRef[]) => Promise<readonly Release[]>;
   /** How setups are found, as the search finds them. */
   readonly policy: Partial<Policy>;
   /** Foundry VTT's title. */
@@ -503,9 +514,10 @@ export function createPlanner(inputs: PlannerInputs): Planner {
       const entry = (key: PackageKey, version: string): PlanEntry => {
         const needer = picks.has(key) ? undefined : by.get(key);
         const manifest = key === CORE || version === UNINSTALL ? undefined : releaseOf(key, version)?.versionManifest;
+        const from = installed.get(key);
         return {
           key,
-          installed: installed.get(key) ?? version,
+          ...(from !== undefined && { installed: from }),
           version,
           ...(needer !== undefined && { by: needer }),
           ...(manifest !== undefined && { manifest }),
@@ -523,16 +535,35 @@ export function createPlanner(inputs: PlannerInputs): Planner {
 
     candidates(key) {
       const from = installed.get(key);
-      if (from === undefined) return [];
-      if (key === CORE) return builds().filter(build => newer(build, from));
+      if (key === CORE) return builds().filter(build => newer(build, core));
       const runnable = builds();
       return newestFirst(
         resolver,
         universe.releases
-          .filter(release => packageKey(release.package) === key && newer(release.version, from))
+          .filter(
+            release => packageKey(release.package) === key && (from === undefined || newer(release.version, from)),
+          )
           .filter(release => runnable.some(build => runsOn(resolver, release, build, universe)))
           .map(({ version }) => version),
       );
+    },
+
+    async add(key) {
+      const known = () => universe.releases.some(release => packageKey(release.package) === key);
+      if (known() || installed.has(key) || inputs.lookUp === undefined) return known();
+      const type = key.startsWith('system:') ? 'system' : 'module';
+      const found = await inputs.lookUp([{ type, id: key.slice(key.indexOf(':') + 1) }]);
+      const have = new Set(universe.releases.map(release => `${packageKey(release.package)}@${release.version}`));
+      const added = found.filter(release => {
+        const id = `${packageKey(release.package)}@${release.version}`;
+        if (have.has(id)) return false;
+        have.add(id);
+        return true;
+      });
+      universe = { core: universe.core, releases: [...universe.releases, ...added] };
+      // What could not be completed before may be now.
+      completions.clear();
+      return known();
     },
 
     missingManifest(key, version) {

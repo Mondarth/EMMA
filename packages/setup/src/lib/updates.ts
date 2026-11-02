@@ -28,7 +28,15 @@
  * Pure but for the resolver's loading, and the badges, which are Foundry's. The resolver and the badges are the ones the
  * setup kit gives, from the installed EMMA module (see `@mondarth/emma-core/setup-kit`).
  */
-import type { PackageKey, Policy, Release, ReleaseCheck, SetupSpec, Universe } from '@mondarth/fvtt-resolver';
+import type {
+  PackageKey,
+  PackageRef,
+  Policy,
+  Release,
+  ReleaseCheck,
+  SetupSpec,
+  Universe,
+} from '@mondarth/fvtt-resolver';
 
 import type { KitBadge, KitBadges, KitResolver } from '@mondarth/emma-core/setup-kit';
 
@@ -131,6 +139,8 @@ export interface UpdateInputs {
   readonly universe: Universe;
   /** Load listed releases from their manifests, as the resolver needs them. */
   readonly load: (needs: readonly Release[]) => Promise<readonly Release[]>;
+  /** Look up the releases of packages not installed, to install anew; none can be without it. */
+  readonly lookUp?: (packages: readonly PackageRef[]) => Promise<readonly Release[]>;
 }
 
 /**
@@ -298,7 +308,15 @@ export async function findUpdates(inputs: UpdateInputs): Promise<UpdateSearch> {
     updates.set(key, { key, installed: version, newest, versions });
   }
   // A newer version that is not offered on its own may be, with what it needs changed too.
-  const planner = createPlanner({ resolver, overview, universe, load, policy, coreTitle: localize('Tree.Root') });
+  const planner = createPlanner({
+    resolver,
+    overview,
+    universe,
+    load,
+    policy,
+    coreTitle: localize('Tree.Root'),
+    ...(inputs.lookUp !== undefined && { lookUp: inputs.lookUp }),
+  });
   for (const [key, block] of [...blocked]) {
     const completion = await planner.complete(new Map([[key, block.newest]]));
     if (completion.ok) {

@@ -4,6 +4,7 @@ import { UpdateState } from '../../../src/app/update-state.svelte';
 import { KitUnavailable } from '../../../src/foundry/setup-kit';
 import { buildOverview } from '../../../src/lib/overview';
 import type { PackageUpdate, UpdateSearch } from '../../../src/lib/updates';
+import type { Planner } from '../../../src/lib/plans';
 import { UNINSTALL } from '../../../src/lib/plans';
 import { alone, installation, installedModule } from '../../mocks/fixtures';
 
@@ -162,6 +163,104 @@ describe('UpdateState', () => {
     expect(options[1]).not.toHaveProperty('conflict');
   });
 
+  describe('installing anew', () => {
+    /**
+     * A planner that also knows Dice, not installed, once looked up.
+     * @param fails - Whether it cannot take a set of choices
+     * @param missing - Whether a version of Dice has no manifest URL of its own
+     * @returns The planner
+     */
+    function withDice(
+      fails: (picks: ReadonlyMap<string, string>) => boolean = () => false,
+      missing: (version: string) => boolean = () => false,
+    ): Planner {
+      const base = alone(APP, LIB);
+      return {
+        ...base,
+        add: vi.fn((key: string) => Promise.resolve(key === 'module:dice')),
+        candidates: key => (key === 'module:dice' ? ['3.0.0', '2.0.0', '1.0.0'] : base.candidates(key)),
+        complete: picks =>
+          fails(picks) ? Promise.resolve({ ok: false, explanation: ['It will not fit.'] }) : base.complete(picks),
+        missingManifest: (key, version) => key === 'module:dice' && missing(version),
+      };
+    }
+
+    /**
+     * The state, searched, with a planner that knows Dice.
+     * @param planner - The planner
+     * @returns The state
+     */
+    async function searchedWith(planner: Planner): Promise<UpdateState> {
+      const updates = new UpdateState(() => Promise.resolve({ ...finding(APP, LIB), planner }));
+      await updates.searchFor(OVERVIEW);
+      return updates;
+    }
+
+    test('installs at the newest version the plan takes, passing over those without a manifest URL', async () => {
+      const planner = withDice(
+        picks => picks.get('module:dice') === '2.0.0',
+        version => version === '3.0.0',
+      );
+      const updates = await searchedWith(planner);
+
+      await expect(updates.install('module:dice')).resolves.toEqual({ ok: true, version: '1.0.0' });
+
+      expect(updates.chosenOf('module:dice')).toBe('1.0.0');
+      expect(planner.add).toHaveBeenCalledWith('module:dice');
+    });
+
+    test('says why it cannot install: not now, not found, or no version fits', async () => {
+      const updates = await searchedWith(withDice(() => true));
+      await expect(updates.install('module:app')).resolves.toEqual({ ok: false, reason: 'It cannot be added now.' });
+      await expect(new UpdateState(() => Promise.resolve(finding(APP))).install('module:dice')).resolves.toMatchObject({
+        ok: false,
+      });
+      await expect(updates.install('module:none')).resolves.toEqual({
+        ok: false,
+        reason: 'EMMA found no releases of it.',
+      });
+      await expect(updates.install('module:dice')).resolves.toEqual({
+        ok: false,
+        reason: 'No version of it fits the installation and the plan.',
+        explanation: ['It will not fit.'],
+      });
+      // Without words for why, none are given.
+      const silent = await searchedWith({
+        ...withDice(),
+        complete: () => Promise.resolve({ ok: false }),
+      });
+      await expect(silent.install('module:dice')).resolves.toEqual({
+        ok: false,
+        reason: 'No version of it fits the installation and the plan.',
+      });
+    });
+
+    test('takes a package to install out of the plan, and nothing else', async () => {
+      const updates = await searchedWith(withDice());
+      await updates.install('module:dice');
+      await updates.choose('module:app', '2.0.0');
+
+      await expect(updates.forget('module:none')).resolves.toBe(false);
+      await expect(updates.forget('module:dice')).resolves.toBe(true);
+
+      expect(updates.picks).toEqual([['module:app', '2.0.0']]);
+      await updates.forget('module:app');
+      expect(updates.plan).toEqual([]);
+      await expect(new UpdateState(() => Promise.resolve(finding(APP))).forget('module:app')).resolves.toBe(false);
+    });
+
+    test('looks a package to install up again for a new search, keeping it', async () => {
+      const planner = withDice();
+      const updates = await searchedWith(planner);
+      await updates.install('module:dice');
+
+      await updates.searchFor(OVERVIEW);
+
+      expect(planner.add).toHaveBeenCalledTimes(3);
+      expect(updates.chosenOf('module:dice')).toBe('3.0.0');
+    });
+  });
+
   describe('uninstalling', () => {
     /** App requires Library; Solo has no update on offer. */
     const INSTALLED = buildOverview(
@@ -223,6 +322,7 @@ describe('UpdateState', () => {
 
       // Keeping App would break Library's uninstall, so it is refused while Library's stands.
       await expect(updates.choose('module:app', '1.0.0')).resolves.toBe(false);
+      await expect(updates.forget('module:app')).resolves.toBe(false);
       expect(updates.chosenOf('module:app')).toBe(UNINSTALL);
     });
 
