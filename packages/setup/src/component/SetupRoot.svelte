@@ -126,6 +126,17 @@
         ? 'module'
         : undefined,
   );
+  /**
+   * What the modules the selected group offers to install are for: universal, or a game system, by its title as the
+   * installation or the plan gives it, or else its ID, as the tree names it; none outside a group.
+   */
+  const installScope = $derived.by(() => {
+    if (selection.kind !== 'group') return undefined;
+    if (selection.system === undefined) return localize('Tree.Universal');
+    const key = `system:${selection.system}`;
+    const title = updates.titleOf(key);
+    return title === key ? selection.system : title;
+  });
   /** The packages on Foundry's listing that fit the installation and the plan, as the selected group shows them. */
   const installablePackages = $derived.by(() => {
     const listing = installType === undefined ? null : setup.listings[installType];
@@ -218,6 +229,7 @@
               <InstallSection
                 type={installType}
                 listing={setup.listings[installType]}
+                scope={installScope}
                 packages={installablePackages}
                 filters={setup.installFilters[installType]}
                 {updates}

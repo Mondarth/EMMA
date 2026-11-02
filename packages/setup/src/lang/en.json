@@ -167,6 +167,8 @@
   "Install": {
     "Systems": "Install a game system",
     "Modules": "Install a module",
+    "ModulesForA": "Install a {scope} module",
+    "ModulesForAn": "Install an {scope} module",
     "Reading": "Reading Foundry's package listing…",
     "ReadFailed": "Could not read Foundry's package listing.",
     "Hint": "Those that fit the installation and the plan, as Foundry's listing gives their newest versions. Adding one looks up its releases, and the plan takes the newest version that fits.",

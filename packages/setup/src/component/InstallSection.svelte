@@ -10,7 +10,7 @@
   import type { ListingState } from '../app/setup-state.svelte';
   import type { InstallResult, ManifestResult, UpdateState } from '../app/update-state.svelte';
   import type { ListedPackage } from '../foundry/setup-game';
-  import { format, localize } from '../lib/i18n';
+  import { format, localize, takesAn } from '../lib/i18n';
   import type { InstallFilters } from '../lib/install';
   import { compatibilityText, matching, tagsAmong, tagText, toggleTag, UNTAGGED, withTags } from '../lib/install';
 
@@ -18,6 +18,8 @@
     type: 'module' | 'system';
     /** Foundry's listing, as far as it is read. */
     listing: ListingState;
+    /** What the modules offered are for, as the heading names it: `Universal`, or a game system's title. */
+    scope?: string | undefined;
     /** The packages on it that fit, as the filters narrow them. */
     packages: readonly ListedPackage[];
     /** How the user narrows them. */
@@ -29,7 +31,7 @@
     onFilter: (change: Partial<InstallFilters>) => void;
   }
 
-  let { type, listing, packages, filters, updates, onShow, onFilter }: Props = $props();
+  let { type, listing, scope, packages, filters, updates, onShow, onFilter }: Props = $props();
   const plural = $derived(type === 'system' ? 'Systems' : 'Modules');
   $effect(() => {
     onShow(type);
@@ -116,7 +118,13 @@
 </script>
 
 <section class="emma-install" aria-labelledby="{uid}-heading">
-  <h3 id="{uid}-heading">{localize(type === 'system' ? 'Install.Systems' : 'Install.Modules')}</h3>
+  <h3 id="{uid}-heading">
+    {type === 'system'
+      ? localize('Install.Systems')
+      : scope === undefined
+        ? localize('Install.Modules')
+        : format(takesAn(scope) ? 'Install.ModulesForAn' : 'Install.ModulesForA', { scope })}
+  </h3>
   <form
     class="emma-install-manifest"
     onsubmit={event => {

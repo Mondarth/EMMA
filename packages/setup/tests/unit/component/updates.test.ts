@@ -869,13 +869,13 @@ describe('installing anew, by group', () => {
     const user = await listing(() => Promise.resolve([listed('anywhere'), listed('dnd-only', ['dnd5e'])]));
 
     await user.click(within(row(/Universal/)).getByText('Universal'));
-    expect(await screen.findByRole('region', { name: 'Install a module' })).toHaveTextContent('anywhere');
-    expect(screen.getByRole('region', { name: 'Install a module' })).not.toHaveTextContent('dnd-only');
+    expect(await screen.findByRole('region', { name: 'Install a Universal module' })).toHaveTextContent('anywhere');
+    expect(screen.getByRole('region', { name: 'Install a Universal module' })).not.toHaveTextContent('dnd-only');
 
     const group = document.querySelector(`[data-key="${MODULES}/system:dnd5e"]`);
     if (!(group instanceof HTMLElement)) throw new Error('No group for D&D 5e');
     await user.click(within(group).getByText('D&D 5e'));
-    const section = screen.getByRole('region', { name: 'Install a module' });
+    const section = screen.getByRole('region', { name: 'Install a D&D 5e module' });
     expect(section).toHaveTextContent('dnd-only');
     expect(section).not.toHaveTextContent('anywhere');
   });
@@ -1123,7 +1123,7 @@ describe('installing anew, by group', () => {
     if (!(group instanceof HTMLElement)) throw new Error('No group for Pathfinder');
     expect(group).toHaveClass('emma-tree-pending');
     await user.click(within(group).getByText('Pathfinder'));
-    const offered = screen.getByRole('region', { name: 'Install a module' });
+    const offered = screen.getByRole('region', { name: 'Install a Pathfinder module' });
     expect(offered).toHaveTextContent('pf-tools');
     expect(offered).not.toHaveTextContent('anywhere');
   });
