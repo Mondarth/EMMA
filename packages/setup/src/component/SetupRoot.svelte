@@ -10,7 +10,7 @@
   import { readLayout, writeLayout } from '../foundry/preferences';
   import { EXTENSION_RELEASES } from '../foundry/setup-kit';
   import type { InstallFilters } from '../lib/install';
-  import { installable, keptSystems } from '../lib/install';
+  import { installable, keptSystems, pendingPackages } from '../lib/install';
   import { UNINSTALL } from '../lib/plans';
   import { stepText } from '../lib/run';
   import { groupDetail, moduleDetail, systemDetail } from '../lib/details';
@@ -180,6 +180,11 @@
         <InstallationTree
           {overview}
           {updates}
+          pending={pendingPackages(
+            updates.choices,
+            key => updates.titleOf(key),
+            Array.isArray(setup.listings.module) ? setup.listings.module : [],
+          )}
           selected={selected.key}
           onSelect={(row: TreeRow) => {
             selected = { key: row.key, selection: row.selection };

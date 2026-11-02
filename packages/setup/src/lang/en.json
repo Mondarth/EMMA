@@ -11,7 +11,8 @@
     "Root": "Foundry VTT",
     "Systems": "Game systems",
     "Modules": "Modules",
-    "Universal": "Universal"
+    "Universal": "Universal",
+    "Pending": "Pending"
   },
   "Status": {
     "matches": "Matches its record",

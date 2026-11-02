@@ -10,6 +10,7 @@
 import type { ListedPackage } from '../foundry/setup-game';
 import { format, localize } from './i18n';
 import type { Overview } from './overview';
+import type { PendingPackage } from './tree';
 import { UNINSTALL } from './plans';
 
 /** What a package to install must fit. */
@@ -93,6 +94,25 @@ export function keptSystems(overview: Overview, picks: readonly (readonly [strin
     .map(([key]) => key.slice('system:'.length))
     .filter(id => !installed.includes(id));
   return [...installed, ...added];
+}
+
+/**
+ * The packages a plan installs anew, as the installation tree shows them, pending: each a change of the plan to a
+ * package not installed, with the game systems a module is for, as Foundry's listing of modules says, if read.
+ * @param changes - The plan's changes, each with the version installed, if any
+ * @param titleOf - A package's title, by its key
+ * @param listing - Foundry's listing of modules, if read
+ * @returns The packages
+ */
+export function pendingPackages(
+  changes: readonly { readonly key: string; readonly installed?: string; readonly chosen: string }[],
+  titleOf: (key: string) => string,
+  listing: readonly ListedPackage[],
+): PendingPackage[] {
+  const systems = new Map(listing.map(pkg => [`module:${pkg.id}`, pkg.systems]));
+  return changes
+    .filter(({ key, installed, chosen }) => key !== 'core' && installed === undefined && chosen !== UNINSTALL)
+    .map(({ key, chosen }) => ({ key, title: titleOf(key), version: chosen, systems: systems.get(key) ?? [] }));
 }
 
 /**

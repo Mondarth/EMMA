@@ -6,7 +6,7 @@ import type { SetupStateOptions } from '../../../src/app/setup-state.svelte';
 import { SetupState } from '../../../src/app/setup-state.svelte';
 import SetupRoot from '../../../src/component/SetupRoot.svelte';
 import { LAYOUT_KEY } from '../../../src/foundry/preferences';
-import { MODULES } from '../../../src/lib/tree';
+import { MODULES, SYSTEMS } from '../../../src/lib/tree';
 import type { CoreTarget, CoreUpdateState, ListedPackage } from '../../../src/foundry/setup-game';
 import type { KitProblem } from '../../../src/foundry/setup-kit';
 import { EXTENSION_RELEASES, KitUnavailable } from '../../../src/foundry/setup-kit';
@@ -933,8 +933,14 @@ describe('installing anew, by group', () => {
   });
 
   test('offers the modules for a game system the plan installs', async () => {
-    // Pathfinder is not installed; the planner can add it.
+    // Pathfinder is not installed; the planner can add it, and plans it with no version installed.
     const pathfinder: PackageUpdate = { key: 'system:pf2e', installed: 'none', newest: '7.0.0', versions: ['7.0.0'] };
+    const base = alone(pathfinder);
+    const planner = {
+      ...base,
+      plan: async (picks: ReadonlyMap<string, string>) =>
+        (await base.plan(picks))?.map(({ installed: _none, ...entry }) => entry),
+    };
     const user = await listing(
       type =>
         Promise.resolve(
@@ -948,7 +954,7 @@ describe('installing anew, by group', () => {
           blocked: new Map(),
           unresolved: [],
           judge,
-          planner: alone(pathfinder),
+          planner,
         }),
     );
 
@@ -966,6 +972,18 @@ describe('installing anew, by group', () => {
 
     await user.click(within(row(/^Modules/)).getByText('Modules'));
     expect(await screen.findByRole('region', { name: 'Install a module' })).toHaveTextContent('pf-tools');
+
+    // The tree shows Pathfinder as pending, and a group for its modules, which offers them.
+    const system = document.querySelector(`[data-key="${SYSTEMS}/system:pf2e"]`);
+    expect(system).toHaveClass('emma-tree-pending');
+    expect(system).toHaveTextContent(/Pathfinder\s*7\.0\.0\s*Pending/);
+    const group = document.querySelector(`[data-key="${MODULES}/system:pf2e"]`);
+    if (!(group instanceof HTMLElement)) throw new Error('No group for Pathfinder');
+    expect(group).toHaveClass('emma-tree-pending');
+    await user.click(within(group).getByText('Pathfinder'));
+    const offered = screen.getByRole('region', { name: 'Install a module' });
+    expect(offered).toHaveTextContent('pf-tools');
+    expect(offered).not.toHaveTextContent('anywhere');
   });
 
   test('shows more of the list as its end comes into view, and starts again on a search', async () => {

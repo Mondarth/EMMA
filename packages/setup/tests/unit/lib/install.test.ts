@@ -8,6 +8,7 @@ import {
   isBehind,
   keptSystems,
   matching,
+  pendingPackages,
   tagText,
 } from '../../../src/lib/install';
 import { buildOverview } from '../../../src/lib/overview';
@@ -130,6 +131,29 @@ describe('keptSystems', () => {
         ['module:tools', '1.0.0'],
       ]),
     ).toEqual(['dnd5e', 'sw5e']);
+  });
+});
+
+describe('pendingPackages', () => {
+  test("takes the plan's changes to packages not installed, with the game systems a module is for", () => {
+    expect(
+      pendingPackages(
+        [
+          { key: 'core', chosen: '14.369' },
+          { key: 'system:pf2e', chosen: '7.0.0' },
+          { key: 'module:maps', chosen: '1.1.0' },
+          { key: 'module:unlisted', chosen: '2.0.0' },
+          { key: 'module:lib', installed: '1.0.0', chosen: '2.0.0' },
+          { key: 'module:old', installed: '1.0.0', chosen: 'uninstall' },
+        ],
+        key => key.toUpperCase(),
+        [listed('maps', { systems: ['pf2e'] })],
+      ),
+    ).toEqual([
+      { key: 'system:pf2e', title: 'SYSTEM:PF2E', version: '7.0.0', systems: [] },
+      { key: 'module:maps', title: 'MODULE:MAPS', version: '1.1.0', systems: ['pf2e'] },
+      { key: 'module:unlisted', title: 'MODULE:UNLISTED', version: '2.0.0', systems: [] },
+    ]);
   });
 });
 

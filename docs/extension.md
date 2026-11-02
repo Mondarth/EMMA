@@ -129,6 +129,10 @@ Foundry VTT
 - **Under each module**, wherever it shows, the modules it requires, and under those the modules they require in turn.
   A requirement that is not installed is marked **Not installed**.
 
+A game system or module the plan installs anew shows in the tree as soon as it is added, at the version the plan
+takes, on a pale amber background with an amber edge, marked **Pending**: a game system among the game systems, with
+a group of the modules for it, and a module in the groups of the game systems it is for, as Foundry's listing says.
+
 A game system's panel gives the version installed, how many modules are for it, and the worlds that use it, each with
 the version it last ran with; under a world, also the version that world last ran with.
 

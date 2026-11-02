@@ -244,6 +244,92 @@ describe('visibleRows', () => {
   });
 });
 
+describe('visibleRows, with packages the plan installs anew', () => {
+  const PENDING = [
+    { key: 'system:pf2e', title: 'Pathfinder', version: '7.0.0', systems: [] },
+    { key: 'system:sw5e', title: 'SW 5e', version: '2.0.0', systems: [] },
+    { key: 'module:dice', title: 'Dice', version: '1.0.0', systems: [] },
+    { key: 'module:maps', title: 'Maps', version: '1.1.0', systems: ['pf2e'] },
+    { key: 'module:tools', title: 'Tools', version: '0.9.0', systems: ['sw5e'] },
+    { key: 'module:gone', title: 'Gone', version: '4.0.0', systems: [] },
+  ];
+  const UNIVERSAL = `${MODULES}/universal`;
+  const expanded = new Set([
+    ...INITIALLY_EXPANDED,
+    UNIVERSAL,
+    `${MODULES}/system:pf2e`,
+    `${MODULES}/system:sw5e`,
+    `${UNIVERSAL}/module:loop`,
+  ]);
+
+  test('shows them as pending, at the version the plan takes: game systems with the others, modules in their groups', () => {
+    const rows = visibleRows(OVERVIEW, expanded, PENDING);
+    const shown = (key: string) => {
+      const row = rowOf(rows, key);
+      return row && { title: row.title, version: row.version, pending: row.pending, status: row.status?.value };
+    };
+
+    // Pathfinder, which a world uses, is no longer missing; SW 5e is new.
+    expect(shown(`${SYSTEMS}/system:pf2e`)).toEqual({
+      title: 'Pathfinder',
+      version: '7.0.0',
+      pending: true,
+      status: undefined,
+    });
+    expect(shown(`${SYSTEMS}/system:sw5e`)).toEqual({
+      title: 'SW 5e',
+      version: '2.0.0',
+      pending: true,
+      status: undefined,
+    });
+    expect(shown(`${UNIVERSAL}/module:dice`)).toEqual({
+      title: 'Dice',
+      version: '1.0.0',
+      pending: true,
+      status: undefined,
+    });
+    // The group of a game system the plan installs is pending too, and named by it.
+    expect(shown(`${MODULES}/system:pf2e`)).toMatchObject({ title: 'Pathfinder', pending: true, status: undefined });
+    expect(shown(`${MODULES}/system:pf2e/module:maps`)).toMatchObject({ version: '1.1.0', pending: true });
+    expect(shown(`${MODULES}/system:sw5e`)).toMatchObject({ title: 'SW 5e', pending: true });
+    expect(shown(`${MODULES}/system:sw5e/module:tools`)).toMatchObject({ version: '0.9.0', pending: true });
+    // A required module the plan installs is pending where it shows under another.
+    expect(shown(`${UNIVERSAL}/module:loop/module:gone`)).toEqual({
+      title: 'Gone',
+      version: '4.0.0',
+      pending: true,
+      status: undefined,
+    });
+    expect(rows.filter(({ pending }) => pending).length).toBe(9);
+  });
+
+  test('shows groups for what the plan installs, a module installed as installed', () => {
+    const overview = buildOverview(
+      installation({ modules: [installedModule('app', 'App', '2.0.0', { systems: ['dnd5e'] })] }),
+      new Map(),
+    );
+    const rows = visibleRows(overview, new Set([...INITIALLY_EXPANDED, `${MODULES}/universal`]), [
+      { key: 'module:dice', title: 'Dice', version: '1.0.0', systems: [] },
+      // A module installed shows as installed, wherever the plan takes it.
+      { key: 'module:app', title: 'App', version: '3.0.0', systems: ['dnd5e'] },
+      { key: 'system:pf2e', title: 'Pathfinder', version: '7.0.0', systems: [] },
+    ]);
+
+    expect(rowOf(rows, `${MODULES}/universal/module:dice`)?.pending).toBe(true);
+    // A game system the plan installs has a group of modules, though none yet.
+    expect(rowOf(rows, `${MODULES}/system:pf2e`)).toMatchObject({
+      title: 'Pathfinder',
+      pending: true,
+      expandable: false,
+    });
+    expect(keys(rows.filter(({ pending }) => pending))).toEqual([
+      `${SYSTEMS}/system:pf2e`,
+      `${MODULES}/universal/module:dice`,
+      `${MODULES}/system:pf2e`,
+    ]);
+  });
+});
+
 describe('moveFor', () => {
   const expanded = new Set([ROOT, SYSTEMS]);
   const rows = visibleRows(OVERVIEW, expanded);

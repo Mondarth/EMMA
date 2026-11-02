@@ -6,6 +6,9 @@
  *     says it last ran with;
  *   - the modules, grouped by the game systems they are for: first those for any system, then those for each system.
  *
+ * A package the plan installs anew shows as installed ones do, at the version the plan takes, marked as pending: a game
+ * system among the game systems, and a module in the groups of the systems it is for.
+ *
  * A module that requires others has them under it, wherever it shows, so a module may show many times. Every row with
  * rows under it can be expanded and collapsed, and while it is collapsed says which packages it hides, so that it can
  * show what they have, as updates. Pure: which rows are showing, and where the keyboard moves between them.
@@ -29,6 +32,17 @@ export type TreeSelection =
   /** A module, shown under a world if `world` is given. */
   | { readonly kind: 'module'; readonly module: string; readonly world?: string };
 
+/** A package the plan installs anew, not installed yet. */
+export interface PendingPackage {
+  /** `system:<id>` or `module:<id>`. */
+  readonly key: string;
+  readonly title: string;
+  /** The version the plan takes. */
+  readonly version: string;
+  /** For a module, the IDs of the game systems it is for; empty if it is for any. */
+  readonly systems: readonly string[];
+}
+
 /** The status shown beside a row: a world's, or a package's. */
 export type RowStatus =
   { readonly kind: 'world'; readonly value: WorldStatus } | { readonly kind: 'package'; readonly value: ModuleStatus };
@@ -45,6 +59,8 @@ export interface TreeRow {
   readonly version?: string;
   /** Whether that version is the one installed, rather than the one a world last ran with. */
   readonly installed?: true;
+  /** Whether the row is of a package the plan installs anew, or of the group of modules for such a game system. */
+  readonly pending?: true;
   readonly status?: RowStatus;
   /** Whether the row has rows under it. */
   readonly expandable: boolean;
@@ -73,17 +89,26 @@ interface TreeNode {
   readonly version?: string;
   /** Whether the version is the one installed. */
   readonly installed?: true;
+  readonly pending?: true;
   readonly status?: RowStatus;
   readonly children: () => readonly TreeNode[];
 }
+
+/** The packages the plan installs anew, by key. */
+type Pending = ReadonlyMap<string, PendingPackage>;
 
 /**
  * The rows showing, from the top: those under a row show only while it is expanded.
  * @param overview - The installation
  * @param expanded - The keys of the rows expanded
+ * @param pending - The packages the plan installs anew
  * @returns The rows, in order
  */
-export function visibleRows(overview: Overview, expanded: ReadonlySet<string>): TreeRow[] {
+export function visibleRows(
+  overview: Overview,
+  expanded: ReadonlySet<string>,
+  pending: readonly PendingPackage[] = [],
+): TreeRow[] {
   const rows: TreeRow[] = [];
   const visit = (node: TreeNode, level: number, parent?: string): void => {
     const key = parent === undefined ? node.segment : `${parent}/${node.segment}`;
@@ -95,6 +120,7 @@ export function visibleRows(overview: Overview, expanded: ReadonlySet<string>): 
       title: node.title,
       ...(node.version !== undefined && { version: node.version }),
       ...(node.installed && { installed: true }),
+      ...(node.pending && { pending: true }),
       ...(node.status !== undefined && { status: node.status }),
       expandable: children.length > 0,
       ...(children.length > 0 && !expanded.has(key) && { hides: packagesUnder(children) }),
@@ -103,7 +129,7 @@ export function visibleRows(overview: Overview, expanded: ReadonlySet<string>): 
     if (!expanded.has(key)) return;
     for (const child of children) visit(child, level + 1, key);
   };
-  visit(rootNode(overview), 1);
+  visit(rootNode(overview, new Map(pending.map(entry => [entry.key, entry]))), 1);
   return rows;
 }
 
@@ -129,21 +155,22 @@ function packagesUnder(nodes: readonly TreeNode[]): Set<string> {
 /**
  * The root: Foundry VTT, with the game systems and the modules under it.
  * @param overview - The installation
+ * @param pending - The packages the plan installs anew
  * @returns The root's node
  */
-function rootNode(overview: Overview): TreeNode {
+function rootNode(overview: Overview, pending: Pending): TreeNode {
   const modules = new Map(overview.modules.map(use => [use.module.id, use]));
   const systems: TreeNode = {
     segment: 'systems',
     selection: { kind: 'systems' },
     title: localize('Tree.Systems'),
-    children: () => systemNodes(overview, modules),
+    children: () => systemNodes(overview, modules, pending),
   };
   const grouped: TreeNode = {
     segment: 'modules',
     selection: { kind: 'modules' },
     title: localize('Tree.Modules'),
-    children: () => groupNodes(overview, modules),
+    children: () => groupNodes(overview, modules, pending),
   };
   return {
     segment: ROOT,
@@ -161,32 +188,50 @@ const INSTALLED: RowStatus = { kind: 'package', value: 'same' };
 const MISSING: RowStatus = { kind: 'package', value: 'missing' };
 
 /**
- * The game systems: those installed, then any that a world uses but is not installed.
+ * The packages of a type the plan installs anew, by title.
+ * @param pending - The packages the plan installs anew
+ * @param type - Which type
+ * @returns Them, with their IDs
+ */
+function pendingOf(pending: Pending, type: 'system' | 'module'): (PendingPackage & { id: string })[] {
+  return [...pending.values()]
+    .filter(({ key }) => key.startsWith(`${type}:`))
+    .map(entry => ({ ...entry, id: entry.key.slice(type.length + 1) }))
+    .sort(byTitle);
+}
+
+/**
+ * The game systems: those installed, then those the plan installs anew, then any that a world uses but is not
+ * installed.
  * @param overview - The installation
  * @param modules - The installed modules, by ID
+ * @param pending - The packages the plan installs anew
  * @returns Their nodes
  */
-function systemNodes(overview: Overview, modules: ReadonlyMap<string, ModuleUse>): TreeNode[] {
+function systemNodes(overview: Overview, modules: ReadonlyMap<string, ModuleUse>, pending: Pending): TreeNode[] {
   const installed = new Set(overview.systems.map(({ id }) => id));
+  const planned = pendingOf(pending, 'system').filter(({ id }) => !installed.has(id));
   const missing = [...new Set(overview.worlds.map(({ world }) => world.system))]
-    .filter(id => !installed.has(id))
+    .filter(id => !installed.has(id) && !pending.has(`system:${id}`))
     .map(id => ({ id, title: id }))
     .sort(byTitle);
   const node = (
     id: string,
     title: string,
-    shown: { version?: string; installed?: true; status: RowStatus },
+    shown: { version?: string; installed?: true; pending?: true; status?: RowStatus },
   ): TreeNode => ({
     segment: `system:${id}`,
     selection: { kind: 'system', system: id },
     title,
     ...shown,
-    children: () => overview.worlds.filter(({ world }) => world.system === id).map(world => worldNode(world, modules)),
+    children: () =>
+      overview.worlds.filter(({ world }) => world.system === id).map(world => worldNode(world, modules, pending)),
   });
   return [
     ...overview.systems.map(({ id, title, version }) =>
       node(id, title, { version, installed: true, status: INSTALLED }),
     ),
+    ...planned.map(({ id, title, version }) => node(id, title, { version, pending: true })),
     ...missing.map(({ id }) => node(id, id, { status: MISSING })),
   ];
 }
@@ -195,9 +240,10 @@ function systemNodes(overview: Overview, modules: ReadonlyMap<string, ModuleUse>
  * A world, with the game system and the modules its record says it last ran with.
  * @param overview - The world
  * @param modules - The installed modules, by ID
+ * @param pending - The packages the plan installs anew
  * @returns Its node
  */
-function worldNode(overview: WorldOverview, modules: ReadonlyMap<string, ModuleUse>): TreeNode {
+function worldNode(overview: WorldOverview, modules: ReadonlyMap<string, ModuleUse>, pending: Pending): TreeNode {
   const { world, status, ranSystem } = overview;
   return {
     segment: `world:${world.id}`,
@@ -206,7 +252,7 @@ function worldNode(overview: WorldOverview, modules: ReadonlyMap<string, ModuleU
     status: { kind: 'world', value: status },
     children: () => [
       ...(ranSystem === undefined ? [] : [ranSystemNode(ranSystem, world.id)]),
-      ...overview.modules.map(entry => runNode(entry, world.id, modules)),
+      ...overview.modules.map(entry => runNode(entry, world.id, modules, pending)),
     ],
   };
 }
@@ -233,16 +279,22 @@ function ranSystemNode(entry: WorldModule, world: string): TreeNode {
  * @param entry - The module, as the world's record gives it
  * @param world - The world's ID
  * @param modules - The installed modules, by ID
+ * @param pending - The packages the plan installs anew
  * @returns Its node
  */
-function runNode(entry: WorldModule, world: string, modules: ReadonlyMap<string, ModuleUse>): TreeNode {
+function runNode(
+  entry: WorldModule,
+  world: string,
+  modules: ReadonlyMap<string, ModuleUse>,
+  pending: Pending,
+): TreeNode {
   return {
     segment: `module:${entry.id}`,
     selection: { kind: 'module', module: entry.id, world },
     title: entry.title,
     version: entry.recorded,
     status: { kind: 'package', value: entry.status },
-    children: () => requirementNodes([entry.id], world, modules),
+    children: () => requirementNodes([entry.id], world, modules, pending),
   };
 }
 
@@ -250,9 +302,10 @@ function runNode(entry: WorldModule, world: string, modules: ReadonlyMap<string,
  * An installed module, as the modules' groups show it, with the modules it requires.
  * @param use - The module, with the worlds it is active in
  * @param modules - The installed modules, by ID
+ * @param pending - The packages the plan installs anew
  * @returns Its node
  */
-function installedNode(use: ModuleUse, modules: ReadonlyMap<string, ModuleUse>): TreeNode {
+function installedNode(use: ModuleUse, modules: ReadonlyMap<string, ModuleUse>, pending: Pending): TreeNode {
   const { id, title, version } = use.module;
   return {
     segment: `module:${id}`,
@@ -260,7 +313,7 @@ function installedNode(use: ModuleUse, modules: ReadonlyMap<string, ModuleUse>):
     title,
     version,
     installed: true,
-    children: () => requirementNodes([id], undefined, modules),
+    children: () => requirementNodes([id], undefined, modules, pending),
   };
 }
 
@@ -269,57 +322,103 @@ function installedNode(use: ModuleUse, modules: ReadonlyMap<string, ModuleUse>):
  * @param path - The IDs of the module, first, and of the modules it is under, none of which shows again under it
  * @param world - The world it is under, if any
  * @param modules - The installed modules, by ID
+ * @param pending - The packages the plan installs anew, of which one required shows as pending
  * @returns Their nodes; none if the module is not installed, as only its manifest says what it requires
  */
 function requirementNodes(
   path: readonly [string, ...string[]],
   world: string | undefined,
   modules: ReadonlyMap<string, ModuleUse>,
+  pending: Pending,
 ): TreeNode[] {
   const requires = modules.get(path[0])?.module.requires ?? [];
   return requires
     .filter(required => !path.includes(required))
-    .map(required => ({ id: required, title: modules.get(required)?.module.title ?? required }))
+    .map(required => ({
+      id: required,
+      title: modules.get(required)?.module.title ?? pending.get(`module:${required}`)?.title ?? required,
+    }))
     .sort(byTitle)
     .map(({ id, title }): TreeNode => {
       const installed = modules.get(id)?.module;
+      const planned = pending.get(`module:${id}`);
       return {
         segment: `module:${id}`,
         selection: { kind: 'module', module: id, ...(world !== undefined && { world }) },
         title,
-        ...(installed === undefined ? { status: MISSING } : { version: installed.version, installed: true }),
-        children: () => requirementNodes([id, ...path], world, modules),
+        ...(installed !== undefined
+          ? { version: installed.version, installed: true }
+          : planned === undefined
+            ? { status: MISSING }
+            : { version: planned.version, pending: true }),
+        children: () => requirementNodes([id, ...path], world, modules, pending),
       };
     });
 }
 
 /**
- * The modules, grouped: those for any game system, then those for each system, by the system's title.
+ * A module the plan installs anew, as the modules' groups show it. What it requires is not known until it is installed,
+ * though the plan installs that too.
+ * @param entry - The module
+ * @returns Its node
+ */
+function pendingNode(entry: PendingPackage & { id: string }): TreeNode {
+  return {
+    segment: `module:${entry.id}`,
+    selection: { kind: 'module', module: entry.id },
+    title: entry.title,
+    version: entry.version,
+    pending: true,
+    children: () => [],
+  };
+}
+
+/**
+ * The modules, grouped: those for any game system, then those for each system, by the system's title. The modules the
+ * plan installs anew follow those installed in each group, and a game system the plan installs has a group, though
+ * none yet, so that the modules for it can be found there.
  * @param overview - The installation
  * @param modules - The installed modules, by ID
- * @returns The groups' nodes, leaving out any without modules
+ * @param pending - The packages the plan installs anew
+ * @returns The groups' nodes, leaving out any without modules but those of the game systems the plan installs
  */
-function groupNodes(overview: Overview, modules: ReadonlyMap<string, ModuleUse>): TreeNode[] {
+function groupNodes(overview: Overview, modules: ReadonlyMap<string, ModuleUse>, pending: Pending): TreeNode[] {
   const titles = new Map(overview.systems.map(({ id, title }) => [id, title]));
+  const plannedSystems = new Map(pendingOf(pending, 'system').map(({ id, title }) => [id, title]));
+  const planned = pendingOf(pending, 'module').filter(({ id }) => !modules.has(id));
   const universal = overview.modules.filter(({ module: pkg }) => pkg.systems.length === 0);
-  const systems = [...new Set(overview.modules.flatMap(({ module: pkg }) => pkg.systems))]
-    .map(id => ({ id, title: titles.get(id) ?? id }))
+  const plannedUniversal = planned.filter(({ systems }) => systems.length === 0);
+  const forSystems = [
+    ...new Set([
+      ...overview.modules.flatMap(({ module: pkg }) => pkg.systems),
+      ...planned.flatMap(({ systems }) => systems),
+      ...plannedSystems.keys(),
+    ]),
+  ]
+    .map(id => ({ id, title: titles.get(id) ?? plannedSystems.get(id) ?? id }))
     .sort(byTitle);
-  const groups: TreeNode[] = systems.map(({ id, title }) => ({
+  const groups: TreeNode[] = forSystems.map(({ id, title }) => ({
     segment: `system:${id}`,
     selection: { kind: 'group', system: id },
     title,
-    ...(!titles.has(id) && { status: MISSING }),
-    children: () =>
-      overview.modules.filter(({ module: pkg }) => pkg.systems.includes(id)).map(use => installedNode(use, modules)),
+    ...(titles.has(id) ? {} : plannedSystems.has(id) ? { pending: true } : { status: MISSING }),
+    children: () => [
+      ...overview.modules
+        .filter(({ module: pkg }) => pkg.systems.includes(id))
+        .map(use => installedNode(use, modules, pending)),
+      ...planned.filter(({ systems }) => systems.includes(id)).map(pendingNode),
+    ],
   }));
-  if (universal.length === 0) return groups;
+  if (universal.length === 0 && plannedUniversal.length === 0) return groups;
   return [
     {
       segment: 'universal',
       selection: { kind: 'group' },
       title: localize('Tree.Universal'),
-      children: () => universal.map(use => installedNode(use, modules)),
+      children: () => [
+        ...universal.map(use => installedNode(use, modules, pending)),
+        ...plannedUniversal.map(pendingNode),
+      ],
     },
     ...groups,
   ];

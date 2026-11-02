@@ -5,6 +5,8 @@
   A package with an update on offer has a blue arrow to the left of each of its rows, and one with a newer version EMMA
   cannot offer a red one beside it; a collapsed row that hides either has the same arrow, fainter. In Update mode, each row that shows its installed version offers its versions in a list instead, each in
   the colour of EMMA's badge for it, as the EMMA module's version lists are; one the plan uninstalls says so instead.
+  A package the plan installs anew shows at the version the plan takes, on a pale amber background, and says it is
+  pending, so that the colour is not all that tells.
 -->
 <script lang="ts">
   import { tick } from 'svelte';
@@ -14,7 +16,7 @@
   import { localize } from '../lib/i18n';
   import { UNINSTALL } from '../lib/plans';
   import type { Overview } from '../lib/overview';
-  import type { TreeRow } from '../lib/tree';
+  import type { PendingPackage, TreeRow } from '../lib/tree';
   import { INITIALLY_EXPANDED, moveFor, packageOf, visibleRows } from '../lib/tree';
 
   import VersionPicker from './VersionPicker.svelte';
@@ -26,9 +28,11 @@
     onSelect: (row: TreeRow) => void;
     /** The updates on offer, and the versions chosen; none until they are searched for. */
     updates?: UpdateState | undefined;
+    /** The packages the plan installs anew. */
+    pending?: readonly PendingPackage[];
   }
 
-  let { overview, selected, onSelect, updates }: Props = $props();
+  let { overview, selected, onSelect, updates, pending = [] }: Props = $props();
 
   // A column for the red arrows only once there are any, so that the tree is no wider without.
   const anyBlocked = $derived((updates?.search?.blocked.size ?? 0) > 0);
@@ -44,7 +48,7 @@
   }
 
   const expanded = new SvelteSet<string>(INITIALLY_EXPANDED);
-  const rows = $derived(visibleRows(overview, expanded));
+  const rows = $derived(visibleRows(overview, expanded, pending));
   // The keyboard's row: the selected row while it shows, or else the first, so that the tree can always be reached.
   const current = $derived(rows.some(({ key }) => key === selected) ? selected : (rows[0]?.key ?? ''));
 
@@ -122,7 +126,7 @@
     {@const hiddenBlocked = updates !== undefined && anyOf(row.hides, under => updates.blockedOf(under) !== undefined)}
     <li
       role="treeitem"
-      class="emma-tree-row"
+      class={['emma-tree-row', { 'emma-tree-pending': row.pending }]}
       data-key={row.key}
       aria-level={row.level}
       aria-selected={row.key === selected}
@@ -181,11 +185,41 @@
       {#if status !== undefined}
         <span class={['emma-status', `emma-status-${row.status?.value ?? ''}`]}>{status}</span>
       {/if}
+      {#if row.pending}
+        <span class="emma-status emma-tree-pending-label">{localize('Tree.Pending')}</span>
+      {/if}
     </li>
   {/each}
 </ul>
 
 <style>
+  /*
+   * A package the plan installs anew: dark brown on pale amber, 12.2:1, past WCAG AAA's 7:1 whatever the theme, with a
+   * darker amber edge, 4.1:1 against the pale amber and 3.7:1 against a dark theme, past the 3:1 a mark needs. A
+   * selected row takes the selection's colours, with the edge, so that it still shows as pending.
+   */
+  .emma-tree-pending {
+    --emma-pending-background: #fff3cd;
+    --emma-pending-text: #3d2c00;
+    --emma-pending-edge: #a06c00;
+    background: var(--emma-pending-background);
+    color: var(--emma-pending-text);
+    box-shadow: inset 3px 0 0 var(--emma-pending-edge);
+  }
+
+  .emma-tree-pending[aria-selected='true'] {
+    color: inherit;
+  }
+
+  .emma-tree-pending .emma-tree-version,
+  .emma-tree-pending .emma-status {
+    color: inherit;
+  }
+
+  .emma-tree-pending-label {
+    font-style: italic;
+  }
+
   .emma-tree-uninstall {
     color: var(--color-level-error, #c00);
     font-weight: bold;
