@@ -19,6 +19,7 @@
  * what a version needs, and why a set of choices cannot be completed, naming the installed packages by their titles.
  */
 import type {
+  Compatibility,
   ExplanationMessages,
   PackageKey,
   PackageRef,
@@ -305,18 +306,43 @@ export function createPlanner(inputs: PlannerInputs): Planner {
   const releaseOf = (key: PackageKey, version: string) =>
     universe.releases.find(release => packageKey(release.package) === key && sameVersion(release.version, version));
   /**
-   * How the changes of a plan lead to each other: a change to one package leads to a change to another that its version
-   * in the plan names, as one it requires, runs in or conflicts with, and to one whose installed version names it, as
-   * that may not take its new version.
+   * Whether a version is within a relationship's bounds, read exactly, as Foundry reads them: from its minimum, and up
+   * to its maximum. Bounds it does not give are no limit.
+   * @param bounds - The relationship's bounds
+   * @param version - The version
+   * @returns `true` if it is within them
+   */
+  const within = (bounds: Compatibility | undefined, version: string): boolean => {
+    const { minimum, maximum } = bounds ?? {};
+    return !(minimum !== undefined && newer(minimum, version)) && !(maximum !== undefined && newer(version, maximum));
+  };
+  /**
+   * How the changes of a plan lead to each other. A change to one package leads to a change to another where a
+   * relationship between them no longer holds: one the first's version in the plan declares, of a version of the
+   * second it does not take, or one the second's installed version declares, which does not take the first's new
+   * version. A relationship that still holds leads nowhere, though it names the package.
    * @param versions - The plan's versions, by package
    * @returns The changes between a choice and a change it needs, along the shortest way from one to the other
    */
   const chains = (versions: ReadonlyMap<PackageKey, string>) => {
-    const named = (key: PackageKey, version: string | undefined): PackageKey[] => {
+    /**
+     * Whether a package's release has a relationship with another package that a version of that package breaks.
+     * @param key - The package
+     * @param version - The release's version; none if it is not installed
+     * @param other - The other package
+     * @param at - The other's version; none if it is not installed, which breaks a requirement
+     * @returns `true` if the relationship breaks
+     */
+    const breaks = (key: PackageKey, version: string | undefined, other: PackageKey, at: string | undefined) => {
       const release = version === undefined || key === CORE ? undefined : releaseOf(key, version);
-      if (release === undefined) return [];
+      if (release === undefined) return false;
       const { requires, systems, conflicts } = release.relationships;
-      return [...requires, ...systems, ...conflicts].map(({ package: ref }) => packageKey(ref));
+      const of = ({ package: ref }: { readonly package: PackageRef }) => packageKey(ref) === other;
+      return (
+        [...requires, ...systems].some(
+          related => of(related) && (at === undefined || !within(related.compatibility, at)),
+        ) || conflicts.some(related => of(related) && at !== undefined && within(related.compatibility, at))
+      );
     };
     const changed = [...versions.keys()].filter(key => key !== CORE);
     const next = new Map(
@@ -325,7 +351,8 @@ export function createPlanner(inputs: PlannerInputs): Planner {
         changed.filter(
           other =>
             other !== key &&
-            (named(key, versions.get(key)).includes(other) || named(other, installed.get(other)).includes(key)),
+            (breaks(key, versions.get(key), other, installed.get(other)) ||
+              breaks(other, installed.get(other), key, versions.get(key))),
         ),
       ]),
     );

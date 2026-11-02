@@ -342,40 +342,61 @@ describe('installing anew', () => {
 
 describe('the changes a change is needed through', () => {
   /**
-   * DAE 2.0.0 runs in D&D 5e 6 alone, for which Midi 1.0.0, installed, does not run, though 2.0.0 does; a world runs
-   * both.
+   * DAE 2.0.0 runs in D&D 5e 6 alone. Midi 1.0.0, installed, requires DAE 1.0.0 or later, which 2.0.0 is, but does not
+   * run in D&D 5e 6, though Midi 2.0.0 does; Old 1.0.0, installed, conflicts with D&D 5e 6, though Old 2.0.0 does not. A
+   * world runs them all.
    */
-  const DAE = [
+  const RELEASES = [
+    ...DND,
     release('module:dae', '1.0.0'),
-    release('module:dae', '2.0.0', { systems: { dnd5e: { minimum: '6.0.6' } } }),
-  ];
+    release('module:dae', '2.0.0', { systems: { dnd5e: { minimum: '6.0.6', maximum: '6.999' } } }),
+    {
+      ...release('module:midi', '1.0.0', {
+        requires: { dae: { minimum: '1.0.0' } },
+        systems: { dnd5e: { minimum: '5.3.0', maximum: '5.9.99' } },
+      }),
+    },
+    release('module:midi', '2.0.0', {
+      requires: { dae: { minimum: '1.0.0' } },
+      systems: { dnd5e: { minimum: '6.0.6' } },
+    }),
+    {
+      ...release('module:old', '1.0.0'),
+      relationships: {
+        ...release('module:old', '1.0.0').relationships,
+        conflicts: [{ package: { type: 'system', id: 'dnd5e' }, compatibility: { minimum: '6' } }],
+      },
+    },
+    release('module:old', '2.0.0'),
+  ] satisfies Release[];
 
-  test("names them where the choice does not name the change itself, as a module a system's change needs", async () => {
+  test("names them where the choice breaks no relationship of the change's itself, as a system's change does", async () => {
     const plans = planner(
       [
         ['dae', '1.0.0'],
         ['midi', '1.0.0'],
+        ['old', '1.0.0'],
       ],
       {
         a: [
           ['dae', '1.0.0'],
           ['midi', '1.0.0'],
+          ['old', '1.0.0'],
         ],
       },
-      [...DND, ...MIDI.map(midi => ({ ...midi, compatibility: { minimum: '14' } })), ...DAE],
+      RELEASES,
     );
 
     const plan = await plans.plan(new Map([['module:dae', '2.0.0']]));
 
+    const DAE_2 = { package: 'module:dae', version: '2.0.0' };
+    const THROUGH_DND = [{ package: 'system:dnd5e', version: '6.0.6' }];
     expect(plan?.map(({ key, version, by, through }) => ({ key, version, by, through }))).toEqual([
-      { key: 'system:dnd5e', version: '6.0.6', by: { package: 'module:dae', version: '2.0.0' }, through: undefined },
+      { key: 'system:dnd5e', version: '6.0.6', by: DAE_2, through: undefined },
       { key: 'module:dae', version: '2.0.0', by: undefined, through: undefined },
-      {
-        key: 'module:midi',
-        version: '2.0.0',
-        by: { package: 'module:dae', version: '2.0.0' },
-        through: [{ package: 'system:dnd5e', version: '6.0.6' }],
-      },
+      { key: 'module:old', version: '2.0.0', by: DAE_2, through: THROUGH_DND },
+      // Regression: Midi requires DAE, so was taken as needed by DAE directly, though its requirement still holds.
+      { key: 'module:midi', version: '2.0.0', by: DAE_2, through: THROUGH_DND },
     ]);
   });
 });
