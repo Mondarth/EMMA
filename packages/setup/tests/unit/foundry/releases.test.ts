@@ -67,6 +67,19 @@ describe('lookUpReleases', () => {
     await expect(found.lookUp([{ type: 'module', id: 'dice' }])).resolves.toEqual([]);
   });
 
+  test("finds a package to install anew by the manifest URL Foundry's listing gives", async () => {
+    const url = 'https://packages.example.test/dice/module.json';
+    const installed: InstalledManifests = { core: CORE, manifests: [] };
+    const send = answering({
+      [url]: { id: 'dice', title: 'Dice', version: '3.0.0', compatibility: { minimum: '14', verified: '14' } },
+    });
+    const found = await lookUpReleases(installed, { kit: KIT, catalogue: null, proxy: null, fetch: send });
+
+    const releases = await found.lookUp([{ type: 'module', id: 'dice' }], { 'module:dice': [url] });
+
+    expect(releases.map(({ version }) => version)).toEqual(['3.0.0']);
+  });
+
   test('never asks a site that sends no CORS headers', async () => {
     const url = 'https://github.com/someone/lib/releases/latest/download/module.json';
     const send = answering({});

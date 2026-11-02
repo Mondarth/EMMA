@@ -284,6 +284,8 @@ export interface ListedPackage {
   readonly authors?: readonly string[];
   /** Its project's web page. */
   readonly url?: string;
+  /** Its manifest's URL, which Foundry installs it from, and EMMA finds its releases by. */
+  readonly manifest?: string;
   /** The listing's tags for it, such as `maps` or `combat`. */
   readonly tags?: readonly string[];
   /** Whether it is premium content, sold through Foundry. */
@@ -330,6 +332,7 @@ function toListed(entry: unknown, type: 'module' | 'system'): ListedPackage | un
   const description = field(data, 'description');
   const text = typeof description === 'string' ? plainText(description) : '';
   const url = field(data, 'url');
+  const manifest = field(data, 'manifest');
   const tags = field(data, 'tags');
   const tagList = (Array.isArray(tags) ? tags : []).filter((tag): tag is string => typeof tag === 'string');
   return {
@@ -344,6 +347,7 @@ function toListed(entry: unknown, type: 'module' | 'system'): ListedPackage | un
     ...(text !== '' && { description: text }),
     ...(authors.length > 0 && { authors }),
     ...(typeof url === 'string' && /^https?:\/\//i.test(url) && { url }),
+    ...(typeof manifest === 'string' && /^https?:\/\//i.test(manifest) && { manifest }),
     ...(tagList.length > 0 && { tags: tagList }),
     ...(data.protected === true && { premium: true as const }),
     ...(data.exclusive === true && { exclusive: true as const }),

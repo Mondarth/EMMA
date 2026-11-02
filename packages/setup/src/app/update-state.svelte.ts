@@ -417,19 +417,23 @@ export class UpdateState {
    * Install a game system or module anew, at the newest version the plan can take with its other choices.
    * @param key - The package's key
    * @param title - Its title, as Foundry's listing gives it, for the plan to name it by
+   * @param manifest - Its manifest URL, as Foundry's listing gives it, to find its releases by
    * @returns The version chosen, or why none could be
    */
-  async install(key: PackageKey, title?: string): Promise<InstallResult> {
+  async install(key: PackageKey, title?: string, manifest?: string): Promise<InstallResult> {
     const search = this.search;
     if (search === null || this.locked || this.#installedOf(key) !== undefined) {
       return { ok: false, reason: localize('Install.NotNow') };
     }
     const { planner } = search;
     if (title !== undefined) this.#named.set(key, title);
-    if (!(await planner.add(key))) return { ok: false, reason: localize('Install.NotFound') };
+    if (!(await planner.add(key, manifest))) return { ok: false, reason: localize('Install.NotFound') };
+    const candidates = planner.candidates(key);
+    if (candidates.length === 0) return { ok: false, reason: localize('Install.NoneRuns') };
+    const installable = candidates.filter(version => !planner.missingManifest(key, version));
+    if (installable.length === 0) return { ok: false, reason: localize('Install.NoManifest') };
     let explanation: readonly string[] | undefined;
-    for (const version of planner.candidates(key)) {
-      if (planner.missingManifest(key, version)) continue;
+    for (const version of installable) {
       const completion = await planner.complete(withChoice(this.#picks, key, version));
       if (completion.ok) {
         const chosen = await this.choose(key, version);

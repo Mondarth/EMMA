@@ -203,10 +203,13 @@ describe('UpdateState', () => {
       );
       const updates = await searchedWith(planner);
 
-      await expect(updates.install('module:dice')).resolves.toEqual({ ok: true, version: '1.0.0' });
+      await expect(updates.install('module:dice', 'Dice', 'https://example.org/dice/module.json')).resolves.toEqual({
+        ok: true,
+        version: '1.0.0',
+      });
 
       expect(updates.chosenOf('module:dice')).toBe('1.0.0');
-      expect(planner.add).toHaveBeenCalledWith('module:dice');
+      expect(planner.add).toHaveBeenCalledWith('module:dice', 'https://example.org/dice/module.json');
     });
 
     test('says why it cannot install: not now, not found, or no version fits', async () => {
@@ -232,6 +235,18 @@ describe('UpdateState', () => {
       await expect(silent.install('module:dice')).resolves.toEqual({
         ok: false,
         reason: 'No version of it fits the installation and the plan.',
+      });
+      // None runs on the build, or none that does can be installed.
+      const none = await searchedWith({ ...withDice(), candidates: () => [] });
+      await expect(none.install('module:dice')).resolves.toEqual({
+        ok: false,
+        reason: "EMMA found releases of it, but none that it can tell runs on the plan's Foundry VTT build.",
+      });
+      const unmanifested = await searchedWith(withDice(undefined, () => true));
+      await expect(unmanifested.install('module:dice')).resolves.toEqual({
+        ok: false,
+        reason:
+          "The versions of it that run on the plan's Foundry VTT build give no manifest URL of their own to install from.",
       });
     });
 

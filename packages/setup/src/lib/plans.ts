@@ -112,9 +112,10 @@ export interface Planner {
    * Look up the releases of a package not installed, so that it can be chosen, as for installing it. Once found, they
    * are kept, with those of the packages they need loaded as they are needed.
    * @param key - The package
+   * @param manifest - Its manifest URL, as Foundry's listing gives it, to find its releases by
    * @returns Whether any release of it is known
    */
-  add(key: PackageKey): Promise<boolean>;
+  add(key: PackageKey, manifest?: string): Promise<boolean>;
   /**
    * What a version of a package needs, as its manifest declares it: the Foundry builds it runs on, the packages it
    * requires, the game systems it runs in, and those it conflicts with.
@@ -147,7 +148,10 @@ export interface PlannerInputs {
   readonly universe: Universe;
   readonly load: (needs: readonly Release[]) => Promise<readonly Release[]>;
   /** Look up the releases of packages not installed; none are found without it. */
-  readonly lookUp?: (packages: readonly PackageRef[]) => Promise<readonly Release[]>;
+  readonly lookUp?: (
+    packages: readonly PackageRef[],
+    manifests?: Readonly<Record<PackageKey, readonly string[]>>,
+  ) => Promise<readonly Release[]>;
   /** How setups are found, as the search finds them. */
   readonly policy: Partial<Policy>;
   /** Foundry VTT's title. */
@@ -548,11 +552,14 @@ export function createPlanner(inputs: PlannerInputs): Planner {
       );
     },
 
-    async add(key) {
+    async add(key, manifest) {
       const known = () => universe.releases.some(release => packageKey(release.package) === key);
       if (known() || installed.has(key) || inputs.lookUp === undefined) return known();
       const type = key.startsWith('system:') ? 'system' : 'module';
-      const found = await inputs.lookUp([{ type, id: key.slice(key.indexOf(':') + 1) }]);
+      const found = await inputs.lookUp(
+        [{ type, id: key.slice(key.indexOf(':') + 1) }],
+        manifest === undefined ? {} : { [key]: [manifest] },
+      );
       const have = new Set(universe.releases.map(release => `${packageKey(release.package)}@${release.version}`));
       const added = found.filter(release => {
         const id = `${packageKey(release.package)}@${release.version}`;

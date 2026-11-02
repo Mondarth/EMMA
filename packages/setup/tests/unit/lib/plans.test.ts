@@ -289,9 +289,12 @@ describe('installing anew', () => {
     const plans = planner([], { a: [] }, DND, [], lookUp);
     expect(plans.candidates('module:dice')).toEqual([]);
 
+    await expect(plans.add('module:dice', 'https://example.org/dice/module.json')).resolves.toBe(true);
     await expect(plans.add('module:dice')).resolves.toBe(true);
-    await expect(plans.add('module:dice')).resolves.toBe(true);
-    expect(lookUp).toHaveBeenCalledExactlyOnceWith([{ type: 'module', id: 'dice' }]);
+    // With the manifest URL Foundry's listing gives, to find it by.
+    expect(lookUp).toHaveBeenCalledExactlyOnceWith([{ type: 'module', id: 'dice' }], {
+      'module:dice': ['https://example.org/dice/module.json'],
+    });
 
     expect(plans.candidates('module:dice')).toEqual(['1.5.0', '1.0.0']);
     await expect(plans.plan(picks(['module:dice', '1.5.0']))).resolves.toEqual([

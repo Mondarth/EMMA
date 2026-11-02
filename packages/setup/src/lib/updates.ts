@@ -140,7 +140,10 @@ export interface UpdateInputs {
   /** Load listed releases from their manifests, as the resolver needs them. */
   readonly load: (needs: readonly Release[]) => Promise<readonly Release[]>;
   /** Look up the releases of packages not installed, to install anew; none can be without it. */
-  readonly lookUp?: (packages: readonly PackageRef[]) => Promise<readonly Release[]>;
+  readonly lookUp?: (
+    packages: readonly PackageRef[],
+    manifests?: Readonly<Record<PackageKey, readonly string[]>>,
+  ) => Promise<readonly Release[]>;
 }
 
 /**

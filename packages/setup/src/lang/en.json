@@ -206,7 +206,9 @@
     "Exclusive": "Exclusive",
     "WebPage": "Web page",
     "Untagged": "Untagged",
-    "TagsHint": "A module shows if any of its tags is on. Shift-click a tag that is off to show it alone, or one that is on to turn every tag off."
+    "TagsHint": "A module shows if any of its tags is on. Shift-click a tag that is off to show it alone, or one that is on to turn every tag off.",
+    "NoneRuns": "EMMA found releases of it, but none that it can tell runs on the plan's Foundry VTT build.",
+    "NoManifest": "The versions of it that run on the plan's Foundry VTT build give no manifest URL of their own to install from."
   },
   "Uninstall": {
     "Heading": "Uninstall",

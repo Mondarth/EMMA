@@ -27,8 +27,14 @@ export interface ReleaseLookup {
   readonly universe: Universe;
   /** Load listed releases from their manifests, for `resolveInRounds`. */
   readonly load: (needs: readonly Release[]) => Promise<readonly Release[]>;
-  /** Look up every release of more packages, as of one to install anew, from the same sources. */
-  readonly lookUp: (packages: readonly PackageRef[]) => Promise<readonly Release[]>;
+  /**
+   * Look up every release of more packages, as of one to install anew, from the same sources, with manifest URLs to
+   * find them by, as Foundry's listing gives them: those of a package not installed are known from nowhere else.
+   */
+  readonly lookUp: (
+    packages: readonly PackageRef[],
+    manifests?: Readonly<Record<PackageKey, readonly string[]>>,
+  ) => Promise<readonly Release[]>;
   /**
    * The packages the catalogue says cannot be had, archived or gone: only their installed releases are in the
    * universe, so they stay as they are.
@@ -189,34 +195,42 @@ export async function lookUpReleases(installed: InstalledManifests, options: Loo
     core,
     ...(cores?.ok === true ? cores.value.filter(({ version }) => !sameVersion(version, core.version)) : []),
   ];
-  const set = sourceSet({
-    // The installed releases come first, as they are loaded with everything their manifests declare, and then the
-    // manifests the packages declare, which give their newest versions loaded too. Foundry's package listing, through
-    // the proxy only, and GitHub's and GitLab's release lists give the rest. Without the proxy, a version known only
-    // from a release list has no core compatibility, as a browser cannot read its manifest, so cannot be placed.
-    sources: [
-      local,
-      manifestUrlSource(http),
-      ...(proxy === null ? [] : [foundryIndexSource(http)]),
-      githubSource(http),
-      gitlabSource(http),
-    ],
-    http,
-    core: builds,
-    manifests: Object.fromEntries(
-      installed.manifests.flatMap(({ type, id, manifest }) =>
-        manifest === undefined ? [] : [[packageKey({ type, id }), [manifest]]],
-      ),
+  const declared: Readonly<Record<PackageKey, readonly string[]>> = Object.fromEntries(
+    installed.manifests.flatMap(({ type, id, manifest }) =>
+      manifest === undefined ? [] : [[packageKey({ type, id }), [manifest]]],
     ),
-    // Asked directly, not through the proxy, as it sends CORS headers.
-    ...(catalogue !== null && {
-      catalogue: catalogueSource({
-        ...catalogue,
-        fetch: send,
-        ...(clientVersion !== null && { client: `EMMA-extension/${clientVersion}` }),
+  );
+  /**
+   * The sources together, as the resolver asks them.
+   * @param hints - The manifest URLs to find packages by
+   * @returns The source set
+   */
+  const sourcesWith = (hints: Readonly<Record<PackageKey, readonly string[]>>) =>
+    sourceSet({
+      // The installed releases come first, as they are loaded with everything their manifests declare, and then the
+      // manifests the packages declare, which give their newest versions loaded too. Foundry's package listing, through
+      // the proxy only, and GitHub's and GitLab's release lists give the rest. Without the proxy, a version known only
+      // from a release list has no core compatibility, as a browser cannot read its manifest, so cannot be placed.
+      sources: [
+        local,
+        manifestUrlSource(http),
+        ...(proxy === null ? [] : [foundryIndexSource(http)]),
+        githubSource(http),
+        gitlabSource(http),
+      ],
+      http,
+      core: builds,
+      manifests: hints,
+      // Asked directly, not through the proxy, as it sends CORS headers.
+      ...(catalogue !== null && {
+        catalogue: catalogueSource({
+          ...catalogue,
+          fetch: send,
+          ...(clientVersion !== null && { client: `EMMA-extension/${clientVersion}` }),
+        }),
       }),
-    }),
-  });
+    });
+  const set = sourcesWith(declared);
 
   const refs: PackageRef[] = installed.manifests.map(({ type, id }) => ({ type, id }));
   const { releases } = await set.universe(refs);
@@ -243,7 +257,11 @@ export async function lookUpReleases(installed: InstalledManifests, options: Loo
   return {
     universe: { core: builds, releases: [...releases, ...missing.flat()] },
     load: needs => set.load(needs),
-    lookUp: async packages => (await set.universe(packages)).releases,
+    // A set cannot be given more manifest URLs once made, so a lookup with them has its own, on the same client, so with
+    // the same cache and budget of requests.
+    lookUp: async (packages, more = {}) =>
+      (await (Object.keys(more).length === 0 ? set : sourcesWith({ ...declared, ...more })).universe(packages))
+        .releases,
     unavailable,
     unreached: [...refs.map(packageKey).filter(key => failed.has(key)), ...(cores?.ok === false ? [CORE] : [])],
   };

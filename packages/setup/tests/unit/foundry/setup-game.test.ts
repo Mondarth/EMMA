@@ -275,6 +275,7 @@ describe('listPackages', () => {
               description:
                 '<p>Automates\n  <b>combat</b>.</p><script>alert(1)</script><img src="x" onerror="alert(2)">',
               url: 'https://example.org/midi',
+              manifest: 'https://example.org/midi/module.json',
               tags: ['combat', 7, 'automation'],
             },
           ],
@@ -324,6 +325,7 @@ describe('listPackages', () => {
         description: 'Automates combat.',
         authors: ['tposney', 'Helper'],
         url: 'https://example.org/midi',
+        manifest: 'https://example.org/midi/module.json',
         tags: ['combat', 'automation'],
         exclusive: true,
       },

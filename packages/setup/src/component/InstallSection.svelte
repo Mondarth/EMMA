@@ -71,11 +71,11 @@
   /**
    * Add a package to the plan.
    * @param key - The package's key
-   * @param title - Its title
+   * @param pkg - The package, as Foundry's listing gives it
    */
-  async function add(key: string, title: string): Promise<void> {
+  async function add(key: string, pkg: ListedPackage): Promise<void> {
     added.set(key, 'adding');
-    const result = await updates.install(key, title);
+    const result = await updates.install(key, pkg.title, pkg.manifest);
     if (result.ok) added.delete(key);
     else added.set(key, result);
   }
@@ -173,7 +173,7 @@
               type="button"
               disabled={updates.locked || state === 'adding'}
               onclick={() => {
-                void add(key, pkg.title);
+                void add(key, pkg);
               }}>
               {state === 'adding' ? localize('Install.Adding') : format('Install.Add', { title: pkg.title })}
             </button>
