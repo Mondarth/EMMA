@@ -55,6 +55,48 @@ const INSTALL = {
 } as const;
 
 describe('runStep', () => {
+  test("uninstalls a package as Foundry's Uninstall does once confirmed: the server deletes it, then the screen forgets it", async () => {
+    const events: string[] = [];
+    const uninstall = vi.fn((id: string) => {
+      events.push(`forget ${id}`);
+    });
+    vi.stubGlobal('foundry', { packages: { PACKAGE_TYPES: { module: { uninstall } } } });
+    const game = gameWith({
+      post: vi.fn((request: object) => {
+        events.push(`post ${JSON.stringify(request)}`);
+        return Promise.resolve({});
+      }),
+      reload: vi.fn(() => {
+        events.push('reload');
+        return Promise.resolve();
+      }),
+    });
+
+    await runStep(game, guardRecording(events), {
+      kind: 'uninstall',
+      key: 'module:old',
+      type: 'module',
+      id: 'old',
+      title: 'Old',
+    });
+
+    expect(events).toEqual(['post {"action":"uninstallPackage","type":"module","id":"old"}', 'forget old', 'reload']);
+    expect(game.post).toHaveBeenCalledWith(expect.anything(), { notify: false });
+    vi.unstubAllGlobals();
+  });
+
+  test('fails if the server refuses to uninstall, and uninstalls without the rest where Foundry lacks it', async () => {
+    const step = { kind: 'uninstall', key: 'system:old', type: 'system', id: 'old', title: 'Old' } as const;
+    const refusing = gameWith({ post: vi.fn(() => Promise.reject(new Error('In use'))) });
+    await expect(runStep(refusing, guardRecording([]), step)).rejects.toThrow('In use');
+
+    vi.stubGlobal('foundry', { packages: { PACKAGE_TYPES: { system: 'odd' } } });
+    const game = gameWith({ post: vi.fn(() => Promise.resolve({})) });
+    await runStep(game, guardRecording([]), step);
+    expect(game.post).toHaveBeenCalledOnce();
+    vi.unstubAllGlobals();
+  });
+
   test("makes a snapshot with its note, as Foundry's Manage Backups does", async () => {
     const game = gameWith();
     await runStep(game, guardRecording([]), { kind: 'snapshot', key: 'snapshot', note: 'Before' });

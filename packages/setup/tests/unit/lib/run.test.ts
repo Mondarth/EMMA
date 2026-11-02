@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import type { PlanEntry } from '../../../src/lib/plans';
+import { UNINSTALL } from '../../../src/lib/plans';
 import type { RunStep } from '../../../src/lib/run';
 import { runSteps, stepText } from '../../../src/lib/run';
 import type { Safeguard } from '../../../src/lib/safeguards';
@@ -24,8 +25,13 @@ const PLAN: readonly PlanEntry[] = [
     manifest: 'https://example.org/dnd5e/6.0.6/system.json',
   },
   { key: 'module:midi', installed: '1.0.0', version: '2.0.0' },
+  { key: 'module:old', installed: '1.0.0', version: UNINSTALL },
 ];
-const TITLES: Readonly<Record<string, string>> = { 'system:dnd5e': 'D&D 5e', 'module:midi': 'Midi' };
+const TITLES: Readonly<Record<string, string>> = {
+  'system:dnd5e': 'D&D 5e',
+  'module:midi': 'Midi',
+  'module:old': 'Old',
+};
 
 describe('runSteps', () => {
   test('makes the snapshot and backups checked, then each change, in order', () => {
@@ -43,6 +49,7 @@ describe('runSteps', () => {
       },
       // Without a manifest URL, the step is still taken, and fails saying so.
       { kind: 'install', key: 'module:midi', type: 'module', id: 'midi', title: 'Midi', version: '2.0.0' },
+      { kind: 'uninstall', key: 'module:old', type: 'module', id: 'old', title: 'Old' },
     ]);
     expect(runSteps([{ ...SNAPSHOT, checked: false }, ALPHA], [], key => key)).toEqual([
       { kind: 'backup', key: 'world:alpha', world: { id: 'alpha', title: 'Alpha' }, note: 'Before Midi' },
@@ -58,6 +65,7 @@ describe('stepText', () => {
       { kind: 'install', key: 'module:midi', type: 'module', id: 'midi', title: 'Midi', version: '2.0.0' },
       'install Midi 2.0.0',
     ],
+    [{ kind: 'uninstall', key: 'system:old', type: 'system', id: 'old', title: 'Old' }, 'uninstall Old'],
     [
       { kind: 'core', key: 'core', version: '14.369' },
       'stop before updating Foundry VTT to 14.369: the steps after it wait for another run',

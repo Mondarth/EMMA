@@ -61,7 +61,10 @@ describe('readInstallation', () => {
         { id: 'y', title: 'Zed', version: '1.0.0' },
         { id: 'n', version: undefined },
       ],
-      systems: [{ id: 'dnd5e', title: 'D&D 5e', version: '5.3.3' }],
+      systems: [
+        { id: 'dnd5e', title: 'D&D 5e', version: '5.3.3' },
+        { id: 'pf2e', title: 'Pathfinder', version: '7.0.0', locked: true },
+      ],
     });
     game.worlds.set('broken', null);
     game.modules.set('broken', null);
@@ -76,7 +79,11 @@ describe('readInstallation', () => {
         { id: 'y', title: 'Zed', version: '1.0.0', systems: [], requires: [] },
         { id: 'z', title: 'Zed', version: '2.0.0', systems: [], requires: [] },
       ],
-      systems: [{ id: 'dnd5e', title: 'D&D 5e', version: '5.3.3' }],
+      // Only a package locked says so.
+      systems: [
+        { id: 'dnd5e', title: 'D&D 5e', version: '5.3.3' },
+        { id: 'pf2e', title: 'Pathfinder', version: '7.0.0', locked: true },
+      ],
     });
   });
 

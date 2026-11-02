@@ -219,7 +219,8 @@ say what a world's backup needs, so its row gives the space free alone. What is 
 1. the snapshot and backups checked, as Foundry's **Manage Backups** makes them;
 2. each package change, installed from the manifest URL of the version chosen, as Foundry's Install button installs
    one; the guard lets EMMA's installs through. Foundry's dependency dialog is not shown, as the plan already has
-   what each change needs.
+   what each change needs;
+3. each package to uninstall, last, once nothing installed needs it (see [Uninstalling](#uninstalling)).
 
 Each row says how far its step has got, and the footer how the run went. A run stops at the first step that fails,
 saying why, and before Foundry VTT's own update: updating Foundry in place restarts it, and is for the user to do with
@@ -267,6 +268,30 @@ declares, Foundry's package listing, and GitHub's and GitLab's lists of releases
 A browser cannot read Foundry's listing or the manifests attached to GitHub releases itself, which the proxy lets it
 do. Without the proxy, as in a development build, a version found only in a release list says nothing of the Foundry
 VTT versions it works with, and is not offered.
+
+### Uninstalling
+
+The panel of a game system or module has an **Uninstall** section below it. **Uninstall <title>** puts the package in
+the plan: its row says **Uninstall**, with nothing to install, and the tree shows **Uninstall** in place of its version.
+**Keep <title> installed** takes it out again. Uninstalling deletes the package from the server, with any data it keeps
+there, and cannot be undone; a snapshot keeps a copy.
+
+EMMA refuses an uninstall that would break something it knows of, saying what:
+
+- a game system a world uses;
+- a module a recorded world runs, or will need when next run;
+- a module another installed module requires, unless the plan uninstalls that one too;
+- a package locked in Foundry;
+- a package the plan's other choices need, such as a module a newer version chosen requires.
+
+So does the plan: a choice made later that would need a package it uninstalls cannot be made, and keeping a module
+another uninstall depends on is refused while that uninstall stands. What EMMA cannot know, it warns of without
+refusing: a world without a record may run the module, and modules for a game system uninstalled may be left with no
+system they run in.
+
+A run uninstalls as Foundry's own **Uninstall** does once confirmed: the server deletes the package, and the setup
+screen forgets it and reads the installation again. An uninstall stays in the plan while the package is still
+installed, as when its step failed.
 
 ### Worlds without a record
 

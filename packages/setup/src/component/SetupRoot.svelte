@@ -9,6 +9,7 @@
   import type { Layout } from '../foundry/preferences';
   import { readLayout, writeLayout } from '../foundry/preferences';
   import { EXTENSION_RELEASES } from '../foundry/setup-kit';
+  import { UNINSTALL } from '../lib/plans';
   import { stepText } from '../lib/run';
   import { groupDetail, moduleDetail, systemDetail } from '../lib/details';
   import { format, localize } from '../lib/i18n';
@@ -21,6 +22,7 @@
   import Splitter from './Splitter.svelte';
   import SystemPanel from './SystemPanel.svelte';
   import CoreStep from './CoreStep.svelte';
+  import UninstallSection from './UninstallSection.svelte';
   import UpdatePlan from './UpdatePlan.svelte';
   import WorldPanel from './WorldPanel.svelte';
 
@@ -119,6 +121,19 @@
   );
 </script>
 
+{#snippet uninstall(key: string)}
+  {@const offer = updates.uninstallOf(key)}
+  {#if offer !== undefined}
+    <UninstallSection
+      title={updates.titleOf(key)}
+      {offer}
+      locked={updates.locked}
+      onChoose={(remove: boolean) => {
+        void updates.choose(key, remove ? UNINSTALL : offer.installed);
+      }} />
+  {/if}
+{/snippet}
+
 <div class="emma-setup">
   {#if overview === null}
     <p class="emma-setup-message" role="status">
@@ -150,11 +165,13 @@
               detail={moduleDetail(overview, selection.module, selection.world)}
               blocked={updates.blockedOf(`module:${selection.module}`)}
               explained={updates.explainedOf(`module:${selection.module}`)} />
+            {@render uninstall(`module:${selection.module}`)}
           {:else if selection.kind === 'system'}
             <SystemPanel
               detail={systemDetail(overview, selection.system, selection.world)}
               blocked={updates.blockedOf(`system:${selection.system}`)}
               explained={updates.explainedOf(`system:${selection.system}`)} />
+            {@render uninstall(`system:${selection.system}`)}
           {:else if selection.kind === 'systems' || selection.kind === 'modules' || selection.kind === 'group'}
             <GroupPanel detail={groupDetail(overview, selection)} />
           {:else if world !== undefined}
