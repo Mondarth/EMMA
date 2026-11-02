@@ -329,9 +329,11 @@ export function createPlanner(inputs: PlannerInputs): Planner {
    * How the changes of a plan lead to each other. A change to one package leads to a change to another where a
    * relationship between them no longer holds: one the first's version in the plan declares, of a version of the
    * second it does not take, or one the second's installed version declares, which does not take the first's new
-   * version. A relationship that still holds leads nowhere, though it names the package.
+   * version. A relationship that still holds leads nowhere, though it names the package. Foundry VTT's builds are
+   * declared as core compatibility instead: a version that does not run on the installed build leads to Foundry VTT's
+   * change, which leads to a package whose installed version does not run on the new build.
    * @param versions - The plan's versions, by package
-   * @returns The changes between a choice and a change it needs, along the shortest way from one to the other
+   * @returns The changes between a choice and a change it needs: each that leads straight to it, with the way there
    */
   const chains = (versions: ReadonlyMap<PackageKey, string>) => {
     /**
@@ -353,34 +355,58 @@ export function createPlanner(inputs: PlannerInputs): Planner {
         ) || conflicts.some(related => of(related) && at !== undefined && within(related.compatibility, at))
       );
     };
-    const changed = [...versions.keys()].filter(key => key !== CORE);
-    const next = new Map(
-      changed.map(key => [
-        key,
-        changed.filter(
-          other =>
-            other !== key &&
-            (breaks(key, versions.get(key), other, installed.get(other)) ||
-              breaks(other, installed.get(other), key, versions.get(key))),
-        ),
-      ]),
-    );
+    /**
+     * Whether a package's release, if found, runs on a Foundry build, by the core compatibility it declares.
+     * @param key - The package
+     * @param version - The release's version; none if it is not installed
+     * @param build - The build
+     * @returns `false` only for a release found that does not run on it
+     */
+    const runsOnBuild = (key: PackageKey, version: string | undefined, build: string): boolean => {
+      const release = version === undefined ? undefined : releaseOf(key, version);
+      const { coreAvailability, isUnavailable } = resolver;
+      return (
+        release === undefined ||
+        !isUnavailable(coreAvailability({ ...release.compatibility, ...release.listing }, build, universe.core))
+      );
+    };
+    const coreFrom = installed.get(CORE) ?? core;
+    const coreTo = versions.get(CORE);
+    // Foundry VTT changes with the rest: a package's version in the plan that does not run on the installed build leads
+    // to it, and it leads to a package whose installed version does not run on its new build.
+    const linked = (key: PackageKey, other: PackageKey): boolean =>
+      key === CORE
+        ? coreTo !== undefined && !runsOnBuild(other, installed.get(other), coreTo)
+        : other === CORE
+          ? !runsOnBuild(key, versions.get(key), coreFrom)
+          : breaks(key, versions.get(key), other, installed.get(other)) ||
+            breaks(other, installed.get(other), key, versions.get(key));
+    const changed = [...versions.keys()];
+    const next = new Map(changed.map(key => [key, changed.filter(other => other !== key && linked(key, other))]));
+    // Every change that leads straight to the one needed, as each is a reason for it, with the changes on the shortest
+    // way to it from the choice, nearest the choice first. A way does not go through the change needed, as the changes
+    // it leads to in turn are no reason for it.
     return (from: PackageKey, to: PackageKey): PackageVersion[] => {
-      // Breadth first, so that the way found is a shortest.
       const came = new Map<PackageKey, PackageKey>();
+      const steps = new Map<PackageKey, number>([[from, 0]]);
       const queue = [from];
-      for (let at = queue.shift(); at !== undefined && at !== to; at = queue.shift()) {
+      for (let at = queue.shift(); at !== undefined; at = queue.shift()) {
+        if (at === to) continue;
         for (const other of next.get(at) ?? []) {
-          if (other === from || came.has(other)) continue;
+          if (steps.has(other)) continue;
           came.set(other, at);
+          steps.set(other, (steps.get(at) ?? 0) + 1);
           queue.push(other);
         }
       }
-      const way: PackageVersion[] = [];
-      for (let at = came.get(to); at !== undefined && at !== from; at = came.get(at)) {
-        way.unshift({ package: at, version: versions.get(at) ?? '' });
+      const through = new Set<PackageKey>();
+      for (const cause of changed.filter(key => key !== to && steps.has(key) && next.get(key)?.includes(to) === true)) {
+        for (let at: PackageKey | undefined = cause; at !== undefined && at !== from; at = came.get(at))
+          through.add(at);
       }
-      return way;
+      return [...through]
+        .sort((a, b) => (steps.get(a) ?? 0) - (steps.get(b) ?? 0))
+        .map(key => ({ package: key, version: versions.get(key) ?? '' }));
     };
   };
 

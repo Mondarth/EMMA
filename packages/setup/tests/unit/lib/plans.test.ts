@@ -221,7 +221,15 @@ describe('createPlanner', () => {
     const plans = planner([['midi', '1.0.0']], { a: [['midi', '1.0.0']] }, [...DND, ...MIDI]);
 
     await expect(plans.plan(picks(['system:dnd5e', '6.0.6']))).resolves.toEqual([
-      { key: 'core', installed: '14.368', version: '14.369', by: { package: 'system:dnd5e', version: '6.0.6' } },
+      // Regression: Foundry VTT read as needed by D&D 5e 6.0.6, which takes 14.367, though Midi 2.0.0, which D&D 5e
+      // 6.0.6 needs, is what needs 14.369.
+      {
+        key: 'core',
+        installed: '14.368',
+        version: '14.369',
+        by: { package: 'system:dnd5e', version: '6.0.6' },
+        through: [{ package: 'module:midi', version: '2.0.0' }],
+      },
       {
         key: 'system:dnd5e',
         installed: '5.3.3',
@@ -337,6 +345,84 @@ describe('installing anew', () => {
     await expect(planner([], { a: [] }, DND, [], () => Promise.resolve([])).add('module:dice')).resolves.toBe(false);
     await expect(planner([], { a: [] }, DND, [], () => Promise.resolve(DICE)).add('system:none')).resolves.toBe(false);
     await expect(planner([], { a: [] }, DND).add('system:dnd5e')).resolves.toBe(true);
+  });
+});
+
+describe('the changes Foundry VTT leads to', () => {
+  test('names each change that needs the new build, with the way to it: Midi, and DAE, which Midi requires', async () => {
+    // D&D 5e 6.0.6 takes 14.368; Midi 2.0.0, for D&D 5e 6, needs 14.369 and DAE 2.0.0, which needs 14.369 too.
+    const NEEDS = { minimum: '14.369', verified: '14' };
+    const plans = planner(
+      [
+        ['dae', '1.0.0'],
+        ['midi', '1.0.0'],
+      ],
+      {
+        a: [
+          ['dae', '1.0.0'],
+          ['midi', '1.0.0'],
+        ],
+      },
+      [
+        release('system:dnd5e', '5.3.3'),
+        release('system:dnd5e', '6.0.6'),
+        release('module:dae', '1.0.0'),
+        release('module:dae', '2.0.0', { core: NEEDS, systems: { dnd5e: { minimum: '6.0.6' } } }),
+        release('module:midi', '1.0.0', {
+          requires: { dae: { minimum: '1.0.0' } },
+          systems: { dnd5e: { minimum: '5.3.0', maximum: '5.9.99' } },
+        }),
+        release('module:midi', '2.0.0', {
+          core: NEEDS,
+          requires: { dae: { minimum: '2.0.0' } },
+          systems: { dnd5e: { minimum: '6.0.6' } },
+        }),
+      ],
+    );
+
+    const plan = await plans.plan(picks(['system:dnd5e', '6.0.6']));
+
+    expect(plan?.find(({ key }) => key === 'core')).toMatchObject({
+      version: '14.369',
+      by: { package: 'system:dnd5e', version: '6.0.6' },
+      through: [
+        { package: 'module:midi', version: '2.0.0' },
+        { package: 'module:dae', version: '2.0.0' },
+      ],
+    });
+  });
+
+  test("names Foundry VTT's change where a choice needs a newer build, which an installed module does not run on", async () => {
+    // App 2.0.0 needs 14.370, which Old 1.0.0, installed, does not run on, though Old 2.0.0 does.
+    const plans = planner(
+      [
+        ['app', '1.0.0'],
+        ['old', '1.0.0'],
+      ],
+      {
+        a: [
+          ['app', '1.0.0'],
+          ['old', '1.0.0'],
+        ],
+      },
+      [
+        ...DND,
+        release('module:app', '1.0.0'),
+        release('module:app', '2.0.0', { core: { minimum: '14.370', verified: '14' } }),
+        release('module:old', '1.0.0', { core: { minimum: '14', verified: '14', maximum: '14.369' } }),
+        release('module:old', '2.0.0'),
+      ],
+    );
+
+    const plan = await plans.plan(picks(['module:app', '2.0.0']));
+
+    expect(plan?.find(({ key }) => key === 'module:old')).toMatchObject({
+      version: '2.0.0',
+      by: { package: 'module:app', version: '2.0.0' },
+      through: [{ package: 'core', version: '14.370' }],
+    });
+    // Foundry VTT itself is needed by App directly, which needs its build.
+    expect(plan?.find(({ key }) => key === 'core')).not.toHaveProperty('through');
   });
 });
 
