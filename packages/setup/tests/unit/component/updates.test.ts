@@ -646,6 +646,25 @@ describe('without an EMMA module whose setup kit fits', () => {
 });
 
 describe("the panels' sizes", () => {
+  test('open as they were kept, the plan only once it has changes, and then as it was when last open', async () => {
+    localStorage.setItem(LAYOUT_KEY, JSON.stringify({ tree: 0.3, plan: 0.5 }));
+    try {
+      const { user } = await setUp();
+      expect(screen.getByRole('separator', { name: 'Resize the installation tree' })).toHaveAttribute(
+        'aria-valuenow',
+        '30',
+      );
+      expect(screen.queryByRole('separator', { name: 'Resize the update plan' })).toBeNull();
+
+      await openList(user, 'Version of D&D 5e: 5.3.3');
+      await user.click(screen.getByRole('option', { name: /^5\.4\.0/ }));
+
+      expect(screen.getByRole('separator', { name: 'Resize the update plan' })).toHaveAttribute('aria-valuenow', '50');
+    } finally {
+      localStorage.removeItem(LAYOUT_KEY);
+    }
+  });
+
   test('change from the keyboard, within their limits, and are kept', async () => {
     const { user } = await setUp();
     const tree = screen.getByRole('separator', { name: 'Resize the installation tree' });

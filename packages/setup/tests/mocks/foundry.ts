@@ -11,14 +11,30 @@ import type { WorldRecord } from '@mondarth/emma-core/world-record';
 export class ApplicationV2Mock {
   static DEFAULT_OPTIONS: object = {};
 
-  options: { id?: string };
+  options: { id?: string; position?: object };
   element: HTMLElement | null = null;
   rendered = false;
+  /** Whether the window is minimised, as Foundry's `minimized`. */
+  minimized = false;
+  /** Where the window is, as Foundry's `position`. */
+  position: Record<string, unknown> = {};
   bringToFront: Mock<() => void> = vi.fn();
 
   constructor(options: object = {}) {
     const ctor = this.constructor as typeof ApplicationV2Mock;
     this.options = { ...ctor.DEFAULT_OPTIONS, ...options };
+    this.position = { ...(this.options.position ?? {}) };
+  }
+
+  /**
+   * Move or resize the window, as Foundry's `setPosition`, then tell `_onPosition`.
+   * @param position - What changes
+   * @returns Where the window is
+   */
+  setPosition(position: object = {}): Record<string, unknown> {
+    Object.assign(this.position, position);
+    this._onPosition(this.position);
+    return this.position;
   }
 
   async render(options: object = {}): Promise<this> {
@@ -52,6 +68,10 @@ export class ApplicationV2Mock {
 
   protected _onClose(_options: object): void | Promise<void> {
     // The base class does nothing on close.
+  }
+
+  protected _onPosition(_position: object): void {
+    // The base class does nothing once moved.
   }
 }
 

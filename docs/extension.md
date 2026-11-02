@@ -273,7 +273,9 @@ takes them all back, and choosing the installed version takes back one, with wha
 
 The handle between the tree and the panel, and the one above the update plan, resize them, by dragging or from the
 keyboard: the arrow keys move a handle, and Home and End to its limits. Each panel keeps its share as the window is
-resized, and the browser remembers the sizes.
+resized, and the browser remembers the sizes. The window opens where it was last left, at the size it was left; the
+update plan, which shows only while it has changes, opens at the height it last had. Foundry keeps the window on the
+screen, so one left off a larger screen opens on it.
 
 EMMA finds versions in EMMA's package catalogue first, which holds every release of the packages it knows, with the
 Foundry VTT versions each works with. For packages the catalogue does not hold, EMMA reads the manifest each package
