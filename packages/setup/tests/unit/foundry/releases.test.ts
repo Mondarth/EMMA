@@ -1,3 +1,4 @@
+import type { Release } from '@mondarth/fvtt-resolver';
 import { describe, expect, test, vi } from 'vitest';
 
 import { lookUpReleases } from '../../../src/foundry/releases';
@@ -59,7 +60,7 @@ describe('lookUpReleases', () => {
     await expect(found.load([])).resolves.toEqual([]);
   });
 
-  test('installs from a "latest" manifest at the version it gives, where the index agrees or cannot be read', async () => {
+  test('installs from a "latest" manifest at the version it gives now, whatever the index says', async () => {
     const url = 'https://packages.example.test/app/module.json';
     const installed: InstalledManifests = { core: CORE, manifests: [moduleManifest('app', '1.0.0', url)] };
     const send = answering({
@@ -78,7 +79,8 @@ describe('lookUpReleases', () => {
 
     await expect(newest()).resolves.toBe(url);
     await expect(newest(() => Promise.resolve(new Map([['module:app', '2.0.0']])))).resolves.toBe(url);
-    await expect(newest(() => Promise.resolve(new Map([['module:app', '2.1.0']])))).resolves.toBeUndefined();
+    // Read now, the manifest gives what Foundry's updater installs, whatever Foundry's listing says.
+    await expect(newest(() => Promise.resolve(new Map([['module:app', '1.0.0']])))).resolves.toBe(url);
     await expect(newest(() => Promise.reject(new Error('offline')))).resolves.toBe(url);
   });
 
@@ -219,6 +221,61 @@ describe('lookUpReleases', () => {
       'lib@2.0.0',
     ]);
     expect([...found.unavailable]).toEqual(['module:gone']);
+  });
+
+  test("adds what a package's own manifest gives now, ahead of the catalogue and Foundry's listing", async () => {
+    const url = 'https://packages.example.test/content/module.json';
+    const held = (version: string, unlisted = false) => ({
+      package: { type: 'module', id: 'content' },
+      version,
+      compatibility: { minimum: '13', verified: '14' },
+      relationships: { requires: [], systems: [], conflicts: [], recommends: [] },
+      protected: false,
+      origin: url,
+      detail: 'loaded',
+      manifest: url,
+      ...(unlisted && { unlisted: true }),
+    });
+    const universe = (releases: unknown[]) => ({
+      'https://catalogue.example.test/api/v1/universe': {
+        universe: { core: [], releases },
+        gaps: [],
+        pending: [],
+        unavailable: [],
+        asOf: null,
+      },
+    });
+    const manifest = { id: 'content', title: 'Content', version: '1.0.36', compatibility: { minimum: '13' } };
+    const lookUp = (answers: Record<string, unknown>) =>
+      lookUpReleases(
+        { core: CORE, manifests: [moduleManifest('content', '1.0.35', url)] },
+        {
+          kit: KIT,
+          catalogue: { url: 'https://catalogue.example.test/', key: 'k3y' },
+          proxy: null,
+          fetch: answering(answers),
+        },
+      );
+    const shown = (releases: readonly Release[]) =>
+      releases.map(({ version, versionManifest, unlisted }) => ({ version, versionManifest, unlisted }));
+
+    // A manifest that cannot be read adds nothing; asked first, as the session keeps what is read.
+    const unread = await lookUp(universe([held('1.0.35')]));
+    expect(unread.universe.releases.map(({ version }) => version)).toEqual(['1.0.35']);
+
+    // The catalogue holds 1.0.35 alone, as Foundry's listing gives it; the manifest gives 1.0.36, as Foundry updates to.
+    const added = await lookUp({ ...universe([held('1.0.35')]), [url]: manifest });
+    expect(shown(added.universe.releases)).toEqual([
+      { version: '1.0.35', versionManifest: undefined, unlisted: undefined },
+      { version: '1.0.36', versionManifest: url, unlisted: undefined },
+    ]);
+
+    // One the catalogue holds as unlisted is taken as listed, installable from the manifest.
+    const listed = await lookUp({ ...universe([held('1.0.35'), held('1.0.36', true)]), [url]: manifest });
+    expect(shown(listed.universe.releases)).toEqual([
+      { version: '1.0.35', versionManifest: undefined, unlisted: undefined },
+      { version: '1.0.36', versionManifest: url, unlisted: undefined },
+    ]);
   });
 
   test('fetches through the proxy, with its key and the version, but asks the catalogue directly', async () => {
