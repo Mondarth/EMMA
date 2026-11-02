@@ -8,7 +8,7 @@
   import { SvelteMap } from 'svelte/reactivity';
 
   import type { ListingState } from '../app/setup-state.svelte';
-  import type { InstallResult, UpdateState } from '../app/update-state.svelte';
+  import type { InstallResult, ManifestResult, UpdateState } from '../app/update-state.svelte';
   import type { ListedPackage } from '../foundry/setup-game';
   import { format, localize } from '../lib/i18n';
   import type { InstallFilters } from '../lib/install';
@@ -68,6 +68,31 @@
     };
   });
 
+  /** The manifest URL the user is giving. */
+  let manifestUrl = $state('');
+  /** How adding from it went, while it is read or once it has been. */
+  let fromUrl = $state<'reading' | ManifestResult | null>(null);
+  /** What the user added of this type against EMMA's advice. */
+  const forced = $derived(updates.forced.filter(({ key }) => key.startsWith(`${type}:`)));
+
+  /** Add the package the manifest URL gives to the plan, if the plan can take it. */
+  async function addFromUrl(): Promise<void> {
+    fromUrl = 'reading';
+    fromUrl = await updates.installFrom(manifestUrl.trim(), type);
+    if (fromUrl.ok) manifestUrl = '';
+  }
+
+  /**
+   * Add a package the plan cannot take anyway, against EMMA's advice.
+   * @param result - Why the plan cannot take it, with the install to add
+   */
+  function override(result: Extract<ManifestResult, { ok: false }>): void {
+    if (result.override !== undefined && updates.force(result.override)) {
+      fromUrl = null;
+      manifestUrl = '';
+    }
+  }
+
   /**
    * Add a package to the plan, or take it out, as its checkbox is ticked or not. The box shows what the plan has, so it
    * goes back until the plan changes, and stays as it was if the plan cannot.
@@ -92,6 +117,71 @@
 
 <section class="emma-install" aria-labelledby="{uid}-heading">
   <h3 id="{uid}-heading">{localize(type === 'system' ? 'Install.Systems' : 'Install.Modules')}</h3>
+  <form
+    class="emma-install-manifest"
+    onsubmit={event => {
+      event.preventDefault();
+      void addFromUrl();
+    }}>
+    <label for="{uid}-manifest">{localize('Manifest.Label')}</label>
+    <input
+      id="{uid}-manifest"
+      type="url"
+      required
+      placeholder={type === 'system' ? 'https://…/system.json' : 'https://…/module.json'}
+      value={manifestUrl}
+      oninput={event => {
+        manifestUrl = event.currentTarget.value;
+      }} />
+    <button
+      type="submit"
+      aria-label={localize('Manifest.Add')}
+      data-tooltip={localize('Manifest.Add')}
+      disabled={updates.locked || fromUrl === 'reading' || manifestUrl.trim() === ''}>
+      <i class="fa-solid fa-plus" aria-hidden="true"></i>
+    </button>
+  </form>
+  {#if fromUrl === 'reading'}
+    <p role="status">{localize('Manifest.Reading')}</p>
+  {:else if fromUrl?.ok === true}
+    <p role="status">{format('Manifest.Added', { title: fromUrl.title, version: fromUrl.version })}</p>
+  {:else if fromUrl !== null}
+    {@const refused = fromUrl}
+    <div class="emma-install-failed" role="alert">
+      <p>{refused.reason}</p>
+      {#if refused.explanation !== undefined}
+        <ul>
+          {#each refused.explanation as line, index (index)}
+            <li>{line}</li>
+          {/each}
+        </ul>
+      {/if}
+      {#if refused.override !== undefined}
+        <button
+          type="button"
+          class="emma-install-override"
+          disabled={updates.locked}
+          onclick={() => {
+            override(refused);
+          }}>
+          <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+          {localize('Manifest.Override')}
+        </button>
+      {/if}
+    </div>
+  {/if}
+  {#each forced as install (install.key)}
+    <p class="emma-install-forced">
+      <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+      {format('Manifest.Forced', { title: install.title, version: install.version })}
+      <button
+        type="button"
+        disabled={updates.locked}
+        onclick={() => {
+          updates.unforce(install.key);
+        }}>{format('Manifest.TakeOut', { title: install.title })}</button>
+    </p>
+  {/each}
   {#if listing === null || listing === 'loading'}
     <p>{localize('Install.Reading')}</p>
   {:else if listing === 'failed'}
@@ -361,6 +451,34 @@
 
   .emma-install-failed p {
     margin: 0;
+  }
+
+  .emma-install-manifest {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.5rem 0;
+  }
+
+  .emma-install-manifest input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .emma-install .emma-install-manifest button {
+    flex: 0 0 auto;
+  }
+
+  /* Dark red on pale red, 10.2:1, with a 7.1:1 border, whatever the theme; the triangle and the words say it too. */
+  .emma-install .emma-install-override {
+    margin-top: 0.25rem;
+    border: 1px solid #842029;
+    background: #f8d7da;
+    color: #58151c;
+  }
+
+  .emma-install-forced {
+    color: var(--color-level-error, #c00);
   }
 
   .emma-install-details dl {

@@ -319,6 +319,19 @@ describe('installing anew', () => {
     await expect(plans.complete(picks(['module:dice', '1.0.0']))).resolves.toMatchObject({ ok: true });
   });
 
+  test('includes releases read from a manifest, in place of any of the same version, and plans them afresh', async () => {
+    const plans = planner([], { a: [] }, DND, [], () => Promise.resolve(DICE));
+    await plans.add('module:dice');
+    await expect(plans.complete(picks(['module:dice', '3.0.0']))).resolves.toMatchObject({ ok: false });
+
+    plans.include([release('module:dice', '3.0.0'), { ...release('module:dice', '1.0.0'), origin: 'manual' }]);
+
+    expect(plans.candidates('module:dice')).toEqual(['3.0.0', '1.5.0', '1.0.0']);
+    expect(plans.universe.releases.filter(({ origin }) => origin === 'manual')).toHaveLength(1);
+    expect(plans.universe.releases.filter(({ package: ref }) => ref.id === 'dice')).toHaveLength(4);
+    await expect(plans.complete(picks(['module:dice', '3.0.0']))).resolves.toMatchObject({ ok: true });
+  });
+
   test('finds nothing to add without a lookup, or where it finds nothing, and has the installed', async () => {
     await expect(planner([], { a: [] }, DND).add('module:dice')).resolves.toBe(false);
     await expect(planner([], { a: [] }, DND, [], () => Promise.resolve([])).add('module:dice')).resolves.toBe(false);

@@ -211,7 +211,7 @@
     <tbody>
       {#each updates.choices as choice (choice.key)}
         {@const older = choice.key === 'core' ? newerCore : undefined}
-        <tr>
+        <tr class={[choice.forced && 'emma-plan-forced']}>
           <th scope="row">
             {#if choice.key === 'core' && coreBlocked !== undefined}
               <i
@@ -237,6 +237,12 @@
             {/if}
             {#if choice.by !== undefined}
               <span class="emma-plan-needed">{format('Update.NeededBy', choice.by)}</span>
+            {/if}
+            {#if choice.forced}
+              <span class="emma-plan-against">
+                <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                {localize('Manifest.AgainstAdvice')}
+              </span>
             {/if}
             {#if older !== undefined}
               <span class="emma-plan-newer">
@@ -276,6 +282,26 @@
 </section>
 
 <style>
+  /*
+   * A package added against EMMA's advice: dark red on pale red, 10.2:1, whatever the theme, with its link the same, and
+   * the triangle and the words saying it as well as the colour.
+   */
+  .emma-plan-forced {
+    background: #f8d7da;
+    color: #58151c;
+  }
+
+  .emma-plan-forced a,
+  .emma-plan-forced .emma-plan-note {
+    color: inherit;
+  }
+
+  .emma-plan-against {
+    display: block;
+    font-size: 0.85em;
+    font-weight: bold;
+  }
+
   .emma-plan-needed {
     font-size: 0.85em;
     opacity: 0.8;

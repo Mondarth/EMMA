@@ -117,6 +117,11 @@ export interface Planner {
    */
   add(key: PackageKey, manifest?: string): Promise<boolean>;
   /**
+   * Know more releases, as one read from a manifest the user gives, in place of any of the same version.
+   * @param releases - The releases
+   */
+  include(releases: readonly Release[]): void;
+  /**
    * What a version of a package needs, as its manifest declares it: the Foundry builds it runs on, the packages it
    * requires, the game systems it runs in, and those it conflicts with.
    * @param key - The package
@@ -550,6 +555,18 @@ export function createPlanner(inputs: PlannerInputs): Planner {
           .filter(release => runnable.some(build => runsOn(resolver, release, build, universe)))
           .map(({ version }) => version),
       );
+    },
+
+    include(releases) {
+      const given = new Set(releases.map(release => `${packageKey(release.package)}@${release.version}`));
+      universe = {
+        core: universe.core,
+        releases: [
+          ...universe.releases.filter(release => !given.has(`${packageKey(release.package)}@${release.version}`)),
+          ...releases,
+        ],
+      };
+      completions.clear();
     },
 
     async add(key, manifest) {

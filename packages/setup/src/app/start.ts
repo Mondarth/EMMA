@@ -84,14 +84,22 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
       const found = locateKit(installed, path => foundry.utils.getRoute(path));
       if (!found.ok) throw new KitUnavailable(found.problem);
       const kit = await loadKit(found);
-      const { universe, load, lookUp } = await lookUpReleases(installed, {
+      const { universe, load, lookUp, readManifest } = await lookUpReleases(installed, {
         kit,
         catalogue: revealCatalogue(__EMMA_DEFAULT_CATALOGUE__),
         proxy: revealProxy(__EMMA_DEFAULT_PROXY__),
         clientVersion: __EMMA_EXTENSION_VERSION__,
         index: () => readIndex(game),
       });
-      return findUpdates({ resolver: kit.resolver, badges: kit.badges, overview, universe, load, lookUp });
+      return findUpdates({
+        resolver: kit.resolver,
+        badges: kit.badges,
+        overview,
+        universe,
+        load,
+        lookUp,
+        readManifest,
+      });
     },
     installModule: async () => {
       if (placed.guard !== undefined) await installEmma(game, placed.guard);

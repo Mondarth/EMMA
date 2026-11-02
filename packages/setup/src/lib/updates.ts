@@ -126,7 +126,18 @@ export interface UpdateSearch {
   readonly judge: VersionJudge;
   /** Plans the versions chosen, with what they need. */
   readonly planner: Planner;
+  /** Read a manifest the user gives, to install a package from; none can be without it. */
+  readonly readManifest?: ReadManifest;
 }
+
+/** What reading a manifest the user gives found: the release it describes, or why it is none. */
+export type ManifestRead =
+  | { readonly ok: true; readonly release: Release; readonly title: string }
+  | { readonly ok: false; readonly problem: 'unreadable' | 'not-manifest' }
+  | { readonly ok: false; readonly problem: 'other-type'; readonly type: 'module' | 'system' };
+
+/** Read a manifest the user gives, as of a type of package. */
+export type ReadManifest = (url: string, type: 'module' | 'system') => Promise<ManifestRead>;
 
 /** What the search works on. */
 export interface UpdateInputs {
@@ -144,6 +155,8 @@ export interface UpdateInputs {
     packages: readonly PackageRef[],
     manifests?: Readonly<Record<PackageKey, readonly string[]>>,
   ) => Promise<readonly Release[]>;
+  /** Read a manifest the user gives; none can be without it. */
+  readonly readManifest?: ReadManifest;
 }
 
 /**
@@ -341,7 +354,14 @@ export async function findUpdates(inputs: UpdateInputs): Promise<UpdateSearch> {
       blocked.set(key, { ...block, holds, ...(explanation.length > 0 && { explanation }) });
     }
   }
-  return { updates, blocked, unresolved, judge: judgeIn({ resolver, badges, overview, planner }), planner };
+  return {
+    updates,
+    blocked,
+    unresolved,
+    judge: judgeIn({ resolver, badges, overview, planner }),
+    planner,
+    ...(inputs.readManifest !== undefined && { readManifest: inputs.readManifest }),
+  };
 }
 
 /** How badly each colour of badge fits, worst last; a version with no badge fits, as in the EMMA module. */

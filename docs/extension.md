@@ -305,6 +305,19 @@ other choices, and with what that version requires, which comes in with it. Its 
 version fits, the section says why, in the resolver's words, and the box stays unticked. Unticking it takes it out of
 the plan again, with what it brought in. A premium package you do not own has its box disabled.
 
+**Manifest URL**, at the top of the section, installs a package from a manifest you give, as Foundry's own Install
+dialog can. **+** (or Enter) reads it, through EMMA's proxy where a site sends no CORS headers, and checks that it is a
+manifest of the section's type: by its file name, `module.json` or `system.json`, or failing that by the fields only a
+game system declares. A package installed already, or in the plan already, is refused. EMMA then looks up the modules
+it requires, and checks the version it gives against the plan, as for any other: if the plan can take it, it is added,
+at the manifest's URL as its own.
+
+If the plan cannot take it, the section says why, with **Override and add anyway**, in red. That adds it to the plan
+against EMMA's advice: it is installed as the manifest gives it, and left out of everything the plan resolves, so it
+stops nothing else being planned, nor is anything planned around it. Its row in the plan is red, and says **Added
+against EMMA's advice**, and the section says it is in the plan, with a button to take it out again. A package added
+this way is kept through a new search, until it is installed, but not through a reload for Foundry VTT's own update.
+
 Foundry's listing gives each package's newest version alone, without the modules it requires, and looking up every
 listed package's releases would take thousands of requests. So the section filters by what the listing says, and a
 package whose newest version does not fit is not offered, even if an older version would.

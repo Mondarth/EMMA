@@ -3,7 +3,7 @@
  * offered only if the plan can take it, and choosing it brings in what it needs. Reactive, with Svelte 5 runes, so the
  * window follows any change.
  */
-import type { PackageKey } from '@mondarth/fvtt-resolver';
+import type { PackageKey, Release } from '@mondarth/fvtt-resolver';
 import { SvelteMap } from 'svelte/reactivity';
 
 import type { KitProblem } from '../foundry/setup-kit';
@@ -34,7 +34,30 @@ export interface UpdateChoice {
   readonly by?: { readonly title: string; readonly version: string };
   /** The manifest URL to install it from; none for Foundry VTT, or if none is found. */
   readonly manifest?: string;
+  /** Whether the user added it against EMMA's advice, so that the plan installs it as given, without resolving it. */
+  readonly forced?: true;
 }
+
+/** A package the user added against EMMA's advice, from a manifest they gave: installed as given, and resolved never. */
+export interface ForcedInstall {
+  readonly key: PackageKey;
+  readonly title: string;
+  readonly version: string;
+  readonly manifest: string;
+}
+
+/**
+ * Installing a package from a manifest the user gives: the version added, or why it could not be, with the install to
+ * add against EMMA's advice when the plan cannot take it.
+ */
+export type ManifestResult =
+  | { readonly ok: true; readonly title: string; readonly version: string }
+  | {
+      readonly ok: false;
+      readonly reason: string;
+      readonly explanation?: readonly string[];
+      readonly override?: ForcedInstall;
+    };
 
 /** Installing a package anew: the version the plan took, or why it could take none. */
 export type InstallResult =
@@ -106,6 +129,10 @@ export class UpdateState {
   readonly #picks = new SvelteMap<PackageKey, string>();
   /** The titles of the packages installed anew, as Foundry's listing gives them, by package key. */
   readonly #named = new SvelteMap<PackageKey, string>();
+  /** The releases read from manifests the user gave, by package key, which no search finds again. */
+  readonly #manual = new SvelteMap<PackageKey, Release>();
+  /** The packages added against EMMA's advice, by package key. */
+  readonly #forced = new SvelteMap<PackageKey, ForcedInstall>();
   /** What the user changed of the plan's snapshot and backups, by their keys. */
   readonly #safeguardEdits = new SvelteMap<string, SafeguardEdit>();
   /** The installation the last search was for. */
@@ -116,18 +143,40 @@ export class UpdateState {
   /** Counts the searches, so that only the latest one's answer is kept. */
   #searches = 0;
 
-  /** The changes in the plan: the versions chosen, in the order they were chosen, then what they need. */
-  readonly choices: readonly UpdateChoice[] = $derived(
-    this.plan.map(({ key, installed, version, by, manifest }) => ({
+  /**
+   * The changes in the plan: the versions chosen, in the order they were chosen, then what they need, then what the user
+   * added against EMMA's advice, which takes the place of any change the plan makes to the same package.
+   */
+  readonly choices: readonly UpdateChoice[] = $derived([
+    ...this.plan
+      .filter(({ key }) => !this.#forced.has(key))
+      .map(({ key, installed, version, by, manifest }) => ({
+        key,
+        ...(installed !== undefined && { installed }),
+        chosen: version,
+        ...(manifest !== undefined && { manifest }),
+        ...(by !== undefined && {
+          by: { title: this.titleOf(by.package), version: by.version },
+        }),
+      })),
+    ...[...this.#forced.values()].map(({ key, version, manifest }) => ({
       key,
-      ...(installed !== undefined && { installed }),
       chosen: version,
-      ...(manifest !== undefined && { manifest }),
-      ...(by !== undefined && {
-        by: { title: this.titleOf(by.package), version: by.version },
-      }),
+      manifest,
+      forced: true as const,
     })),
-  );
+  ]);
+
+  /**
+   * The plan as it is run: its changes, with what the user added against EMMA's advice in place of any change to the
+   * same package, installed after the others and before the uninstalls.
+   */
+  readonly runPlan: readonly PlanEntry[] = $derived.by(() => {
+    const kept = this.plan.filter(({ key }) => !this.#forced.has(key));
+    const forced = [...this.#forced.values()].map(({ key, version, manifest }) => ({ key, version, manifest }));
+    const uninstalls = kept.filter(({ version }) => version === UNINSTALL);
+    return [...kept.filter(({ version }) => version !== UNINSTALL), ...forced, ...uninstalls];
+  });
 
   /**
    * What the plan offers to keep before it changes anything: a snapshot, checked when Foundry VTT changes, then a
@@ -173,6 +222,9 @@ export class UpdateState {
       this.problem = null;
       this.status = 'found';
       this.#listed = {};
+      // What the user read from manifests is known again; what they added against advice stays until it is installed.
+      found.planner.include([...this.#manual.values()]);
+      for (const key of [...this.#forced.keys()]) if (this.#installedOf(key) !== undefined) this.#forced.delete(key);
       // The choices are kept that the new search still offers, and planned again: an uninstall, while the package is
       // installed still, and every uninstall may still be made. A package to install anew is looked up again.
       for (const [key, version] of this.#picks) {
@@ -543,10 +595,87 @@ export class UpdateState {
     return title === key ? (this.#named.get(key) ?? key) : title;
   }
 
+  /**
+   * The packages the user added against EMMA's advice.
+   * @returns Them, in the order they were added
+   */
+  get forced(): readonly ForcedInstall[] {
+    return [...this.#forced.values()];
+  }
+
+  /**
+   * Install a package from a manifest the user gives: check it is a manifest of the type asked for, of a package not
+   * installed nor in the plan, look up what it requires, and add it to the plan if the plan can take it. If it cannot,
+   * say why, and give the install to add against EMMA's advice.
+   * @param url - The manifest's URL
+   * @param type - The type of package it must be
+   * @returns The version added, or why it was not
+   */
+  async installFrom(url: string, type: 'module' | 'system'): Promise<ManifestResult> {
+    const search = this.search;
+    const read = search?.readManifest;
+    if (search === null || read === undefined || this.locked) return { ok: false, reason: localize('Install.NotNow') };
+    const found = await read(url, type);
+    if (!found.ok) {
+      return {
+        ok: false,
+        reason:
+          found.problem === 'other-type'
+            ? localize(found.type === 'system' ? 'Manifest.IsSystem' : 'Manifest.IsModule')
+            : localize(found.problem === 'unreadable' ? 'Manifest.Unreadable' : 'Manifest.NotManifest'),
+      };
+    }
+    const { release, title } = found;
+    const key = `${release.package.type}:${release.package.id}`;
+    if (this.#installedOf(key) !== undefined) return { ok: false, reason: format('Manifest.Installed', { title }) };
+    if (this.#picks.has(key) || this.#forced.has(key)) {
+      return { ok: false, reason: format('Manifest.Planned', { title }) };
+    }
+    this.#named.set(key, title);
+    this.#manual.set(key, release);
+    const { planner } = search;
+    planner.include([release]);
+    for (const { package: required, manifest } of release.relationships.requires) {
+      await planner.add(`${required.type}:${required.id}`, manifest);
+    }
+    const { version } = release;
+    const completion = await planner.complete(withChoice(this.#picks, key, version));
+    if (completion.ok && (await this.choose(key, version))) return { ok: true, title, version };
+    const explanation = completion.ok ? undefined : completion.explanation;
+    return {
+      ok: false,
+      reason: localize('Manifest.Refused'),
+      ...(explanation !== undefined && explanation.length > 0 && { explanation }),
+      override: { key, title, version, manifest: url },
+    };
+  }
+
+  /**
+   * Add a package to the plan against EMMA's advice: it is installed as given, and left out of what the plan resolves,
+   * so that it stops nothing else being planned.
+   * @param install - The install, as {@link installFrom} gave it
+   * @returns Whether it was added
+   */
+  force(install: ForcedInstall): boolean {
+    if (this.locked || this.#installedOf(install.key) !== undefined) return false;
+    this.#named.set(install.key, install.title);
+    this.#forced.set(install.key, install);
+    return true;
+  }
+
+  /**
+   * Take a package added against EMMA's advice out of the plan.
+   * @param key - The package's key
+   */
+  unforce(key: PackageKey): void {
+    if (!this.locked) this.#forced.delete(key);
+  }
+
   /** Take back every choice, and what was changed of the plan's snapshot and backups. */
   clear(): void {
     if (this.locked) return;
     this.#picks.clear();
+    this.#forced.clear();
     this.#safeguardEdits.clear();
     this.plan = [];
   }

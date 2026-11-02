@@ -998,6 +998,80 @@ describe('installing anew, by group', () => {
     expect(within(systems).queryByRole('group', { name: 'Tags' })).toBeNull();
   });
 
+  test('adds from a manifest URL, or against advice where the plan cannot take it, marked in red', async () => {
+    const good = 'https://example.org/dice/module.json';
+    const bad = 'https://example.org/old/module.json';
+    const base = alone();
+    const known = new Set<string>();
+    const planner = {
+      ...base,
+      include: (releases: readonly { package: { id: string } }[]) => {
+        for (const { package: ref } of releases) known.add(`module:${ref.id}`);
+      },
+      add: (key: string) => Promise.resolve(known.has(key)),
+      candidates: (key: string) => (key === 'module:dice' && known.has(key) ? ['1.2.0'] : base.candidates(key)),
+      complete: (picks: ReadonlyMap<string, string>) =>
+        picks.has('module:old')
+          ? Promise.resolve({ ok: false as const, explanation: ['Old needs Foundry VTT 9.'] })
+          : base.complete(picks),
+      plan: async (picks: ReadonlyMap<string, string>) =>
+        (await base.plan(picks))?.map(({ installed: _none, ...entry }) => entry),
+    };
+    const manifestOf = (id: string, url: string) => ({
+      ...release(`module:${id}`, '1.2.0'),
+      manifest: url,
+      versionManifest: url,
+    });
+    const user = await listing(
+      () => Promise.resolve([]),
+      () =>
+        Promise.resolve({
+          updates: new Map(),
+          blocked: new Map(),
+          unresolved: [],
+          judge,
+          planner,
+          readManifest: (url: string) =>
+            Promise.resolve(
+              url === good
+                ? { ok: true as const, release: manifestOf('dice', good), title: 'Dice' }
+                : { ok: true as const, release: manifestOf('old', bad), title: 'Old' },
+            ),
+        }),
+    );
+    await user.click(within(row(/^Modules/)).getByText('Modules'));
+    const section = await screen.findByRole('region', { name: 'Install a module' });
+    const field = within(section).getByRole('textbox', { name: 'Manifest URL' });
+    const add = within(section).getByRole('button', { name: 'Add from the manifest URL' });
+    expect(add).toBeDisabled();
+
+    await user.type(field, good);
+    await user.click(add);
+    expect(await within(section).findByText('Dice 1.2.0 is in the plan.')).toBeInTheDocument();
+    expect(field).toHaveValue('');
+
+    await user.type(field, `${bad}{Enter}`);
+    const refused = await within(section).findByRole('alert');
+    expect(refused).toHaveTextContent('The plan cannot take it. Old needs Foundry VTT 9.');
+    await user.click(within(refused).getByRole('button', { name: 'Override and add anyway' }));
+
+    const plan = screen.getByRole('region', { name: 'Update plan' });
+    const old = changesIn(plan)
+      .getAllByRole('row')
+      .find(tr => tr.textContent.includes('Old'));
+    expect(old).toHaveClass('emma-plan-forced');
+    expect(old).toHaveTextContent(/Old\s*Not installed\s*1\.2\.0\s*Added against EMMA's advice/);
+    expect(section).toHaveTextContent("Old 1.2.0 is in the plan against EMMA's advice.");
+
+    await user.click(within(section).getByRole('button', { name: 'Take Old out of the plan' }));
+    expect(section).not.toHaveTextContent("against EMMA's advice");
+    expect(
+      changesIn(screen.getByRole('region', { name: 'Update plan' }))
+        .getAllByRole('row')
+        .some(tr => tr.textContent.includes('Old')),
+    ).toBe(false);
+  });
+
   test('offers the modules for a game system the plan installs', async () => {
     // Pathfinder is not installed; the planner can add it, and plans it with no version installed.
     const pathfinder: PackageUpdate = { key: 'system:pf2e', installed: 'none', newest: '7.0.0', versions: ['7.0.0'] };

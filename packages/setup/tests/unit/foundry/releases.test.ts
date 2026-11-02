@@ -82,6 +82,39 @@ describe('lookUpReleases', () => {
     await expect(newest(() => Promise.reject(new Error('offline')))).resolves.toBe(url);
   });
 
+  test('reads a manifest the user gives, as the version it names, from its own URL', async () => {
+    const url = 'https://example.org/dice/module.json';
+    const send = answering({
+      [url]: { id: 'dice', title: 'Dice', version: '1.2.0', compatibility: { minimum: '14' } },
+      'https://example.org/page.json': { hello: 'world' },
+      'https://example.org/pf2e/system.json': { id: 'pf2e', title: 'Pathfinder', version: '8.6.1' },
+    });
+    const found = await lookUpReleases(
+      { core: CORE, manifests: [] },
+      { kit: KIT, catalogue: null, proxy: null, fetch: send },
+    );
+
+    const read = await found.readManifest(url, 'module');
+    expect(read).toMatchObject({
+      ok: true,
+      title: 'Dice',
+      release: { package: { type: 'module', id: 'dice' }, version: '1.2.0', manifest: url, versionManifest: url },
+    });
+    await expect(found.readManifest('https://example.org/gone/module.json', 'module')).resolves.toEqual({
+      ok: false,
+      problem: 'unreadable',
+    });
+    await expect(found.readManifest('https://example.org/page.json', 'module')).resolves.toEqual({
+      ok: false,
+      problem: 'not-manifest',
+    });
+    await expect(found.readManifest('https://example.org/pf2e/system.json', 'module')).resolves.toEqual({
+      ok: false,
+      problem: 'other-type',
+      type: 'system',
+    });
+  });
+
   test('looks up more packages from the same sources, as one to install anew', async () => {
     const installed: InstalledManifests = { core: CORE, manifests: [] };
     const send = answering({});

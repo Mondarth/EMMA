@@ -249,7 +249,7 @@ export class SetupState {
     const runStep = this.#options.runStep;
     if (runStep === undefined || this.running) return;
     const { updates } = this;
-    const steps = runSteps(updates.safeguards, updates.plan, key => updates.titleOf(key));
+    const steps = runSteps(updates.safeguards, updates.runPlan, key => updates.titleOf(key));
     let states: Record<string, StepState> = Object.fromEntries(steps.map(({ key }) => [key, 'waiting']));
     const mark = (key: string, state: StepState): void => {
       states = { ...states, [key]: state };

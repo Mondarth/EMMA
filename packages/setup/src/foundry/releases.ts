@@ -20,6 +20,8 @@ import type { DefaultProxy } from '@mondarth/emma-core/default-proxy';
 import type { SetupKit } from '@mondarth/emma-core/setup-kit';
 
 import { acceptLatest } from '../lib/latest';
+import { manifestShape, manifestTypeOf } from '../lib/manifest-url';
+import type { ReadManifest } from '../lib/updates';
 
 import type { CoreBuild, InstalledManifests } from './setup-game';
 
@@ -37,6 +39,8 @@ export interface ReleaseLookup {
     packages: readonly PackageRef[],
     manifests?: Readonly<Record<PackageKey, readonly string[]>>,
   ) => Promise<readonly Release[]>;
+  /** Read a manifest the user gives, to install a package from, through the same client. */
+  readonly readManifest: ReadManifest;
   /**
    * The packages the catalogue says cannot be had, archived or gone: only their installed releases are in the
    * universe, so they stay as they are.
@@ -276,6 +280,23 @@ export async function lookUpReleases(installed: InstalledManifests, options: Loo
         (await (Object.keys(more).length === 0 ? set : sourcesWith({ ...declared, ...more })).universe(packages))
           .releases,
       ),
+    readManifest: async (url, type) => {
+      const fetched = await http.getJson(url, { maxAge: 0 });
+      if (!fetched.ok) return { ok: false, problem: 'unreadable' };
+      const shape = manifestShape(fetched.value);
+      const typed = manifestTypeOf(url, fetched.value);
+      if (shape !== undefined && typed !== undefined && typed !== type) {
+        return { ok: false, problem: 'other-type', type: typed };
+      }
+      const read =
+        shape === undefined
+          ? undefined
+          : await localSource([{ json: fetched.value, origin: url, type }]).releases({ type, id: shape.id });
+      const found = read?.ok === true ? read.value[0] : undefined;
+      if (shape === undefined || found === undefined) return { ok: false, problem: 'not-manifest' };
+      // The user's URL is the version's own manifest: what it gives is what they chose.
+      return { ok: true, title: shape.title, release: { ...found, manifest: url, versionManifest: url } };
+    },
     unavailable,
     unreached: [...refs.map(packageKey).filter(key => failed.has(key)), ...(cores?.ok === false ? [CORE] : [])],
   };

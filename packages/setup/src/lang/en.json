@@ -281,5 +281,22 @@
     "UniversalNote": "Modules that name no game system, for use with any.",
     "SystemNote": "Modules that name {title} among the game systems they are for.",
     "SystemMissingNote": "Modules that name {title} among the game systems they are for. {title} is not installed."
+  },
+  "Manifest": {
+    "Label": "Manifest URL",
+    "Add": "Add from the manifest URL",
+    "Reading": "Reading the manifest…",
+    "Added": "{title} {version} is in the plan.",
+    "Unreadable": "The manifest could not be read. A browser can read only sites that allow it, and EMMA reads others only through its proxy.",
+    "NotManifest": "That is not a game system's or module's manifest.",
+    "IsSystem": "That is a game system's manifest, not a module's.",
+    "IsModule": "That is a module's manifest, not a game system's.",
+    "Installed": "{title} is installed already: its updates are offered in the installation tree.",
+    "Planned": "{title} is in the plan already.",
+    "Refused": "The plan cannot take it.",
+    "Override": "Override and add anyway",
+    "Forced": "{title} {version} is in the plan against EMMA's advice.",
+    "TakeOut": "Take {title} out of the plan",
+    "AgainstAdvice": "Added against EMMA's advice"
   }
 }
