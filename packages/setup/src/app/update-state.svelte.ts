@@ -536,9 +536,9 @@ export class UpdateState {
   }
 
   /**
-   * Take a change out of the plan, as its row's button does. Alone, what it brought in stays, chosen at the versions
-   * the plan has, so that the rest of the plan stands as it is; with what it needs, that goes too, unless another
-   * change needs it still.
+   * Take a change out of the plan, as its row's button does. Alone, what it brought in stays: chosen at the versions the
+   * plan has, so that the rest of the plan stands as it is, but for what another change still needs, which stays as
+   * needed by it. With what it needs, that goes too, unless another change needs it still.
    * @param key - The package's key
    * @param withNeeds - Whether what it brought in goes with it
    * @returns Whether it was taken out
@@ -552,7 +552,19 @@ export class UpdateState {
     const overview = this.#overview;
     if (search === null || overview === null || this.locked || !this.#picks.has(key)) return false;
     let picks = withChoice(this.#picks, key, null);
-    if (!withNeeds) for (const entry of this.#broughtIn(key)) picks = withChoice(picks, entry.key, entry.version);
+    if (!withNeeds) {
+      const brought = this.#broughtIn(key);
+      for (const entry of brought) picks = withChoice(picks, entry.key, entry.version);
+      // What another change still needs comes in again as needed, at the same version, so it is not kept as chosen,
+      // and stays locked in.
+      for (const entry of brought) {
+        const without = withChoice(picks, entry.key, null);
+        const planned = await search.planner.plan(without);
+        if (planned?.some(({ key: other, version }) => other === entry.key && version === entry.version) === true) {
+          picks = without;
+        }
+      }
+    }
     // Taking out an uninstall may break another, as of a module the plan's other uninstall needs gone.
     const allowed = this.#uninstallsAllowed(overview, picks);
     const plan = !allowed ? undefined : picks.size === 0 ? [] : await search.planner.plan(picks);

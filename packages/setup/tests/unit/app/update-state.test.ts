@@ -878,11 +878,10 @@ describe('taking a change out of the plan', () => {
 
     await expect(updates.takeOut('module:app', false)).resolves.toBe(true);
 
-    expect(updates.picks).toEqual([
-      ['module:lib', '1.1.0'],
-      ['module:maps', '2.0.0'],
-    ]);
-    expect(held(updates)).toEqual(['module:lib@1.1.0', 'module:maps@2.0.0']);
+    // Regression: Maps, which Library needs, was kept as chosen too, so offered as if it could be taken out alone.
+    expect(updates.picks).toEqual([['module:lib', '1.1.0']]);
+    expect(held(updates)).toEqual(['module:lib@1.1.0', 'module:maps@2.0.0 < module:lib']);
+    expect(updates.canTakeOut('module:maps')).toBe(false);
   });
 
   test('takes a change out with what it brought in, but for what another change still needs', async () => {
