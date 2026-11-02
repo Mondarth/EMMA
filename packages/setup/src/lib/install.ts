@@ -7,6 +7,7 @@
  */
 import type { ListedPackage } from '../foundry/setup-game';
 import type { Overview } from './overview';
+import { UNINSTALL } from './plans';
 
 /** What a package to install must fit. */
 export interface InstallTarget {
@@ -45,6 +46,22 @@ export function fitsCore(compatibility: ListedPackage['compatibility'], core: st
   return maximum.build === undefined
     ? at.generation <= maximum.generation
     : position <= maximum.generation * 1e6 + maximum.build;
+}
+
+/**
+ * The game systems a plan leaves installed: those installed that it does not uninstall, and those it installs.
+ * @param overview - The installation
+ * @param picks - The plan's choices, by package key
+ * @returns Their IDs
+ */
+export function keptSystems(overview: Overview, picks: readonly (readonly [string, string])[]): string[] {
+  const chosen = new Map(picks);
+  const installed = overview.systems.map(({ id }) => id).filter(id => chosen.get(`system:${id}`) !== UNINSTALL);
+  const added = picks
+    .filter(([key, version]) => key.startsWith('system:') && version !== UNINSTALL)
+    .map(([key]) => key.slice('system:'.length))
+    .filter(id => !installed.includes(id));
+  return [...installed, ...added];
 }
 
 /**

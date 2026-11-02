@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import type { ListedPackage } from '../../../src/foundry/setup-game';
-import { fitsCore, installable, matching } from '../../../src/lib/install';
+import { fitsCore, installable, keptSystems, matching } from '../../../src/lib/install';
 import { buildOverview } from '../../../src/lib/overview';
 import { installation, installedModule } from '../../mocks/fixtures';
 
@@ -68,6 +68,30 @@ describe('installable', () => {
     );
 
     expect(offered.map(({ type, id }) => `${type}:${id}`)).toEqual(['module:any', 'module:dnd', 'system:sw5e']);
+  });
+});
+
+describe('keptSystems', () => {
+  test('keeps the game systems installed that the plan does not uninstall, and adds those it installs', () => {
+    const overview = buildOverview(
+      installation({
+        systems: [
+          { id: 'dnd5e', title: 'D&D 5e', version: '5.3.3' },
+          { id: 'pf2e', title: 'Pathfinder', version: '7.0.0' },
+        ],
+      }),
+      new Map(),
+    );
+
+    expect(
+      keptSystems(overview, [
+        ['system:dnd5e', '5.4.0'],
+        ['system:pf2e', 'uninstall'],
+        ['system:sw5e', '2.0.0'],
+        ['system:gone', 'uninstall'],
+        ['module:tools', '1.0.0'],
+      ]),
+    ).toEqual(['dnd5e', 'sw5e']);
   });
 });
 

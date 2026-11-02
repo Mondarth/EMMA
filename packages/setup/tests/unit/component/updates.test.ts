@@ -808,9 +808,13 @@ describe('installing anew, by group', () => {
   /**
    * Render EMMA's window content, with a listing of modules.
    * @param listPackages - How the listing is read
+   * @param findUpdates - How updates are found
    * @returns A user to act with
    */
-  async function listing(listPackages: (type: 'module' | 'system') => Promise<readonly ListedPackage[]>) {
+  async function listing(
+    listPackages: (type: 'module' | 'system') => Promise<readonly ListedPackage[]>,
+    findUpdates: SetupStateOptions['findUpdates'] = findingBlocked(),
+  ) {
     // Tools is for D&D 5e alone, so the modules have a group for it.
     const overview = buildOverview(
       installation({
@@ -825,7 +829,7 @@ describe('installing anew, by group', () => {
       load: () => Promise.resolve(overview),
       guardOn: true,
       onGuardChange: vi.fn(),
-      findUpdates: findingBlocked(),
+      findUpdates,
       installModule: noInstall,
       runStep: () => Promise.resolve(),
       listPackages,
@@ -867,6 +871,42 @@ describe('installing anew, by group', () => {
     const section = screen.getByRole('region', { name: 'Install a module' });
     expect(section).toHaveTextContent('dnd-only');
     expect(section).not.toHaveTextContent('anywhere');
+  });
+
+  test('offers the modules for a game system the plan installs', async () => {
+    // Pathfinder is not installed; the planner can add it.
+    const pathfinder: PackageUpdate = { key: 'system:pf2e', installed: 'none', newest: '7.0.0', versions: ['7.0.0'] };
+    const user = await listing(
+      type =>
+        Promise.resolve(
+          type === 'system'
+            ? [{ ...listed('pf2e'), type, title: 'Pathfinder' }]
+            : [listed('anywhere'), listed('pf-tools', ['pf2e'])],
+        ),
+      () =>
+        Promise.resolve({
+          updates: new Map(),
+          blocked: new Map(),
+          unresolved: [],
+          judge,
+          planner: alone(pathfinder),
+        }),
+    );
+
+    await user.click(within(row(/^Modules/)).getByText('Modules'));
+    const modules = await screen.findByRole('region', { name: 'Install a module' });
+    await vi.waitFor(() => {
+      expect(modules).toHaveTextContent('anywhere');
+    });
+    expect(modules).not.toHaveTextContent('pf-tools');
+
+    await user.click(within(row(/^Game systems/)).getByText('Game systems'));
+    const systems = await screen.findByRole('region', { name: 'Install a game system' });
+    await user.click(await within(systems).findByRole('button', { name: 'Add Pathfinder to the plan' }));
+    await within(systems).findByRole('button', { name: 'Take Pathfinder out of the plan' });
+
+    await user.click(within(row(/^Modules/)).getByText('Modules'));
+    expect(await screen.findByRole('region', { name: 'Install a module' })).toHaveTextContent('pf-tools');
   });
 
   test('shows more of the list as its end comes into view, and starts again on a search', async () => {

@@ -9,7 +9,7 @@
   import type { Layout } from '../foundry/preferences';
   import { readLayout, writeLayout } from '../foundry/preferences';
   import { EXTENSION_RELEASES } from '../foundry/setup-kit';
-  import { installable } from '../lib/install';
+  import { installable, keptSystems } from '../lib/install';
   import { UNINSTALL } from '../lib/plans';
   import { stepText } from '../lib/run';
   import { groupDetail, moduleDetail, systemDetail } from '../lib/details';
@@ -129,7 +129,7 @@
   const installablePackages = $derived.by(() => {
     const listing = installType === undefined ? null : setup.listings[installType];
     if (overview === null || typeof listing !== 'object' || listing === null) return [];
-    const kept = overview.systems.map(({ id }) => id).filter(id => updates.chosenOf(`system:${id}`) !== UNINSTALL);
+    const kept = keptSystems(overview, updates.picks);
     const fits = installable(listing, overview, { core: updates.chosenOf('core') ?? overview.core, systems: kept });
     // A system's group offers the modules for it, and the universal group those for any system.
     if (selection.kind !== 'group') return fits;
