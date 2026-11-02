@@ -780,22 +780,29 @@ describe('installing anew', () => {
     expect(within(section).getByRole('status')).toHaveTextContent('Showing 1 of 1');
     expect(section).toHaveTextContent('Dice by Someone newest 2.0.0');
 
-    await user.click(within(section).getByRole('button', { name: 'Add Dice to the plan' }));
+    const dice = within(section).getByRole('checkbox', { name: 'Install Dice' });
+    expect(dice).not.toBeChecked();
+    await user.click(dice);
 
     const plan = await screen.findByRole('region', { name: 'Update plan' });
     expect(changesIn(plan).getAllByRole('row')[1]).toHaveTextContent(/^Dice\s*Not installed\s*1\.0\.0/);
     expect(section).toHaveTextContent('In the plan at 1.0.0');
+    expect(dice).toBeChecked();
 
-    await user.click(within(section).getByRole('button', { name: 'Take Dice out of the plan' }));
+    await user.click(dice);
     expect(screen.queryByRole('region', { name: 'Update plan' })).toBeNull();
+    expect(dice).not.toBeChecked();
 
     await user.clear(within(section).getByRole('searchbox', { name: 'Search' }));
-    await user.click(within(section).getByRole('button', { name: 'Add Stuck to the plan' }));
+    const stuck = within(section).getByRole('checkbox', { name: 'Install Stuck' });
+    await user.click(stuck);
     await vi.waitFor(() => {
       expect(section).toHaveTextContent(
         'No version of it fits the installation and the plan. Alpha cannot keep working.',
       );
     });
+    // What the plan could not take stays unticked.
+    expect(stuck).not.toBeChecked();
 
     // A system's group of modules offers those for it; the game systems offer systems.
     await user.click(within(row(/^Game systems/)).getByText('Game systems'));
@@ -907,22 +914,26 @@ describe('installing anew, by group', () => {
     await user.click(premium);
     expect(within(section).getByRole('status')).toHaveTextContent('Showing 3 of 3');
     // One not owned cannot be added.
-    expect(within(section).queryByRole('button', { name: 'Add Paid to the plan' })).toBeNull();
+    expect(within(section).getByRole('checkbox', { name: 'Install Paid' })).toBeDisabled();
     expect(section).toHaveTextContent('Premium content you do not own, so Foundry cannot install it.');
 
-    const fresh = within(section).getByText('Details of Fresh').closest('details');
+    // A title opens and closes its drawer.
+    const fresh = within(section).getByText('Fresh').closest('details');
     if (fresh === null) throw new Error('No details of Fresh');
-    await user.click(within(fresh).getByText('Details of Fresh'));
+    expect(fresh).not.toHaveAttribute('open');
+    await user.click(within(fresh).getByText('Fresh'));
     expect(fresh).toHaveAttribute('open');
     expect(fresh).toHaveTextContent(
       'Description Rolls dice. Authors Ann, Bo Newest version 1.0.0 Foundry VTT minimum 13, verified 14.368 ' +
         'Game systems Any Tags Dice Rolls Content Exclusive Web page https://example.org/fresh',
     );
     expect(within(fresh).getByRole('link', { name: 'https://example.org/fresh' })).toHaveAttribute('target', '_blank');
-    expect(within(section).getByText('Details of Ancient').closest('details')).toHaveTextContent(
+    expect(within(section).getByText('Ancient').closest('details')).toHaveTextContent(
       'Foundry VTT minimum 0.6.6 Game systems dnd5e Content Premium, owned',
     );
-    expect(within(section).getByText('Details of Paid').closest('details')).toHaveTextContent('Premium, not owned');
+    expect(within(section).getByText('Paid').closest('details')).toHaveTextContent('Premium, not owned');
+    await user.click(within(fresh).getByText('Fresh'));
+    expect(fresh).not.toHaveAttribute('open');
     // Each type keeps its own filters.
     await user.click(within(row(/^Game systems/)).getByText('Game systems'));
     expect(
@@ -1022,8 +1033,10 @@ describe('installing anew, by group', () => {
 
     await user.click(within(row(/^Game systems/)).getByText('Game systems'));
     const systems = await screen.findByRole('region', { name: 'Install a game system' });
-    await user.click(await within(systems).findByRole('button', { name: 'Add Pathfinder to the plan' }));
-    await within(systems).findByRole('button', { name: 'Take Pathfinder out of the plan' });
+    await user.click(await within(systems).findByRole('checkbox', { name: 'Install Pathfinder' }));
+    await vi.waitFor(() => {
+      expect(within(systems).getByRole('checkbox', { name: 'Install Pathfinder' })).toBeChecked();
+    });
 
     await user.click(within(row(/^Modules/)).getByText('Modules'));
     expect(await screen.findByRole('region', { name: 'Install a module' })).toHaveTextContent('pf-tools');

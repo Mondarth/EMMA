@@ -69,11 +69,20 @@
   });
 
   /**
-   * Add a package to the plan.
+   * Add a package to the plan, or take it out, as its checkbox is ticked or not. The box shows what the plan has, so it
+   * goes back until the plan changes, and stays as it was if the plan cannot.
+   * @param box - The package's checkbox
    * @param key - The package's key
    * @param pkg - The package, as Foundry's listing gives it
    */
-  async function add(key: string, pkg: ListedPackage): Promise<void> {
+  async function choose(box: HTMLInputElement, key: string, pkg: ListedPackage): Promise<void> {
+    const adding = box.checked;
+    box.checked = !adding;
+    if (!adding) {
+      added.delete(key);
+      await updates.forget(key);
+      return;
+    }
     added.set(key, 'adding');
     const result = await updates.install(key, pkg.title, pkg.manifest);
     if (result.ok) added.delete(key);
@@ -144,52 +153,35 @@
     <p role="status">
       {format('Install.Shown', { shown: String(Math.min(found.length, shown)), count: String(found.length) })}
     </p>
-    <ul>
+    <ul class="emma-install-list">
       {#each found.slice(0, shown) as pkg (pkg.id)}
         {@const key = `${pkg.type}:${pkg.id}`}
         {@const planned = updates.chosenOf(key)}
         {@const state = added.get(key)}
         <li>
-          <span class="emma-install-title">{pkg.title}</span>
-          {#if pkg.author !== undefined}
-            <span class="emma-install-author">{format('Install.By', { author: pkg.author })}</span>
-          {/if}
-          <span class="emma-install-version">{format('Install.Newest', { version: pkg.version })}</span>
-          {#if planned !== undefined}
-            <span>{format('Install.Planned', { version: planned })}</span>
-            <button
-              type="button"
-              disabled={updates.locked}
-              onclick={() => {
-                void updates.forget(key);
-              }}>{format('Install.TakeOut', { title: pkg.title })}</button>
-          {:else if pkg.unowned}
-            <span class="emma-install-unowned">
-              <i class="fa-solid fa-lock" aria-hidden="true"></i>
-              {localize('Install.Unowned')}
-            </span>
-          {:else}
-            <button
-              type="button"
-              disabled={updates.locked || state === 'adding'}
-              onclick={() => {
-                void add(key, pkg);
-              }}>
-              {state === 'adding' ? localize('Install.Adding') : format('Install.Add', { title: pkg.title })}
-            </button>
-          {/if}
-          {#if typeof state === 'object'}
-            <p class="emma-install-failed">{state.reason}</p>
-            {#if state.explanation !== undefined}
-              <ul>
-                {#each state.explanation as line, index (index)}
-                  <li>{line}</li>
-                {/each}
-              </ul>
-            {/if}
-          {/if}
+          <input
+            type="checkbox"
+            class="emma-install-choose"
+            checked={planned !== undefined}
+            disabled={updates.locked || state === 'adding' || (pkg.unowned && planned === undefined)}
+            aria-label={format('Install.Choose', { title: pkg.title })}
+            onchange={event => {
+              void choose(event.currentTarget, key, pkg);
+            }} />
           <details class="emma-install-details">
-            <summary>{format('Install.Details', { title: pkg.title })}</summary>
+            <summary>
+              <span class="emma-install-title">{pkg.title}</span>
+              {#if pkg.author !== undefined}
+                <span class="emma-install-author">{format('Install.By', { author: pkg.author })}</span>
+              {/if}
+              <span class="emma-install-version">{format('Install.Newest', { version: pkg.version })}</span>
+              {#if planned !== undefined}
+                <span class="emma-install-planned">{format('Install.Planned', { version: planned })}</span>
+              {:else if state === 'adding'}
+                <span class="emma-install-planned">{localize('Install.Adding')}</span>
+              {/if}
+              <i class="emma-install-caret fa-solid fa-caret-right" aria-hidden="true"></i>
+            </summary>
             <dl>
               {#if pkg.description !== undefined}
                 <dt>{localize('Install.Description')}</dt>
@@ -225,6 +217,24 @@
               {/if}
             </dl>
           </details>
+          {#if pkg.unowned && planned === undefined}
+            <p class="emma-install-unowned">
+              <i class="fa-solid fa-lock" aria-hidden="true"></i>
+              {localize('Install.Unowned')}
+            </p>
+          {/if}
+          {#if typeof state === 'object'}
+            <div class="emma-install-failed">
+              <p>{state.reason}</p>
+              {#if state.explanation !== undefined}
+                <ul>
+                  {#each state.explanation as line, index (index)}
+                    <li>{line}</li>
+                  {/each}
+                </ul>
+              {/if}
+            </div>
+          {/if}
         </li>
       {/each}
     </ul>
@@ -302,9 +312,55 @@
     opacity: 0.8;
   }
 
+  .emma-install .emma-install-list {
+    list-style: none;
+    padding-left: 0;
+  }
+
+  .emma-install-list > li {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 0.5rem;
+    align-items: start;
+  }
+
+  .emma-install-list > li > :not(.emma-install-choose) {
+    grid-column: 2;
+  }
+
+  .emma-install-choose {
+    margin: 0.2rem 0 0;
+  }
+
   .emma-install-details summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 0.5rem;
     cursor: pointer;
+    list-style: none;
+  }
+
+  .emma-install-details summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .emma-install-caret {
+    margin-left: auto;
+    transition: transform 0.15s;
+  }
+
+  .emma-install-details[open] .emma-install-caret {
+    transform: rotate(90deg);
+  }
+
+  .emma-install-planned {
     font-size: 0.85em;
+    font-style: italic;
+  }
+
+  .emma-install-failed p {
+    margin: 0;
   }
 
   .emma-install-details dl {

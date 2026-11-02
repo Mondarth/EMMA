@@ -295,14 +295,15 @@ Two filters narrow it, each kept for the session, apart for game systems and for
   module shows if any of its tags is on. A click turns a tag on or off; a shift-click turns every other tag off first,
   so on a tag that is off it shows that tag alone, and on one that is on it turns every tag off.
 
-Each package has a drawer, **Details of <title>**, of what Foundry's listing says of it: its description, as plain
-text, authors, newest version, the Foundry VTT builds it declares, the game systems a module is for, its tags, whether
-it is premium or exclusive content, and its web page.
+Each package's title opens and closes a drawer, as the triangle at the right of it shows, of what Foundry's listing
+says of it: its description, as plain text, authors, newest version, the Foundry VTT builds it declares, the game
+systems a module is for, its tags, whether it is premium or exclusive content, and its web page.
 
-**Add <title> to the plan** looks up the package's releases, from the same sources as the updates, and the plan takes
-the newest version that fits with its other choices, and with what that version requires, which comes in with it. Its
-row says it is not installed. If no version fits, the section says why, in the resolver's words. **Take <title> out of
-the plan** takes it out again, with what it brought in.
+The checkbox at the left of each title, **Install <title>**, is ticked while the plan installs it. Ticking it looks up
+the package's releases, from the same sources as the updates, and the plan takes the newest version that fits with its
+other choices, and with what that version requires, which comes in with it. Its row says it is not installed. If no
+version fits, the section says why, in the resolver's words, and the box stays unticked. Unticking it takes it out of
+the plan again, with what it brought in. A premium package you do not own has its box disabled.
 
 Foundry's listing gives each package's newest version alone, without the modules it requires, and looking up every
 listed package's releases would take thousands of requests. So the section filters by what the listing says, and a

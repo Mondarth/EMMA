@@ -174,10 +174,8 @@
     "Shown": "Showing {shown} of {count}",
     "By": "by {author}",
     "Newest": "newest {version}",
-    "Add": "Add {title} to the plan",
     "Adding": "Looking it up…",
     "Planned": "In the plan at {version}",
-    "TakeOut": "Take {title} out of the plan",
     "NotNow": "It cannot be added now.",
     "NotFound": "EMMA found no releases of it.",
     "NoVersion": "No version of it fits the installation and the plan.",
@@ -188,7 +186,6 @@
     "ShowUnownedModules": "Show premium modules I do not own",
     "ShowUnownedSystems": "Show premium game systems I do not own",
     "Unowned": "Premium content you do not own, so Foundry cannot install it.",
-    "Details": "Details of {title}",
     "Description": "Description",
     "Authors": "Authors",
     "Version": "Newest version",
@@ -208,7 +205,8 @@
     "Untagged": "Untagged",
     "TagsHint": "A module shows if any of its tags is on. Shift-click a tag that is off to show it alone, or one that is on to turn every tag off.",
     "NoneRuns": "EMMA found releases of it, but none that it can tell runs on the plan's Foundry VTT build.",
-    "NoManifest": "The versions of it that run on the plan's Foundry VTT build give no manifest URL of their own to install from."
+    "NoManifest": "The versions of it that run on the plan's Foundry VTT build give no manifest URL of their own to install from.",
+    "Choose": "Install {title}"
   },
   "Uninstall": {
     "Heading": "Uninstall",
