@@ -109,7 +109,7 @@ describe('InstallationTree', () => {
     if (toggle === null) throw new Error('No triangle');
     await user.click(toggle);
     expect(universal).toHaveAttribute('aria-expanded', 'true');
-    expect(rows()).toContain('Library 1.0.0');
+    expect(rows()).toContain('Library 1.0.0 In use, Current state');
 
     await user.click(row(/Foundry/).querySelector('.emma-tree-toggle') ?? universal);
     expect(rows()).toEqual(['Foundry VTT 14.368']);

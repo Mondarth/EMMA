@@ -325,6 +325,8 @@ function installedNode(use: ModuleUse, modules: ReadonlyMap<string, ModuleUse>, 
     version,
     installed: true,
     ...(locked && { locked }),
+    // That it is installed, its version says; that a world uses it, its status.
+    ...(use.worlds.length > 0 && { status: IN_USE }),
     children: () => requirementNodes([id], undefined, modules, pending),
   };
 }
@@ -352,14 +354,20 @@ function requirementNodes(
     }))
     .sort(byTitle)
     .map(({ id, title }): TreeNode => {
-      const installed = modules.get(id)?.module;
+      const use = modules.get(id);
+      const installed = use?.module;
       const planned = pending.get(`module:${id}`);
       return {
         segment: `module:${id}`,
         selection: { kind: 'module', module: id, ...(world !== undefined && { world }) },
         title,
         ...(installed !== undefined
-          ? { version: installed.version, installed: true, ...(installed.locked && { locked: true }) }
+          ? {
+              version: installed.version,
+              installed: true,
+              ...(installed.locked && { locked: true }),
+              ...(use !== undefined && use.worlds.length > 0 && { status: IN_USE }),
+            }
           : planned === undefined
             ? { status: MISSING }
             : { version: planned.version, pending: true }),

@@ -130,7 +130,8 @@ Foundry VTT
 Each of these badges says what it reports in its tooltip: **Current state**, or, where the plan changes it, **Planned
 update**. A badge of something the plan changes, a package it updates or uninstalls, or a world whose game system, a
 module it runs, or Foundry VTT the plan changes, takes its own colour and a dashed border instead of its usual colour.
-- **Modules**: every installed module, grouped by the game systems its manifest names. **Universal** holds the modules
+- **Modules**: every installed module, marked **In use** if a world uses it, grouped by the game systems its manifest
+  names. **Universal** holds the modules
   that name none, for use with any system. A module for several systems is in each of their groups.
 - **Under each module**, wherever it shows, the modules it requires, and under those the modules they require in turn.
   A requirement that is not installed is marked **Not installed**.
