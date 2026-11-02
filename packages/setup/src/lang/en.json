@@ -112,6 +112,7 @@
     "Brings": "Choosing it also changes:",
     "BringsItem": "{title} to {version}",
     "NeededBy": "needed by {title} {version}",
+    "NeededThrough": "needed for {title} {version}, through {through}",
     "ExplainedInstalled": "{version}, installed",
     "NoVerdict": "EMMA has no verdict on this version, as nothing says which Foundry VTT builds it works with.",
     "CoreFits": "Every package the recorded worlds run works with it.",

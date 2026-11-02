@@ -32,6 +32,8 @@ export interface UpdateChoice {
   readonly chosen: string;
   /** The version chosen that needs it, by its package's title; none for a version chosen. */
   readonly by?: { readonly title: string; readonly version: string };
+  /** The other changes it is needed through, from that choice, by their packages' titles (see {@link PlanEntry}). */
+  readonly through?: readonly { readonly title: string; readonly version: string }[];
   /** The manifest URL to install it from; none for Foundry VTT, or if none is found. */
   readonly manifest?: string;
   /** Whether the user added it against EMMA's advice, so that the plan installs it as given, without resolving it. */
@@ -166,13 +168,16 @@ export class UpdateState {
   readonly choices: readonly UpdateChoice[] = $derived([
     ...this.plan
       .filter(({ key }) => !this.#forced.has(key))
-      .map(({ key, installed, version, by, manifest }) => ({
+      .map(({ key, installed, version, by, through, manifest }) => ({
         key,
         ...(installed !== undefined && { installed }),
         chosen: version,
         ...(manifest !== undefined && { manifest }),
         ...(by !== undefined && {
           by: { title: this.titleOf(by.package), version: by.version },
+        }),
+        ...(through !== undefined && {
+          through: through.map(step => ({ title: this.titleOf(step.package), version: step.version })),
         }),
       })),
     ...[...this.#forced.values()].map(({ key, version, manifest }) => ({

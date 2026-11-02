@@ -238,7 +238,16 @@
               <span class={[older !== undefined && 'emma-plan-older']}>{choice.chosen}</span>
             {/if}
             {#if choice.by !== undefined}
-              <span class="emma-plan-needed">{format('Update.NeededBy', choice.by)}</span>
+              <span class="emma-plan-needed">
+                {choice.through === undefined
+                  ? format('Update.NeededBy', choice.by)
+                  : format('Update.NeededThrough', {
+                      ...choice.by,
+                      through: new Intl.ListFormat('en').format(
+                        choice.through.map(({ title, version }) => `${title} ${version}`),
+                      ),
+                    })}
+              </span>
             {/if}
             {#if choice.forced}
               <span class="emma-plan-against">

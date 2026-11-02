@@ -1656,6 +1656,50 @@ describe("the plan's snapshot and backups", () => {
   });
 });
 
+describe('the changes a change is needed through', () => {
+  test('names them after the choice that needs it', async () => {
+    const base = alone(...UPDATES);
+    // Choosing Library 2.0.0 brings in D&D 5e 5.4.0, as if through a change to Library itself.
+    const planner = {
+      ...base,
+      plan: async (picks: ReadonlyMap<string, string>) => [
+        ...((await base.plan(picks)) ?? []),
+        {
+          key: 'system:dnd5e',
+          installed: '5.3.3',
+          version: '5.4.0',
+          by: { package: 'module:lib', version: '2.0.0' },
+          through: [{ package: 'module:lib', version: '2.0.0' }],
+        },
+      ],
+    };
+    const setup = new SetupState({
+      load: () => Promise.resolve(OVERVIEW),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: () =>
+        Promise.resolve({
+          updates: new Map(UPDATES.map(update => [update.key, update])),
+          blocked: new Map(),
+          unresolved: [],
+          judge,
+          planner,
+        }),
+      installModule: noInstall,
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    await vi.waitFor(() => {
+      expect(setup.updates.status).toBe('found');
+    });
+
+    await setup.updates.choose('module:lib', '2.0.0');
+
+    const plan = await screen.findByRole('region', { name: 'Update plan' });
+    expect(plan).toHaveTextContent('5.4.0 needed for Library 2.0.0, through Library 2.0.0');
+  });
+});
+
 describe('taking changes out of the plan', () => {
   test('offers - on each change chosen, taking it out alone, or with what it needs on a shift-click', async () => {
     const base = alone(...UPDATES);

@@ -340,6 +340,46 @@ describe('installing anew', () => {
   });
 });
 
+describe('the changes a change is needed through', () => {
+  /**
+   * DAE 2.0.0 runs in D&D 5e 6 alone, for which Midi 1.0.0, installed, does not run, though 2.0.0 does; a world runs
+   * both.
+   */
+  const DAE = [
+    release('module:dae', '1.0.0'),
+    release('module:dae', '2.0.0', { systems: { dnd5e: { minimum: '6.0.6' } } }),
+  ];
+
+  test("names them where the choice does not name the change itself, as a module a system's change needs", async () => {
+    const plans = planner(
+      [
+        ['dae', '1.0.0'],
+        ['midi', '1.0.0'],
+      ],
+      {
+        a: [
+          ['dae', '1.0.0'],
+          ['midi', '1.0.0'],
+        ],
+      },
+      [...DND, ...MIDI.map(midi => ({ ...midi, compatibility: { minimum: '14' } })), ...DAE],
+    );
+
+    const plan = await plans.plan(new Map([['module:dae', '2.0.0']]));
+
+    expect(plan?.map(({ key, version, by, through }) => ({ key, version, by, through }))).toEqual([
+      { key: 'system:dnd5e', version: '6.0.6', by: { package: 'module:dae', version: '2.0.0' }, through: undefined },
+      { key: 'module:dae', version: '2.0.0', by: undefined, through: undefined },
+      {
+        key: 'module:midi',
+        version: '2.0.0',
+        by: { package: 'module:dae', version: '2.0.0' },
+        through: [{ package: 'system:dnd5e', version: '6.0.6' }],
+      },
+    ]);
+  });
+});
+
 describe('uninstalling', () => {
   /** A library, and an app whose 1.0.0 needs nothing and whose 2.0.0 requires the library. */
   const APPS = [

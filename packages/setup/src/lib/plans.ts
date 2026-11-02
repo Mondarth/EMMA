@@ -80,6 +80,12 @@ export interface PlanEntry {
   readonly version: string;
   /** The choice that needs it; none for a version chosen. */
   readonly by?: PackageVersion;
+  /**
+   * The other changes it is needed through, from the choice that needs it, in order, where the choice does not name it
+   * itself: as a module needed only because a game system the choice needs changes. None where the choice names it, or
+   * where no such changes are found.
+   */
+  readonly through?: readonly PackageVersion[];
   /** The manifest URL to install the version from, one for that version alone; none for Foundry VTT, or if none is found. */
   readonly manifest?: string;
 }
@@ -298,6 +304,50 @@ export function createPlanner(inputs: PlannerInputs): Planner {
     );
   const releaseOf = (key: PackageKey, version: string) =>
     universe.releases.find(release => packageKey(release.package) === key && sameVersion(release.version, version));
+  /**
+   * How the changes of a plan lead to each other: a change to one package leads to a change to another that its version
+   * in the plan names, as one it requires, runs in or conflicts with, and to one whose installed version names it, as
+   * that may not take its new version.
+   * @param versions - The plan's versions, by package
+   * @returns The changes between a choice and a change it needs, along the shortest way from one to the other
+   */
+  const chains = (versions: ReadonlyMap<PackageKey, string>) => {
+    const named = (key: PackageKey, version: string | undefined): PackageKey[] => {
+      const release = version === undefined || key === CORE ? undefined : releaseOf(key, version);
+      if (release === undefined) return [];
+      const { requires, systems, conflicts } = release.relationships;
+      return [...requires, ...systems, ...conflicts].map(({ package: ref }) => packageKey(ref));
+    };
+    const changed = [...versions.keys()].filter(key => key !== CORE);
+    const next = new Map(
+      changed.map(key => [
+        key,
+        changed.filter(
+          other =>
+            other !== key &&
+            (named(key, versions.get(key)).includes(other) || named(other, installed.get(other)).includes(key)),
+        ),
+      ]),
+    );
+    return (from: PackageKey, to: PackageKey): PackageVersion[] => {
+      // Breadth first, so that the way found is a shortest.
+      const came = new Map<PackageKey, PackageKey>();
+      const queue = [from];
+      for (let at = queue.shift(); at !== undefined && at !== to; at = queue.shift()) {
+        for (const other of next.get(at) ?? []) {
+          if (other === from || came.has(other)) continue;
+          came.set(other, at);
+          queue.push(other);
+        }
+      }
+      const way: PackageVersion[] = [];
+      for (let at = came.get(to); at !== undefined && at !== from; at = came.get(at)) {
+        way.unshift({ package: at, version: versions.get(at) ?? '' });
+      }
+      return way;
+    };
+  };
+
   // The same choices are completed again as lists open and close.
   const completions = new Map<string, Promise<Completion>>();
   // The resolver's words, naming the installed packages by their titles.
@@ -520,8 +570,10 @@ export function createPlanner(inputs: PlannerInputs): Planner {
         }
         versions = completion.versions;
       }
+      const chainOf = chains(versions);
       const entry = (key: PackageKey, version: string): PlanEntry => {
         const needer = picks.has(key) ? undefined : by.get(key);
+        const through = needer === undefined ? [] : chainOf(needer.package, key);
         const manifest = key === CORE || version === UNINSTALL ? undefined : releaseOf(key, version)?.versionManifest;
         const from = installed.get(key);
         return {
@@ -529,6 +581,7 @@ export function createPlanner(inputs: PlannerInputs): Planner {
           ...(from !== undefined && { installed: from }),
           version,
           ...(needer !== undefined && { by: needer }),
+          ...(through.length > 0 && { through }),
           ...(manifest !== undefined && { manifest }),
         };
       };
