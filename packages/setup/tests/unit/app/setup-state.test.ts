@@ -12,6 +12,37 @@ import { alone, installation, noInstall, noUpdates, unjudged } from '../../mocks
 const OVERVIEW = buildOverview(installation(), new Map());
 
 describe('SetupState', () => {
+  test("reads Foundry's listings once each, keeping a failure, and installs only where it can list and run", async () => {
+    const listPackages = vi
+      .fn<(type: 'module' | 'system') => Promise<never[]>>()
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error('offline'));
+    const options = {
+      load: () => Promise.resolve(OVERVIEW),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: noUpdates,
+      installModule: noInstall,
+    };
+    const setup = new SetupState({ ...options, listPackages, runStep: () => Promise.resolve() });
+    expect(setup.canInstall).toBe(true);
+
+    const reading = setup.loadListing('module');
+    expect(setup.listings.module).toBe('loading');
+    await reading;
+    await setup.loadListing('module');
+    await setup.loadListing('system');
+
+    expect(setup.listings).toEqual({ module: [], system: 'failed' });
+    expect(listPackages).toHaveBeenCalledTimes(2);
+
+    const without = new SetupState({ ...options, listPackages });
+    expect(without.canInstall).toBe(false);
+    const unlisted = new SetupState(options);
+    await unlisted.loadListing('module');
+    expect(unlisted.listings.module).toBeNull();
+  });
+
   test('reads the installation, saying while it does', async () => {
     let finish = (): void => undefined;
     const setup = new SetupState({

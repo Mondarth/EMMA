@@ -163,6 +163,25 @@
     "BackupSpace": "Size not known; {available} free",
     "BackupSizeUnknown": "Size not known"
   },
+  "Install": {
+    "Systems": "Install a game system",
+    "Modules": "Install a module",
+    "Reading": "Reading Foundry's package listing…",
+    "ReadFailed": "Could not read Foundry's package listing.",
+    "Hint": "Those that fit the installation and the plan, as Foundry's listing gives their newest versions. Adding one looks up its releases, and the plan takes the newest version that fits.",
+    "Search": "Search",
+    "Shown": "Showing {shown} of {count}",
+    "By": "by {author}",
+    "Newest": "newest {version}",
+    "Add": "Add {title} to the plan",
+    "Adding": "Looking it up…",
+    "Planned": "In the plan at {version}",
+    "TakeOut": "Take {title} out of the plan",
+    "NotNow": "It cannot be added now.",
+    "NotFound": "EMMA found no releases of it.",
+    "NoVersion": "No version of it fits the installation and the plan.",
+    "NotInstalled": "Not installed"
+  },
   "Uninstall": {
     "Heading": "Uninstall",
     "Button": "Uninstall {title}",

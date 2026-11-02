@@ -3,7 +3,7 @@
  * Foundry's own package buttons. Reactive, with Svelte 5 runes, so the window follows any change.
  */
 import type { PendingPlan } from '../foundry/preferences';
-import type { CoreTarget, CoreUpdateState, SnapshotSpace } from '../foundry/setup-game';
+import type { CoreTarget, CoreUpdateState, ListedPackage, SnapshotSpace } from '../foundry/setup-game';
 import type { Overview } from '../lib/overview';
 import type { RunStep, StepState } from '../lib/run';
 import { runSteps } from '../lib/run';
@@ -35,7 +35,12 @@ export interface SetupStateOptions {
   readonly keepPendingPlan?: (plan: PendingPlan | null) => boolean;
   /** The plan kept to restore after Foundry VTT's update, if any. */
   readonly pendingPlan?: () => PendingPlan | undefined;
+  /** Read Foundry's listing of the packages of a type that may be installed; none where it cannot be read. */
+  readonly listPackages?: (type: 'module' | 'system') => Promise<readonly ListedPackage[]>;
 }
+
+/** What is known of Foundry's listing of a type of package: `loading`, `failed`, or the packages; `null` before. */
+export type ListingState = readonly ListedPackage[] | 'loading' | 'failed' | null;
 
 /** Foundry's own updater, as its Update Software form drives it (see `foundry/setup-game.ts`). */
 export interface CoreUpdater {
@@ -96,6 +101,16 @@ export class SetupState {
   coreUpdating = $state.raw<CoreUpdating | null>(null);
   /** The version of Foundry VTT the plan was restored on, after it was updated to it. */
   resumedOn = $state<string | null>(null);
+  /** Foundry's listings of the game systems and modules that may be installed, once read, for the session. */
+  listings = $state.raw<Readonly<Record<'module' | 'system', ListingState>>>({ module: null, system: null });
+
+  /**
+   * Whether packages can be installed anew here.
+   * @returns `true` where Foundry's listing can be read and the plan run
+   */
+  get canInstall(): boolean {
+    return this.#options.listPackages !== undefined && this.#options.runStep !== undefined;
+  }
 
   /**
    * Whether Foundry can update itself in place, and its channel.
@@ -170,6 +185,25 @@ export class SetupState {
       this.installing = false;
     }
     await this.refresh();
+  }
+
+  /**
+   * Read Foundry's listing of a type of package that may be installed, once for the session. A failure is kept in
+   * {@link listings}, never thrown.
+   * @param type - Which
+   * @returns Once read, or failed
+   */
+  async loadListing(type: 'module' | 'system'): Promise<void> {
+    const list = this.#options.listPackages;
+    if (list === undefined || this.listings[type] !== null) return;
+    this.listings = { ...this.listings, [type]: 'loading' };
+    let listing: ListingState;
+    try {
+      listing = await list(type);
+    } catch {
+      listing = 'failed';
+    }
+    this.listings = { ...this.listings, [type]: listing };
   }
 
   /**

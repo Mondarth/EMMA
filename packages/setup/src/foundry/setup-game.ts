@@ -97,6 +97,8 @@ export interface SetupGame {
   installPackage?: (options: PackageInstall) => Promise<unknown>;
   /** Asks the user whether to install a package's missing dependencies, and installs those chosen. */
   installDependencies?: (pkg: unknown) => Promise<unknown>;
+  /** Foundry's listing of the packages of a type that may be installed, by ID, as its Install dialog shows it. */
+  getPackages?: (options: { readonly type: 'module' | 'system' }) => Promise<unknown>;
   /** Reads what is installed from the server again, and shows it, as Foundry does after uninstalling a package. */
   reload?: () => Promise<unknown>;
   /** Makes a snapshot of the installation, as **Manage Backups** does, with a note; it says itself if it fails. */
@@ -260,6 +262,66 @@ function field(value: unknown, name: string): unknown {
   return (typeof value === 'object' && value !== null) || typeof value === 'function'
     ? (Reflect.get(value, name) as unknown)
     : undefined;
+}
+
+/** A package on Foundry's listing, which gives only its newest version. */
+export interface ListedPackage {
+  readonly type: 'module' | 'system';
+  readonly id: string;
+  readonly title: string;
+  /** Its newest version. */
+  readonly version: string;
+  readonly author?: string;
+  /** The Foundry builds its newest version runs on, as its manifest declares them. */
+  readonly compatibility: { readonly minimum?: string; readonly verified?: string; readonly maximum?: string };
+  /** The IDs of the game systems a module is for; empty if it is for any. */
+  readonly systems: readonly string[];
+  /** Whether it is a premium package the user does not own, which Foundry cannot install for them. */
+  readonly unowned: boolean;
+}
+
+/**
+ * Read Foundry's listing of the game systems or modules that may be installed, as its Install dialog does, through
+ * `game.getPackages`, which asks the server, so it needs no proxy. Checked on Foundry 14.368: it answers a `Map` of
+ * each package's data by ID, keeps it for the session, and says itself if the server fails, answering an empty map.
+ * The listing gives each package's newest version alone, without the modules it requires.
+ * @param game - The setup screen's `game`
+ * @param type - Which
+ * @returns The packages, sorted by title; none if Foundry offers no listing
+ */
+export async function listPackages(game: SetupGame, type: 'module' | 'system'): Promise<ListedPackage[]> {
+  const listing = await game.getPackages?.call(game, { type });
+  if (!(listing instanceof Map)) return [];
+  return sorted(Array.from(listing.values() as Iterable<unknown>, entry => toListed(entry, type)));
+}
+
+/**
+ * Describe a package on Foundry's listing.
+ * @param entry - Its data
+ * @param type - Its type
+ * @returns The package, or `undefined` if it lacks an ID, title or version
+ */
+function toListed(entry: unknown, type: 'module' | 'system'): ListedPackage | undefined {
+  const described = toPackage(entry);
+  if (described === undefined) return undefined;
+  const data = entry as Record<string, unknown>;
+  const compatibility = field(data, 'compatibility');
+  const version = (name: string) => {
+    const value = field(compatibility, name);
+    return typeof value === 'string' || typeof value === 'number' ? { [name]: String(value) } : {};
+  };
+  const authors = field(data, 'authors');
+  const author = Array.isArray(authors) ? field(authors[0], 'name') : undefined;
+  return {
+    type,
+    id: described.id,
+    title: described.title,
+    version: described.version,
+    ...(typeof author === 'string' && author !== '' && { author }),
+    compatibility: { ...version('minimum'), ...version('verified'), ...version('maximum') },
+    systems: type === 'module' ? relatedIds(field(field(data, 'relationships'), 'systems')) : [],
+    unowned: data.protected === true && data.owned !== true,
+  };
 }
 
 /** What `game.installPackage` is given. */

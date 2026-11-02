@@ -147,6 +147,7 @@ export function alone(...updates: readonly PackageUpdate[]): Planner {
     },
     candidates: key =>
       updates.find(update => update.key === key)?.versions.filter(version => version !== installed.get(key)) ?? [],
+    add: key => Promise.resolve(installed.has(key)),
     titleOf: key => key,
     needsOf: () => [],
     missingManifest: () => false,

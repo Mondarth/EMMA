@@ -27,6 +27,8 @@ export interface ReleaseLookup {
   readonly universe: Universe;
   /** Load listed releases from their manifests, for `resolveInRounds`. */
   readonly load: (needs: readonly Release[]) => Promise<readonly Release[]>;
+  /** Look up every release of more packages, as of one to install anew, from the same sources. */
+  readonly lookUp: (packages: readonly PackageRef[]) => Promise<readonly Release[]>;
   /**
    * The packages the catalogue says cannot be had, archived or gone: only their installed releases are in the
    * universe, so they stay as they are.
@@ -241,6 +243,7 @@ export async function lookUpReleases(installed: InstalledManifests, options: Loo
   return {
     universe: { core: builds, releases: [...releases, ...missing.flat()] },
     load: needs => set.load(needs),
+    lookUp: async packages => (await set.universe(packages)).releases,
     unavailable,
     unreached: [...refs.map(packageKey).filter(key => failed.has(key)), ...(cores?.ok === false ? [CORE] : [])],
   };

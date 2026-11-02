@@ -220,9 +220,15 @@
                 aria-label={format('Plan.CoreBlocked', { reason: coreBlocked })}
                 data-tooltip={coreBlocked}></i>
             {/if}
-            {titles.get(choice.key) ?? choice.key}{@render stateOf(choice.key)}
+            {titles.get(choice.key) ?? updates.titleOf(choice.key)}{@render stateOf(choice.key)}
           </th>
-          <td>{choice.installed}</td>
+          <td>
+            {#if choice.installed === undefined}
+              <span class="emma-plan-note">{localize('Install.NotInstalled')}</span>
+            {:else}
+              {choice.installed}
+            {/if}
+          </td>
           <td>
             {#if choice.chosen === UNINSTALL}
               <span class="emma-plan-uninstall">{localize('Update.Uninstall')}</span>

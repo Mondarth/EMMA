@@ -59,6 +59,14 @@ describe('lookUpReleases', () => {
     await expect(found.load([])).resolves.toEqual([]);
   });
 
+  test('looks up more packages from the same sources, as one to install anew', async () => {
+    const installed: InstalledManifests = { core: CORE, manifests: [] };
+    const send = answering({});
+    const found = await lookUpReleases(installed, { kit: KIT, catalogue: null, proxy: null, fetch: send });
+
+    await expect(found.lookUp([{ type: 'module', id: 'dice' }])).resolves.toEqual([]);
+  });
+
   test('never asks a site that sends no CORS headers', async () => {
     const url = 'https://github.com/someone/lib/releases/latest/download/module.json';
     const send = answering({});

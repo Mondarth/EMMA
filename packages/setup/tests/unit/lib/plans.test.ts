@@ -1,5 +1,5 @@
-import type { CoreRelease, Release } from '@mondarth/fvtt-resolver';
-import { describe, expect, test } from 'vitest';
+import type { CoreRelease, PackageRef, Release } from '@mondarth/fvtt-resolver';
+import { describe, expect, test, vi } from 'vitest';
 
 import type { RecordState } from '../../../src/foundry/records';
 import { buildOverview } from '../../../src/lib/overview';
@@ -22,6 +22,7 @@ const CORES = [build('14.368'), build('14.369'), build('14.370')];
  * @param records - The worlds' records, each the modules it runs, as `[id, version]`
  * @param releases - Every release found, the installed ones among them
  * @param unrecorded - The IDs of worlds without a record
+ * @param lookUp - How the releases of packages not installed are looked up, if they can be
  * @returns The planner
  */
 function planner(
@@ -29,6 +30,7 @@ function planner(
   records: Readonly<Record<string, readonly (readonly [string, string])[]>>,
   releases: readonly Release[],
   unrecorded: readonly string[] = [],
+  lookUp?: (packages: readonly PackageRef[]) => Promise<readonly Release[]>,
 ) {
   const overview = buildOverview(
     installation({
@@ -49,6 +51,7 @@ function planner(
     load: () => Promise.resolve([]),
     policy: { verified: 'ignore', systemCompatibility: 'require', missingCompatibility: 'reject' },
     coreTitle: 'Foundry VTT',
+    ...(lookUp !== undefined && { lookUp }),
   });
 }
 
@@ -269,6 +272,55 @@ describe('createPlanner', () => {
     expect(plans.needsOf('module:midi', '9.9.9')).toEqual([]);
     expect(plans.needsOf('core', '14.369')).toEqual([]);
     expect(plans.universe.core).toBe(CORES);
+  });
+});
+
+describe('installing anew', () => {
+  /** Dice: 2.0.0 needs Foundry 15, 1.5.0 runs on 14, and 1.0.0 too. */
+  const DICE = [
+    release('module:dice', '1.0.0'),
+    release('module:dice', '1.5.0', { requires: { lib: {} } }),
+    release('module:dice', '2.0.0', { core: { minimum: '15' } }),
+    release('module:lib', '1.0.0'),
+  ];
+
+  test('looks up a package not installed once, offering its versions that run, and plans it with what it needs', async () => {
+    const lookUp = vi.fn(() => Promise.resolve(DICE));
+    const plans = planner([], { a: [] }, DND, [], lookUp);
+    expect(plans.candidates('module:dice')).toEqual([]);
+
+    await expect(plans.add('module:dice')).resolves.toBe(true);
+    await expect(plans.add('module:dice')).resolves.toBe(true);
+    expect(lookUp).toHaveBeenCalledExactlyOnceWith([{ type: 'module', id: 'dice' }]);
+
+    expect(plans.candidates('module:dice')).toEqual(['1.5.0', '1.0.0']);
+    await expect(plans.plan(picks(['module:dice', '1.5.0']))).resolves.toEqual([
+      {
+        key: 'module:lib',
+        version: '1.0.0',
+        by: { package: 'module:dice', version: '1.5.0' },
+        manifest: 'https://example.org/lib/1.0.0/module.json',
+      },
+      { key: 'module:dice', version: '1.5.0', manifest: 'https://example.org/dice/1.5.0/module.json' },
+    ]);
+  });
+
+  test('keeps a release looked up once, and plans afresh what failed before', async () => {
+    const lookUp = vi.fn(() => Promise.resolve([...DICE, release('module:dice', '1.0.0')]));
+    const plans = planner([], { a: [] }, DND, [], lookUp);
+    await expect(plans.complete(picks(['module:dice', '1.0.0']))).resolves.toMatchObject({ ok: false });
+
+    await plans.add('module:dice');
+
+    expect(plans.universe.releases.filter(({ package: ref }) => ref.id === 'dice')).toHaveLength(3);
+    await expect(plans.complete(picks(['module:dice', '1.0.0']))).resolves.toMatchObject({ ok: true });
+  });
+
+  test('finds nothing to add without a lookup, or where it finds nothing, and has the installed', async () => {
+    await expect(planner([], { a: [] }, DND).add('module:dice')).resolves.toBe(false);
+    await expect(planner([], { a: [] }, DND, [], () => Promise.resolve([])).add('module:dice')).resolves.toBe(false);
+    await expect(planner([], { a: [] }, DND, [], () => Promise.resolve(DICE)).add('system:none')).resolves.toBe(false);
+    await expect(planner([], { a: [] }, DND).add('system:dnd5e')).resolves.toBe(true);
   });
 });
 

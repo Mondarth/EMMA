@@ -9,6 +9,7 @@
   import type { Layout } from '../foundry/preferences';
   import { readLayout, writeLayout } from '../foundry/preferences';
   import { EXTENSION_RELEASES } from '../foundry/setup-kit';
+  import { installable } from '../lib/install';
   import { UNINSTALL } from '../lib/plans';
   import { stepText } from '../lib/run';
   import { groupDetail, moduleDetail, systemDetail } from '../lib/details';
@@ -22,6 +23,7 @@
   import Splitter from './Splitter.svelte';
   import SystemPanel from './SystemPanel.svelte';
   import CoreStep from './CoreStep.svelte';
+  import InstallSection from './InstallSection.svelte';
   import UninstallSection from './UninstallSection.svelte';
   import UpdatePlan from './UpdatePlan.svelte';
   import WorldPanel from './WorldPanel.svelte';
@@ -115,6 +117,25 @@
     }
   }
   const selection = $derived(selected.selection);
+  /** The type of package the selected group offers to install, if it offers any. */
+  const installType = $derived(
+    selection.kind === 'systems'
+      ? 'system'
+      : selection.kind === 'modules' || selection.kind === 'group'
+        ? 'module'
+        : undefined,
+  );
+  /** The packages on Foundry's listing that fit the installation and the plan, as the selected group shows them. */
+  const installablePackages = $derived.by(() => {
+    const listing = installType === undefined ? null : setup.listings[installType];
+    if (overview === null || typeof listing !== 'object' || listing === null) return [];
+    const kept = overview.systems.map(({ id }) => id).filter(id => updates.chosenOf(`system:${id}`) !== UNINSTALL);
+    const fits = installable(listing, overview, { core: updates.chosenOf('core') ?? overview.core, systems: kept });
+    // A system's group offers the modules for it, and the universal group those for any system.
+    if (selection.kind !== 'group') return fits;
+    const { system } = selection;
+    return fits.filter(pkg => (system === undefined ? pkg.systems.length === 0 : pkg.systems.includes(system)));
+  });
   // What is selected, if it is still there: after reading again, a world may have gone.
   const world = $derived(
     selection.kind === 'world' ? overview?.worlds.find(({ world: { id } }) => id === selection.world) : undefined,
@@ -174,6 +195,16 @@
             {@render uninstall(`system:${selection.system}`)}
           {:else if selection.kind === 'systems' || selection.kind === 'modules' || selection.kind === 'group'}
             <GroupPanel detail={groupDetail(overview, selection)} />
+            {#if installType !== undefined && setup.canInstall}
+              <InstallSection
+                type={installType}
+                listing={setup.listings[installType]}
+                packages={installablePackages}
+                {updates}
+                onShow={(type: 'module' | 'system') => {
+                  void setup.loadListing(type);
+                }} />
+            {/if}
           {:else if world !== undefined}
             <WorldPanel {world} />
           {:else}
