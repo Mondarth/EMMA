@@ -37,6 +37,8 @@ export interface SetupStateOptions {
   readonly keepPendingPlan?: (plan: PendingPlan | null) => boolean;
   /** The plan kept to restore after Foundry VTT's update, if any. */
   readonly pendingPlan?: () => PendingPlan | undefined;
+  /** Lock a game system or module in Foundry, or unlock it, as Foundry's own package menu does; none can be without. */
+  readonly lockPackage?: (type: 'module' | 'system', id: string, lock: boolean) => Promise<void>;
   /** Read Foundry's listing of the packages of a type that may be installed; none where it cannot be read. */
   readonly listPackages?: (type: 'module' | 'system') => Promise<readonly ListedPackage[]>;
 }
@@ -174,6 +176,35 @@ export class SetupState {
     } finally {
       this.loading = false;
     }
+  }
+
+  /**
+   * Whether packages can be locked and unlocked here.
+   * @returns `true` where they can
+   */
+  get canLock(): boolean {
+    return this.#options.lockPackage !== undefined;
+  }
+
+  /**
+   * Lock a game system or module in Foundry, or unlock it, then read the installation afresh, so that the plan keeps a
+   * package locked as it is, or may change one unlocked. Nothing is done while the plan runs; a failure, which Foundry
+   * tells the user of, leaves the package as it was.
+   * @param key - The package's key
+   * @param lock - Whether to lock it, or unlock it
+   * @returns Whether it was done
+   */
+  async setLocked(key: string, lock: boolean): Promise<boolean> {
+    const lockPackage = this.#options.lockPackage;
+    if (lockPackage === undefined || this.running || this.updates.locked) return false;
+    const type = key.startsWith('system:') ? 'system' : 'module';
+    try {
+      await lockPackage(type, key.slice(key.indexOf(':') + 1), lock);
+    } catch {
+      return false;
+    }
+    await this.refresh();
+    return true;
   }
 
   /**

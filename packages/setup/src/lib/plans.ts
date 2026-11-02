@@ -37,7 +37,7 @@ import type { KitResolver } from '@mondarth/emma-core/setup-kit';
 import { format, localize } from './i18n';
 import type { Overview } from './overview';
 import type { WorldUses } from './setups';
-import { newerIn, newestFirst, runsOn, usedBy } from './setups';
+import { keepsLocked, newerIn, newestFirst, runsOn, usedBy } from './setups';
 
 /**
  * The version a package is chosen at to uninstall it. A plan uninstalls such a package only if nothing it keeps needs
@@ -297,7 +297,9 @@ export function createPlanner(inputs: PlannerInputs): Planner {
         ],
   );
   const channels = policy.coreChannels ?? ['stable'];
-  let universe = inputs.universe;
+  // A package locked in Foundry keeps its installed release alone, however releases are found.
+  const unlocked = keepsLocked(resolver, overview);
+  let universe = { core: inputs.universe.core, releases: inputs.universe.releases.filter(unlocked) };
   const builds = () =>
     newestFirst(
       resolver,
@@ -407,7 +409,7 @@ export function createPlanner(inputs: PlannerInputs): Planner {
     // An update never goes back.
     const releases = rounds.universe.releases.filter(release => {
       const from = installed.get(packageKey(release.package));
-      return from === undefined || !newer(from, release.version);
+      return (from === undefined || !newer(from, release.version)) && unlocked(release);
     });
     universe = { core: universe.core, releases };
     return rounds.resolution;
@@ -637,7 +639,8 @@ export function createPlanner(inputs: PlannerInputs): Planner {
       );
     },
 
-    include(releases) {
+    include(read) {
+      const releases = read.filter(unlocked);
       const given = new Set(releases.map(release => `${packageKey(release.package)}@${release.version}`));
       universe = {
         core: universe.core,
@@ -658,7 +661,7 @@ export function createPlanner(inputs: PlannerInputs): Planner {
         manifest === undefined ? {} : { [key]: [manifest] },
       );
       const have = new Set(universe.releases.map(release => `${packageKey(release.package)}@${release.version}`));
-      const added = found.filter(release => {
+      const added = found.filter(unlocked).filter(release => {
         const id = `${packageKey(release.package)}@${release.version}`;
         if (have.has(id)) return false;
         have.add(id);

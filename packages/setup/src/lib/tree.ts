@@ -61,6 +61,8 @@ export interface TreeRow {
   readonly installed?: true;
   /** Whether the row is of a package the plan installs anew, or of the group of modules for such a game system. */
   readonly pending?: true;
+  /** Whether the row shows a package installed and locked in Foundry, which is kept as it is. */
+  readonly locked?: true;
   readonly status?: RowStatus;
   /** Whether the row has rows under it. */
   readonly expandable: boolean;
@@ -90,6 +92,7 @@ interface TreeNode {
   /** Whether the version is the one installed. */
   readonly installed?: true;
   readonly pending?: true;
+  readonly locked?: true;
   readonly status?: RowStatus;
   readonly children: () => readonly TreeNode[];
 }
@@ -121,6 +124,7 @@ export function visibleRows(
       ...(node.version !== undefined && { version: node.version }),
       ...(node.installed && { installed: true }),
       ...(node.pending && { pending: true }),
+      ...(node.locked && { locked: true }),
       ...(node.status !== undefined && { status: node.status }),
       expandable: children.length > 0,
       ...(children.length > 0 && !expanded.has(key) && { hides: packagesUnder(children) }),
@@ -218,7 +222,7 @@ function systemNodes(overview: Overview, modules: ReadonlyMap<string, ModuleUse>
   const node = (
     id: string,
     title: string,
-    shown: { version?: string; installed?: true; pending?: true; status?: RowStatus },
+    shown: { version?: string; installed?: true; pending?: true; locked?: true; status?: RowStatus },
   ): TreeNode => ({
     segment: `system:${id}`,
     selection: { kind: 'system', system: id },
@@ -228,8 +232,8 @@ function systemNodes(overview: Overview, modules: ReadonlyMap<string, ModuleUse>
       overview.worlds.filter(({ world }) => world.system === id).map(world => worldNode(world, modules, pending)),
   });
   return [
-    ...overview.systems.map(({ id, title, version }) =>
-      node(id, title, { version, installed: true, status: INSTALLED }),
+    ...overview.systems.map(({ id, title, version, locked }) =>
+      node(id, title, { version, installed: true, ...(locked && { locked }), status: INSTALLED }),
     ),
     ...planned.map(({ id, title, version }) => node(id, title, { version, pending: true })),
     ...missing.map(({ id }) => node(id, id, { status: MISSING })),
@@ -306,13 +310,14 @@ function runNode(
  * @returns Its node
  */
 function installedNode(use: ModuleUse, modules: ReadonlyMap<string, ModuleUse>, pending: Pending): TreeNode {
-  const { id, title, version } = use.module;
+  const { id, title, version, locked } = use.module;
   return {
     segment: `module:${id}`,
     selection: { kind: 'module', module: id },
     title,
     version,
     installed: true,
+    ...(locked && { locked }),
     children: () => requirementNodes([id], undefined, modules, pending),
   };
 }
@@ -347,7 +352,7 @@ function requirementNodes(
         selection: { kind: 'module', module: id, ...(world !== undefined && { world }) },
         title,
         ...(installed !== undefined
-          ? { version: installed.version, installed: true }
+          ? { version: installed.version, installed: true, ...(installed.locked && { locked: true }) }
           : planned === undefined
             ? { status: MISSING }
             : { version: planned.version, pending: true }),

@@ -14,6 +14,7 @@ import {
   checkCoreUpdate,
   checkSnapshotSpace,
   listPackages,
+  lockPackage,
   readCoreUpdate,
   readIndex,
   readInstallation,
@@ -111,6 +112,9 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
       update: () => startCoreUpdate(game, readCoreUpdate(game).channel),
     },
     listPackages: type => listPackages(game, type),
+    lockPackage: async (type, id, lock) => {
+      if (placed.guard !== undefined) await placed.guard.allowing(() => lockPackage(game, type, id, lock));
+    },
     keepPendingPlan: writePendingPlan,
     pendingPlan: readPendingPlan,
     runStep: async step => {

@@ -17,6 +17,7 @@ const CORE = { version: '14.368', generation: 14, channel: 'stable' } as const;
  * @param systems - The installed systems, each as `[id, version]`
  * @param unrecorded - The IDs of worlds without a record, which use D&D 5e too
  * @param cores - Foundry's builds known, the installed one, 14.368, among them
+ * @param locked - The IDs of the modules locked in Foundry
  * @returns What the search found
  */
 async function search(
@@ -26,11 +27,15 @@ async function search(
   systems: readonly (readonly [string, string])[] = [['dnd5e', '5.3.3']],
   unrecorded: readonly string[] = [],
   cores: readonly CoreRelease[] = [CORE],
+  locked: readonly string[] = [],
 ) {
   const overview = buildOverview(
     installation({
       worlds: [...Object.keys(records), ...unrecorded].map(id => ({ id, title: id, system: 'dnd5e' })),
-      modules: modules.map(([id, version]) => installedModule(id, id, version)),
+      modules: modules.map(([id, version]) => ({
+        ...installedModule(id, id, version),
+        ...(locked.includes(id) && { locked: true as const }),
+      })),
       systems: systems.map(([id, version]) => ({ id, title: id, version })),
     }),
     new Map<string, RecordState>(
@@ -82,6 +87,41 @@ describe('findUpdates', () => {
       { key: 'module:app', installed: '1.0.0', newest: '2.0.0', versions: ['2.0.0', '1.0.0'] },
       { key: 'module:lib', installed: '1.0.0', newest: '2.5.0', versions: ['2.5.0', '2.0.0', '1.0.0'] },
     ]);
+  });
+
+  test('keeps a package locked in Foundry as it is, offering nothing that would change it', async () => {
+    const found = await search(
+      [
+        ['app', '1.0.0'],
+        ['lib', '1.0.0'],
+      ],
+      {
+        a: [
+          ['app', '1.0.0'],
+          ['lib', '1.0.0'],
+        ],
+      },
+      [
+        ...DND,
+        release('module:app', '1.0.0', { requires: { lib: {} } }),
+        release('module:app', '1.5.0', { requires: { lib: {} } }),
+        release('module:app', '2.0.0', { requires: { lib: { minimum: '2.0.0' } } }),
+        release('module:lib', '1.0.0'),
+        release('module:lib', '2.0.0'),
+      ],
+      undefined,
+      [],
+      [CORE],
+      ['lib'],
+    );
+
+    expect([...found.updates.values()]).toEqual([
+      { key: 'module:app', installed: '1.0.0', newest: '1.5.0', versions: ['1.5.0', '1.0.0'] },
+    ]);
+    expect(found.planner.candidates('module:lib')).toEqual([]);
+    // Nor do releases found later change it.
+    found.planner.include([release('module:lib', '3.0.0')]);
+    expect(found.planner.candidates('module:lib')).toEqual([]);
   });
 
   test('offers a package the newest version every world that uses it accepts', async () => {

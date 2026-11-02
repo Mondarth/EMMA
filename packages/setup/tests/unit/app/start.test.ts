@@ -223,6 +223,22 @@ describe('startEmmaSetup', () => {
     });
   });
 
+  test("locks a package as Foundry's package menu does, through the guard", async () => {
+    const { game, post } = installSetupMocks({ modules: [{ id: 'midi-qol', title: 'Midi', version: '14.0.15' }] });
+    const menu = showMenu();
+    await startEmmaSetup();
+    menu.querySelector('button')?.click();
+    const setup = vi.mocked(openEmmaSetup).mock.lastCall?.[0] as SetupState;
+
+    await expect(setup.setLocked('module:midi-qol', true)).resolves.toBe(true);
+
+    expect(post).toHaveBeenCalledWith(
+      { action: 'lockPackage', type: 'module', id: 'midi-qol', shouldLock: true },
+      { notify: false },
+    );
+    expect([...game.modules].find(pkg => (pkg as { id: string }).id === 'midi-qol')).toMatchObject({ locked: true });
+  });
+
   test('installs the EMMA module from its prompt, through the guard', async () => {
     const { game, post, ui } = installSetupMocks();
     const installPackage = vi.fn(() => game.post({ action: 'installPackage', id: 'mondarth-emma' }));

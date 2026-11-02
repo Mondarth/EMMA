@@ -48,6 +48,6 @@ export async function runStep(game: SetupGame, guard: Guard, step: Exclude<RunSt
       return;
     }
     case 'uninstall':
-      await uninstallPackage(game, step.type, step.id);
+      await guard.allowing(() => uninstallPackage(game, step.type, step.id));
   }
 }

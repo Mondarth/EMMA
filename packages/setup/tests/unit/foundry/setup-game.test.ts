@@ -5,6 +5,7 @@ import {
   checkSnapshotSpace,
   isSetupGame,
   listPackages,
+  lockPackage,
   readIndex,
   readCoreUpdate,
   readInstallation,
@@ -370,5 +371,44 @@ describe('listPackages', () => {
     await expect(listPackages(game as never, 'module')).resolves.toEqual([]);
     Object.assign(game, { getPackages: () => Promise.resolve([]) });
     await expect(listPackages(game as never, 'module')).resolves.toEqual([]);
+  });
+});
+
+describe('lockPackage', () => {
+  test("locks a package as Foundry's package menu does, then shows it so in Foundry's list", async () => {
+    const { game } = installSetupMocks({ modules: [{ id: 'midi-qol', title: 'Midi', version: '14.0.15' }] });
+    const post = vi.fn(() => Promise.resolve({}));
+    Object.assign(game, { post });
+    const render = vi.fn();
+    vi.stubGlobal('ui', { setupPackages: { render } });
+    try {
+      await lockPackage(game as never, 'module', 'midi-qol', true);
+
+      expect(post).toHaveBeenCalledWith(
+        { action: 'lockPackage', type: 'module', id: 'midi-qol', shouldLock: true },
+        { notify: false },
+      );
+      expect([...game.modules].find(pkg => (pkg as { id: string }).id === 'midi-qol')).toMatchObject({ locked: true });
+      expect(render).toHaveBeenCalledOnce();
+
+      // A package Foundry does not show, and a screen without its list, are let be.
+      vi.stubGlobal('ui', {});
+      await lockPackage(game as never, 'system', 'gone', false);
+      expect(post).toHaveBeenLastCalledWith(
+        { action: 'lockPackage', type: 'system', id: 'gone', shouldLock: false },
+        { notify: false },
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  test('fails if the server refuses, changing nothing', async () => {
+    const { game } = installSetupMocks({ modules: [{ id: 'midi-qol', title: 'Midi', version: '14.0.15' }] });
+    Object.assign(game, { post: vi.fn(() => Promise.reject(new Error('No such package'))) });
+
+    await expect(lockPackage(game as never, 'module', 'midi-qol', true)).rejects.toThrow('No such package');
+
+    expect([...game.modules].find(pkg => (pkg as { id: string }).id === 'midi-qol')).not.toHaveProperty('locked', true);
   });
 });
