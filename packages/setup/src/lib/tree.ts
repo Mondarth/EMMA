@@ -187,8 +187,8 @@ function rootNode(overview: Overview, pending: Pending): TreeNode {
   };
 }
 
-/** The status of a package that is installed. */
-const INSTALLED: RowStatus = { kind: 'package', value: 'same' };
+/** The status of a package that is installed at the version in use: a world's, or one a world uses. */
+const IN_USE: RowStatus = { kind: 'package', value: 'same' };
 /** The status of a package that is not installed. */
 const MISSING: RowStatus = { kind: 'package', value: 'missing' };
 
@@ -234,7 +234,13 @@ function systemNodes(overview: Overview, modules: ReadonlyMap<string, ModuleUse>
   });
   return [
     ...overview.systems.map(({ id, title, version, locked }) =>
-      node(id, title, { version, installed: true, ...(locked && { locked }), status: INSTALLED }),
+      node(id, title, {
+        version,
+        installed: true,
+        ...(locked && { locked }),
+        // That it is installed, its version says; that a world uses it, its status.
+        ...(overview.worlds.some(({ world }) => world.system === id) && { status: IN_USE }),
+      }),
     ),
     ...planned.map(({ id, title, version }) => node(id, title, { version, pending: true })),
     ...missing.map(({ id }) => node(id, id, { status: MISSING })),

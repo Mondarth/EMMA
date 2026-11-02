@@ -211,7 +211,7 @@ describe('SetupRoot', () => {
     await user.keyboard('{ArrowRight}{ArrowRight}');
 
     expect(screen.getByRole('heading', { name: 'Idle' })).toBeInTheDocument();
-    expect(screen.queryByText(/^In /)).toBeNull();
+    expect(screen.queryByText(/^In \d/)).toBeNull();
     expect(screen.getByText('Game systems', { selector: 'dt' }).nextElementSibling).toHaveTextContent('D&D 5e');
     expect(items('Requires')).toEqual(['Library']);
     expect(screen.getByText('Not active in any recorded world.')).toBeInTheDocument();

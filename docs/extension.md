@@ -115,7 +115,7 @@ Foundry VTT
 
 - **The root**, Foundry VTT and its version: a summary of the worlds (how many, by game system, and how their records
   compare with what is installed) and of the modules (how many, and how many are active in a recorded world).
-- **Game systems**: each installed system, with its version marked **Installed**, and the worlds that use it; then any
+- **Game systems**: each installed system, with its version, marked **In use** if a world uses it, and the worlds that use it; then any
   system a world uses that is not installed, marked **Not installed**. Only one version of a system is installed at a
   time. Each world shows how its record compares with what is installed now:
   - **Matches its record**: Foundry, the game system and every module are installed at the versions the world last ran
@@ -123,9 +123,13 @@ Foundry VTT
   - **Changed since it last ran**: something has been updated or uninstalled since. The world's panel lists what.
   - **No record**, or **Record unreadable**: see below.
 - **Under each world**, first its game system, then the modules it runs, each with the version the world last ran with
-  and whether that version is **Installed**, **Another version installed**, or **Not installed**. So a world that last
+  and whether that version is **In use**, as it is installed, **Another version installed**, or **Not installed**. So a world that last
   ran with an older version of its system, or with a system since uninstalled, says so. A world without a record shows
   nothing under it, as EMMA cannot tell what it last ran with.
+
+Each of these badges says what it reports in its tooltip: **Current state**, or, where the plan changes it, **Planned
+update**. A badge of something the plan changes, a package it updates or uninstalls, or a world whose game system, a
+module it runs, or Foundry VTT the plan changes, takes its own colour and a dashed border instead of its usual colour.
 - **Modules**: every installed module, grouped by the game systems its manifest names. **Universal** holds the modules
   that name none, for use with any system. A module for several systems is in each of their groups.
 - **Under each module**, wherever it shows, the modules it requires, and under those the modules they require in turn.

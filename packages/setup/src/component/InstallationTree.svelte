@@ -100,13 +100,38 @@
   }
 
   /**
+   * Whether the plan changes what a row's status reports: the package, or for a world, Foundry VTT, its game system or
+   * a module it runs.
+   * @param row - The row
+   * @returns `true` if it does
+   */
+  function planned(row: TreeRow): boolean {
+    const changed = updates?.choices.map(({ key }) => key) ?? [];
+    const { selection } = row;
+    if (selection.kind !== 'world') {
+      const key = packageOf(selection);
+      return key !== undefined && changed.includes(key);
+    }
+    const world = overview.worlds.find(({ world: { id } }) => id === selection.world);
+    const uses = [
+      'core',
+      ...(world === undefined
+        ? []
+        : [`system:${world.world.system}`, ...world.modules.map(({ id }) => `module:${id}`)]),
+    ];
+    return uses.some(key => changed.includes(key));
+  }
+
+  /**
    * The text of a row's status.
    * @param row - The row
    * @returns The text, or `undefined` if it has no status
    */
   function statusText(row: TreeRow): string | undefined {
     if (row.status === undefined) return undefined;
-    return localize(row.status.kind === 'world' ? `Status.${row.status.value}` : `Module.${row.status.value}`);
+    if (row.status.kind === 'world') return localize(`Status.${row.status.value}`);
+    // The tree says a version installed is in use, as a world uses it; the panels say so of what is installed.
+    return localize(row.status.value === 'same' ? 'Tree.InUse' : `Module.${row.status.value}`);
   }
 </script>
 
@@ -187,7 +212,13 @@
         <span class="emma-tree-version">{row.version}</span>
       {/if}
       {#if status !== undefined}
-        <span class={['emma-status', `emma-status-${row.status?.value ?? ''}`]}>{status}</span>
+        {@const affected = planned(row)}
+        {@const meaning = localize(affected ? 'Status.Planned' : 'Status.Current')}
+        <span
+          class={['emma-status', affected ? 'emma-status-planned' : `emma-status-${row.status?.value ?? ''}`]}
+          data-tooltip={meaning}>
+          {status}<span class="emma-visually-hidden">, {meaning}</span>
+        </span>
       {/if}
       {#if row.pending}
         <span class="emma-status emma-tree-pending-label">{localize('Tree.Pending')}</span>
@@ -323,6 +354,12 @@
   .emma-status-unreadable,
   .emma-status-missing {
     color: var(--color-level-error, #e55);
+  }
+
+  /* What the plan changes, told apart by a dashed border as well as its colour, and by its tooltip. */
+  .emma-status-planned {
+    color: var(--color-level-info, #6af);
+    border-style: dashed;
   }
 
   /* On the selected row's background, the status takes the row's own colour, which stays readable. */
