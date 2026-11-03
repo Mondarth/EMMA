@@ -44,7 +44,7 @@ import { format, localize } from './i18n';
 import type { Planner, UpdateHold } from './plans';
 import { createPlanner } from './plans';
 import type { Use, WorldUses } from './setups';
-import { keepsLocked, newerIn, newestFirst, oldest, runsOn, unique, usedBy } from './setups';
+import { considered, keepsLocked, newerIn, newestFirst, oldest, runsOn, unique, usedBy } from './setups';
 
 import type { Overview } from './overview';
 
@@ -185,10 +185,22 @@ const BEST_VERSIONS_POLICY: Partial<Policy> = {
 
 /**
  * Find the updates on offer.
- * @param inputs - The installation, and the releases found
+ * @param given - The installation, and the releases found
  * @returns The updates, and the worlds no setup was found for
  */
-export async function findUpdates(inputs: UpdateInputs): Promise<UpdateSearch> {
+export async function findUpdates(given: UpdateInputs): Promise<UpdateSearch> {
+  // What EMMA ignores, the search never takes into account, nor the plans made from it.
+  const seen = considered(given.resolver, given.overview);
+  const { lookUp } = given;
+  const inputs: UpdateInputs = {
+    ...given,
+    overview: seen.overview,
+    universe: { core: given.universe.core, releases: [...seen.releases(given.universe.releases), ...seen.standIns] },
+    load: async needs => seen.releases(await given.load(needs)),
+    ...(lookUp !== undefined && {
+      lookUp: async (packages, manifests) => seen.releases(await lookUp(packages, manifests)),
+    }),
+  };
   const { resolver, badges, overview, load } = inputs;
   const { CORE, packageKey, resolveInRounds, sameVersion } = resolver;
   const newer = newerIn(resolver);

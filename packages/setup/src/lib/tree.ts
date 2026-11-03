@@ -15,7 +15,7 @@
  */
 import { localize } from './i18n';
 import type { ModuleStatus, ModuleUse, Overview, WorldModule, WorldOverview, WorldStatus } from './overview';
-import { byTitle } from './overview';
+import { byTitle, isIgnored } from './overview';
 
 /** What is selected in the tree, and so shown in the panel beside it. */
 export type TreeSelection =
@@ -66,6 +66,8 @@ export interface TreeRow {
   /** For a module another recommends, as a row under it: that module's key, `module:<id>`. */
   readonly recommendedBy?: string;
   readonly status?: RowStatus;
+  /** Whether EMMA ignores the world, game system or module the row shows. */
+  readonly ignored?: true;
   /** Whether the row has rows under it. */
   readonly expandable: boolean;
   /** While it is collapsed, the packages in the rows under it, at any depth, as {@link packageOf} names them. */
@@ -154,6 +156,7 @@ function rowsOf(
       ...(node.pending && { pending: true }),
       ...(node.locked && { locked: true }),
       ...(node.recommendedBy !== undefined && { recommendedBy: node.recommendedBy }),
+      ...(isIgnored(overview, ignoreKeyOf(node.selection) ?? '') && { ignored: true }),
       ...(node.status !== undefined && { status: node.status }),
       expandable: children.length > 0,
       ...(children.length > 0 && !isExpanded(key) && { hides: packagesUnder(children) }),
@@ -522,6 +525,19 @@ export function packageOf(selection: TreeSelection): string | undefined {
   if (selection.kind === 'system') return `system:${selection.system}`;
   if (selection.kind === 'module') return `module:${selection.module}`;
   return undefined;
+}
+
+/**
+ * The key EMMA ignores a row's world, game system or module by.
+ * @param selection - The row's selection
+ * @returns `world:<id>`, `system:<id>` or `module:<id>`, or `undefined` for a row that cannot be ignored
+ */
+export function ignoreKeyOf(selection: TreeSelection): string | undefined {
+  return selection.kind === 'world'
+    ? `world:${selection.world}`
+    : selection.kind === 'root'
+      ? undefined
+      : packageOf(selection);
 }
 
 /** Where a key moves the keyboard's row, or how it changes what is expanded. */

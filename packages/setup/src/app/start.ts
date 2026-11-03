@@ -8,9 +8,11 @@ import { installEmma } from '../foundry/install-emma';
 import { keepMenuButton } from '../foundry/menu-button';
 import {
   readCoreLocked,
+  readIgnored,
   readGuardOn,
   readPendingPlan,
   writeCoreLocked,
+  writeIgnored,
   writeGuardOn,
   writePendingPlan,
 } from '../foundry/preferences';
@@ -83,10 +85,15 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
   const placed: { guard?: Guard } = {};
   const setup = new SetupState({
     load: async () => {
-      const installation = { ...readInstallation(game), ...(readCoreLocked() && { coreLocked: true as const }) };
+      const installation = {
+        ...readInstallation(game),
+        ...(readCoreLocked() && { coreLocked: true as const }),
+        ignored: readIgnored(),
+      };
       return buildOverview(installation, await readRecords(installation.worlds.map(({ id }) => id)));
     },
     lockCore: writeCoreLocked,
+    ignore: writeIgnored,
     findUpdates: async overview => {
       const installed = readManifests(game);
       // The resolver comes from the installed EMMA module's setup kit, if it fits.

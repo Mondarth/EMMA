@@ -42,6 +42,11 @@ export interface Installation {
   readonly core: string;
   /** Whether EMMA keeps Foundry VTT at that version, as the user locked it in EMMA: Foundry has no lock for itself. */
   readonly coreLocked?: true;
+  /**
+   * What the user has EMMA ignore, by key, such as `world:alpha`, `system:dnd5e` or `module:dice`: kept by EMMA alone,
+   * as Foundry has no such setting.
+   */
+  readonly ignored?: readonly string[];
   readonly worlds: readonly InstalledWorld[];
   readonly modules: readonly InstalledModule[];
   readonly systems: readonly InstalledPackage[];

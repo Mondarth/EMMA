@@ -102,6 +102,25 @@ describe('SetupState', () => {
     expect(lockCore).toHaveBeenCalledOnce();
   });
 
+  test('ignores a world, a game system or a module only where it can, while no plan runs, reading again', async () => {
+    const load = vi.fn(() => Promise.resolve(OVERVIEW));
+    const options = { load, guardOn: true, onGuardChange: vi.fn(), findUpdates: noUpdates, installModule: noInstall };
+    const without = new SetupState(options);
+    expect(without.canIgnore).toBe(false);
+    await expect(without.setIgnored('module:lib', true)).resolves.toBe(false);
+
+    const ignore = vi.fn();
+    const setup = new SetupState({ ...options, ignore });
+    expect(setup.canIgnore).toBe(true);
+    await expect(setup.setIgnored('world:a', true)).resolves.toBe(true);
+    expect(ignore).toHaveBeenCalledWith('world:a', true);
+    expect(load).toHaveBeenCalledOnce();
+
+    setup.updates.locked = true;
+    await expect(setup.setIgnored('world:a', false)).resolves.toBe(false);
+    expect(ignore).toHaveBeenCalledOnce();
+  });
+
   test('reads the installation, saying while it does', async () => {
     let finish = (): void => undefined;
     const setup = new SetupState({

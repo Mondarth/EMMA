@@ -103,6 +103,8 @@ export interface Overview {
   readonly core: string;
   /** Whether EMMA keeps Foundry VTT at the build installed (see {@link Installation.coreLocked}). */
   readonly coreLocked?: true;
+  /** What EMMA ignores, by key (see {@link Installation.ignored}): plans never take it into account. */
+  readonly ignored?: readonly string[];
   /** The installed game systems, sorted by title. */
   readonly systems: readonly InstalledPackage[];
   readonly worlds: readonly WorldOverview[];
@@ -123,6 +125,13 @@ export function buildOverview(installation: Installation, records: ReadonlyMap<s
   const worlds = installation.worlds.map(world =>
     worldOverview(world, records.get(world.id) ?? { kind: 'none' }, installation.core, modules, systems),
   );
+  // What is ignored and still there: a key kept for something uninstalled since is no more.
+  const there = new Set([
+    ...installation.worlds.map(({ id }) => `world:${id}`),
+    ...installation.systems.map(({ id }) => `system:${id}`),
+    ...installation.modules.map(({ id }) => `module:${id}`),
+  ]);
+  const ignored = (installation.ignored ?? []).filter(key => there.has(key));
   const uses = installation.modules.map((installed): ModuleUse => {
     const runs = (world: WorldOverview): boolean => world.modules.some(({ id }) => id === installed.id);
     const needs = (world: WorldOverview): boolean => world.needs.some(({ id }) => id === installed.id);
@@ -135,6 +144,7 @@ export function buildOverview(installation: Installation, records: ReadonlyMap<s
   return {
     core: installation.core,
     ...(installation.coreLocked && { coreLocked: true }),
+    ...(ignored.length > 0 && { ignored }),
     systems: installation.systems,
     worlds,
     modules: uses,
@@ -292,4 +302,14 @@ function summarise(
 export function byTitle(a: { id: string; title: string }, b: { id: string; title: string }): number {
   const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
   return collator.compare(a.title, b.title) || collator.compare(a.id, b.id);
+}
+
+/**
+ * Whether EMMA ignores a world, a game system or a module.
+ * @param overview - The installation
+ * @param key - Its key, such as `world:alpha`, `system:dnd5e` or `module:dice`
+ * @returns `true` if it is ignored
+ */
+export function isIgnored(overview: Overview, key: string): boolean {
+  return overview.ignored?.includes(key) === true;
 }

@@ -405,6 +405,24 @@ build, but still updates the game systems and modules that run on the build inst
 its build and still have its packages brought up to date. The tree's root shows the lock, **Locked in EMMA**. The
 browser remembers the lock for that server. It does not stop Foundry's own **Update Software**.
 
+### Ignoring
+
+A world, game system or module can be ignored, in EMMA alone: no plan takes it into account. This is the EMMA module's
+hypothetical-mode ignore (see [Modules hypothetical mode ignores](usage.md#modules-hypothetical-mode-ignores)), extended
+to whole worlds and to game systems, outside any one world.
+
+- **An ignored game system or module** stays at its installed version. EMMA never looks up or judges its other
+  releases, so it is never updated or offered as an update. What it asks of the setup holds nothing back, and whatever
+  version of it another package asks for is taken to be the one installed. Use it for a package whose releases EMMA
+  cannot read, or judges wrongly.
+- **An ignored world** holds nothing back: what it runs is not taken into account, so a plan may leave it unable to
+  run. Use it for a world no longer played.
+
+Each world's panel, and each installed game system's and module's, has an **Ignore** section: **Ignore <title>** or
+**Stop ignoring <title>**. It takes effect at once, reading the installation again, not in the plan. An ignored row is
+greyed out and struck through in the tree, and can still be selected: its panel has an **Ignored** block in its top
+right corner, which stays in view as the panel scrolls. The browser remembers what is ignored for that server.
+
 ### Uninstalling
 
 The panel of a game system or module has an **Uninstall** section below it. **Uninstall <title>** puts the package in
