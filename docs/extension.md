@@ -359,6 +359,25 @@ catalogue saw it give before is installed from it only where Foundry's listing l
 versions found from it cannot be installed, as the manifest no longer gives them, so such a package has only the
 version installed and the latest to choose between. What its download gives may also change under the same version.
 
+### Recommended modules
+
+A module's manifest may name modules it recommends: modules that work with it, though it runs without them. Each shows
+in the module's panel, under **Recommends**, and under the module in the tree, marked **Recommended**, with a checkbox
+at its left, **Install <recommended> with <module>**. A module ticked comes into the plan with the module that
+recommends it, at the newest version that fits, when that module is added to the plan, or at once if it is in the plan
+already; one installed already is left as it is. Its row in the plan says **recommended by <module>**. It goes with
+that module, taken out of the plan, and so it does unticked. The tree's checkbox takes a click; from the keyboard, the
+panel's does the same. Both lists are by name. A module installed already is shown ticked, and cannot be unticked,
+as it is there whatever is chosen. One ticked that cannot come into the plan with its module, as no version of it fits,
+is unticked again, saying why below it, or, in the tree, in its checkbox's tooltip.
+
+A module to install, in an **Install** section, has the same in its drawer: opened, the drawer reads the module's
+manifest, as Foundry's listing does not say, and lists what it **Requires**, which comes into the plan with it, and what
+it **Recommends**, each with its checkbox. **Always install recommendations**, with the section's filters, ticks every
+recommendation at first, so that a module added brings them all in; untick one in the drawer before adding the module
+to leave it out. A module whose wanted recommendation cannot be added is not added either: the section says which, so
+that it can be unticked.
+
 ### Locking
 
 A game system or module locked in Foundry has a lock beside it in the tree. EMMA keeps it as it is installed, as

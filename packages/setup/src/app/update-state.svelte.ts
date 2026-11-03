@@ -4,7 +4,7 @@
  * window follows any change.
  */
 import type { PackageKey, Release } from '@mondarth/fvtt-resolver';
-import { SvelteMap } from 'svelte/reactivity';
+import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
 import type { KitProblem } from '../foundry/setup-kit';
 import { KitUnavailable } from '../foundry/setup-kit';
@@ -38,6 +38,8 @@ export interface UpdateChoice {
   readonly manifest?: string;
   /** Whether the user added it against EMMA's advice, so that the plan installs it as given, without resolving it. */
   readonly forced?: true;
+  /** The title of the module in the plan that recommends it, for one installed as the user wanted it with that one. */
+  readonly recommendedBy?: string;
 }
 
 /** A package the user added against EMMA's advice, from a manifest they gave: installed as given, and resolved never. */
@@ -147,10 +149,22 @@ export class UpdateState {
   readonly #picks = new SvelteMap<PackageKey, string>();
   /** The titles of the packages installed anew, as Foundry's listing gives them, by package key. */
   readonly #named = new SvelteMap<PackageKey, string>();
+  /** The titles of every package on Foundry's listing, once read, by package key, to name any not installed by. */
+  readonly #listingTitles = new SvelteMap<PackageKey, string>();
   /** The releases read from manifests the user gave, by package key, which no search finds again. */
   readonly #manual = new SvelteMap<PackageKey, Release>();
   /** The packages added against EMMA's advice, by package key. */
   readonly #forced = new SvelteMap<PackageKey, ForcedInstall>();
+  /** The modules the user wants with a module that recommends them, as `<module>><recommended>`. */
+  readonly #recommending = new SvelteSet<string>();
+  /** Those the user does not want, though they always want what a module recommends, as `<module>><recommended>`. */
+  readonly #unwanted = new SvelteSet<string>();
+  /** Why each module a module recommends could not come into the plan with it, as `<module>><recommended>`. */
+  readonly #rejected = new SvelteMap<string, Exclude<InstallResult, { ok: true }>>();
+  /** Whether the user wants every module a module recommends with it, but for those they untick. */
+  alwaysRecommended = $state(false);
+  /** The modules the plan installs as a module in it recommends them, by their keys, each with that module's. */
+  readonly #recommendedBy = new SvelteMap<PackageKey, PackageKey>();
   /** What the user changed of the plan's snapshot and backups, by their keys. */
   readonly #safeguardEdits = new SvelteMap<string, SafeguardEdit>();
   /** The installation the last search was for. */
@@ -179,6 +193,7 @@ export class UpdateState {
         ...(through !== undefined && {
           through: through.map(step => ({ title: this.titleOf(step.package), version: step.version })),
         }),
+        ...(this.#recommendedBy.has(key) && { recommendedBy: this.titleOf(this.#recommendedBy.get(key) ?? key) }),
       })),
     ...[...this.#forced.values()].map(({ key, version, manifest }) => ({
       key,
@@ -261,6 +276,8 @@ export class UpdateState {
       this.#picks.clear();
       for (const [key, version] of plan === undefined ? [] : picks) this.#picks.set(key, version);
       this.plan = plan ?? [];
+      // What came in on a recommendation and is no longer chosen is no longer the recommendation's.
+      for (const key of [...this.#recommendedBy.keys()]) if (!this.#picks.has(key)) this.#recommendedBy.delete(key);
     } catch (error) {
       if (search !== this.#searches) return;
       if (error instanceof KitUnavailable) {
@@ -462,6 +479,19 @@ export class UpdateState {
    * @returns Whether the plan could take it, and so it is chosen
    */
   async choose(key: PackageKey, version: string): Promise<boolean> {
+    const chosen = await this.#choose(key, version);
+    // What it recommends that the user ticked comes in with it.
+    if (chosen && version !== UNINSTALL) await this.#bringRecommended(key);
+    return chosen;
+  }
+
+  /**
+   * Choose a version of a package, as {@link choose} does, without what it recommends.
+   * @param key - The package's key
+   * @param version - The version
+   * @returns Whether it was chosen
+   */
+  async #choose(key: PackageKey, version: string): Promise<boolean> {
     if (this.locked) return false;
     const search = this.search;
     const overview = this.#overview;
@@ -509,8 +539,19 @@ export class UpdateState {
     for (const version of installable) {
       const completion = await planner.complete(withChoice(this.#picks, key, version));
       if (completion.ok) {
-        const chosen = await this.choose(key, version);
-        return chosen ? { ok: true, version } : { ok: false, reason: localize('Install.NotNow') };
+        const chosen = await this.#choose(key, version);
+        // What it recommends that the user wants comes in with it, or it does not come in at all.
+        const missed = chosen ? await this.#bringRecommended(key, false) : [];
+        if (!chosen || missed.length === 0) {
+          return chosen ? { ok: true, version } : { ok: false, reason: localize('Install.NotNow') };
+        }
+        await this.takeOut(key, true);
+        return {
+          ok: false,
+          reason: format('Recommends.Blocked', {
+            modules: new Intl.ListFormat('en').format(missed.map(recommended => this.#nameOf(recommended))),
+          }),
+        };
       }
       explanation ??= completion.explanation;
     }
@@ -550,6 +591,24 @@ export class UpdateState {
    * @returns Whether it was taken out
    */
   async takeOut(key: PackageKey, withNeeds: boolean): Promise<boolean> {
+    const taken = await this.#takeOut(key, withNeeds);
+    // What came in on its recommendation goes with it.
+    if (taken) {
+      for (const [recommended] of [...this.#recommendedBy].filter(([, by]) => by === key)) {
+        this.#recommendedBy.delete(recommended);
+        await this.#takeOut(recommended, true);
+      }
+    }
+    return taken;
+  }
+
+  /**
+   * Take a change out of the plan, as {@link takeOut} does, leaving what came in on its recommendation.
+   * @param key - The package's key
+   * @param withNeeds - Whether what it brought in goes with it
+   * @returns Whether it was taken out
+   */
+  async #takeOut(key: PackageKey, withNeeds: boolean): Promise<boolean> {
     if (!this.locked && this.#forced.has(key)) {
       this.#forced.delete(key);
       return true;
@@ -577,7 +636,7 @@ export class UpdateState {
     if (plan === undefined || search !== this.search) return false;
     // A change in a ring of changes that need each other, as each brings the next in, would only come straight back:
     // it goes with what it brought in.
-    if (!withNeeds && plan.some(entry => entry.key === key)) return this.takeOut(key, true);
+    if (!withNeeds && plan.some(entry => entry.key === key)) return this.#takeOut(key, true);
     this.#picks.clear();
     for (const [picked, to] of picks) this.#picks.set(picked, to);
     this.plan = plan;
@@ -675,7 +734,7 @@ export class UpdateState {
   titleOf(key: PackageKey): string {
     if (key === 'core') return localize('Tree.Root');
     const title = this.#overview === null ? key : titleIn(this.#overview, key);
-    return title === key ? (this.#named.get(key) ?? key) : title;
+    return title === key ? (this.#named.get(key) ?? this.#listingTitles.get(key) ?? key) : title;
   }
 
   /**
@@ -782,6 +841,7 @@ export class UpdateState {
       if (plan === undefined || search !== this.search) return false;
       this.#picks.clear();
       this.#forced.clear();
+      this.#recommendedBy.clear();
       this.#safeguardEdits.clear();
       for (const [picked, to] of picks) this.#picks.set(picked, to);
       this.plan = plan;
@@ -791,11 +851,183 @@ export class UpdateState {
     }
   }
 
+  /**
+   * The modules a module recommends: those the version in the plan does, or else the installed one.
+   * @param key - The module's key
+   * @returns Each with its title, whether it is installed, and whether the user wants it with the module
+   */
+  recommendationsOf(key: PackageKey): readonly {
+    readonly key: PackageKey;
+    readonly title: string;
+    readonly installed: boolean;
+    readonly wanted: boolean;
+    /** Why it could not come into the plan with the module, if it could not. */
+    readonly rejected?: Exclude<InstallResult, { ok: true }> | undefined;
+  }[] {
+    const planner = this.search?.planner;
+    const version = this.plan.find(entry => entry.key === key)?.version ?? this.#installedOf(key);
+    if (planner === undefined || version === undefined) return [];
+    // By title, as the tree shows them.
+    return planner
+      .recommendsOf(key, version)
+      .map(({ key: recommended }) => ({
+        key: recommended,
+        title: this.#nameOf(recommended),
+        installed: this.#installedOf(recommended) !== undefined,
+        // One installed is there anyway, so it is as good as wanted.
+        wanted: this.#installedOf(recommended) !== undefined || this.wants(key, recommended),
+        ...(this.#rejected.has(`${key}>${recommended}`) && {
+          rejected: this.#rejected.get(`${key}>${recommended}`),
+        }),
+      }))
+      .sort((a, b) => a.title.localeCompare(b.title) || a.key.localeCompare(b.key));
+  }
+
+  /**
+   * The modules a package requires and recommends, as the manifest the user would install it from says, for one not
+   * installed, whose releases are not known until it is added.
+   * @param url - The manifest's URL
+   * @param type - The package's type
+   * @returns The modules, by their keys, with the manifest URL a recommendation gives; none if it cannot be read
+   */
+  async relationsOf(
+    url: string,
+    type: 'module' | 'system',
+  ): Promise<
+    | {
+        readonly requires: readonly PackageKey[];
+        readonly recommends: readonly { readonly key: PackageKey; readonly manifest?: string }[];
+      }
+    | undefined
+  > {
+    const read = this.search?.readManifest;
+    const found = read === undefined ? undefined : await read(url, type);
+    if (found?.ok !== true) return undefined;
+    const { requires, recommends } = found.release.relationships;
+    const modules = <T extends { readonly package: { readonly type: string; readonly id: string } }>(
+      related: readonly T[],
+    ) => related.filter(({ package: ref }) => ref.type === 'module' && ref.id !== found.release.package.id);
+    return {
+      requires: modules(requires).map(({ package: ref }) => `module:${ref.id}`),
+      recommends: modules(recommends).map(({ package: ref, manifest }) => ({
+        key: `module:${ref.id}`,
+        ...(manifest !== undefined && { manifest }),
+      })),
+    };
+  }
+
+  /**
+   * A package's name: its title, or, for one not installed nor looked up yet, which has none, its ID, as the tree names
+   * it.
+   * @param key - Its key
+   * @returns Its name
+   */
+  #nameOf(key: PackageKey): string {
+    const title = this.titleOf(key);
+    return title === key ? key.slice(key.indexOf(':') + 1) : title;
+  }
+
+  /**
+   * Whether the user wants a module with one that recommends it.
+   * @param key - The module's key
+   * @param recommended - The recommended module's key
+   * @returns `true` if they do
+   */
+  wants(key: PackageKey, recommended: PackageKey): boolean {
+    const pair = `${key}>${recommended}`;
+    return this.alwaysRecommended ? !this.#unwanted.has(pair) : this.#recommending.has(pair);
+  }
+
+  /**
+   * Why a module a module recommends could not come into the plan with it.
+   * @param key - The module's key
+   * @param recommended - The recommended module's key
+   * @returns Why, in the plan's words, if it could not
+   */
+  rejectionOf(key: PackageKey, recommended: PackageKey): Exclude<InstallResult, { ok: true }> | undefined {
+    return this.#rejected.get(`${key}>${recommended}`);
+  }
+
+  /**
+   * Whether a package is installed.
+   * @param key - Its key
+   * @returns `true` if it is
+   */
+  isInstalled(key: PackageKey): boolean {
+    return this.#installedOf(key) !== undefined;
+  }
+
+  /**
+   * Want a module a module recommends with it, or not. Wanted, it comes into the plan with that module, now if the
+   * module is in it already, at the newest version that fits, unless it is installed; unwanted, what came in on the
+   * recommendation goes.
+   * @param key - The module's key
+   * @param recommended - The recommended module's key
+   * @param wanted - Whether it is wanted
+   * @returns Once the plan is as wanted
+   */
+  async setRecommended(key: PackageKey, recommended: PackageKey, wanted: boolean): Promise<void> {
+    if (this.locked) return;
+    const pair = `${key}>${recommended}`;
+    this.#rejected.delete(pair);
+    if (wanted) {
+      this.#recommending.add(pair);
+      this.#unwanted.delete(pair);
+      if (this.#picks.has(key) && this.#picks.get(key) !== UNINSTALL) await this.#bringRecommended(key);
+      return;
+    }
+    this.#recommending.delete(pair);
+    this.#unwanted.add(pair);
+    if (this.#recommendedBy.get(recommended) !== key) return;
+    this.#recommendedBy.delete(recommended);
+    await this.#takeOut(recommended, true);
+  }
+
+  /**
+   * Bring into the plan what the user wants of what a module in it recommends, and is neither installed nor planned.
+   * @param key - The module's key
+   * @param untick - Whether one that cannot be brought in is no longer wanted, and says why
+   * @returns Those wanted that could not be brought in
+   */
+  async #bringRecommended(key: PackageKey, untick = true): Promise<PackageKey[]> {
+    const planner = this.search?.planner;
+    const version = this.#picks.get(key);
+    if (planner === undefined || version === undefined) return [];
+    const missed: PackageKey[] = [];
+    for (const { key: recommended, manifest } of planner.recommendsOf(key, version)) {
+      if (!this.wants(key, recommended)) continue;
+      if (this.#installedOf(recommended) !== undefined || this.#picks.has(recommended)) continue;
+      const result = await this.install(recommended, undefined, manifest);
+      if (result.ok) {
+        this.#recommendedBy.set(recommended, key);
+        continue;
+      }
+      missed.push(recommended);
+      // One that cannot come in is no longer wanted, saying why, but where the module is not to come in without it.
+      if (!untick) continue;
+      const pair = `${key}>${recommended}`;
+      this.#recommending.delete(pair);
+      this.#unwanted.add(pair);
+      this.#rejected.set(pair, result);
+    }
+    return missed;
+  }
+
+  /**
+   * Know the titles Foundry's listing gives, so that a package not installed is named by its title wherever it shows,
+   * as one a module recommends that comes into the plan with it.
+   * @param packages - The packages on the listing
+   */
+  knowListing(packages: readonly { readonly type: string; readonly id: string; readonly title: string }[]): void {
+    for (const { type, id, title } of packages) this.#listingTitles.set(`${type}:${id}`, title);
+  }
+
   /** Take back every choice, and what was changed of the plan's snapshot and backups. */
   clear(): void {
     if (this.locked) return;
     this.#picks.clear();
     this.#forced.clear();
+    this.#recommendedBy.clear();
     this.#safeguardEdits.clear();
     this.plan = [];
   }

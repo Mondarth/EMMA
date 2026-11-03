@@ -249,6 +249,9 @@
                     })}
               </span>
             {/if}
+            {#if choice.recommendedBy !== undefined}
+              <span class="emma-plan-needed">{format('Update.RecommendedBy', { title: choice.recommendedBy })}</span>
+            {/if}
             {#if choice.forced}
               <span class="emma-plan-against">
                 <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>

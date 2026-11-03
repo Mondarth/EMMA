@@ -5,6 +5,7 @@
   other choices, looking its releases up first, or says why none does.
 -->
 <script lang="ts">
+  import type { PackageKey } from '@mondarth/fvtt-resolver';
   import { SvelteMap } from 'svelte/reactivity';
 
   import type { ListingState } from '../app/setup-state.svelte';
@@ -70,6 +71,45 @@
     };
   });
 
+  type Relations = NonNullable<Awaited<ReturnType<UpdateState['relationsOf']>>>;
+  /** What each package opened requires and recommends, by its ID, as its manifest says, once read or while it is. */
+  const relations = new SvelteMap<string, 'reading' | 'unreadable' | Relations>();
+  /** The titles of the packages listed, by key, to name what one requires and recommends by. */
+  const titles = $derived(
+    new Map<string, string>(
+      (Array.isArray(listing) ? listing : []).map(({ type: kind, id, title }) => [`${kind}:${id}`, title]),
+    ),
+  );
+
+  /**
+   * Read what a package requires and recommends from its manifest, once, as its drawer opens.
+   * @param pkg - The package
+   */
+  async function readRelations(pkg: ListedPackage): Promise<void> {
+    const { manifest } = pkg;
+    if (manifest === undefined || relations.has(pkg.id)) return;
+    relations.set(pkg.id, 'reading');
+    relations.set(pkg.id, (await updates.relationsOf(manifest, pkg.type)) ?? 'unreadable');
+  }
+
+  /**
+   * A module's name, as the listing or the installation gives it.
+   * @param key - The module's key
+   * @returns Its title, or else its ID
+   */
+  function nameOf(key: PackageKey): string {
+    const title = titles.get(key) ?? updates.titleOf(key);
+    return title === key ? key.slice(key.indexOf(':') + 1) : title;
+  }
+
+  /**
+   * Some modules, by name.
+   * @param keys - The modules' keys
+   * @returns The keys, sorted by name
+   */
+  const byName = (keys: readonly PackageKey[]): PackageKey[] =>
+    [...keys].sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+
   /** The manifest URL the user is giving. */
   let manifestUrl = $state('');
   /** How adding from it went, while it is read or once it has been. */
@@ -116,6 +156,69 @@
     else added.set(key, result);
   }
 </script>
+
+{#snippet relationsOf(pkg: ListedPackage)}
+  {@const key = `${pkg.type}:${pkg.id}`}
+  {@const read = relations.get(pkg.id)}
+  {#if read === 'reading'}
+    <p class="emma-install-hint">{localize('Relations.Reading')}</p>
+  {:else if read === 'unreadable'}
+    <p class="emma-install-hint">{localize('Relations.Unreadable')}</p>
+  {:else if read !== undefined}
+    {#if read.requires.length > 0}
+      <h4>{localize('Relations.Requires')}</h4>
+      <ul class="emma-install-relations">
+        {#each byName(read.requires) as required (required)}
+          <li>
+            {nameOf(required)}
+            <span class="emma-install-hint">
+              {localize(updates.isInstalled(required) ? 'Module.same' : 'Relations.ComesWith')}
+            </span>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+    {#if read.recommends.length > 0}
+      <h4>{localize('Recommends.Heading')}</h4>
+      <ul class="emma-install-relations">
+        {#each byName(read.recommends.map(({ key: recommended }) => recommended)) as recommended (recommended)}
+          {@const why = updates.rejectionOf(key, recommended)}
+          <li>
+            <label>
+              <input
+                type="checkbox"
+                checked={updates.isInstalled(recommended) || updates.wants(key, recommended)}
+                disabled={updates.locked || updates.isInstalled(recommended)}
+                aria-label={format('Recommends.Want', { title: nameOf(recommended), by: pkg.title })}
+                onchange={event => {
+                  void updates.setRecommended(key, recommended, event.currentTarget.checked);
+                }} />
+              {nameOf(recommended)}
+            </label>
+            <span class="emma-install-hint">
+              {localize(updates.isInstalled(recommended) ? 'Module.same' : 'Module.missing')}
+            </span>
+            {#if why !== undefined}
+              <div class="emma-install-failed">
+                <p>{format('Recommends.Rejected', { reason: why.reason })}</p>
+                {#if why.explanation !== undefined}
+                  <ul>
+                    {#each why.explanation as line, index (index)}
+                      <li>{line}</li>
+                    {/each}
+                  </ul>
+                {/if}
+              </div>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
+    {#if read.requires.length === 0 && read.recommends.length === 0}
+      <p class="emma-install-hint">{localize('Relations.None')}</p>
+    {/if}
+  {/if}
+{/snippet}
 
 <section class="emma-install" aria-labelledby="{uid}-heading">
   <h3 id="{uid}-heading">
@@ -228,6 +331,18 @@
           }} />
         {localize(`Install.ShowUnowned${plural}`)}
       </label>
+      {#if type === 'module'}
+        <label>
+          <input
+            type="checkbox"
+            checked={updates.alwaysRecommended}
+            disabled={updates.locked}
+            onchange={event => {
+              updates.alwaysRecommended = event.currentTarget.checked;
+            }} />
+          {localize('Recommends.Always')}
+        </label>
+      {/if}
       {#if tags.length > 0}
         <div class="emma-install-tags" role="group" aria-label={localize('Install.Tags')}>
           {#each tags as tag (tag)}
@@ -266,7 +381,11 @@
             onchange={event => {
               void choose(event.currentTarget, key, pkg);
             }} />
-          <details class="emma-install-details">
+          <details
+            class="emma-install-details"
+            ontoggle={event => {
+              if (event.currentTarget.open) void readRelations(pkg);
+            }}>
             <summary>
               <span class="emma-install-title">{pkg.title}</span>
               {#if pkg.author !== undefined}
@@ -314,6 +433,7 @@
                 <dd><a href={pkg.url} target="_blank" rel="noopener noreferrer">{pkg.url}</a></dd>
               {/if}
             </dl>
+            {@render relationsOf(pkg)}
           </details>
           {#if pkg.unowned && planned === undefined}
             <p class="emma-install-unowned">
@@ -459,6 +579,22 @@
 
   .emma-install-failed p {
     margin: 0;
+  }
+
+  .emma-install-details h4 {
+    margin: 0.5rem 0 0.25rem;
+    font-size: 0.9em;
+  }
+
+  .emma-install .emma-install-relations {
+    list-style: none;
+    padding-left: 1rem;
+  }
+
+  .emma-install-relations label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
   }
 
   .emma-install-manifest {

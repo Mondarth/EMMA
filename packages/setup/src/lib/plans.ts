@@ -137,6 +137,14 @@ export interface Planner {
    */
   needsOf(key: PackageKey, version: string): readonly string[];
   /**
+   * The modules a version of a module recommends, as its manifest declares them: they work with it, but it runs
+   * without them.
+   * @param key - The module
+   * @param version - The version
+   * @returns Each by its key, with the manifest URL the recommendation gives, if any; none for a release not found
+   */
+  recommendsOf(key: PackageKey, version: string): readonly { readonly key: PackageKey; readonly manifest?: string }[];
+  /**
    * Whether a version of a package was found, but no manifest URL for it alone was, so that it cannot be installed and
    * is never planned.
    * @param key - The package
@@ -716,6 +724,13 @@ export function createPlanner(inputs: PlannerInputs): Planner {
 
     titleOf(key) {
       return titles.get(key) ?? key;
+    },
+
+    recommendsOf(key, version) {
+      const release = key === CORE ? undefined : releaseOf(key, version);
+      return (release?.relationships.recommends ?? [])
+        .filter(({ package: ref }) => ref.type === 'module' && packageKey(ref) !== key)
+        .map(({ package: ref, manifest }) => ({ key: packageKey(ref), ...(manifest !== undefined && { manifest }) }));
     },
 
     needsOf(key, version) {

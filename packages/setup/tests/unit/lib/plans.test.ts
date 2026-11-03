@@ -426,6 +426,32 @@ describe('the changes Foundry VTT leads to', () => {
   });
 });
 
+describe('what a module recommends', () => {
+  test('is the modules its version recommends, with their manifest URLs, and nothing for a release not found', () => {
+    const app = release('module:app', '1.0.0');
+    const recommending = {
+      ...app,
+      relationships: {
+        ...app.relationships,
+        recommends: [
+          { package: { type: 'module', id: 'dice' }, compatibility: {}, manifest: 'https://example.org/dice.json' },
+          { package: { type: 'module', id: 'maps' }, compatibility: {} },
+          { package: { type: 'system', id: 'pf2e' }, compatibility: {} },
+          { package: { type: 'module', id: 'app' }, compatibility: {} },
+        ],
+      },
+    } satisfies Release;
+    const plans = planner([['app', '1.0.0']], {}, [...DND, recommending]);
+
+    expect(plans.recommendsOf('module:app', '1.0.0')).toEqual([
+      { key: 'module:dice', manifest: 'https://example.org/dice.json' },
+      { key: 'module:maps' },
+    ]);
+    expect(plans.recommendsOf('module:app', '9.0.0')).toEqual([]);
+    expect(plans.recommendsOf('core', '14.368')).toEqual([]);
+  });
+});
+
 describe('a package locked in Foundry', () => {
   test('is kept at its installed release, whatever is found or looked up later', async () => {
     const overview = buildOverview(

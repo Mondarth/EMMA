@@ -13,7 +13,7 @@
   import { SvelteSet } from 'svelte/reactivity';
 
   import type { UpdateState } from '../app/update-state.svelte';
-  import { localize } from '../lib/i18n';
+  import { format, localize } from '../lib/i18n';
   import { UNINSTALL } from '../lib/plans';
   import type { Overview } from '../lib/overview';
   import type { PendingPackage, TreeRow } from '../lib/tree';
@@ -185,7 +185,29 @@
       {:else}
         <span class="emma-tree-toggle"></span>
       {/if}
+      {#if row.recommendedBy !== undefined && updates !== undefined && key !== undefined}
+        {@const by = row.recommendedBy}
+        <!-- Clicked, it is wanted or not; from the keyboard, the module's panel offers the same. -->
+        <input
+          type="checkbox"
+          class="emma-tree-recommend"
+          tabindex="-1"
+          checked={updates.recommendationsOf(by).some(({ key: recommended, wanted }) => recommended === key && wanted)}
+          disabled={updates.locked || updates.isInstalled(key)}
+          data-tooltip={updates.rejectionOf(by, key)?.reason}
+          aria-label={format('Recommends.Want', { title: row.title, by: updates.titleOf(by) })}
+          onclick={event => {
+            // Ticking it is not choosing the row.
+            event.stopPropagation();
+          }}
+          onchange={event => {
+            void updates.setRecommended(by, key, event.currentTarget.checked);
+          }} />
+      {/if}
       <span class="emma-tree-title">{row.title}</span>
+      {#if row.recommendedBy !== undefined}
+        <span class="emma-tree-recommended">{localize('Recommends.Tree')}</span>
+      {/if}
       {#if row.locked}
         {@const lockedBy = localize(row.selection.kind === 'root' ? 'Lock.TreeCore' : 'Lock.Tree')}
         <i class="fa-solid fa-lock emma-tree-locked" role="img" aria-label={lockedBy} data-tooltip={lockedBy}></i>
@@ -249,6 +271,16 @@
   .emma-tree-pending .emma-tree-version,
   .emma-tree-pending .emma-status {
     color: inherit;
+  }
+
+  .emma-tree-recommend {
+    margin: 0 0.25rem 0 0;
+  }
+
+  .emma-tree-recommended {
+    font-size: 0.8em;
+    font-style: italic;
+    opacity: 0.85;
   }
 
   .emma-tree-locked {

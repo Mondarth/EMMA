@@ -90,7 +90,7 @@ describe('readInstallation', () => {
     });
   });
 
-  test("reads the game systems each module is for and the modules it requires, from Foundry's sets", () => {
+  test("reads the game systems each module is for and the modules it requires and recommends, from Foundry's sets", () => {
     const { game } = installSetupMocks({
       modules: [
         {
@@ -106,6 +106,7 @@ describe('readInstallation', () => {
               { type: 'module' },
               null,
             ]),
+            recommends: new Set([{ id: 'dice', type: 'module' }, { id: 'app' }, { id: 'pf2e', type: 'system' }]),
           },
         },
         { id: 'loose', relationships: { systems: 'dnd5e', requires: undefined } },
@@ -113,7 +114,15 @@ describe('readInstallation', () => {
     });
 
     expect(readInstallation(game as never).modules).toEqual([
-      { id: 'app', title: 'app', version: '1.0.0', systems: ['dnd5e', 'pf2e'], requires: ['lib', 'old'] },
+      {
+        id: 'app',
+        title: 'app',
+        version: '1.0.0',
+        systems: ['dnd5e', 'pf2e'],
+        requires: ['lib', 'old'],
+        // What it recommends, of modules other than itself; nothing for one recommending none.
+        recommends: ['dice'],
+      },
       { id: 'loose', title: 'loose', version: '1.0.0', systems: [], requires: [] },
     ]);
   });

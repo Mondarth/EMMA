@@ -99,7 +99,7 @@ export interface PackageData {
   title?: string | undefined;
   version?: string | undefined;
   /** A module's relationships, as Foundry gives them: sets of the packages related. */
-  relationships?: { systems?: unknown; requires?: unknown } | undefined;
+  relationships?: { systems?: unknown; requires?: unknown; recommends?: unknown } | undefined;
   /** The manifest URL it declares. */
   manifest?: string | undefined;
   /** Its manifest's flags, as the EMMA module names its setup kit in. */

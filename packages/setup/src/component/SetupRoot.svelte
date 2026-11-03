@@ -27,6 +27,7 @@
   import BestSection from './BestSection.svelte';
   import InstallSection from './InstallSection.svelte';
   import LockSection from './LockSection.svelte';
+  import RecommendsSection from './RecommendsSection.svelte';
   import UninstallSection from './UninstallSection.svelte';
   import UpdatePlan from './UpdatePlan.svelte';
   import WorldPanel from './WorldPanel.svelte';
@@ -235,6 +236,7 @@
               detail={moduleDetail(overview, selection.module, selection.world)}
               blocked={updates.blockedOf(`module:${selection.module}`)}
               explained={updates.explainedOf(`module:${selection.module}`)} />
+            <RecommendsSection key={`module:${selection.module}`} {updates} />
             {@render lock(`module:${selection.module}`)}
             {@render uninstall(`module:${selection.module}`)}
           {:else if selection.kind === 'system'}

@@ -63,6 +63,8 @@ export interface TreeRow {
   readonly pending?: true;
   /** Whether the row shows a package installed and locked in Foundry, which is kept as it is. */
   readonly locked?: true;
+  /** For a module another recommends, as a row under it: that module's key, `module:<id>`. */
+  readonly recommendedBy?: string;
   readonly status?: RowStatus;
   /** Whether the row has rows under it. */
   readonly expandable: boolean;
@@ -93,6 +95,7 @@ interface TreeNode {
   readonly installed?: true;
   readonly pending?: true;
   readonly locked?: true;
+  readonly recommendedBy?: string;
   readonly status?: RowStatus;
   readonly children: () => readonly TreeNode[];
 }
@@ -125,6 +128,7 @@ export function visibleRows(
       ...(node.installed && { installed: true }),
       ...(node.pending && { pending: true }),
       ...(node.locked && { locked: true }),
+      ...(node.recommendedBy !== undefined && { recommendedBy: node.recommendedBy }),
       ...(node.status !== undefined && { status: node.status }),
       expandable: children.length > 0,
       ...(children.length > 0 && !expanded.has(key) && { hides: packagesUnder(children) }),
@@ -327,8 +331,47 @@ function installedNode(use: ModuleUse, modules: ReadonlyMap<string, ModuleUse>, 
     ...(locked && { locked }),
     // That it is installed, its version says; that a world uses it, its status.
     ...(use.worlds.length > 0 && { status: IN_USE }),
-    children: () => requirementNodes([id], undefined, modules, pending),
+    children: () => [
+      ...requirementNodes([id], undefined, modules, pending),
+      ...recommendationNodes(use, modules, pending),
+    ],
   };
+}
+
+/**
+ * The modules a module recommends, by title, after what it requires, each with a checkbox to want it with the module:
+ * as installed, as the plan installs it, or not installed. What it requires as well is not shown again.
+ * @param use - The module
+ * @param modules - The installed modules, by ID
+ * @param pending - The packages the plan installs anew
+ * @returns Their nodes, with nothing under them
+ */
+function recommendationNodes(use: ModuleUse, modules: ReadonlyMap<string, ModuleUse>, pending: Pending): TreeNode[] {
+  const { id: by, requires, recommends = [] } = use.module;
+  return recommends
+    .filter(id => !requires.includes(id))
+    .map(id => ({ id, title: modules.get(id)?.module.title ?? pending.get(`module:${id}`)?.title ?? id }))
+    .sort(byTitle)
+    .map(({ id, title }): TreeNode => {
+      const installed = modules.get(id);
+      const planned = pending.get(`module:${id}`);
+      return {
+        segment: `recommends:module:${id}`,
+        selection: { kind: 'module', module: id },
+        title,
+        recommendedBy: `module:${by}`,
+        ...(installed !== undefined
+          ? {
+              version: installed.module.version,
+              installed: true,
+              ...(installed.worlds.length > 0 && { status: IN_USE }),
+            }
+          : planned === undefined
+            ? { status: MISSING }
+            : { version: planned.version, pending: true }),
+        children: () => [],
+      };
+    });
 }
 
 /**
