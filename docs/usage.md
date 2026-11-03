@@ -367,6 +367,23 @@ The file is rewritten only when the setup has changed. Closing the browser tab, 
 update it; the next start does. A world backup holds the whole world folder, so it includes the record, and restoring
 the backup restores the record that matches it.
 
+### Changes since the world last ran
+
+When the world starts, its active GM's check compares the record with the installation before writing it again, and
+tells that GM what changed since the world last ran: changes made outside the world, such as on the setup screen. It
+lists, as they apply:
+
+- Foundry VTT's build, before and now;
+- the game system's version, or another game system;
+- each module updated or downgraded, with its versions;
+- each module now active, and each no longer active, or no longer installed.
+
+Nothing is said when nothing changed, when only the EMMA that wrote the record differs, or when there is no record yet.
+How it is told is each GM's own setting, **Changes since the world last ran** (see [Settings](#settings)): a dialog,
+the default, which only informs and changes nothing; a chat card whispered to that GM alone, which stays in the chat
+log; both; or neither. Only the active GM is told, as only that GM checks the record when the world starts: a GM
+joining later finds it written already.
+
 The file holds nothing private, but like everything in a world's folder, anyone who can reach your Foundry server can
 read it. Only a GM or assistant GM allowed to browse and upload files can write it.
 
@@ -397,6 +414,12 @@ Show older versions
   made before updating. Each version shown is judged against every other, so showing many older versions can make
   hypothetical mode noticeably slower. A change applies the next time versions are judged, such as when you next open
   a drop-down or a report. Players are not offered it, as only GMs have hypothetical mode.
+
+Changes since the world last ran
+: A setting for each GM, under **Game Settings**: how EMMA tells them, as the world starts, what changed since it last
+  ran (see [Changes since the world last ran](#changes-since-the-world-last-ran)). **Dialog** (the default) only
+  informs; **Chat card** whispers the changes to them alone; **Dialog and chat card** does both; **Do not tell me**
+  turns it off. Players are not offered it.
 
 Module details
 : A menu every user can open under **Game Settings**, choosing the details their drawers show for themselves. See

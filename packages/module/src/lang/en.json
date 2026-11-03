@@ -154,6 +154,19 @@
         "See": "{phrase} ({number})"
       }
     },
+    "Changes": {
+      "Title": "Changes since the world last ran",
+      "Intro": "{world} has changed since it last ran, on {when}:",
+      "Core": "Foundry VTT: {from} → {to}",
+      "System": "Game system: {from} → {to}",
+      "OtherSystem": "Game system: {fromTitle} {from} → {toTitle} {to}",
+      "Updated": "Updated: {title} {from} → {to}",
+      "Downgraded": "Downgraded: {title} {from} → {to}",
+      "Added": "Now active: {title} {version}",
+      "Deactivated": "No longer active: {title} {version}",
+      "Uninstalled": "No longer installed: {title} {version}",
+      "Ok": "OK"
+    },
     "List": {
       "Label": "Installed modules",
       "Empty": "No modules are installed.",
@@ -306,6 +319,14 @@
           "Title": "Discard your changes?",
           "Body": "The details you chose have not been saved. Closing the window discards them."
         }
+      },
+      "StartupChanges": {
+        "Name": "Changes since the world last ran",
+        "Hint": "When you open the world as its GM, EMMA compares the installation with what the world last ran with, as its record says, and tells you what changed, such as a module updated or uninstalled from the setup screen. A dialog only tells you; it changes nothing. A chat card is whispered to you alone, and stays in the chat log.",
+        "None": "Do not tell me",
+        "Dialog": "Dialog",
+        "Chat": "Chat card",
+        "Both": "Dialog and chat card"
       }
     },
     "Ignore": {

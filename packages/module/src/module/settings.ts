@@ -32,7 +32,14 @@ export const SETTINGS = {
   badgeChecks: 'badgeChecks',
   /** How many versions before the one installed hypothetical mode offers, and its reports consider. */
   olderVersions: 'olderVersions',
+  /** How this GM is told, when a world starts, what changed in its setup since it last ran. */
+  startupChanges: 'startupChanges',
 } as const;
+
+/** How a GM is told what changed since the world last ran: not at all, in a dialog, in a chat card, or both. */
+export type StartupChanges = 'none' | 'dialog' | 'chat' | 'both';
+
+const STARTUP_CHANGES: readonly string[] = ['none', 'dialog', 'chat', 'both'] satisfies StartupChanges[];
 
 /** The most older versions a GM may choose to be shown: more cost more to judge, for little more use. */
 export const MAX_OLDER_VERSIONS = 20;
@@ -167,6 +174,30 @@ export function registerGmSettings(): void {
     range: { min: 0, max: MAX_OLDER_VERSIONS, step: 1 },
     default: 0,
   });
+
+  game.settings.register(MODULE_ID, SETTINGS.startupChanges, {
+    name: 'MONDARTH-EMMA.Settings.StartupChanges.Name',
+    hint: 'MONDARTH-EMMA.Settings.StartupChanges.Hint',
+    scope: 'user',
+    config: game.user?.isGM === true,
+    type: String,
+    choices: {
+      none: 'MONDARTH-EMMA.Settings.StartupChanges.None',
+      dialog: 'MONDARTH-EMMA.Settings.StartupChanges.Dialog',
+      chat: 'MONDARTH-EMMA.Settings.StartupChanges.Chat',
+      both: 'MONDARTH-EMMA.Settings.StartupChanges.Both',
+    },
+    default: 'dialog',
+  });
+}
+
+/**
+ * How the current user chose to be told, when a world starts, what changed since it last ran.
+ * @returns Their choice; a dialog if they made none, or the setting holds something else
+ */
+export function getStartupChanges(): StartupChanges {
+  const chosen = game.settings.get(MODULE_ID, SETTINGS.startupChanges);
+  return STARTUP_CHANGES.includes(chosen) ? chosen : 'dialog';
 }
 
 /**

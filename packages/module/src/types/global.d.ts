@@ -26,6 +26,7 @@ declare module 'fvtt-types/configuration' {
     'mondarth-emma.versionProxyKey': string;
     'mondarth-emma.versionProxyMode': string;
     'mondarth-emma.hypotheticalIgnored': string[];
+    'mondarth-emma.startupChanges': 'none' | 'dialog' | 'chat' | 'both';
   }
 }
 
