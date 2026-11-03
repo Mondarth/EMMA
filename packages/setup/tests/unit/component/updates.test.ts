@@ -1916,3 +1916,82 @@ describe('planning the best versions', () => {
     expect(within(section).queryByRole('status')).toBeNull();
   });
 });
+
+describe('what a module recommends', () => {
+  test('offers each in its panel and under it in the tree, bringing one wanted into the plan with it', async () => {
+    const APP_UPDATE: PackageUpdate = {
+      key: 'module:app',
+      installed: '1.0.0',
+      newest: '2.0.0',
+      versions: ['2.0.0', '1.0.0'],
+    };
+    const overview = buildOverview(
+      installation({ modules: [{ ...installedModule('app', 'App', '1.0.0'), recommends: ['dice'] }] }),
+      new Map(),
+    );
+    const base = alone(APP_UPDATE);
+    let diceKnown = false;
+    const planner = {
+      ...base,
+      recommendsOf: (key: string) => (key === 'module:app' ? [{ key: 'module:dice' }] : []),
+      add: (key: string) => {
+        if (key === 'module:dice') diceKnown = true;
+        return Promise.resolve(key !== 'module:dice' || diceKnown);
+      },
+      candidates: (key: string) => (key === 'module:dice' ? (diceKnown ? ['1.0.0'] : []) : base.candidates(key)),
+      plan: async (picks: ReadonlyMap<string, string>) =>
+        (await base.plan(picks))?.map(({ installed: from, ...entry }) =>
+          entry.key === 'module:dice' ? entry : { ...entry, ...(from !== undefined && { installed: from }) },
+        ),
+    };
+    const setup = new SetupState({
+      load: () => Promise.resolve(overview),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: () =>
+        Promise.resolve({
+          updates: new Map([[APP_UPDATE.key, APP_UPDATE]]),
+          blocked: new Map(),
+          unresolved: [],
+          judge,
+          planner,
+        }),
+      installModule: noInstall,
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    await vi.waitFor(() => {
+      expect(setup.updates.status).toBe('found');
+    });
+    const user = userEvent.setup();
+    const toggle = row(/Universal/).querySelector('.emma-tree-toggle');
+    if (toggle === null) throw new Error('No universal group to open');
+    await user.click(toggle);
+    const appToggle = row(/App 1\.0\.0/).querySelector('.emma-tree-toggle');
+    if (appToggle === null) throw new Error('App has nothing under it');
+    await user.click(appToggle);
+    await user.click(within(row(/App 1\.0\.0/)).getByText('App'));
+
+    const section = screen.getByRole('region', { name: 'Recommends' });
+    const inPanel = within(section).getByRole('checkbox', { name: 'Install dice with App' });
+    const inTree = within(row(/Recommended/)).getByRole('checkbox', { name: 'Install dice with App' });
+    expect(section).toHaveTextContent('Not installed');
+    expect(inPanel).not.toBeChecked();
+
+    // Ticked in the tree, the panel follows, and the row stays as selected.
+    await user.click(inTree);
+    expect(inPanel).toBeChecked();
+    expect(screen.getByRole('region', { name: 'Recommends' })).toBeInTheDocument();
+
+    await setup.updates.choose('module:app', '2.0.0');
+    const plan = await screen.findByRole('region', { name: 'Update plan' });
+    await vi.waitFor(() => {
+      expect(plan).toHaveTextContent('recommended by App');
+    });
+
+    await user.click(inPanel);
+    await vi.waitFor(() => {
+      expect(plan).not.toHaveTextContent('recommended by App');
+    });
+  });
+});

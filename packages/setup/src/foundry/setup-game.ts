@@ -24,6 +24,8 @@ export interface InstalledModule extends InstalledPackage {
   readonly systems: readonly string[];
   /** The IDs of the modules it requires. */
   readonly requires: readonly string[];
+  /** The IDs of the modules it recommends, if any: they work with it, but it runs without them. */
+  readonly recommends?: readonly string[];
 }
 
 /** An installed world. Unlike a module or a system, a world need not have a version. */
@@ -550,12 +552,14 @@ function toPackage(pkg: unknown): InstalledPackage | undefined {
 function toModule(pkg: unknown): InstalledModule | undefined {
   const described = toPackage(pkg);
   if (described === undefined) return undefined;
-  const { relationships } = pkg as { relationships?: { systems?: unknown; requires?: unknown } };
+  const { relationships } = pkg as { relationships?: { systems?: unknown; requires?: unknown; recommends?: unknown } };
+  const recommends = relatedIds(relationships?.recommends, 'module').filter(id => id !== described.id);
   return {
     ...described,
     systems: relatedIds(relationships?.systems),
     // A module requires other modules: a system it needs is given by `systems`.
     requires: relatedIds(relationships?.requires, 'module').filter(id => id !== described.id),
+    ...(recommends.length > 0 && { recommends }),
   };
 }
 

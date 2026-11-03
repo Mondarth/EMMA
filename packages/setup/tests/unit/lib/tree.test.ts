@@ -334,6 +334,47 @@ describe('visibleRows, with packages the plan installs anew', () => {
   });
 });
 
+describe('visibleRows, with what modules recommend', () => {
+  test('shows what a module recommends under it, after what it requires, as installed, planned or not installed', () => {
+    const overview = buildOverview(
+      installation({
+        modules: [
+          {
+            ...installedModule('app', 'App', '1.0.0', { requires: ['lib'] }),
+            recommends: ['lib', 'maps', 'dice', 'gone'],
+          },
+          installedModule('lib', 'Library', '1.0.0'),
+          installedModule('maps', 'Maps', '2.0.0'),
+        ],
+      }),
+      new Map(),
+    );
+    const app = `${MODULES}/universal/module:app`;
+    const rows = visibleRows(overview, new Set([...INITIALLY_EXPANDED, `${MODULES}/universal`, app]), [
+      { key: 'module:dice', title: 'Dice', version: '1.0.0', systems: [] },
+    ]);
+
+    // Library, which App requires too, is not shown again.
+    expect(keys(rows.filter(({ parent }) => parent === app))).toEqual([
+      `${app}/module:lib`,
+      `${app}/recommends:module:dice`,
+      `${app}/recommends:module:gone`,
+      `${app}/recommends:module:maps`,
+    ]);
+    expect(rowOf(rows, `${app}/recommends:module:maps`)).toMatchObject({
+      selection: { kind: 'module', module: 'maps' },
+      version: '2.0.0',
+      installed: true,
+      recommendedBy: 'module:app',
+    });
+    expect(rowOf(rows, `${app}/recommends:module:dice`)).toMatchObject({ version: '1.0.0', pending: true });
+    expect(rowOf(rows, `${app}/recommends:module:gone`)).toMatchObject({
+      title: 'gone',
+      status: { kind: 'package', value: 'missing' },
+    });
+  });
+});
+
 describe('moveFor', () => {
   const expanded = new Set([ROOT, SYSTEMS]);
   const rows = visibleRows(OVERVIEW, expanded);
