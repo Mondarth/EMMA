@@ -978,7 +978,8 @@ describe('what a module recommends', () => {
     const planner: Planner = {
       ...base,
       recommendsOf: key =>
-        key === 'module:app' ? [{ key: 'module:dice', manifest: DICE_URL }, { key: 'module:lib' }] : [],
+        // Given out of order, to be sorted by title.
+        key === 'module:app' ? [{ key: 'module:lib' }, { key: 'module:dice', manifest: DICE_URL }] : [],
       add: vi.fn((key: string) => {
         if (key === 'module:dice') diceKnown = true;
         return Promise.resolve(key !== 'module:dice' || diceKnown);
@@ -1066,5 +1067,109 @@ describe('what a module recommends', () => {
     updates.clear();
     expect(updates.choices).toEqual([]);
     await expect(updates.planBest()).resolves.toBe(true);
+  });
+});
+
+describe('what a module to install requires and recommends', () => {
+  const NEW_URL = 'https://example.org/new/module.json';
+  const NEW = {
+    ...release('module:new', '1.0.0', { requires: { lib: {} } }),
+    relationships: {
+      requires: [
+        { package: { type: 'module' as const, id: 'lib' }, compatibility: {} },
+        { package: { type: 'system' as const, id: 'dnd5e' }, compatibility: {} },
+      ],
+      systems: [],
+      conflicts: [],
+      recommends: [
+        {
+          package: { type: 'module' as const, id: 'dice' },
+          compatibility: {},
+          manifest: 'https://example.org/dice.json',
+        },
+        { package: { type: 'module' as const, id: 'new' }, compatibility: {} },
+      ],
+    },
+  };
+
+  /**
+   * The state, searched, with a planner that can add New, not installed, which recommends Dice and Maps; Maps can be
+   * added, Dice cannot be found.
+   * @returns The state
+   */
+  async function searched() {
+    const base = alone(APP, LIB);
+    const known = new Set<string>();
+    const planner: Planner = {
+      ...base,
+      recommendsOf: key => (key === 'module:new' ? [{ key: 'module:dice' }, { key: 'module:maps' }] : []),
+      add: key => {
+        if (key !== 'module:dice') known.add(key);
+        return Promise.resolve(known.has(key) || key === 'module:app' || key === 'module:lib');
+      },
+      candidates: key => (known.has(key) ? ['1.0.0'] : base.candidates(key)),
+    };
+    const updates = new UpdateState(() =>
+      Promise.resolve({
+        ...finding(APP, LIB),
+        planner,
+        readManifest: (url: string) =>
+          Promise.resolve(
+            url === NEW_URL
+              ? { ok: true as const, release: NEW, title: 'New' }
+              : { ok: false as const, problem: 'not-manifest' as const },
+          ),
+      }),
+    );
+    await updates.searchFor(OVERVIEW);
+    return updates;
+  }
+
+  test('reads them from the manifest it would be installed from, but for systems and itself', async () => {
+    const updates = await searched();
+
+    await expect(updates.relationsOf(NEW_URL, 'module')).resolves.toEqual({
+      requires: ['module:lib'],
+      recommends: [{ key: 'module:dice', manifest: 'https://example.org/dice.json' }],
+    });
+    await expect(updates.relationsOf('https://example.org/other.json', 'module')).resolves.toBeUndefined();
+    await expect(
+      new UpdateState(() => Promise.resolve(finding(APP))).relationsOf(NEW_URL, 'module'),
+    ).resolves.toBeUndefined();
+    expect(updates.isInstalled('module:app')).toBe(true);
+    expect(updates.isInstalled('module:new')).toBe(false);
+  });
+
+  test('wants every recommendation while always wanted, but for those unticked', async () => {
+    const updates = await searched();
+    expect(updates.wants('module:new', 'module:maps')).toBe(false);
+
+    updates.alwaysRecommended = true;
+    expect(updates.wants('module:new', 'module:maps')).toBe(true);
+    await updates.setRecommended('module:new', 'module:dice', false);
+    expect(updates.wants('module:new', 'module:dice')).toBe(false);
+    await updates.setRecommended('module:new', 'module:dice', true);
+    expect(updates.wants('module:new', 'module:dice')).toBe(true);
+  });
+
+  test('installs it with what it recommends that is wanted, or not at all where one cannot be added', async () => {
+    const updates = await searched();
+    updates.alwaysRecommended = true;
+
+    const blocked = await updates.install('module:new', 'New');
+    expect(blocked).toEqual({
+      ok: false,
+      reason: 'What it recommends cannot be added with it: dice. Untick it in the drawer to add the module without it.',
+    });
+    expect(updates.picks).toEqual([]);
+
+    await updates.setRecommended('module:new', 'module:dice', false);
+    await expect(updates.install('module:new', 'New')).resolves.toEqual({ ok: true, version: '1.0.0' });
+    expect(new Map(updates.picks)).toEqual(
+      new Map([
+        ['module:new', '1.0.0'],
+        ['module:maps', '1.0.0'],
+      ]),
+    );
   });
 });

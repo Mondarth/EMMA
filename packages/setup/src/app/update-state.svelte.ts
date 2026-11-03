@@ -155,6 +155,10 @@ export class UpdateState {
   readonly #forced = new SvelteMap<PackageKey, ForcedInstall>();
   /** The modules the user wants with a module that recommends them, as `<module>><recommended>`. */
   readonly #recommending = new SvelteSet<string>();
+  /** Those the user does not want, though they always want what a module recommends, as `<module>><recommended>`. */
+  readonly #unwanted = new SvelteSet<string>();
+  /** Whether the user wants every module a module recommends with it, but for those they untick. */
+  alwaysRecommended = $state(false);
   /** The modules the plan installs as a module in it recommends them, by their keys, each with that module's. */
   readonly #recommendedBy = new SvelteMap<PackageKey, PackageKey>();
   /** What the user changed of the plan's snapshot and backups, by their keys. */
@@ -531,8 +535,19 @@ export class UpdateState {
     for (const version of installable) {
       const completion = await planner.complete(withChoice(this.#picks, key, version));
       if (completion.ok) {
-        const chosen = await this.choose(key, version);
-        return chosen ? { ok: true, version } : { ok: false, reason: localize('Install.NotNow') };
+        const chosen = await this.#choose(key, version);
+        // What it recommends that the user wants comes in with it, or it does not come in at all.
+        const missed = chosen ? await this.#bringRecommended(key) : [];
+        if (!chosen || missed.length === 0) {
+          return chosen ? { ok: true, version } : { ok: false, reason: localize('Install.NotNow') };
+        }
+        await this.takeOut(key, true);
+        return {
+          ok: false,
+          reason: format('Recommends.Blocked', {
+            modules: new Intl.ListFormat('en').format(missed.map(recommended => this.#nameOf(recommended))),
+          }),
+        };
       }
       explanation ??= completion.explanation;
     }
@@ -846,17 +861,80 @@ export class UpdateState {
     const planner = this.search?.planner;
     const version = this.plan.find(entry => entry.key === key)?.version ?? this.#installedOf(key);
     if (planner === undefined || version === undefined) return [];
-    // One not installed nor looked up yet has no title but its ID, as the tree names it.
-    const titled = (recommended: PackageKey) => {
-      const title = this.titleOf(recommended);
-      return title === recommended ? recommended.slice(recommended.indexOf(':') + 1) : title;
+    // By title, as the tree shows them.
+    return planner
+      .recommendsOf(key, version)
+      .map(({ key: recommended }) => ({
+        key: recommended,
+        title: this.#nameOf(recommended),
+        installed: this.#installedOf(recommended) !== undefined,
+        wanted: this.wants(key, recommended),
+      }))
+      .sort((a, b) => a.title.localeCompare(b.title) || a.key.localeCompare(b.key));
+  }
+
+  /**
+   * The modules a package requires and recommends, as the manifest the user would install it from says, for one not
+   * installed, whose releases are not known until it is added.
+   * @param url - The manifest's URL
+   * @param type - The package's type
+   * @returns The modules, by their keys, with the manifest URL a recommendation gives; none if it cannot be read
+   */
+  async relationsOf(
+    url: string,
+    type: 'module' | 'system',
+  ): Promise<
+    | {
+        readonly requires: readonly PackageKey[];
+        readonly recommends: readonly { readonly key: PackageKey; readonly manifest?: string }[];
+      }
+    | undefined
+  > {
+    const read = this.search?.readManifest;
+    const found = read === undefined ? undefined : await read(url, type);
+    if (found?.ok !== true) return undefined;
+    const { requires, recommends } = found.release.relationships;
+    const modules = <T extends { readonly package: { readonly type: string; readonly id: string } }>(
+      related: readonly T[],
+    ) => related.filter(({ package: ref }) => ref.type === 'module' && ref.id !== found.release.package.id);
+    return {
+      requires: modules(requires).map(({ package: ref }) => `module:${ref.id}`),
+      recommends: modules(recommends).map(({ package: ref, manifest }) => ({
+        key: `module:${ref.id}`,
+        ...(manifest !== undefined && { manifest }),
+      })),
     };
-    return planner.recommendsOf(key, version).map(({ key: recommended }) => ({
-      key: recommended,
-      title: titled(recommended),
-      installed: this.#installedOf(recommended) !== undefined,
-      wanted: this.#recommending.has(`${key}>${recommended}`),
-    }));
+  }
+
+  /**
+   * A package's name: its title, or, for one not installed nor looked up yet, which has none, its ID, as the tree names
+   * it.
+   * @param key - Its key
+   * @returns Its name
+   */
+  #nameOf(key: PackageKey): string {
+    const title = this.titleOf(key);
+    return title === key ? key.slice(key.indexOf(':') + 1) : title;
+  }
+
+  /**
+   * Whether the user wants a module with one that recommends it.
+   * @param key - The module's key
+   * @param recommended - The recommended module's key
+   * @returns `true` if they do
+   */
+  wants(key: PackageKey, recommended: PackageKey): boolean {
+    const pair = `${key}>${recommended}`;
+    return this.alwaysRecommended ? !this.#unwanted.has(pair) : this.#recommending.has(pair);
+  }
+
+  /**
+   * Whether a package is installed.
+   * @param key - Its key
+   * @returns `true` if it is
+   */
+  isInstalled(key: PackageKey): boolean {
+    return this.#installedOf(key) !== undefined;
   }
 
   /**
@@ -873,10 +951,12 @@ export class UpdateState {
     const pair = `${key}>${recommended}`;
     if (wanted) {
       this.#recommending.add(pair);
+      this.#unwanted.delete(pair);
       if (this.#picks.has(key) && this.#picks.get(key) !== UNINSTALL) await this.#bringRecommended(key);
       return;
     }
     this.#recommending.delete(pair);
+    this.#unwanted.add(pair);
     if (this.#recommendedBy.get(recommended) !== key) return;
     this.#recommendedBy.delete(recommended);
     await this.#takeOut(recommended, true);
@@ -885,16 +965,20 @@ export class UpdateState {
   /**
    * Bring into the plan what the user wants of what a module in it recommends, and is neither installed nor planned.
    * @param key - The module's key
+   * @returns Those wanted that could not be brought in
    */
-  async #bringRecommended(key: PackageKey): Promise<void> {
+  async #bringRecommended(key: PackageKey): Promise<PackageKey[]> {
     const planner = this.search?.planner;
     const version = this.#picks.get(key);
-    if (planner === undefined || version === undefined) return;
+    if (planner === undefined || version === undefined) return [];
+    const missed: PackageKey[] = [];
     for (const { key: recommended, manifest } of planner.recommendsOf(key, version)) {
-      if (!this.#recommending.has(`${key}>${recommended}`)) continue;
+      if (!this.wants(key, recommended)) continue;
       if (this.#installedOf(recommended) !== undefined || this.#picks.has(recommended)) continue;
       if ((await this.install(recommended, undefined, manifest)).ok) this.#recommendedBy.set(recommended, key);
+      else missed.push(recommended);
     }
+    return missed;
   }
 
   /** Take back every choice, and what was changed of the plan's snapshot and backups. */

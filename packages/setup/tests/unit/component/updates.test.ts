@@ -1091,6 +1091,129 @@ describe('installing anew, by group', () => {
     ).toBe(false);
   });
 
+  test('lists what a module to install requires and recommends in its drawer, recommending as asked', async () => {
+    const url = 'https://example.org/new/module.json';
+    const fromManifest = {
+      ...release('module:new', '1.0.0'),
+      relationships: {
+        requires: [{ package: { type: 'module' as const, id: 'lib' }, compatibility: {} }],
+        systems: [],
+        conflicts: [],
+        recommends: [
+          { package: { type: 'module' as const, id: 'dice' }, compatibility: {} },
+          { package: { type: 'module' as const, id: 'maps' }, compatibility: {} },
+        ],
+      },
+    };
+    const base = alone();
+    const known = new Set<string>();
+    const planner = {
+      ...base,
+      recommendsOf: (key: string) => (key === 'module:new' ? [{ key: 'module:dice' }, { key: 'module:maps' }] : []),
+      add: (key: string) => {
+        if (key !== 'module:dice') known.add(key);
+        return Promise.resolve(known.has(key));
+      },
+      candidates: (key: string) => (known.has(key) ? ['1.0.0'] : []),
+      plan: async (picks: ReadonlyMap<string, string>) =>
+        (await base.plan(picks))?.map(({ installed: _none, ...entry }) => entry),
+    };
+    const user = await listing(
+      () =>
+        Promise.resolve([
+          { ...listed('new'), title: 'New', manifest: url },
+          { ...listed('maps'), title: 'Maps' },
+        ]),
+      () =>
+        Promise.resolve({
+          updates: new Map(),
+          blocked: new Map(),
+          unresolved: [],
+          judge,
+          planner,
+          readManifest: () => Promise.resolve({ ok: true as const, release: fromManifest, title: 'New' }),
+        }),
+    );
+    await user.click(within(row(/^Modules/)).getByText('Modules'));
+    const section = await screen.findByRole('region', { name: 'Install a module' });
+    const drawer = (await within(section).findByText('New')).closest('details');
+    if (drawer === null) throw new Error('No drawer for New');
+
+    await user.click(within(drawer).getByText('New'));
+    await vi.waitFor(() => {
+      expect(drawer).toHaveTextContent('Requires Library Installed');
+    });
+    // By name, Maps as the listing names it, Dice by its ID.
+    expect(drawer).toHaveTextContent('Recommends dice Not installed Maps Not installed');
+    const dice = within(drawer).getByRole('checkbox', { name: 'Install dice with New' });
+    const maps = within(drawer).getByRole('checkbox', { name: 'Install Maps with New' });
+    expect(dice).not.toBeChecked();
+
+    await user.click(within(section).getByRole('checkbox', { name: 'Always install recommendations' }));
+    expect(dice).toBeChecked();
+    expect(maps).toBeChecked();
+
+    // Dice cannot be found, so New cannot come in with it.
+    await user.click(within(section).getByRole('checkbox', { name: 'Install New' }));
+    expect(await within(section).findByText(/What it recommends cannot be added with it: dice\./)).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Update plan' })).toBeNull();
+
+    await user.click(dice);
+    await user.click(within(section).getByRole('checkbox', { name: 'Install New' }));
+    const plan = await screen.findByRole('region', { name: 'Update plan' });
+    await vi.waitFor(() => {
+      expect(plan).toHaveTextContent('recommended by New');
+    });
+  });
+
+  test('says when what a module requires and recommends cannot be read, or it has none', async () => {
+    const user = await listing(
+      () =>
+        Promise.resolve([
+          { ...listed('odd'), title: 'Odd', manifest: 'https://example.org/odd.json' },
+          { ...listed('plain'), title: 'Plain', manifest: 'https://example.org/plain.json' },
+          { ...listed('bare'), title: 'Bare' },
+        ]),
+      () =>
+        Promise.resolve({
+          updates: new Map(),
+          blocked: new Map(),
+          unresolved: [],
+          judge,
+          planner: alone(),
+          readManifest: (url: string) =>
+            Promise.resolve(
+              url.endsWith('plain.json')
+                ? { ok: true as const, release: release('module:plain', '1.0.0'), title: 'Plain' }
+                : { ok: false as const, problem: 'not-manifest' as const },
+            ),
+        }),
+    );
+    await user.click(within(row(/^Modules/)).getByText('Modules'));
+    const section = await screen.findByRole('region', { name: 'Install a module' });
+    const open = async (title: string) => {
+      const drawer = (await within(section).findByText(title)).closest('details');
+      if (drawer === null) throw new Error(`No drawer for ${title}`);
+      await user.click(within(drawer).getByText(title));
+      return drawer;
+    };
+
+    const odd = await open('Odd');
+    await vi.waitFor(() => {
+      expect(odd).toHaveTextContent('What it requires and recommends could not be read from its manifest.');
+    });
+    const plain = await open('Plain');
+    await vi.waitFor(() => {
+      expect(plain).toHaveTextContent('It requires and recommends no other module.');
+    });
+    // Without a manifest URL, nothing is read; closed and opened again, it is not read again.
+    const bare = await open('Bare');
+    expect(bare).not.toHaveTextContent('Requires');
+    await user.click(within(odd).getByText('Odd'));
+    await user.click(within(odd).getByText('Odd'));
+    expect(odd).toHaveTextContent('could not be read');
+  });
+
   test('offers the modules for a game system the plan installs', async () => {
     // Pathfinder is not installed; the planner can add it, and plans it with no version installed.
     const pathfinder: PackageUpdate = { key: 'system:pf2e', installed: 'none', newest: '7.0.0', versions: ['7.0.0'] };

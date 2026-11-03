@@ -336,6 +336,15 @@
     "Heading": "Recommends",
     "Hint": "Modules that work with it, though it runs without them. One ticked comes into the plan with it, unless it is installed.",
     "Want": "Install {title} with {by}",
-    "Tree": "Recommended"
+    "Tree": "Recommended",
+    "Always": "Always install recommendations",
+    "Blocked": "What it recommends cannot be added with it: {modules}. Untick it in the drawer to add the module without it."
+  },
+  "Relations": {
+    "Reading": "Reading what it requires and recommends…",
+    "Unreadable": "What it requires and recommends could not be read from its manifest.",
+    "Requires": "Requires",
+    "ComesWith": "Comes into the plan with it",
+    "None": "It requires and recommends no other module."
   }
 }
