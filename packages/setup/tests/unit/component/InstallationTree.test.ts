@@ -179,3 +179,70 @@ describe("the tree's status badges", () => {
     expect(row(/Alpha/)).toHaveTextContent('Planned update: the plan changes this');
   });
 });
+
+describe('the finder', () => {
+  /**
+   * Render a tree of D&D 5e, with Alpha running Library, and Pathfinder, with Gamma, as the window does.
+   * @returns A user to act with
+   */
+  function finder() {
+    const overview = buildOverview(
+      installation({
+        worlds: [
+          { id: 'a', title: 'Alpha', system: 'dnd5e' },
+          { id: 'g', title: 'Gamma', system: 'pf2e' },
+        ],
+        systems: [
+          { id: 'dnd5e', title: 'Dungeons and Dragons Fifth Edition', version: '5.3.3' },
+          { id: 'pf2e', title: 'Pathfinder', version: '7.0.0' },
+        ],
+        modules: [installedModule('lib', 'Library', '1.0.0')],
+      }),
+      new Map([['a', recorded(record('a', { modules: [{ id: 'lib', title: 'Library', version: '1.0.0' }] }))]]),
+    );
+    const onSelect = vi.fn();
+    const view = render(InstallationTree, { overview, selected: ROOT, onSelect });
+    onSelect.mockImplementation((chosen: TreeRow) => view.rerender({ selected: chosen.key }));
+    return { user: userEvent.setup({ advanceTimers: vi.advanceTimersByTime.bind(vi) }), onSelect };
+  }
+  const selected = () => screen.getByRole('treeitem', { selected: true });
+
+  test('selects the first row whose title has what is typed, opening what it is under, and closing it again', async () => {
+    vi.useFakeTimers();
+    try {
+      const { user } = finder();
+      row(/^Foundry/).focus();
+
+      await user.keyboard('eon');
+      expect(selected()).toHaveTextContent('Dungeons and Dragons Fifth Edition');
+      expect(screen.getByRole('status')).toHaveTextContent('Finding “eon”');
+
+      // Library, under Alpha, which the finder opens; then Gamma, under Pathfinder, so it closes them again.
+      await user.keyboard('{Escape}');
+      expect(screen.queryByRole('status')).toBeNull();
+      await user.keyboard('libr');
+      expect(selected()).toHaveTextContent('Library');
+      expect(row(/^Alpha/)).toHaveAttribute('aria-expanded', 'true');
+      await user.keyboard('{Backspace}{Backspace}{Backspace}{Backspace}gamm');
+      expect(selected()).toHaveTextContent('Gamma');
+      expect(screen.queryByRole('treeitem', { name: /^Alpha/ })).toBeNull();
+      expect(row(/Pathfinder/)).toHaveAttribute('aria-expanded', 'true');
+
+      await user.keyboard('x');
+      expect(screen.getByRole('status')).toHaveTextContent('Nothing has “gammx”');
+      expect(selected()).toHaveTextContent('Gamma');
+
+      // A pause ends it; a space then is no find.
+      vi.advanceTimersByTime(2000);
+      await vi.waitFor(() => {
+        expect(screen.queryByRole('status')).toBeNull();
+      });
+      await user.keyboard(' ');
+      expect(screen.queryByRole('status')).toBeNull();
+      // What it opened stays open once it is done.
+      expect(row(/Pathfinder/)).toHaveAttribute('aria-expanded', 'true');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

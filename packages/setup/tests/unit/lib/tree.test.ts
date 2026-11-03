@@ -2,7 +2,18 @@ import { describe, expect, test } from 'vitest';
 
 import { buildOverview } from '../../../src/lib/overview';
 import type { TreeRow } from '../../../src/lib/tree';
-import { INITIALLY_EXPANDED, MODULES, moveFor, ROOT, SYSTEMS, visibleRows } from '../../../src/lib/tree';
+import {
+  INITIALLY_EXPANDED,
+  MODULES,
+  ROOT,
+  SYSTEMS,
+  allRows,
+  ancestorsOf,
+  findRow,
+  moveFor,
+  rowFor,
+  visibleRows,
+} from '../../../src/lib/tree';
 import { installation, installedModule, record, recorded } from '../../mocks/fixtures';
 
 /**
@@ -372,6 +383,35 @@ describe('visibleRows, with what modules recommend', () => {
       title: 'gone',
       status: { kind: 'package', value: 'missing' },
     });
+  });
+});
+
+describe('finding rows', () => {
+  test('lists every row as if each were expanded, and the rows a row is under', () => {
+    const rows = allRows(OVERVIEW);
+
+    expect(rows.length).toBeGreaterThan(visibleRows(OVERVIEW, new Set(INITIALLY_EXPANDED)).length);
+    expect(keys(rows)).toContain(`${WORLD_A}/module:app/module:lib`);
+    expect(rows.every(({ hides }) => hides === undefined)).toBe(true);
+    expect(ancestorsOf(`${WORLD_A}/module:app`)).toEqual([ROOT, SYSTEMS, DND, WORLD_A]);
+    expect(ancestorsOf(ROOT)).toEqual([]);
+  });
+
+  test('finds the first row whose title has the text, anywhere in it, ignoring case', () => {
+    const rows = allRows(OVERVIEW);
+
+    expect(findRow(rows, 'IBR')?.key).toBe(`${WORLD_A}/module:app/module:lib`);
+    expect(findRow(rows, 'nothing like it')).toBeUndefined();
+    expect(findRow(rows, '')).toBeUndefined();
+  });
+
+  test("finds the row a panel's link names, a package's in its group rather than under a world", () => {
+    const rows = allRows(OVERVIEW);
+
+    expect(rowFor(rows, { kind: 'module', module: 'app' })?.key).toBe(`${MODULES}/system:dnd5e/module:app`);
+    expect(rowFor(rows, { kind: 'system', system: 'dnd5e' })?.key).toBe(DND);
+    expect(rowFor(rows, { kind: 'world', world: 'a' })?.key).toBe(WORLD_A);
+    expect(rowFor(rows, { kind: 'module', module: 'nowhere' })).toBeUndefined();
   });
 });
 

@@ -156,6 +156,15 @@ be.
 Every row with rows under it opens and closes, from its triangle or from the keyboard: the arrow keys move up and down,
 and open and close a row, and Home and End go to the first and last row. **Read again** reads the installation afresh.
 
+Typing in the tree finds: each key selects the first row, from the top, whose title has what is typed so far,
+anywhere in it and ignoring case, so "eon" finds Dungeons and Dragons Fifth Edition. The rows it is under open to show
+it, and close again when what is typed next is found elsewhere, if they were closed before. What is typed shows above
+the tree, or that nothing has it; Backspace takes a letter back, Escape ends it, and so does a pause.
+
+In the panels, each name of a game system, module or world links to it in the tree: clicked, the tree opens to it and
+selects it, as it shows in its group rather than under a world. The Install sections' names do not, as there a
+title opens its details.
+
 ### Updates
 
 As soon as EMMA has read the installation, it looks for newer versions of the installed game systems and modules. The

@@ -9,7 +9,7 @@
   pending, so that the colour is not all that tells.
 -->
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
 
   import type { UpdateState } from '../app/update-state.svelte';
@@ -17,7 +17,7 @@
   import { UNINSTALL } from '../lib/plans';
   import type { Overview } from '../lib/overview';
   import type { PendingPackage, TreeRow } from '../lib/tree';
-  import { INITIALLY_EXPANDED, moveFor, packageOf, visibleRows } from '../lib/tree';
+  import { INITIALLY_EXPANDED, allRows, ancestorsOf, findRow, moveFor, packageOf, visibleRows } from '../lib/tree';
 
   import VersionPicker from './VersionPicker.svelte';
 
@@ -30,9 +30,11 @@
     updates?: UpdateState | undefined;
     /** The packages the plan installs anew. */
     pending?: readonly PendingPackage[];
+    /** A row to open the tree to and select, as a panel's name links to it; a new object each time. */
+    reveal?: { readonly key: string } | null;
   }
 
-  let { overview, selected, onSelect, updates, pending = [] }: Props = $props();
+  let { overview, selected, onSelect, updates, pending = [], reveal: revealing = null }: Props = $props();
 
   // A column for the red arrows only once there are any, so that the tree is no wider without.
   const anyBlocked = $derived((updates?.search?.blocked.size ?? 0) > 0);
@@ -73,11 +75,80 @@
     else expanded.add(key);
   }
 
+  /** How long the finder waits for the next key before its text is done, in milliseconds. */
+  const FINDER_PAUSE = 1500;
+  /** What the user is typing to find a row, while they type. */
+  let finding = $state('');
+  /** Whether nothing has what they type. */
+  let unfound = $state(false);
+  /** The rows the finder expanded to show what it found, which it collapses again for a find elsewhere. */
+  let opened: string[] = [];
+  let finderTimer: ReturnType<typeof setTimeout> | undefined;
+
   /**
-   * Handle a key pressed on a row.
+   * Open the tree to a row, and select it. The rows expanded to show it are the finder's, for it to collapse again, if
+   * a find made it.
+   * @param key - The row's key
+   * @param found - Whether the finder found it
+   */
+  function reveal(key: string, found = false): void {
+    const path = ancestorsOf(key);
+    for (const earlier of opened) if (!path.includes(earlier)) expanded.delete(earlier);
+    const newly = path.filter(above => !expanded.has(above));
+    for (const above of newly) expanded.add(above);
+    opened = found ? [...opened.filter(earlier => path.includes(earlier)), ...newly] : [];
+    const row = allRows(overview, pending).find(candidate => candidate.key === key);
+    if (row !== undefined) void focusRow(row);
+  }
+
+  // Open to each row a panel's name links to, as it comes, apart from what the tree shows meanwhile.
+  $effect(() => {
+    const target = revealing;
+    if (target !== null)
+      untrack(() => {
+        reveal(target.key);
+      });
+  });
+
+  /** Forget what the finder was typing; what it opened stays open. */
+  function endFinding(): void {
+    clearTimeout(finderTimer);
+    finding = '';
+    unfound = false;
+    opened = [];
+  }
+
+  /**
+   * Find the first row whose title has what the user has typed, as they type it.
+   * @param text - What they have typed
+   */
+  function seek(text: string): void {
+    clearTimeout(finderTimer);
+    finding = text;
+    finderTimer = setTimeout(endFinding, FINDER_PAUSE);
+    const found = findRow(allRows(overview, pending), text);
+    unfound = found === undefined && text !== '';
+    if (found !== undefined) reveal(found.key, true);
+  }
+
+  /**
+   * Handle a key pressed on a row: a letter, digit or other character finds, as do Backspace and Escape while finding;
+   * the arrows, Home and End move.
    * @param event - The key
    */
   function onKeydown(event: KeyboardEvent): void {
+    const typing = event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey;
+    if (typing && (event.key !== ' ' || finding !== '')) {
+      event.preventDefault();
+      seek(finding + event.key);
+      return;
+    }
+    if (finding !== '' && (event.key === 'Backspace' || event.key === 'Escape')) {
+      event.preventDefault();
+      if (event.key === 'Escape') endFinding();
+      else seek(finding.slice(0, -1));
+      return;
+    }
     const move = moveFor(rows, current, expanded, event.key);
     if (move === undefined) return;
     event.preventDefault();
@@ -140,114 +211,124 @@
   <span class="emma-visually-hidden">{localize(text)}</span>
 {/snippet}
 
-<ul class="emma-tree" role="tree" aria-label={localize('Tree.Label')} bind:this={tree}>
-  {#each rows as row (row.key)}
-    {@const status = statusText(row)}
-    {@const key = packageOf(row.selection)}
-    {@const update = key === undefined ? undefined : updates?.updateOf(key)}
-    {@const blocked = key !== undefined && updates?.blockedOf(key) !== undefined}
-    {@const removing = key !== undefined && row.installed === true && updates?.chosenOf(key) === UNINSTALL}
-    {@const hidden = updates !== undefined && anyOf(row.hides, under => updates.updateOf(under) !== undefined)}
-    {@const hiddenBlocked = updates !== undefined && anyOf(row.hides, under => updates.blockedOf(under) !== undefined)}
-    <li
-      role="treeitem"
-      class={['emma-tree-row', { 'emma-tree-pending': row.pending }]}
-      data-key={row.key}
-      aria-level={row.level}
-      aria-selected={row.key === selected}
-      aria-expanded={row.expandable ? expanded.has(row.key) : undefined}
-      tabindex={row.key === current ? 0 : -1}
-      style:--emma-depth={row.level - 1}
-      onclick={event => {
-        onClick(event, row);
-      }}
-      onkeydown={onKeydown}>
-      <span class="emma-tree-update">
-        {#if update !== undefined}
-          {@render arrow('Update.Available', false)}
-        {:else if hidden}
-          {@render arrow('Update.Hidden', true)}
-        {/if}
-      </span>
-      {#if anyBlocked}
-        <span class="emma-tree-update emma-tree-blocked">
-          {#if blocked}
-            {@render arrow('Update.Blocked', false)}
-          {:else if hiddenBlocked}
-            {@render arrow('Update.HiddenBlocked', true)}
+<div class="emma-tree-box">
+  {#if finding !== ''}
+    <p class={['emma-tree-finder', { 'emma-tree-unfound': unfound }]} role="status">
+      {format(unfound ? 'Tree.Unfound' : 'Tree.Finding', { text: finding })}
+    </p>
+  {/if}
+  <ul class="emma-tree" role="tree" aria-label={localize('Tree.Label')} bind:this={tree}>
+    {#each rows as row (row.key)}
+      {@const status = statusText(row)}
+      {@const key = packageOf(row.selection)}
+      {@const update = key === undefined ? undefined : updates?.updateOf(key)}
+      {@const blocked = key !== undefined && updates?.blockedOf(key) !== undefined}
+      {@const removing = key !== undefined && row.installed === true && updates?.chosenOf(key) === UNINSTALL}
+      {@const hidden = updates !== undefined && anyOf(row.hides, under => updates.updateOf(under) !== undefined)}
+      {@const hiddenBlocked =
+        updates !== undefined && anyOf(row.hides, under => updates.blockedOf(under) !== undefined)}
+      <li
+        role="treeitem"
+        class={['emma-tree-row', { 'emma-tree-pending': row.pending }]}
+        data-key={row.key}
+        aria-level={row.level}
+        aria-selected={row.key === selected}
+        aria-expanded={row.expandable ? expanded.has(row.key) : undefined}
+        tabindex={row.key === current ? 0 : -1}
+        style:--emma-depth={row.level - 1}
+        onclick={event => {
+          onClick(event, row);
+        }}
+        onkeydown={onKeydown}>
+        <span class="emma-tree-update">
+          {#if update !== undefined}
+            {@render arrow('Update.Available', false)}
+          {:else if hidden}
+            {@render arrow('Update.Hidden', true)}
           {/if}
         </span>
-      {/if}
-      {#if row.expandable}
-        <i
-          class={['emma-tree-toggle', 'fa-solid', expanded.has(row.key) ? 'fa-caret-down' : 'fa-caret-right']}
-          aria-hidden="true"></i>
-      {:else}
-        <span class="emma-tree-toggle"></span>
-      {/if}
-      {#if row.recommendedBy !== undefined && updates !== undefined && key !== undefined}
-        {@const by = row.recommendedBy}
-        <!-- Clicked, it is wanted or not; from the keyboard, the module's panel offers the same. -->
-        <input
-          type="checkbox"
-          class="emma-tree-recommend"
-          tabindex="-1"
-          checked={updates.recommendationsOf(by).some(({ key: recommended, wanted }) => recommended === key && wanted)}
-          disabled={updates.locked || updates.isInstalled(key)}
-          data-tooltip={updates.rejectionOf(by, key)?.reason}
-          aria-label={format('Recommends.Want', { title: row.title, by: updates.titleOf(by) })}
-          onclick={event => {
-            // Ticking it is not choosing the row.
-            event.stopPropagation();
-          }}
-          onchange={event => {
-            void updates.setRecommended(by, key, event.currentTarget.checked);
-          }} />
-      {/if}
-      <span class="emma-tree-title">{row.title}</span>
-      {#if row.recommendedBy !== undefined}
-        <span class="emma-tree-recommended">{localize('Recommends.Tree')}</span>
-      {/if}
-      {#if row.locked}
-        {@const lockedBy = localize(row.selection.kind === 'root' ? 'Lock.TreeCore' : 'Lock.Tree')}
-        <i class="fa-solid fa-lock emma-tree-locked" role="img" aria-label={lockedBy} data-tooltip={lockedBy}></i>
-      {/if}
-      {#if removing}
-        <span class="emma-tree-uninstall">{localize('Update.Uninstall')}</span>
-      {:else if updates !== undefined && update !== undefined && key !== undefined && row.installed === true}
-        <VersionPicker
-          title={row.title}
-          chosen={updates.optionOf(key, updates.chosenOf(key) ?? update.installed)}
-          versions={() => updates.optionsFor(key)}
-          installed={update.installed}
-          onChoose={(version: string) => {
-            void updates.choose(key, version);
-          }}
-          onOpen={() => {
-            // The panel beside the tree explains the versions looked at.
-            onSelect(row);
-          }}
-          onPreview={(version: string | null) => {
-            updates.setPreview(key, version);
-          }} />
-      {:else if row.version !== undefined}
-        <span class="emma-tree-version">{row.version}</span>
-      {/if}
-      {#if status !== undefined}
-        {@const affected = planned(row)}
-        {@const meaning = localize(affected ? 'Status.Planned' : 'Status.Current')}
-        <span
-          class={['emma-status', affected ? 'emma-status-planned' : `emma-status-${row.status?.value ?? ''}`]}
-          data-tooltip={meaning}>
-          {status}<span class="emma-visually-hidden">, {meaning}</span>
-        </span>
-      {/if}
-      {#if row.pending}
-        <span class="emma-status emma-tree-pending-label">{localize('Tree.Pending')}</span>
-      {/if}
-    </li>
-  {/each}
-</ul>
+        {#if anyBlocked}
+          <span class="emma-tree-update emma-tree-blocked">
+            {#if blocked}
+              {@render arrow('Update.Blocked', false)}
+            {:else if hiddenBlocked}
+              {@render arrow('Update.HiddenBlocked', true)}
+            {/if}
+          </span>
+        {/if}
+        {#if row.expandable}
+          <i
+            class={['emma-tree-toggle', 'fa-solid', expanded.has(row.key) ? 'fa-caret-down' : 'fa-caret-right']}
+            aria-hidden="true"></i>
+        {:else}
+          <span class="emma-tree-toggle"></span>
+        {/if}
+        {#if row.recommendedBy !== undefined && updates !== undefined && key !== undefined}
+          {@const by = row.recommendedBy}
+          <!-- Clicked, it is wanted or not; from the keyboard, the module's panel offers the same. -->
+          <input
+            type="checkbox"
+            class="emma-tree-recommend"
+            tabindex="-1"
+            checked={updates
+              .recommendationsOf(by)
+              .some(({ key: recommended, wanted }) => recommended === key && wanted)}
+            disabled={updates.locked || updates.isInstalled(key)}
+            data-tooltip={updates.rejectionOf(by, key)?.reason}
+            aria-label={format('Recommends.Want', { title: row.title, by: updates.titleOf(by) })}
+            onclick={event => {
+              // Ticking it is not choosing the row.
+              event.stopPropagation();
+            }}
+            onchange={event => {
+              void updates.setRecommended(by, key, event.currentTarget.checked);
+            }} />
+        {/if}
+        <span class="emma-tree-title">{row.title}</span>
+        {#if row.recommendedBy !== undefined}
+          <span class="emma-tree-recommended">{localize('Recommends.Tree')}</span>
+        {/if}
+        {#if row.locked}
+          {@const lockedBy = localize(row.selection.kind === 'root' ? 'Lock.TreeCore' : 'Lock.Tree')}
+          <i class="fa-solid fa-lock emma-tree-locked" role="img" aria-label={lockedBy} data-tooltip={lockedBy}></i>
+        {/if}
+        {#if removing}
+          <span class="emma-tree-uninstall">{localize('Update.Uninstall')}</span>
+        {:else if updates !== undefined && update !== undefined && key !== undefined && row.installed === true}
+          <VersionPicker
+            title={row.title}
+            chosen={updates.optionOf(key, updates.chosenOf(key) ?? update.installed)}
+            versions={() => updates.optionsFor(key)}
+            installed={update.installed}
+            onChoose={(version: string) => {
+              void updates.choose(key, version);
+            }}
+            onOpen={() => {
+              // The panel beside the tree explains the versions looked at.
+              onSelect(row);
+            }}
+            onPreview={(version: string | null) => {
+              updates.setPreview(key, version);
+            }} />
+        {:else if row.version !== undefined}
+          <span class="emma-tree-version">{row.version}</span>
+        {/if}
+        {#if status !== undefined}
+          {@const affected = planned(row)}
+          {@const meaning = localize(affected ? 'Status.Planned' : 'Status.Current')}
+          <span
+            class={['emma-status', affected ? 'emma-status-planned' : `emma-status-${row.status?.value ?? ''}`]}
+            data-tooltip={meaning}>
+            {status}<span class="emma-visually-hidden">, {meaning}</span>
+          </span>
+        {/if}
+        {#if row.pending}
+          <span class="emma-status emma-tree-pending-label">{localize('Tree.Pending')}</span>
+        {/if}
+      </li>
+    {/each}
+  </ul>
+</div>
 
 <style>
   /*
@@ -297,12 +378,31 @@
     font-weight: bold;
   }
 
+  .emma-tree-box {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border-right: 1px solid var(--color-border, #555);
+  }
+
   .emma-tree {
+    flex: 1 1 auto;
+    min-height: 0;
     list-style: none;
     margin: 0;
     padding: 0.25rem;
     overflow: auto;
-    border-right: 1px solid var(--color-border, #555);
+  }
+
+  .emma-tree-finder {
+    margin: 0;
+    padding: 0.15rem 0.5rem;
+    font-size: 0.85em;
+    border-bottom: 1px solid var(--color-border, #555);
+  }
+
+  .emma-tree-unfound {
+    color: var(--color-level-error, #e55);
   }
 
   .emma-tree-row {

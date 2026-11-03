@@ -115,6 +115,31 @@ export function visibleRows(
   expanded: ReadonlySet<string>,
   pending: readonly PendingPackage[] = [],
 ): TreeRow[] {
+  return rowsOf(overview, key => expanded.has(key), pending);
+}
+
+/**
+ * Every row of the tree, from the top, as if each were expanded, as the finder and the panels' links look in.
+ * @param overview - The installation
+ * @param pending - The packages the plan installs anew
+ * @returns The rows, in order
+ */
+export function allRows(overview: Overview, pending: readonly PendingPackage[] = []): TreeRow[] {
+  return rowsOf(overview, () => true, pending);
+}
+
+/**
+ * The rows of the tree that show, from the top.
+ * @param overview - The installation
+ * @param isExpanded - Whether a row, by its key, is expanded
+ * @param pending - The packages the plan installs anew
+ * @returns The rows, in order
+ */
+function rowsOf(
+  overview: Overview,
+  isExpanded: (key: string) => boolean,
+  pending: readonly PendingPackage[],
+): TreeRow[] {
   const rows: TreeRow[] = [];
   const visit = (node: TreeNode, level: number, parent?: string): void => {
     const key = parent === undefined ? node.segment : `${parent}/${node.segment}`;
@@ -131,10 +156,10 @@ export function visibleRows(
       ...(node.recommendedBy !== undefined && { recommendedBy: node.recommendedBy }),
       ...(node.status !== undefined && { status: node.status }),
       expandable: children.length > 0,
-      ...(children.length > 0 && !expanded.has(key) && { hides: packagesUnder(children) }),
+      ...(children.length > 0 && !isExpanded(key) && { hides: packagesUnder(children) }),
       ...(parent !== undefined && { parent }),
     });
-    if (!expanded.has(key)) return;
+    if (!isExpanded(key)) return;
     for (const child of children) visit(child, level + 1, key);
   };
   visit(rootNode(overview, new Map(pending.map(entry => [entry.key, entry]))), 1);
@@ -543,4 +568,37 @@ export function moveFor(
     default:
       return undefined;
   }
+}
+
+/**
+ * The keys of the rows a row is under, from the top: those to expand to show it.
+ * @param key - The row's key
+ * @returns The keys
+ */
+export function ancestorsOf(key: string): string[] {
+  const parts = key.split('/');
+  return parts.slice(0, -1).map((_, index) => parts.slice(0, index + 1).join('/'));
+}
+
+/**
+ * The first row whose title has some text, ignoring case, as the finder looks for it.
+ * @param rows - The rows, in order
+ * @param text - The text
+ * @returns The row, or `undefined` if none has it, or the text is empty
+ */
+export function findRow(rows: readonly TreeRow[], text: string): TreeRow | undefined {
+  const wanted = text.toLocaleLowerCase();
+  return wanted === '' ? undefined : rows.find(({ title }) => title.toLocaleLowerCase().includes(wanted));
+}
+
+/**
+ * The row a panel's link goes to: the first showing what it names, but for a package, not one under a world, where a
+ * module or game system shows as the world last ran with it.
+ * @param rows - The rows, in order
+ * @param link - What the link names, as a row's selection
+ * @returns The row, or `undefined` if none shows it
+ */
+export function rowFor(rows: readonly TreeRow[], link: TreeSelection): TreeRow | undefined {
+  const same = (row: TreeRow) => JSON.stringify(row.selection) === JSON.stringify(link);
+  return rows.find(row => same(row) && row.recommendedBy === undefined) ?? rows.find(same);
 }

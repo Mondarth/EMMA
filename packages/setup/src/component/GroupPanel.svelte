@@ -4,12 +4,17 @@
 -->
 <script lang="ts">
   import type { GroupDetail } from '../lib/details';
+  import type { TreeSelection } from '../lib/tree';
+
+  import TreeLink from './TreeLink.svelte';
 
   interface Props {
     detail: GroupDetail;
+    /** Open the tree to a row a name links to, and select it; without it, names do not link. */
+    onOpen?: ((link: TreeSelection) => void) | undefined;
   }
 
-  let { detail }: Props = $props();
+  let { detail, onOpen }: Props = $props();
 </script>
 
 <h2>{detail.title}</h2>
@@ -21,7 +26,7 @@
 <ul class="emma-group-items" tabindex="0" aria-label={detail.title}>
   {#each detail.items as item, index (index)}
     <li>
-      {item.title}
+      <TreeLink title={item.title} link={item.link} {onOpen} />
       {#if item.detail !== undefined}
         <span class="emma-group-detail">{item.detail}</span>
       {/if}

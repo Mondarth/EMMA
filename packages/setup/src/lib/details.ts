@@ -18,6 +18,7 @@ export interface RelatedPackage {
 
 /** A world that uses a game system. */
 export interface SystemWorld {
+  readonly id: string;
   readonly title: string;
   /** The system as the world's record says it last ran with it, if it has a record. */
   readonly ran?: WorldModule;
@@ -43,6 +44,8 @@ export interface SystemDetail {
 
 /** A world a module is active in, or will be when next run. */
 export interface ActiveIn {
+  /** The world's ID. */
+  readonly id: string;
   readonly title: string;
   /**
    * If the world's record does not say it runs the module, but it will need it when next run: the titles of the modules
@@ -67,8 +70,8 @@ export interface ModuleDetail {
   readonly systems: readonly RelatedPackage[];
   /** The modules it requires. */
   readonly requires: readonly RelatedPackage[];
-  /** The titles of the installed modules that require it. */
-  readonly requiredBy: readonly string[];
+  /** The installed modules that require it, by title. */
+  readonly requiredBy: readonly { readonly id: string; readonly title: string }[];
   /** The worlds whose records say it is active in them, or that will need it when next run. */
   readonly activeIn: readonly ActiveIn[];
 }
@@ -93,7 +96,11 @@ export function systemDetail(overview: Overview, id: string, worldId?: string): 
     status: ran?.status ?? (installed === undefined ? 'missing' : 'same'),
     worlds: overview.worlds
       .filter(({ world: { system } }) => system === id)
-      .map(({ world: { title }, ranSystem }) => ({ title, ...(ranSystem?.id === id && { ran: ranSystem }) })),
+      .map(({ world: { id: inWorld, title }, ranSystem }) => ({
+        id: inWorld,
+        title,
+        ...(ranSystem?.id === id && { ran: ranSystem }),
+      })),
     modules: overview.modules.filter(({ module: pkg }) => pkg.systems.includes(id)).length,
   };
 }
@@ -129,11 +136,11 @@ export function moduleDetail(overview: Overview, id: string, worldId?: string): 
     requires: related(installed?.requires ?? [], modules),
     requiredBy: overview.modules
       .filter(({ module: pkg }) => pkg.requires.includes(id))
-      .map(({ module: pkg }) => pkg.title),
-    activeIn: overview.worlds.flatMap(({ world: { title }, modules: running, needs }): ActiveIn[] => {
-      if (running.some(entry => entry.id === id)) return [{ title }];
+      .map(({ module: { id: other, title } }) => ({ id: other, title })),
+    activeIn: overview.worlds.flatMap(({ world: { id: inWorld, title }, modules: running, needs }): ActiveIn[] => {
+      if (running.some(entry => entry.id === id)) return [{ id: inWorld, title }];
       const need = needs.find(candidate => candidate.id === id);
-      return need === undefined ? [] : [{ title, needed: need.by }];
+      return need === undefined ? [] : [{ id: inWorld, title, needed: need.by }];
     }),
   };
 }
@@ -143,8 +150,8 @@ export interface GroupDetail {
   readonly title: string;
   /** Said of the group as a whole, if anything. */
   readonly note?: string;
-  /** What it holds, each with a detail beside it if it has one. */
-  readonly items: readonly { readonly title: string; readonly detail?: string }[];
+  /** What it holds, each with a detail beside it if it has one, and the row of the tree it shows as. */
+  readonly items: readonly { readonly title: string; readonly detail?: string; readonly link: TreeSelection }[];
 }
 
 /** The rows that only group others. */
@@ -171,6 +178,7 @@ export function groupDetail(overview: Overview, selection: GroupSelection): Grou
           return {
             title: system.title,
             detail: format('Group.WorldCount', { count: system.worlds.length }),
+            link: { kind: 'system', system: id },
           };
         }),
       };
@@ -185,9 +193,15 @@ export function groupDetail(overview: Overview, selection: GroupSelection): Grou
         title: localize('Tree.Modules'),
         note: format('Group.ModulesNote', { count: overview.modules.length }),
         items: [
-          ...(universal === 0 ? [] : [{ title: localize('Tree.Universal'), count: universal }]),
-          ...systems.map(({ id, title }) => ({ title, count: systemDetail(overview, id).modules })),
-        ].map(({ title, count }) => ({ title, detail: format('Group.ModuleCount', { count }) })),
+          ...(universal === 0
+            ? []
+            : [{ title: localize('Tree.Universal'), count: universal, link: { kind: 'group' } as const }]),
+          ...systems.map(({ id, title }) => ({
+            title,
+            count: systemDetail(overview, id).modules,
+            link: { kind: 'group', system: id } as const,
+          })),
+        ].map(({ title, count, link }) => ({ title, detail: format('Group.ModuleCount', { count }), link })),
       };
     }
     case 'group': {
@@ -204,7 +218,11 @@ export function groupDetail(overview: Overview, selection: GroupSelection): Grou
             : format(installed === undefined ? 'Group.SystemMissingNote' : 'Group.SystemNote', {
                 title: installed?.title ?? system,
               }),
-        items: modules.map(({ title, version }) => ({ title, detail: version })),
+        items: modules.map(({ id, title, version }) => ({
+          title,
+          detail: version,
+          link: { kind: 'module', module: id } as const,
+        })),
       };
     }
   }

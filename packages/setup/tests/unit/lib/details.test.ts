@@ -29,10 +29,11 @@ describe('systemDetail', () => {
       status: 'same',
       worlds: [
         {
+          id: 'a',
           title: 'Alpha',
           ran: { id: 'dnd5e', title: 'D&D 5e', recorded: '5.3.3', installed: '5.3.3', status: 'same' },
         },
-        { title: 'Beta' },
+        { id: 'b', title: 'Beta' },
       ],
       modules: 1,
     });
@@ -43,7 +44,7 @@ describe('systemDetail', () => {
       id: 'swade',
       title: 'swade',
       status: 'missing',
-      worlds: [{ title: 'Savage' }],
+      worlds: [{ id: 's', title: 'Savage' }],
       modules: 0,
     });
   });
@@ -58,7 +59,7 @@ describe('systemDetail', () => {
       world: { world: { id: 'a' } },
       ran: { recorded: '4.0.0', installed: '5.3.3' },
       status: 'other',
-      worlds: [{ title: 'Alpha', ran: { status: 'other' } }],
+      worlds: [{ id: 'a', title: 'Alpha', ran: { status: 'other' } }],
     });
   });
 });
@@ -83,7 +84,7 @@ describe('moduleDetail', () => {
         { id: 'lib', title: 'Library', installed: true },
       ],
       requiredBy: [],
-      activeIn: [{ title: 'Alpha' }],
+      activeIn: [{ id: 'a', title: 'Alpha' }],
     });
   });
 
@@ -97,8 +98,8 @@ describe('moduleDetail', () => {
       status: 'same',
       systems: [],
       requires: [],
-      requiredBy: ['App'],
-      activeIn: [{ title: 'Alpha', needed: ['App'] }],
+      requiredBy: [{ id: 'app', title: 'App' }],
+      activeIn: [{ id: 'a', title: 'Alpha', needed: ['App'] }],
     });
   });
 
@@ -128,9 +129,9 @@ describe('moduleDetail', () => {
       ]),
     );
 
-    expect(moduleDetail(overview, 'lib').activeIn).toEqual([{ title: 'Alpha', needed: ['App', 'Tool'] }]);
-    expect(moduleDetail(overview, 'base').activeIn).toEqual([{ title: 'Alpha', needed: ['App', 'Tool'] }]);
-    expect(moduleDetail(overview, 'tool').activeIn).toEqual([{ title: 'Alpha' }]);
+    expect(moduleDetail(overview, 'lib').activeIn).toEqual([{ id: 'a', title: 'Alpha', needed: ['App', 'Tool'] }]);
+    expect(moduleDetail(overview, 'base').activeIn).toEqual([{ id: 'a', title: 'Alpha', needed: ['App', 'Tool'] }]);
+    expect(moduleDetail(overview, 'tool').activeIn).toEqual([{ id: 'a', title: 'Alpha' }]);
   });
 
   test('gives a module that is not installed, under a world that does not run it', () => {
@@ -141,7 +142,7 @@ describe('moduleDetail', () => {
       status: 'missing',
       systems: [],
       requires: [],
-      requiredBy: ['App'],
+      requiredBy: [{ id: 'app', title: 'App' }],
     });
   });
 });
@@ -151,8 +152,8 @@ describe('groupDetail', () => {
     expect(groupDetail(OVERVIEW, { kind: 'systems' })).toEqual({
       title: 'Game systems',
       items: [
-        { title: 'D&D 5e', detail: '2 worlds' },
-        { title: 'swade', detail: '1 worlds' },
+        { title: 'D&D 5e', detail: '2 worlds', link: { kind: 'system', system: 'dnd5e' } },
+        { title: 'swade', detail: '1 worlds', link: { kind: 'system', system: 'swade' } },
       ],
     });
   });
@@ -162,9 +163,9 @@ describe('groupDetail', () => {
       title: 'Modules',
       note: expect.stringMatching(/^2 modules installed/) as string,
       items: [
-        { title: 'Universal', detail: '1 modules' },
-        { title: 'D&D 5e', detail: '1 modules' },
-        { title: 'pf2e', detail: '1 modules' },
+        { title: 'Universal', detail: '1 modules', link: { kind: 'group' } },
+        { title: 'D&D 5e', detail: '1 modules', link: { kind: 'group', system: 'dnd5e' } },
+        { title: 'pf2e', detail: '1 modules', link: { kind: 'group', system: 'pf2e' } },
       ],
     });
   });
@@ -179,12 +180,12 @@ describe('groupDetail', () => {
     expect(groupDetail(OVERVIEW, { kind: 'group' })).toEqual({
       title: 'Universal',
       note: 'Modules that name no game system, for use with any.',
-      items: [{ title: 'Library', detail: '1.0.0' }],
+      items: [{ title: 'Library', detail: '1.0.0', link: { kind: 'module', module: 'lib' } }],
     });
     expect(groupDetail(OVERVIEW, { kind: 'group', system: 'dnd5e' })).toEqual({
       title: 'D&D 5e',
       note: 'Modules that name D&D 5e among the game systems they are for.',
-      items: [{ title: 'App', detail: '2.0.0' }],
+      items: [{ title: 'App', detail: '2.0.0', link: { kind: 'module', module: 'app' } }],
     });
     expect(groupDetail(OVERVIEW, { kind: 'group', system: 'pf2e' }).note).toBe(
       'Modules that name pf2e among the game systems they are for. pf2e is not installed.',

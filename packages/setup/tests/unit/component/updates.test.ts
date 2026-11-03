@@ -2137,6 +2137,13 @@ describe('what a module recommends', () => {
     await vi.waitFor(() => {
       expect(plan).not.toHaveTextContent('recommended by App');
     });
+
+    // Its name links to it in the tree: here, under App, as it shows nowhere else.
+    await user.click(within(section).getByRole('button', { name: 'Show dice in the tree' }));
+    expect(screen.getByRole('treeitem', { selected: true })).toHaveAttribute(
+      'data-key',
+      'root/modules/universal/module:app/recommends:module:dice',
+    );
   });
 });
 

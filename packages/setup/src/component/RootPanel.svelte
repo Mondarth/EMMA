@@ -8,7 +8,10 @@
   import type { Overview, WorldStatus } from '../lib/overview';
   import type { BlockedUpdate as Blocked } from '../lib/updates';
 
+  import type { TreeSelection } from '../lib/tree';
+
   import BlockedUpdate from './BlockedUpdate.svelte';
+  import TreeLink from './TreeLink.svelte';
   import VersionExplanation from './VersionExplanation.svelte';
 
   interface Props {
@@ -19,9 +22,11 @@
     blocked?: Blocked | undefined;
     /** The build looked at in its list, or chosen, to explain, if any. */
     explained?: ExplainedVersion | undefined;
+    /** Open the tree to a row a name links to, and select it; without it, names do not link. */
+    onOpen?: ((link: TreeSelection) => void) | undefined;
   }
 
-  let { overview, guardOn, onGuardChange, blocked, explained }: Props = $props();
+  let { overview, guardOn, onGuardChange, blocked, explained, onOpen }: Props = $props();
 
   const STATUSES: readonly WorldStatus[] = ['matches', 'differs', 'unrecorded', 'unreadable'];
   const worlds = $derived(overview.summary.worlds);
@@ -54,7 +59,10 @@
     <h4>{localize('Root.Systems')}</h4>
     <ul>
       {#each worlds.systems as system (system.id)}
-        <li>{format('Root.SystemCount', { title: system.title, count: system.count })}</li>
+        <li>
+          <TreeLink title={system.title} link={{ kind: 'system', system: system.id }} {onOpen} />:
+          {system.count}
+        </li>
       {/each}
     </ul>
   {/if}

@@ -121,7 +121,11 @@ describe('SetupRoot', () => {
     const worlds = screen.getByRole('region', { name: 'Worlds' });
     expect(within(worlds).getByText('Changed since it last ran').nextElementSibling).toHaveTextContent('1');
     expect(within(worlds).getByText('No record').nextElementSibling).toHaveTextContent('1');
-    expect(within(worlds).getByText('D&D 5e: 3')).toBeInTheDocument();
+    expect(
+      within(worlds)
+        .getAllByRole('listitem')
+        .map(item => item.textContent.replace(/\s+/g, ' ').trim()),
+    ).toContain('D&D 5e: 3');
     expect(within(worlds).getByText(/has not been opened with EMMA 0\.9/)).toBeInTheDocument();
     const modules = screen.getByRole('region', { name: 'Modules' });
     expect(within(modules).getByText('Active in a recorded world').nextElementSibling).toHaveTextContent('1');
@@ -250,5 +254,45 @@ describe('SetupRoot', () => {
     await user.click(row(/^Universal/));
     expect(screen.getByText('Modules that name no game system, for use with any.')).toBeInTheDocument();
     expect(screen.getByText('Library')).toBeInTheDocument();
+  });
+});
+
+describe("the panels' links", () => {
+  test('open the tree to what a panel names, and select it, from panel to panel', async () => {
+    const { user } = await setUp();
+    const selected = () => screen.getByRole('treeitem', { selected: true });
+
+    await user.click(screen.getByRole('button', { name: 'Show D&D 5e in the tree' }));
+    expect(selected()).toHaveTextContent(/^D&D 5e/);
+    expect(screen.getByRole('heading', { name: 'D&D 5e', level: 2 })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Show Alpha in the tree' }));
+    expect(selected()).toHaveTextContent(/^Alpha/);
+
+    await user.click(screen.getByRole('button', { name: 'Show D&D 5e in the tree' }));
+    expect(selected()).toHaveTextContent(/^D&D 5e/);
+
+    // To a module in its group, opening the group, and on to what it requires.
+    await user.click(row(/^Modules/));
+    await user.click(screen.getByRole('button', { name: 'Show D&D 5e in the tree' }));
+    await user.click(screen.getByRole('button', { name: 'Show Idle in the tree' }));
+    expect(selected()).toHaveTextContent(/^Idle/);
+    expect(selected().getAttribute('data-key')).toBe('root/modules/system:dnd5e/module:idle');
+    await user.click(screen.getByRole('button', { name: 'Show Library in the tree' }));
+    expect(selected()).toHaveTextContent(/^Library/);
+    expect(selected().getAttribute('data-key')).toBe('root/modules/universal/module:lib');
+
+    // Back to what requires it, and to it again.
+    await user.click(screen.getByRole('button', { name: 'Show Idle in the tree' }));
+    expect(selected()).toHaveTextContent(/^Idle/);
+    await user.click(screen.getByRole('button', { name: 'Show Library in the tree' }));
+    // On to a world it is active in, and from a module to the game system it is for.
+    await user.click(screen.getByRole('button', { name: 'Show Delta in the tree' }));
+    expect(selected().getAttribute('data-key')).toBe('root/systems/system:dnd5e/world:d');
+    await user.click(row(/^Modules/));
+    await user.click(screen.getByRole('button', { name: 'Show D&D 5e in the tree' }));
+    await user.click(screen.getByRole('button', { name: 'Show Idle in the tree' }));
+    await user.click(screen.getByRole('button', { name: 'Show D&D 5e in the tree' }));
+    expect(selected().getAttribute('data-key')).toBe('root/systems/system:dnd5e');
   });
 });
