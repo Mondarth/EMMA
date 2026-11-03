@@ -329,6 +329,18 @@
     "CoreUnlocked": "Locking {title} in EMMA keeps it at {version}: no plan updates it, though plans still update the game systems and modules that run on it. Foundry has no lock for itself, so this is EMMA's own.",
     "TreeCore": "Locked in EMMA"
   },
+  "Ignore": {
+    "Heading": "Ignore",
+    "Badge": "Ignored",
+    "BadgeNote": "No plan takes it into account.",
+    "Ignored": "EMMA ignores {title}. No plan takes it into account: it is never updated, nothing it asks for holds anything back, and whatever version of it another package asks for is taken as the one installed.",
+    "IgnoredWorld": "EMMA ignores {title}. No plan takes it into account: what it runs holds nothing back, and a plan may leave it unable to run.",
+    "Unignored": "Ignoring {title} leaves it out of every plan: it stays as it is installed, nothing it asks for holds anything back, and whatever version of it another package asks for is taken as the one installed. Use it for a package whose releases EMMA cannot read or judge correctly.",
+    "UnignoredWorld": "Ignoring {title} leaves it out of every plan: what it runs no longer holds anything back, so a plan may leave it unable to run. Use it for a world you no longer play.",
+    "Ignore": "Ignore {title}",
+    "Unignore": "Stop ignoring {title}",
+    "Tree": "ignored"
+  },
   "Best": {
     "Heading": "Best versions",
     "Hint": "Plans the newest versions of Foundry VTT and of every game system and module installed that work together, and keep every recorded world working, in place of what is chosen now. Locked packages stay as they are.",

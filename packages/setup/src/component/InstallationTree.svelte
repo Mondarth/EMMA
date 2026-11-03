@@ -229,7 +229,7 @@
         updates !== undefined && anyOf(row.hides, under => updates.blockedOf(under) !== undefined)}
       <li
         role="treeitem"
-        class={['emma-tree-row', { 'emma-tree-pending': row.pending }]}
+        class={['emma-tree-row', { 'emma-tree-pending': row.pending, 'emma-tree-ignored': row.ignored }]}
         data-key={row.key}
         aria-level={row.level}
         aria-selected={row.key === selected}
@@ -285,6 +285,9 @@
             }} />
         {/if}
         <span class="emma-tree-title">{row.title}</span>
+        {#if row.ignored}
+          <span class="emma-visually-hidden">, {localize('Ignore.Tree')}</span>
+        {/if}
         {#if row.recommendedBy !== undefined}
           <span class="emma-tree-recommended">{localize('Recommends.Tree')}</span>
         {/if}
@@ -336,6 +339,15 @@
    * darker amber edge, 4.1:1 against the pale amber and 3.7:1 against a dark theme, past the 3:1 a mark needs. A
    * selected row takes the selection's colours, with the edge, so that it still shows as pending.
    */
+  /* Ignored, it is there still, but greyed and struck through: no plan takes it into account. */
+  .emma-tree-ignored > :not(.emma-visually-hidden) {
+    opacity: 0.5;
+  }
+
+  .emma-tree-ignored .emma-tree-title {
+    text-decoration: line-through;
+  }
+
   .emma-tree-pending {
     --emma-pending-background: #fff3cd;
     --emma-pending-text: #3d2c00;

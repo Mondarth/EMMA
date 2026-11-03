@@ -296,3 +296,72 @@ describe("the panels' links", () => {
     expect(selected().getAttribute('data-key')).toBe('root/systems/system:dnd5e');
   });
 });
+
+describe('ignoring', () => {
+  test('ignores a world, a game system or a module from its panel, greying it in the tree, and stops', async () => {
+    const ignored = new Set<string>();
+    const ignore = vi.fn((key: string, on: boolean) => {
+      if (on) ignored.add(key);
+      else ignored.delete(key);
+    });
+    const setup = new SetupState({
+      load: () => {
+        const base = installation({
+          worlds: [{ id: 'a', title: 'Alpha', system: 'dnd5e' }],
+          modules: [installedModule('lib', 'Library', '1.1.0')],
+        });
+        return Promise.resolve(buildOverview({ ...base, ignored: [...ignored] }, new Map()));
+      },
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: noUpdates,
+      installModule: noInstall,
+      ignore,
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    const user = userEvent.setup();
+    const section = () => screen.getByRole('region', { name: 'Ignore' });
+
+    await toggle(user, /^D&D 5e/);
+    await user.click(row(/^Alpha/));
+    expect(screen.queryByRole('note')).toBeNull();
+    expect(section()).toHaveTextContent('Ignoring Alpha leaves it out of every plan');
+    await user.click(within(section()).getByRole('button', { name: 'Ignore Alpha' }));
+
+    expect(ignore).toHaveBeenCalledWith('world:a', true);
+    await vi.waitFor(() => {
+      expect(screen.getByRole('note')).toHaveTextContent('Ignored');
+    });
+    expect(section()).toHaveTextContent('EMMA ignores Alpha');
+    expect(row(/^Alpha/)).toHaveClass('emma-tree-ignored');
+    expect(row(/^Alpha/)).toHaveAccessibleName(/^Alpha\s*, ignored/);
+
+    // Still selectable, as are a game system and a module, which say so in their own words.
+    await user.click(row(/^D&D 5e/));
+    expect(screen.queryByRole('note')).toBeNull();
+    await user.click(within(section()).getByRole('button', { name: 'Ignore D&D 5e' }));
+    await vi.waitFor(() => {
+      expect(section()).toHaveTextContent('EMMA ignores D&D 5e. No plan takes it into account: it is never updated');
+    });
+    await toggle(user, /^Universal/);
+    await user.click(row(/^Library/));
+    expect(section()).toHaveTextContent('Ignoring Library leaves it out of every plan');
+
+    await user.click(row(/^Alpha/));
+    await user.click(within(section()).getByRole('button', { name: 'Stop ignoring Alpha' }));
+    expect(ignore).toHaveBeenLastCalledWith('world:a', false);
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('note')).toBeNull();
+    });
+    expect(row(/^Alpha/)).not.toHaveClass('emma-tree-ignored');
+  });
+
+  test('is not offered where it cannot be kept', async () => {
+    const { user } = await setUp();
+    expect(screen.queryByRole('region', { name: 'Ignore' })).toBeNull();
+    await toggle(user, /^D&D 5e/);
+    await user.click(row(/^Alpha/));
+    expect(screen.queryByRole('region', { name: 'Ignore' })).toBeNull();
+  });
+});

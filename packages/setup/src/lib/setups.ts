@@ -2,11 +2,12 @@
  * What the update search and the plans share: which packages a world uses, the order of versions as Foundry counts it,
  * and whether a release may be offered on a Foundry build. Pure.
  */
-import type { PackageKey, Release, Universe } from '@mondarth/fvtt-resolver';
+import type { PackageKey, Relationship, Release, Universe } from '@mondarth/fvtt-resolver';
 
 import type { KitResolver } from '@mondarth/emma-core/setup-kit';
 
 import type { Overview } from './overview';
+import { isIgnored } from './overview';
 
 /** A package a world uses, at its installed version. */
 export interface Use {
@@ -126,5 +127,61 @@ export function keepsLocked(resolver: KitResolver, overview: Overview): (release
   return release => {
     const version = locked.get(resolver.packageKey(release.package));
     return version === undefined || resolver.sameVersion(version, release.version);
+  };
+}
+
+/** What the plans take into account of an installation, and of the releases found, leaving out what EMMA ignores. */
+export interface Considered {
+  /** The installation without the worlds EMMA ignores: their setups hold nothing back. */
+  readonly overview: Overview;
+  /**
+   * Releases as the plans take them: none of a package EMMA ignores, and any version of one asked for satisfied by the
+   * one installed.
+   */
+  readonly releases: (releases: readonly Release[]) => Release[];
+  /** The releases the packages EMMA ignores stand as: at their installed versions, asking nothing. */
+  readonly standIns: readonly Release[];
+}
+
+/**
+ * What the plans take into account, as the EMMA module's hypothetical mode takes a module it ignores, but for worlds and
+ * game systems too. A package ignored is taken as present at its installed version, its other releases never looked up
+ * or judged, so that it never changes, asks nothing of the setup, and satisfies whatever version of it another asks.
+ * @param resolver - The resolver
+ * @param overview - The installation, with what EMMA ignores
+ * @returns What the plans take into account
+ */
+export function considered(resolver: KitResolver, overview: Overview): Considered {
+  const { packageKey } = resolver;
+  const installed = [
+    ...overview.systems.map(({ id, version }) => ({ type: 'system' as const, id, version })),
+    ...overview.modules.map(({ module: { id, version } }) => ({ type: 'module' as const, id, version })),
+  ].filter(({ type, id }) => isIgnored(overview, `${type}:${id}`));
+  const ignored = new Set(installed.map(ref => packageKey(ref)));
+  const satisfied = (relationship: Relationship): Relationship =>
+    ignored.has(packageKey(relationship.package)) ? { ...relationship, compatibility: {} } : relationship;
+  return {
+    overview: { ...overview, worlds: overview.worlds.filter(({ world }) => !isIgnored(overview, `world:${world.id}`)) },
+    releases: releases =>
+      releases
+        .filter(release => !ignored.has(packageKey(release.package)))
+        .map(release => ({
+          ...release,
+          relationships: {
+            ...release.relationships,
+            requires: release.relationships.requires.map(satisfied),
+            systems: release.relationships.systems.map(satisfied),
+          },
+        })),
+    // It declares the installed build's compatibility rather than none, as the policy refuses a release declaring none.
+    standIns: installed.map(({ type, id, version }) => ({
+      package: { type, id },
+      version,
+      compatibility: { minimum: overview.core, verified: overview.core },
+      relationships: { requires: [], systems: [], conflicts: [], recommends: [] },
+      protected: false,
+      origin: `${type}s/${id}/${type}.json`,
+      detail: 'loaded',
+    })),
   };
 }

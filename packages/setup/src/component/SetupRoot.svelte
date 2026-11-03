@@ -15,8 +15,9 @@
   import { stepText } from '../lib/run';
   import { groupDetail, moduleDetail, systemDetail } from '../lib/details';
   import { format, localize } from '../lib/i18n';
+  import { isIgnored } from '../lib/overview';
   import type { TreeRow, TreeSelection } from '../lib/tree';
-  import { ROOT, allRows, rowFor } from '../lib/tree';
+  import { ROOT, allRows, ignoreKeyOf, rowFor } from '../lib/tree';
   import GroupPanel from './GroupPanel.svelte';
   import InstallationTree from './InstallationTree.svelte';
   import ModulePanel from './ModulePanel.svelte';
@@ -26,6 +27,7 @@
   import CoreStep from './CoreStep.svelte';
   import BestSection from './BestSection.svelte';
   import InstallSection from './InstallSection.svelte';
+  import IgnoreSection from './IgnoreSection.svelte';
   import LockSection from './LockSection.svelte';
   import RecommendsSection from './RecommendsSection.svelte';
   import UninstallSection from './UninstallSection.svelte';
@@ -121,6 +123,8 @@
     }
   }
   const selection = $derived(selected.selection);
+  /** Whether EMMA ignores what the panel shows. */
+  const ignoredShown = $derived(overview !== null && isIgnored(overview, ignoreKeyOf(selection) ?? ''));
   /**
    * The packages the plan installs anew, as the tree shows them, pending.
    * @returns The packages
@@ -210,6 +214,29 @@
   {/if}
 {/snippet}
 
+{#snippet ignore(key: string, title: string)}
+  {#if overview !== null && setup.canIgnore}
+    <IgnoreSection
+      {title}
+      world={key.startsWith('world:')}
+      ignored={isIgnored(overview, key)}
+      disabled={updates.locked || setup.running}
+      onIgnore={(ignoring: boolean) => {
+        void setup.setIgnored(key, ignoring);
+      }} />
+  {/if}
+{/snippet}
+
+{#snippet ignoreInstalled(key: string)}
+  {@const id = key.slice(key.indexOf(':') + 1)}
+  {@const pkg = key.startsWith('system:')
+    ? overview?.systems.find(system => system.id === id)
+    : overview?.modules.find(({ module: installed }) => installed.id === id)?.module}
+  {#if pkg !== undefined}
+    {@render ignore(key, pkg.title)}
+  {/if}
+{/snippet}
+
 {#snippet uninstall(key: string)}
   {@const offer = updates.uninstallOf(key)}
   {#if offer !== undefined}
@@ -251,6 +278,13 @@
             resize({ tree });
           }} />
         <section class="emma-setup-panel">
+          {#if ignoredShown}
+            <!-- It stays in view as the panel scrolls, so that what the panel says is never taken for what plans use. -->
+            <div class="emma-setup-ignored" role="note">
+              <strong>{localize('Ignore.Badge')}</strong>
+              <span>{localize('Ignore.BadgeNote')}</span>
+            </div>
+          {/if}
           {#if selection.kind === 'module'}
             <ModulePanel
               detail={moduleDetail(overview, selection.module, selection.world)}
@@ -259,6 +293,7 @@
               explained={updates.explainedOf(`module:${selection.module}`)} />
             <RecommendsSection key={`module:${selection.module}`} {updates} onOpen={openLink} />
             {@render lock(`module:${selection.module}`)}
+            {@render ignoreInstalled(`module:${selection.module}`)}
             {@render uninstall(`module:${selection.module}`)}
           {:else if selection.kind === 'system'}
             <SystemPanel
@@ -267,6 +302,7 @@
               blocked={updates.blockedOf(`system:${selection.system}`)}
               explained={updates.explainedOf(`system:${selection.system}`)} />
             {@render lock(`system:${selection.system}`)}
+            {@render ignoreInstalled(`system:${selection.system}`)}
             {@render uninstall(`system:${selection.system}`)}
           {:else if selection.kind === 'systems' || selection.kind === 'modules' || selection.kind === 'group'}
             <GroupPanel detail={groupDetail(overview, selection)} onOpen={openLink} />
@@ -287,6 +323,7 @@
             {/if}
           {:else if world !== undefined}
             <WorldPanel {world} onOpen={openLink} />
+            {@render ignore(`world:${world.world.id}`, world.world.title)}
           {:else}
             <RootPanel
               {overview}
@@ -427,6 +464,38 @@
   .emma-setup-panel {
     overflow: auto;
     padding: 0 1rem;
+  }
+
+  /* At least three lines high, in the panel's top right corner, to catch the eye wherever the panel is scrolled. */
+  .emma-setup-ignored {
+    position: sticky;
+    top: 0.5rem;
+    z-index: 1;
+    float: right;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.25rem;
+    min-height: 4.5rem;
+    max-width: 12rem;
+    margin: 0.5rem 0 0.5rem 1rem;
+    padding: 0.5rem 1rem;
+    border: 3px solid var(--color-level-error, #c00);
+    border-radius: 6px;
+    background: var(--color-bg-option, #fff);
+    color: var(--color-level-error, #c00);
+    box-shadow: 0 2px 6px rgb(0 0 0 / 35%);
+    text-align: center;
+  }
+
+  .emma-setup-ignored strong {
+    font-size: 1.6em;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  .emma-setup-ignored span {
+    font-size: 0.85em;
   }
 
   .emma-setup-plan {

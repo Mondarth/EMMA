@@ -6,11 +6,14 @@ import {
   LAYOUT_KEY,
   PENDING_PLAN_KEY,
   CORE_LOCK_KEY,
+  IGNORED_KEY,
   readCoreLocked,
+  readIgnored,
   readGuardOn,
   readLayout,
   readPendingPlan,
   writeCoreLocked,
+  writeIgnored,
   writeGuardOn,
   writeLayout,
   writePendingPlan,
@@ -43,6 +46,44 @@ describe("EMMA's lock of Foundry VTT", () => {
     expect(readCoreLocked()).toBe(false);
     expect(() => {
       writeCoreLocked(true);
+    }).not.toThrow();
+  });
+});
+
+describe('what EMMA ignores', () => {
+  test('is nothing until something is ignored, and is kept, in order', () => {
+    expect(readIgnored()).toEqual([]);
+
+    writeIgnored('world:b', true);
+    writeIgnored('module:a', true);
+    writeIgnored('module:a', true);
+    expect(localStorage.getItem(IGNORED_KEY)).toBe('["module:a","world:b"]');
+    expect(readIgnored()).toEqual(['module:a', 'world:b']);
+
+    writeIgnored('module:a', false);
+    expect(readIgnored()).toEqual(['world:b']);
+    writeIgnored('world:b', false);
+    expect(localStorage.getItem(IGNORED_KEY)).toBeNull();
+  });
+
+  test('is nothing when what is kept is not a list of keys, and keeps only the keys of one', () => {
+    localStorage.setItem(IGNORED_KEY, '{"a":1}');
+    expect(readIgnored()).toEqual([]);
+    localStorage.setItem(IGNORED_KEY, 'not json');
+    expect(readIgnored()).toEqual([]);
+    localStorage.setItem(IGNORED_KEY, '["module:a",2]');
+    expect(readIgnored()).toEqual(['module:a']);
+  });
+
+  test('is nothing, and is not kept, when the storage refuses', () => {
+    const blocked = () => {
+      throw new Error('blocked');
+    };
+    vi.stubGlobal('localStorage', { getItem: blocked, setItem: blocked, removeItem: blocked });
+
+    expect(readIgnored()).toEqual([]);
+    expect(() => {
+      writeIgnored('module:a', true);
     }).not.toThrow();
   });
 });

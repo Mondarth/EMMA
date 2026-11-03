@@ -39,6 +39,8 @@ export interface SetupStateOptions {
   readonly pendingPlan?: () => PendingPlan | undefined;
   /** Keep whether EMMA keeps Foundry VTT at the build installed, which reading the installation then reads; none can be without. */
   readonly lockCore?: (locked: boolean) => void;
+  /** Keep whether EMMA ignores a world, a game system or a module, which reading the installation then reads; none can be without. */
+  readonly ignore?: (key: string, ignored: boolean) => void;
   /** Lock a game system or module in Foundry, or unlock it, as Foundry's own package menu does; none can be without. */
   readonly lockPackage?: (type: 'module' | 'system', id: string, lock: boolean) => Promise<void>;
   /** Read Foundry's listing of the packages of a type that may be installed; none where it cannot be read. */
@@ -230,6 +232,30 @@ export class SetupState {
     const lockCore = this.#options.lockCore;
     if (lockCore === undefined || this.running || this.updates.locked) return false;
     lockCore(lock);
+    await this.refresh();
+    return true;
+  }
+
+  /**
+   * Whether worlds, game systems and modules can be ignored here.
+   * @returns `true` where they can
+   */
+  get canIgnore(): boolean {
+    return this.#options.ignore !== undefined;
+  }
+
+  /**
+   * Have EMMA ignore a world, a game system or a module, or stop ignoring it, then read the installation afresh, so that
+   * the plan takes it. Ignored, the plan never takes it into account: a world's setup does not hold anything back, and
+   * a package stays as it is installed, taken as whatever what needs it asks. Nothing is done while the plan runs.
+   * @param key - Its key, such as `world:alpha`, `system:dnd5e` or `module:dice`
+   * @param ignored - Whether to ignore it
+   * @returns Whether it was done
+   */
+  async setIgnored(key: string, ignored: boolean): Promise<boolean> {
+    const ignore = this.#options.ignore;
+    if (ignore === undefined || this.running || this.updates.locked) return false;
+    ignore(key, ignored);
     await this.refresh();
     return true;
   }

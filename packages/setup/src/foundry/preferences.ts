@@ -59,6 +59,40 @@ export function writeCoreLocked(locked: boolean): void {
   }
 }
 
+/** The key what EMMA ignores is kept under. */
+export const IGNORED_KEY = 'mondarth-emma.setup.ignored';
+
+/**
+ * What the user has EMMA ignore, by key: none if the storage cannot be read, or holds something else.
+ * @returns The keys, such as `world:alpha`, `system:dnd5e` or `module:dice`
+ */
+export function readIgnored(): string[] {
+  try {
+    const kept: unknown = JSON.parse(localStorage.getItem(IGNORED_KEY) ?? '[]');
+    return Array.isArray(kept) ? kept.filter((key): key is string => typeof key === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Have EMMA ignore a world, a game system or a module, or stop ignoring it. Nothing changes if the storage cannot be
+ * written.
+ * @param key - Its key
+ * @param ignored - Whether to ignore it
+ */
+export function writeIgnored(key: string, ignored: boolean): void {
+  const keys = new Set(readIgnored());
+  if (ignored) keys.add(key);
+  else keys.delete(key);
+  try {
+    if (keys.size === 0) localStorage.removeItem(IGNORED_KEY);
+    else localStorage.setItem(IGNORED_KEY, JSON.stringify([...keys].sort()));
+  } catch {
+    // As for the guard's setting.
+  }
+}
+
 /** The key the panels' sizes are kept under. */
 export const LAYOUT_KEY = 'mondarth-emma.setup.layout';
 
