@@ -414,7 +414,7 @@ to whole worlds and to game systems, outside any one world.
 - **An ignored game system or module** stays at its installed version. EMMA never looks up or judges its other
   releases, so it is never updated or offered as an update. What it asks of the setup holds nothing back, and whatever
   version of it another package asks for is taken to be the one installed. Use it for a package whose releases EMMA
-  cannot read, or judges wrongly.
+  cannot read or judge correctly.
 - **An ignored world** holds nothing back: what it runs is not taken into account, so a plan may leave it unable to
   run. Use it for a world no longer played.
 
