@@ -267,6 +267,7 @@ export class SetupState {
       listing = 'failed';
     }
     this.listings = { ...this.listings, [type]: listing };
+    if (typeof listing === 'object') this.updates.knowListing(listing);
   }
 
   /**

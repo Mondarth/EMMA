@@ -1164,6 +1164,13 @@ describe('installing anew, by group', () => {
     await vi.waitFor(() => {
       expect(plan).toHaveTextContent('recommended by New');
     });
+    // Regression: what came in on a recommendation was named by its key, though the listing gives its title.
+    expect(
+      changesIn(plan)
+        .getAllByRole('row')
+        .slice(1)
+        .map(tr => within(tr).getByRole('rowheader').textContent.trim()),
+    ).toEqual(['New', 'Maps']);
   });
 
   test('says when what a module requires and recommends cannot be read, or it has none', async () => {

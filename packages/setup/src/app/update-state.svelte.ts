@@ -149,6 +149,8 @@ export class UpdateState {
   readonly #picks = new SvelteMap<PackageKey, string>();
   /** The titles of the packages installed anew, as Foundry's listing gives them, by package key. */
   readonly #named = new SvelteMap<PackageKey, string>();
+  /** The titles of every package on Foundry's listing, once read, by package key, to name any not installed by. */
+  readonly #listingTitles = new SvelteMap<PackageKey, string>();
   /** The releases read from manifests the user gave, by package key, which no search finds again. */
   readonly #manual = new SvelteMap<PackageKey, Release>();
   /** The packages added against EMMA's advice, by package key. */
@@ -730,7 +732,7 @@ export class UpdateState {
   titleOf(key: PackageKey): string {
     if (key === 'core') return localize('Tree.Root');
     const title = this.#overview === null ? key : titleIn(this.#overview, key);
-    return title === key ? (this.#named.get(key) ?? key) : title;
+    return title === key ? (this.#named.get(key) ?? this.#listingTitles.get(key) ?? key) : title;
   }
 
   /**
@@ -979,6 +981,15 @@ export class UpdateState {
       else missed.push(recommended);
     }
     return missed;
+  }
+
+  /**
+   * Know the titles Foundry's listing gives, so that a package not installed is named by its title wherever it shows,
+   * as one a module recommends that comes into the plan with it.
+   * @param packages - The packages on the listing
+   */
+  knowListing(packages: readonly { readonly type: string; readonly id: string; readonly title: string }[]): void {
+    for (const { type, id, title } of packages) this.#listingTitles.set(`${type}:${id}`, title);
   }
 
   /** Take back every choice, and what was changed of the plan's snapshot and backups. */
