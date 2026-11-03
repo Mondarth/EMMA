@@ -120,3 +120,64 @@ function recordedPackage(value: unknown): RecordedPackage | undefined {
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
+
+/** A package whose version changed between two records. */
+export interface ChangedPackage {
+  readonly id: string;
+  readonly title: string;
+  readonly from: string;
+  readonly to: string;
+}
+
+/** What changed in a world's setup between its record and what it is now. */
+export interface WorldChanges {
+  /** The Foundry version, if it changed. */
+  readonly core?: { readonly from: string; readonly to: string };
+  /** The game system, if it, or its version, changed. */
+  readonly system?: { readonly from: RecordedPackage; readonly to: RecordedPackage };
+  /** The modules active now that were not then, by title. */
+  readonly added: readonly RecordedPackage[];
+  /** The modules active then that are not now, by title. */
+  readonly removed: readonly RecordedPackage[];
+  /** The modules active then and now whose version changed, by title. */
+  readonly changed: readonly ChangedPackage[];
+}
+
+/**
+ * What changed in a world's setup since its record was written: the Foundry version, the game system, and the active
+ * modules. Which EMMA wrote it, the world's title and when it was written are not changes to the setup.
+ * @param saved - The record, as last written
+ * @param now - What the record would say now
+ * @returns The changes
+ */
+export function recordChanges(saved: WorldRecordContent, now: WorldRecordContent): WorldChanges {
+  const before = new Map(saved.modules.map(entry => [entry.id, entry]));
+  const after = new Map(now.modules.map(entry => [entry.id, entry]));
+  const byTitle = <T extends { readonly title: string }>(a: T, b: T) => a.title.localeCompare(b.title);
+  const sameSystem = saved.system.id === now.system.id && saved.system.version === now.system.version;
+  return {
+    ...(saved.core !== now.core && { core: { from: saved.core, to: now.core } }),
+    ...(!sameSystem && { system: { from: saved.system, to: now.system } }),
+    added: now.modules.filter(({ id }) => !before.has(id)).sort(byTitle),
+    removed: saved.modules.filter(({ id }) => !after.has(id)).sort(byTitle),
+    changed: now.modules
+      .flatMap(({ id, title, version }) => {
+        const from = before.get(id)?.version;
+        return from === undefined || from === version ? [] : [{ id, title, from, to: version }];
+      })
+      .sort(byTitle),
+  };
+}
+
+/**
+ * Whether anything changed.
+ * @param changes - The changes
+ * @returns `true` if there are any
+ */
+export function hasChanges(changes: WorldChanges): boolean {
+  return (
+    changes.core !== undefined ||
+    changes.system !== undefined ||
+    changes.added.length + changes.removed.length + changes.changed.length > 0
+  );
+}

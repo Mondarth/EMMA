@@ -1,7 +1,14 @@
 import { describe, expect, test } from 'vitest';
 
 import type { WorldRecordContent } from '../src/world-record';
-import { parseWorldRecord, recordHolds, stampRecord, WORLD_RECORD_SCHEMA } from '../src/world-record';
+import {
+  hasChanges,
+  parseWorldRecord,
+  recordChanges,
+  recordHolds,
+  stampRecord,
+  WORLD_RECORD_SCHEMA,
+} from '../src/world-record';
 
 const CONTENT: WorldRecordContent = {
   schema: WORLD_RECORD_SCHEMA,
@@ -75,5 +82,65 @@ describe('parseWorldRecord', () => {
 
   test.each([undefined, null, 'text', [RECORD]])('refuses %j', value => {
     expect(parseWorldRecord(value)).toBeUndefined();
+  });
+});
+
+describe('recordChanges', () => {
+  const pkg = (id: string, version: string) => ({ id, title: id.toUpperCase(), version });
+  const setup = (change: Partial<WorldRecordContent>): WorldRecordContent => ({
+    schema: WORLD_RECORD_SCHEMA,
+    emma: '0.9.0',
+    world: { id: 'w', title: 'World' },
+    core: '14.368',
+    system: pkg('dnd5e', '5.3.3'),
+    modules: [pkg('kept', '1.0.0'), pkg('gone', '1.0.0'), pkg('moved', '1.0.0'), pkg('back', '2.0.0')],
+    ...change,
+  });
+
+  test('finds nothing changed in the same setup, whoever wrote it and whatever the world is called', () => {
+    const changes = recordChanges(setup({}), setup({ emma: '1.0.0', world: { id: 'w', title: 'Renamed' } }));
+
+    expect(changes).toEqual({ added: [], removed: [], changed: [] });
+    expect(hasChanges(changes)).toBe(false);
+  });
+
+  test("finds Foundry's build, the game system, and the modules added, removed and changed, by title", () => {
+    const changes = recordChanges(
+      setup({}),
+      setup({
+        core: '14.370',
+        system: pkg('dnd5e', '6.0.6'),
+        modules: [
+          pkg('kept', '1.0.0'),
+          pkg('moved', '1.1.0'),
+          pkg('back', '1.0.0'),
+          pkg('new', '1.0.0'),
+          pkg('b', '1'),
+        ],
+      }),
+    );
+
+    expect(changes).toEqual({
+      core: { from: '14.368', to: '14.370' },
+      system: { from: pkg('dnd5e', '5.3.3'), to: pkg('dnd5e', '6.0.6') },
+      added: [pkg('b', '1'), pkg('new', '1.0.0')],
+      removed: [pkg('gone', '1.0.0')],
+      changed: [
+        { id: 'back', title: 'BACK', from: '2.0.0', to: '1.0.0' },
+        { id: 'moved', title: 'MOVED', from: '1.0.0', to: '1.1.0' },
+      ],
+    });
+    expect(hasChanges(changes)).toBe(true);
+  });
+
+  test('finds another game system, and each kind of change alone', () => {
+    expect(recordChanges(setup({}), setup({ system: pkg('pf2e', '7.0.0') })).system?.to.id).toBe('pf2e');
+    expect(hasChanges(recordChanges(setup({}), setup({ core: '15.1' })))).toBe(true);
+    expect(hasChanges(recordChanges(setup({}), setup({ system: pkg('dnd5e', '6.0.6') })))).toBe(true);
+    expect(hasChanges(recordChanges(setup({ modules: [] }), setup({ modules: [pkg('a', '1')] })))).toBe(true);
+    expect(hasChanges(recordChanges(setup({ modules: [pkg('a', '1')] }), setup({ modules: [] })))).toBe(true);
+    expect(hasChanges(recordChanges(setup({ modules: [pkg('a', '1')] }), setup({ modules: [pkg('a', '2')] })))).toBe(
+      true,
+    );
   });
 });

@@ -5,6 +5,7 @@ import {
   getDrawerFields,
   getHypotheticallyIgnored,
   getOlderVersions,
+  getStartupChanges,
   getVersionProxy,
   getVersionProxyKey,
   getVersionProxyMode,
@@ -70,6 +71,34 @@ describe('registerSettings', () => {
         default: ['description', 'authors', 'languages'],
       }),
     );
+  });
+});
+
+describe('getStartupChanges', () => {
+  test('registers the per-user setting, a dialog by default, in Game Settings for GMs alone', async () => {
+    const { game } = installFoundryMocks();
+
+    registerGmSettings();
+
+    expect(game.settings.register).toHaveBeenCalledWith('mondarth-emma', 'startupChanges', {
+      name: 'MONDARTH-EMMA.Settings.StartupChanges.Name',
+      hint: 'MONDARTH-EMMA.Settings.StartupChanges.Hint',
+      scope: 'user',
+      config: true,
+      type: String,
+      choices: {
+        none: 'MONDARTH-EMMA.Settings.StartupChanges.None',
+        dialog: 'MONDARTH-EMMA.Settings.StartupChanges.Dialog',
+        chat: 'MONDARTH-EMMA.Settings.StartupChanges.Chat',
+        both: 'MONDARTH-EMMA.Settings.StartupChanges.Both',
+      },
+      default: 'dialog',
+    });
+    expect(getStartupChanges()).toBe('dialog');
+    await game.settings.set('mondarth-emma', 'startupChanges', 'both');
+    expect(getStartupChanges()).toBe('both');
+    await game.settings.set('mondarth-emma', 'startupChanges', 'loudly');
+    expect(getStartupChanges()).toBe('dialog');
   });
 });
 
