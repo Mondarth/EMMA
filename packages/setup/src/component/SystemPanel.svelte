@@ -7,7 +7,10 @@
   import type { SystemDetail } from '../lib/details';
   import type { BlockedUpdate as Blocked } from '../lib/updates';
 
+  import type { TreeSelection } from '../lib/tree';
+
   import BlockedUpdate from './BlockedUpdate.svelte';
+  import TreeLink from './TreeLink.svelte';
   import VersionExplanation from './VersionExplanation.svelte';
   import { format, localize } from '../lib/i18n';
 
@@ -17,9 +20,11 @@
     blocked?: Blocked | undefined;
     /** The version looked at in its list, or chosen, to explain, if any. */
     explained?: ExplainedVersion | undefined;
+    /** Open the tree to a row a name links to, and select it; without it, names do not link. */
+    onOpen?: ((link: TreeSelection) => void) | undefined;
   }
 
-  let { detail, blocked, explained }: Props = $props();
+  let { detail, blocked, explained, onOpen }: Props = $props();
 </script>
 
 <h2>{detail.title}</h2>
@@ -56,7 +61,7 @@
     <ul>
       {#each detail.worlds as world, index (index)}
         <li>
-          {world.title}
+          <TreeLink title={world.title} link={{ kind: 'world', world: world.id }} {onOpen} />
           {#if world.ran !== undefined}
             <span class="emma-note">{format('System.RanWith', { version: world.ran.recorded })}</span>
             <span class={['emma-badge', `emma-status-${world.ran.status}`]}>

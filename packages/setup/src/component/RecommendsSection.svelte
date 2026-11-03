@@ -6,14 +6,19 @@
 <script lang="ts">
   import type { UpdateState } from '../app/update-state.svelte';
   import { format, localize } from '../lib/i18n';
+  import type { TreeSelection } from '../lib/tree';
+
+  import TreeLink from './TreeLink.svelte';
 
   interface Props {
     /** The module's key. */
     key: string;
     updates: UpdateState;
+    /** Open the tree to a row a name links to, and select it; without it, names do not link. */
+    onOpen?: ((link: TreeSelection) => void) | undefined;
   }
 
-  let { key, updates }: Props = $props();
+  let { key, updates, onOpen }: Props = $props();
 
   const uid = $props.id();
   const recommended = $derived(updates.recommendationsOf(key));
@@ -39,17 +44,19 @@
     <ul>
       {#each recommended as recommendation (recommendation.key)}
         <li>
-          <label>
-            <input
-              type="checkbox"
-              checked={recommendation.wanted}
-              disabled={updates.locked || recommendation.installed}
-              aria-label={format('Recommends.Want', { title: recommendation.title, by: updates.titleOf(key) })}
-              onchange={event => {
-                void updates.setRecommended(key, recommendation.key, event.currentTarget.checked);
-              }} />
-            {recommendation.title}
-          </label>
+          <!-- The checkbox has its own name, so that the module's name beside it can link to it in the tree. -->
+          <input
+            type="checkbox"
+            checked={recommendation.wanted}
+            disabled={updates.locked || recommendation.installed}
+            aria-label={format('Recommends.Want', { title: recommendation.title, by: updates.titleOf(key) })}
+            onchange={event => {
+              void updates.setRecommended(key, recommendation.key, event.currentTarget.checked);
+            }} />
+          <TreeLink
+            title={recommendation.title}
+            link={{ kind: 'module', module: recommendation.key.slice(recommendation.key.indexOf(':') + 1) }}
+            {onOpen} />
           <span class="emma-recommends-state"
             >{localize(recommendation.installed ? 'Module.same' : 'Module.missing')}</span>
           {#if recommendation.rejected !== undefined}
@@ -71,10 +78,9 @@
     padding-left: 0;
   }
 
-  .emma-recommends label {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
+  .emma-recommends input[type='checkbox'] {
+    margin: 0 0.5rem 0 0;
+    vertical-align: middle;
   }
 
   .emma-recommends-rejected {

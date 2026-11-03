@@ -13,7 +13,10 @@
     "Modules": "Modules",
     "Universal": "Universal",
     "Pending": "Pending",
-    "InUse": "In use"
+    "InUse": "In use",
+    "Finding": "Finding “{text}”",
+    "Unfound": "Nothing has “{text}”",
+    "Show": "Show {title} in the tree"
   },
   "Status": {
     "matches": "Matches its record",
@@ -56,7 +59,8 @@
     "Unrecorded": "This world has no record: it has not been opened with EMMA 0.9 or later active. Open it once, with EMMA active, and EMMA records its setup.",
     "Needs": "Will need when next run",
     "Need": "{title}: now required by {modules}, updated since the world last ran",
-    "Unreadable": "EMMA cannot read this world's record. Open the world once, with EMMA active, to record its setup again."
+    "Unreadable": "EMMA cannot read this world's record. Open the world once, with EMMA active, to record its setup again.",
+    "NeedBy": "now required by {modules}, updated since the world last ran"
   },
   "ModuleInfo": {
     "InWorld": "In {world}",

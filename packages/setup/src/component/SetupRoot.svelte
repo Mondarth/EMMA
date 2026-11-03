@@ -16,7 +16,7 @@
   import { groupDetail, moduleDetail, systemDetail } from '../lib/details';
   import { format, localize } from '../lib/i18n';
   import type { TreeRow, TreeSelection } from '../lib/tree';
-  import { ROOT } from '../lib/tree';
+  import { ROOT, allRows, rowFor } from '../lib/tree';
   import GroupPanel from './GroupPanel.svelte';
   import InstallationTree from './InstallationTree.svelte';
   import ModulePanel from './ModulePanel.svelte';
@@ -121,6 +121,29 @@
     }
   }
   const selection = $derived(selected.selection);
+  /**
+   * The packages the plan installs anew, as the tree shows them, pending.
+   * @returns The packages
+   */
+  function pendingNow() {
+    const listing = setup.listings.module;
+    return pendingPackages(updates.choices, key => updates.titleOf(key), Array.isArray(listing) ? listing : []);
+  }
+
+  /** The row of the tree a panel's name last linked to, for the tree to open to; a new object for each link. */
+  let revealing = $state.raw<{ readonly key: string } | null>(null);
+
+  /**
+   * Open the tree to the row a panel's name links to, and select it.
+   * @param link - What the name links to, as a row's selection
+   */
+  function openLink(link: TreeSelection): void {
+    // Panels show only once the installation is read.
+    if (overview !== null) {
+      const row = rowFor(allRows(overview, pendingNow()), link);
+      if (row !== undefined) revealing = { key: row.key };
+    }
+  }
   /** The type of package the selected group offers to install, if it offers any. */
   const installType = $derived(
     selection.kind === 'systems'
@@ -209,13 +232,10 @@
     <div class="emma-setup-body">
       <div class="emma-setup-main" style:--emma-tree-share="{layout.tree * 100}%">
         <InstallationTree
+          reveal={revealing}
           {overview}
           {updates}
-          pending={pendingPackages(
-            updates.choices,
-            key => updates.titleOf(key),
-            Array.isArray(setup.listings.module) ? setup.listings.module : [],
-          )}
+          pending={pendingNow()}
           selected={selected.key}
           onSelect={(row: TreeRow) => {
             selected = { key: row.key, selection: row.selection };
@@ -234,20 +254,22 @@
           {#if selection.kind === 'module'}
             <ModulePanel
               detail={moduleDetail(overview, selection.module, selection.world)}
+              onOpen={openLink}
               blocked={updates.blockedOf(`module:${selection.module}`)}
               explained={updates.explainedOf(`module:${selection.module}`)} />
-            <RecommendsSection key={`module:${selection.module}`} {updates} />
+            <RecommendsSection key={`module:${selection.module}`} {updates} onOpen={openLink} />
             {@render lock(`module:${selection.module}`)}
             {@render uninstall(`module:${selection.module}`)}
           {:else if selection.kind === 'system'}
             <SystemPanel
               detail={systemDetail(overview, selection.system, selection.world)}
+              onOpen={openLink}
               blocked={updates.blockedOf(`system:${selection.system}`)}
               explained={updates.explainedOf(`system:${selection.system}`)} />
             {@render lock(`system:${selection.system}`)}
             {@render uninstall(`system:${selection.system}`)}
           {:else if selection.kind === 'systems' || selection.kind === 'modules' || selection.kind === 'group'}
-            <GroupPanel detail={groupDetail(overview, selection)} />
+            <GroupPanel detail={groupDetail(overview, selection)} onOpen={openLink} />
             {#if installType !== undefined && setup.canInstall}
               <InstallSection
                 type={installType}
@@ -264,10 +286,11 @@
                 }} />
             {/if}
           {:else if world !== undefined}
-            <WorldPanel {world} />
+            <WorldPanel {world} onOpen={openLink} />
           {:else}
             <RootPanel
               {overview}
+              onOpen={openLink}
               guardOn={setup.guardOn}
               blocked={updates.blockedOf('core')}
               explained={updates.explainedOf('core')}

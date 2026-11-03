@@ -5,12 +5,17 @@
 <script lang="ts">
   import { format, localize } from '../lib/i18n';
   import type { Difference, WorldOverview } from '../lib/overview';
+  import type { TreeSelection } from '../lib/tree';
+
+  import TreeLink from './TreeLink.svelte';
 
   interface Props {
     world: WorldOverview;
+    /** Open the tree to a row a name links to, and select it; without it, names do not link. */
+    onOpen?: ((link: TreeSelection) => void) | undefined;
   }
 
-  let { world }: Props = $props();
+  let { world, onOpen }: Props = $props();
 
   const recorded = $derived(
     world.record === undefined
@@ -39,7 +44,13 @@
 
 <dl>
   <dt>{localize('World.System')}</dt>
-  <dd>{world.system === undefined ? world.world.system : `${world.system.title} ${world.system.version}`}</dd>
+  <dd>
+    <TreeLink
+      title={world.system?.title ?? world.world.system}
+      link={{ kind: 'system', system: world.world.system }}
+      {onOpen} />
+    {world.system?.version ?? ''}
+  </dd>
   {#if world.record !== undefined}
     <dt>{localize('World.LastRan')}</dt>
     <dd>
@@ -79,7 +90,8 @@
     <ul>
       {#each world.needs as need (need.id)}
         <li>
-          {format('World.Need', { title: need.title, modules: new Intl.ListFormat(undefined).format(need.by) })}
+          <TreeLink title={need.title} link={{ kind: 'module', module: need.id }} {onOpen} />:
+          {format('World.NeedBy', { modules: new Intl.ListFormat(undefined).format(need.by) })}
           {#if !need.installed}
             <span class="emma-status-missing">{localize('ModuleInfo.NotInstalled')}</span>
           {/if}
