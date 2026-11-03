@@ -287,6 +287,22 @@ describe('SetupState', () => {
       return { setup, load };
     }
 
+    test('shows a run while it runs, and once over until the user changes the plan, a new search aside', async () => {
+      const { setup } = await planned(() => Promise.resolve(), [['module:app', '2.0.0']]);
+      expect(setup.shownRun).toBeNull();
+
+      await setup.runPlan();
+      // Read again, the installation is searched again, which changes nothing the user did.
+      await vi.waitFor(() => {
+        expect(setup.updates.status).toBe('found');
+      });
+      expect(setup.shownRun).toMatchObject({ over: true });
+
+      await setup.updates.choose('module:lib', '1.1.0');
+      expect(setup.shownRun).toBeNull();
+      expect(setup.run).toMatchObject({ over: true });
+    });
+
     test('makes the snapshot checked, then each change, in order, the choices fixed meanwhile, then reads again', async () => {
       const seen: string[] = [];
       const running: { setup?: SetupState } = {};

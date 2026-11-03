@@ -144,6 +144,8 @@ export class UpdateState {
   planning = $state(false);
   /** Whether the choices cannot change, as while the plan runs. */
   locked = $state(false);
+  /** How many times the user has changed the plan, as by choosing, taking out or clearing; a new search does not. */
+  changes = $state(0);
 
   /** The versions chosen, by package key, in the order they were chosen. */
   readonly #picks = new SvelteMap<PackageKey, string>();
@@ -510,6 +512,7 @@ export class UpdateState {
       this.#picks.clear();
       for (const [picked, to] of picks) this.#picks.set(picked, to);
       this.plan = plan;
+      this.changes++;
       return true;
     } finally {
       this.planning = false;
@@ -611,6 +614,7 @@ export class UpdateState {
   async #takeOut(key: PackageKey, withNeeds: boolean): Promise<boolean> {
     if (!this.locked && this.#forced.has(key)) {
       this.#forced.delete(key);
+      this.changes++;
       return true;
     }
     const search = this.search;
@@ -640,6 +644,7 @@ export class UpdateState {
     this.#picks.clear();
     for (const [picked, to] of picks) this.#picks.set(picked, to);
     this.plan = plan;
+    this.changes++;
     return true;
   }
 
@@ -794,6 +799,7 @@ export class UpdateState {
     if (this.locked || this.#installedOf(install.key) !== undefined) return false;
     this.#named.set(install.key, install.title);
     this.#forced.set(install.key, install);
+    this.changes++;
     return true;
   }
 
@@ -802,7 +808,8 @@ export class UpdateState {
    * @param key - The package's key
    */
   unforce(key: PackageKey): void {
-    if (!this.locked) this.#forced.delete(key);
+    if (this.locked || !this.#forced.delete(key)) return;
+    this.changes++;
   }
 
   /**
@@ -845,6 +852,7 @@ export class UpdateState {
       this.#safeguardEdits.clear();
       for (const [picked, to] of picks) this.#picks.set(picked, to);
       this.plan = plan;
+      this.changes++;
       return true;
     } finally {
       this.planning = false;
@@ -1030,6 +1038,7 @@ export class UpdateState {
     this.#recommendedBy.clear();
     this.#safeguardEdits.clear();
     this.plan = [];
+    this.changes++;
   }
 
   /**

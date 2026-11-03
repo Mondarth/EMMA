@@ -426,11 +426,17 @@
     padding: 0 0.5rem;
   }
 
+  /* The title and the buttons stay in view as the plan's tables scroll, on the window's own background. */
   header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--background, var(--color-cool-5, #1b1d24));
+    border-bottom: 1px solid var(--color-border, #555);
   }
 
   header button {

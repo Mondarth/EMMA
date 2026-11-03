@@ -1215,3 +1215,27 @@ describe('what a module to install requires and recommends', () => {
     );
   });
 });
+
+describe("the user's changes to the plan", () => {
+  test('are counted as they choose, take out, add against advice and clear, but not as a search finds', async () => {
+    const updates = new UpdateState(() => Promise.resolve(finding(APP, LIB)));
+    await updates.searchFor(OVERVIEW);
+    expect(updates.changes).toBe(0);
+
+    await updates.choose('module:app', '2.0.0');
+    expect(updates.changes).toBe(1);
+    await updates.searchFor(OVERVIEW);
+    expect(updates.changes).toBe(1);
+    await updates.takeOut('module:app', true);
+    const install = { key: 'module:dice', title: 'Dice', version: '1.0.0', manifest: 'https://example.org/dice.json' };
+    updates.force(install);
+    updates.unforce('module:dice');
+    // Taking out what is not there is no change.
+    updates.unforce('module:dice');
+    updates.force(install);
+    await updates.takeOut('module:dice', false);
+    updates.clear();
+    await updates.planBest();
+    expect(updates.changes).toBe(8);
+  });
+});
