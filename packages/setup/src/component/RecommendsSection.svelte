@@ -19,6 +19,19 @@
   const recommended = $derived(updates.recommendationsOf(key));
 </script>
 
+{#snippet rejected(why: { readonly reason: string; readonly explanation?: readonly string[] })}
+  <div class="emma-recommends-rejected">
+    <p>{format('Recommends.Rejected', { reason: why.reason })}</p>
+    {#if why.explanation !== undefined}
+      <ul>
+        {#each why.explanation as line, index (index)}
+          <li>{line}</li>
+        {/each}
+      </ul>
+    {/if}
+  </div>
+{/snippet}
+
 {#if recommended.length > 0}
   <section class="emma-recommends" aria-labelledby="{uid}-heading">
     <h3 id="{uid}-heading">{localize('Recommends.Heading')}</h3>
@@ -30,7 +43,7 @@
             <input
               type="checkbox"
               checked={recommendation.wanted}
-              disabled={updates.locked}
+              disabled={updates.locked || recommendation.installed}
               aria-label={format('Recommends.Want', { title: recommendation.title, by: updates.titleOf(key) })}
               onchange={event => {
                 void updates.setRecommended(key, recommendation.key, event.currentTarget.checked);
@@ -39,6 +52,9 @@
           </label>
           <span class="emma-recommends-state"
             >{localize(recommendation.installed ? 'Module.same' : 'Module.missing')}</span>
+          {#if recommendation.rejected !== undefined}
+            {@render rejected(recommendation.rejected)}
+          {/if}
         </li>
       {/each}
     </ul>
@@ -50,7 +66,7 @@
     margin-top: 1rem;
   }
 
-  .emma-recommends ul {
+  .emma-recommends > ul {
     list-style: none;
     padding-left: 0;
   }
@@ -59,6 +75,15 @@
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  .emma-recommends-rejected {
+    color: var(--color-level-error, #c00);
+    font-size: 0.85em;
+  }
+
+  .emma-recommends-rejected p {
+    margin: 0;
   }
 
   .emma-recommends-hint,

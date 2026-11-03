@@ -367,7 +367,9 @@ at its left, **Install <recommended> with <module>**. A module ticked comes into
 recommends it, at the newest version that fits, when that module is added to the plan, or at once if it is in the plan
 already; one installed already is left as it is. Its row in the plan says **recommended by <module>**. It goes with
 that module, taken out of the plan, and so it does unticked. The tree's checkbox takes a click; from the keyboard, the
-panel's does the same. Both lists are by name.
+panel's does the same. Both lists are by name. A module installed already is shown ticked, and cannot be unticked,
+as it is there whatever is chosen. One ticked that cannot come into the plan with its module, as no version of it fits,
+is unticked again, saying why below it, or, in the tree, in its checkbox's tooltip.
 
 A module to install, in an **Install** section, has the same in its drawer: opened, the drawer reads the module's
 manifest, as Foundry's listing does not say, and lists what it **Requires**, which comes into the plan with it, and what

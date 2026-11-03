@@ -338,7 +338,8 @@
     "Want": "Install {title} with {by}",
     "Tree": "Recommended",
     "Always": "Always install recommendations",
-    "Blocked": "What it recommends cannot be added with it: {modules}. Untick it in the drawer to add the module without it."
+    "Blocked": "What it recommends cannot be added with it: {modules}. Untick it in the drawer to add the module without it.",
+    "Rejected": "It could not come into the plan with it: {reason}"
   },
   "Relations": {
     "Reading": "Reading what it requires and recommends…",

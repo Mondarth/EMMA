@@ -159,6 +159,8 @@ export class UpdateState {
   readonly #recommending = new SvelteSet<string>();
   /** Those the user does not want, though they always want what a module recommends, as `<module>><recommended>`. */
   readonly #unwanted = new SvelteSet<string>();
+  /** Why each module a module recommends could not come into the plan with it, as `<module>><recommended>`. */
+  readonly #rejected = new SvelteMap<string, Exclude<InstallResult, { ok: true }>>();
   /** Whether the user wants every module a module recommends with it, but for those they untick. */
   alwaysRecommended = $state(false);
   /** The modules the plan installs as a module in it recommends them, by their keys, each with that module's. */
@@ -539,7 +541,7 @@ export class UpdateState {
       if (completion.ok) {
         const chosen = await this.#choose(key, version);
         // What it recommends that the user wants comes in with it, or it does not come in at all.
-        const missed = chosen ? await this.#bringRecommended(key) : [];
+        const missed = chosen ? await this.#bringRecommended(key, false) : [];
         if (!chosen || missed.length === 0) {
           return chosen ? { ok: true, version } : { ok: false, reason: localize('Install.NotNow') };
         }
@@ -859,6 +861,8 @@ export class UpdateState {
     readonly title: string;
     readonly installed: boolean;
     readonly wanted: boolean;
+    /** Why it could not come into the plan with the module, if it could not. */
+    readonly rejected?: Exclude<InstallResult, { ok: true }> | undefined;
   }[] {
     const planner = this.search?.planner;
     const version = this.plan.find(entry => entry.key === key)?.version ?? this.#installedOf(key);
@@ -870,7 +874,11 @@ export class UpdateState {
         key: recommended,
         title: this.#nameOf(recommended),
         installed: this.#installedOf(recommended) !== undefined,
-        wanted: this.wants(key, recommended),
+        // One installed is there anyway, so it is as good as wanted.
+        wanted: this.#installedOf(recommended) !== undefined || this.wants(key, recommended),
+        ...(this.#rejected.has(`${key}>${recommended}`) && {
+          rejected: this.#rejected.get(`${key}>${recommended}`),
+        }),
       }))
       .sort((a, b) => a.title.localeCompare(b.title) || a.key.localeCompare(b.key));
   }
@@ -931,6 +939,16 @@ export class UpdateState {
   }
 
   /**
+   * Why a module a module recommends could not come into the plan with it.
+   * @param key - The module's key
+   * @param recommended - The recommended module's key
+   * @returns Why, in the plan's words, if it could not
+   */
+  rejectionOf(key: PackageKey, recommended: PackageKey): Exclude<InstallResult, { ok: true }> | undefined {
+    return this.#rejected.get(`${key}>${recommended}`);
+  }
+
+  /**
    * Whether a package is installed.
    * @param key - Its key
    * @returns `true` if it is
@@ -951,6 +969,7 @@ export class UpdateState {
   async setRecommended(key: PackageKey, recommended: PackageKey, wanted: boolean): Promise<void> {
     if (this.locked) return;
     const pair = `${key}>${recommended}`;
+    this.#rejected.delete(pair);
     if (wanted) {
       this.#recommending.add(pair);
       this.#unwanted.delete(pair);
@@ -967,9 +986,10 @@ export class UpdateState {
   /**
    * Bring into the plan what the user wants of what a module in it recommends, and is neither installed nor planned.
    * @param key - The module's key
+   * @param untick - Whether one that cannot be brought in is no longer wanted, and says why
    * @returns Those wanted that could not be brought in
    */
-  async #bringRecommended(key: PackageKey): Promise<PackageKey[]> {
+  async #bringRecommended(key: PackageKey, untick = true): Promise<PackageKey[]> {
     const planner = this.search?.planner;
     const version = this.#picks.get(key);
     if (planner === undefined || version === undefined) return [];
@@ -977,8 +997,18 @@ export class UpdateState {
     for (const { key: recommended, manifest } of planner.recommendsOf(key, version)) {
       if (!this.wants(key, recommended)) continue;
       if (this.#installedOf(recommended) !== undefined || this.#picks.has(recommended)) continue;
-      if ((await this.install(recommended, undefined, manifest)).ok) this.#recommendedBy.set(recommended, key);
-      else missed.push(recommended);
+      const result = await this.install(recommended, undefined, manifest);
+      if (result.ok) {
+        this.#recommendedBy.set(recommended, key);
+        continue;
+      }
+      missed.push(recommended);
+      // One that cannot come in is no longer wanted, saying why, but where the module is not to come in without it.
+      if (!untick) continue;
+      const pair = `${key}>${recommended}`;
+      this.#recommending.delete(pair);
+      this.#unwanted.add(pair);
+      this.#rejected.set(pair, result);
     }
     return missed;
   }

@@ -182,12 +182,13 @@
       <h4>{localize('Recommends.Heading')}</h4>
       <ul class="emma-install-relations">
         {#each byName(read.recommends.map(({ key: recommended }) => recommended)) as recommended (recommended)}
+          {@const why = updates.rejectionOf(key, recommended)}
           <li>
             <label>
               <input
                 type="checkbox"
-                checked={updates.wants(key, recommended)}
-                disabled={updates.locked}
+                checked={updates.isInstalled(recommended) || updates.wants(key, recommended)}
+                disabled={updates.locked || updates.isInstalled(recommended)}
                 aria-label={format('Recommends.Want', { title: nameOf(recommended), by: pkg.title })}
                 onchange={event => {
                   void updates.setRecommended(key, recommended, event.currentTarget.checked);
@@ -197,6 +198,18 @@
             <span class="emma-install-hint">
               {localize(updates.isInstalled(recommended) ? 'Module.same' : 'Module.missing')}
             </span>
+            {#if why !== undefined}
+              <div class="emma-install-failed">
+                <p>{format('Recommends.Rejected', { reason: why.reason })}</p>
+                {#if why.explanation !== undefined}
+                  <ul>
+                    {#each why.explanation as line, index (index)}
+                      <li>{line}</li>
+                    {/each}
+                  </ul>
+                {/if}
+              </div>
+            {/if}
           </li>
         {/each}
       </ul>

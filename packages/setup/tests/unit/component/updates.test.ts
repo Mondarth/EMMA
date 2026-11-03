@@ -1111,10 +1111,15 @@ describe('installing anew, by group', () => {
       ...base,
       recommendsOf: (key: string) => (key === 'module:new' ? [{ key: 'module:dice' }, { key: 'module:maps' }] : []),
       add: (key: string) => {
-        if (key !== 'module:dice') known.add(key);
-        return Promise.resolve(known.has(key));
+        known.add(key);
+        return Promise.resolve(true);
       },
       candidates: (key: string) => (known.has(key) ? ['1.0.0'] : []),
+      // Dice is found, but fits nothing.
+      complete: (picks: ReadonlyMap<string, string>) =>
+        picks.has('module:dice')
+          ? Promise.resolve({ ok: false as const, explanation: ['Dice needs Foundry VTT 15.'] })
+          : base.complete(picks),
       plan: async (picks: ReadonlyMap<string, string>) =>
         (await base.plan(picks))?.map(({ installed: _none, ...entry }) => entry),
     };
@@ -1153,7 +1158,7 @@ describe('installing anew, by group', () => {
     expect(dice).toBeChecked();
     expect(maps).toBeChecked();
 
-    // Dice cannot be found, so New cannot come in with it.
+    // Dice fits nothing, so New cannot come in with it.
     await user.click(within(section).getByRole('checkbox', { name: 'Install New' }));
     expect(await within(section).findByText(/What it recommends cannot be added with it: dice\./)).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Update plan' })).toBeNull();
@@ -1171,6 +1176,15 @@ describe('installing anew, by group', () => {
         .slice(1)
         .map(tr => within(tr).getByRole('rowheader').textContent.trim()),
     ).toEqual(['New', 'Maps']);
+
+    // Ticked with New in the plan, Dice cannot come in, so is unticked, saying why.
+    await user.click(dice);
+    await vi.waitFor(() => {
+      expect(drawer).toHaveTextContent(
+        'It could not come into the plan with it: No version of it fits the installation and the plan. Dice needs Foundry VTT 15.',
+      );
+    });
+    expect(dice).not.toBeChecked();
   });
 
   test('says when what a module requires and recommends cannot be read, or it has none', async () => {
@@ -2123,5 +2137,81 @@ describe('what a module recommends', () => {
     await vi.waitFor(() => {
       expect(plan).not.toHaveTextContent('recommended by App');
     });
+  });
+});
+
+describe('what a module recommends, installed or not to be had', () => {
+  test('shows one installed ticked and fixed, and unticks one that cannot come in, saying why', async () => {
+    const APP_UPDATE: PackageUpdate = {
+      key: 'module:app',
+      installed: '1.0.0',
+      newest: '2.0.0',
+      versions: ['2.0.0', '1.0.0'],
+    };
+    const overview = buildOverview(
+      installation({
+        modules: [
+          { ...installedModule('app', 'App', '1.0.0'), recommends: ['dice', 'lib'] },
+          installedModule('lib', 'Library', '1.0.0'),
+        ],
+      }),
+      new Map(),
+    );
+    const planner = {
+      ...alone(APP_UPDATE),
+      recommendsOf: (key: string) => (key === 'module:app' ? [{ key: 'module:dice' }, { key: 'module:lib' }] : []),
+      add: () => Promise.resolve(true),
+      candidates: (key: string) => (key === 'module:dice' ? ['1.0.0'] : alone(APP_UPDATE).candidates(key)),
+      complete: (picks: ReadonlyMap<string, string>) =>
+        picks.has('module:dice')
+          ? Promise.resolve({ ok: false as const, explanation: ['Dice needs Foundry VTT 15.'] })
+          : alone(APP_UPDATE).complete(picks),
+    };
+    const setup = new SetupState({
+      load: () => Promise.resolve(overview),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: () =>
+        Promise.resolve({
+          updates: new Map([[APP_UPDATE.key, APP_UPDATE]]),
+          blocked: new Map(),
+          unresolved: [],
+          judge,
+          planner,
+        }),
+      installModule: noInstall,
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    await vi.waitFor(() => {
+      expect(setup.updates.status).toBe('found');
+    });
+    const user = userEvent.setup();
+    const toggle = row(/Universal/).querySelector('.emma-tree-toggle');
+    if (toggle === null) throw new Error('No universal group to open');
+    await user.click(toggle);
+    const appToggle = row(/App 1\.0\.0/).querySelector('.emma-tree-toggle');
+    if (appToggle === null) throw new Error('App has nothing under it');
+    await user.click(appToggle);
+    await user.click(within(row(/App 1\.0\.0/)).getByText('App'));
+    await setup.updates.choose('module:app', '2.0.0');
+    const section = screen.getByRole('region', { name: 'Recommends' });
+
+    const library = within(section).getByRole('checkbox', { name: 'Install Library with App' });
+    expect(library).toBeChecked();
+    expect(library).toBeDisabled();
+
+    const dice = within(section).getByRole('checkbox', { name: 'Install dice with App' });
+    await user.click(dice);
+
+    await vi.waitFor(() => {
+      expect(section).toHaveTextContent(
+        'It could not come into the plan with it: No version of it fits the installation and the plan. Dice needs Foundry VTT 15.',
+      );
+    });
+    expect(dice).not.toBeChecked();
+    const inTree = screen.getAllByRole('checkbox', { name: 'Install dice with App' }).find(box => box !== dice);
+    expect(inTree).toHaveAttribute('data-tooltip', 'No version of it fits the installation and the plan.');
+    expect(inTree).not.toBeChecked();
   });
 });

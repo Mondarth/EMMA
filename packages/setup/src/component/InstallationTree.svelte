@@ -193,7 +193,8 @@
           class="emma-tree-recommend"
           tabindex="-1"
           checked={updates.recommendationsOf(by).some(({ key: recommended, wanted }) => recommended === key && wanted)}
-          disabled={updates.locked}
+          disabled={updates.locked || updates.isInstalled(key)}
+          data-tooltip={updates.rejectionOf(by, key)?.reason}
           aria-label={format('Recommends.Want', { title: row.title, by: updates.titleOf(by) })}
           onclick={event => {
             // Ticking it is not choosing the row.

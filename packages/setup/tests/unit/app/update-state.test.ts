@@ -1001,7 +1001,8 @@ describe('what a module recommends', () => {
 
     expect(updates.recommendationsOf('module:app')).toEqual([
       { key: 'module:dice', title: 'dice', installed: false, wanted: true },
-      { key: 'module:lib', title: 'lib', installed: true, wanted: false },
+      // Installed, it is as good as wanted.
+      { key: 'module:lib', title: 'lib', installed: true, wanted: true },
     ]);
     expect(updates.recommendationsOf('module:none')).toEqual([]);
     expect(new UpdateState(() => Promise.resolve(finding(APP))).recommendationsOf('module:app')).toEqual([]);
@@ -1150,6 +1151,47 @@ describe('what a module to install requires and recommends', () => {
     expect(updates.wants('module:new', 'module:dice')).toBe(false);
     await updates.setRecommended('module:new', 'module:dice', true);
     expect(updates.wants('module:new', 'module:dice')).toBe(true);
+  });
+
+  test('unticks a recommendation that cannot come into the plan with its module, saying why, until ticked again', async () => {
+    const updates = await searched();
+    await expect(updates.install('module:new', 'New')).resolves.toMatchObject({ ok: true });
+
+    await updates.setRecommended('module:new', 'module:dice', true);
+
+    expect(updates.picks).toEqual([['module:new', '1.0.0']]);
+    expect(updates.wants('module:new', 'module:dice')).toBe(false);
+    expect(updates.rejectionOf('module:new', 'module:dice')).toEqual({
+      ok: false,
+      reason: 'EMMA found no releases of it.',
+    });
+    expect(updates.recommendationsOf('module:new').find(({ key }) => key === 'module:dice')).toMatchObject({
+      wanted: false,
+      rejected: { reason: 'EMMA found no releases of it.' },
+    });
+    // Unticked by hand, the reason goes.
+    await updates.setRecommended('module:new', 'module:dice', false);
+    expect(updates.rejectionOf('module:new', 'module:dice')).toBeUndefined();
+  });
+
+  test('unticks one that cannot come in as its module is chosen, the module coming in all the same', async () => {
+    const updates = await searched();
+    await updates.setRecommended('module:new', 'module:dice', true);
+    await updates.setRecommended('module:new', 'module:maps', true);
+    // Found by an install of it first, as the Install section would.
+    await expect(updates.install('module:maps', 'Maps')).resolves.toMatchObject({ ok: true });
+    await updates.forget('module:maps');
+
+    await updates.choose('module:new', '1.0.0');
+
+    expect(new Map(updates.picks)).toEqual(
+      new Map([
+        ['module:new', '1.0.0'],
+        ['module:maps', '1.0.0'],
+      ]),
+    );
+    expect(updates.rejectionOf('module:new', 'module:dice')).toMatchObject({ ok: false });
+    expect(updates.rejectionOf('module:new', 'module:maps')).toBeUndefined();
   });
 
   test('installs it with what it recommends that is wanted, or not at all where one cannot be added', async () => {
