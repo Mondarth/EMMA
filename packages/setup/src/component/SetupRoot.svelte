@@ -94,7 +94,7 @@
   });
   /** What the footer says of the last run of the plan. */
   const runStatus = $derived.by(() => {
-    const { run } = setup;
+    const run = setup.shownRun;
     if (setup.resumedOn !== null && run === null) return format('Core.Resumed', { version: setup.resumedOn });
     if (run === null) return undefined;
     if (!run.over) return localize('Run.Running');
@@ -316,7 +316,7 @@
             {updates}
             space={setup.snapshotSpace}
             {coreBlocked}
-            run={setup.run}
+            run={setup.shownRun}
             onRun={setup.canRun
               ? () => {
                   void setup.runPlan();

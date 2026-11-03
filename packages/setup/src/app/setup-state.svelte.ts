@@ -101,6 +101,8 @@ export class SetupState {
   snapshotSpace = $state.raw<SnapshotSpaceState>(null);
   /** The last run of the update plan, until the next. */
   run = $state.raw<PlanRun | null>(null);
+  /** How many changes the user had made to the plan when the last run ended (see {@link UpdateState.changes}). */
+  #ranUntil = $state(0);
   /** The build Foundry's updater would install, once asked, until the installation is read again. */
   coreTarget = $state.raw<CoreTargetState>(null);
   /** Where updating Foundry VTT in place has got, once begun. */
@@ -334,8 +336,19 @@ export class SetupState {
     } finally {
       updates.locked = false;
       this.run = { steps, states, over: true, ...end };
+      this.#ranUntil = updates.changes;
     }
     await this.refresh();
+  }
+
+  /**
+   * The run to show: the last, while it runs, and once it is over until the user changes the plan, as by starting a new
+   * one, when what it said is of another plan.
+   * @returns The run, or `null`
+   */
+  get shownRun(): PlanRun | null {
+    const { run } = this;
+    return run?.over === true && this.updates.changes !== this.#ranUntil ? null : run;
   }
 
   /**

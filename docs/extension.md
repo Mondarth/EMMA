@@ -252,7 +252,9 @@ say what a world's backup needs, so its row gives the space free alone. What is 
    not shown, as the plan already has what each change needs;
 3. each package to uninstall, last, once nothing installed needs it (see [Uninstalling](#uninstalling)).
 
-Each row says how far its step has got, and the footer how the run went. A run stops at the first step that fails,
+Each row says how far its step has got, and the footer how the run went, until the plan is changed again, as by
+starting a new one. The plan's title and its **Run the plan** and **Clear choices** buttons stay in view as its tables
+scroll. A run stops at the first step that fails,
 saying why, and before Foundry VTT's own update: updating Foundry in place restarts it, and is for the user to do with
 care. Meanwhile the choices cannot change. After a run, EMMA reads the installation again, so what was done leaves the
 plan and the rest stays in it, to run again.
