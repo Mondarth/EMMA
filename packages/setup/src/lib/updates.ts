@@ -424,8 +424,14 @@ function judgeIn(inputs: {
     planner.universe.releases.find(
       release => packageKey(release.package) === key && sameVersion(release.version, version),
     );
+  const installedModules = new Map(
+    overview.modules.map(({ module: { id, version } }) => [packageKey({ type: 'module', id }), version] as const),
+  );
   /**
-   * A world's setup, with one package at a version and everything else at the version chosen.
+   * A world's setup, with one package at a version and everything else at the version chosen. The modules that a
+   * version the world does not run yet requires join it, at the version chosen or else installed, as the world will
+   * need them active: a newer version may require a module the plan installs anew. What the world runs as it is, it is
+   * judged by as it is, a module it runs without one it requires among them.
    * @param uses - What the world uses
    * @param key - The package
    * @param version - Its version
@@ -443,7 +449,22 @@ function judgeIn(inputs: {
       version: use.key === key ? version : (chosen(use.key) ?? use.installed),
     });
     const core = key === CORE ? version : (chosen(CORE) ?? overview.core);
-    return { core, system: at(uses.system), modules: uses.modules.map(at) };
+    const modules = uses.modules.map(at);
+    const present = new Set(modules.map(({ package: running }) => running));
+    const runs = new Map(uses.modules.map(use => [use.key, use.installed]));
+    for (const running of modules) {
+      const ran = runs.get(running.package);
+      if (ran !== undefined && sameVersion(ran, running.version)) continue;
+      for (const { package: required } of releaseOf(running.package, running.version)?.relationships.requires ?? []) {
+        const requiredKey = packageKey(required);
+        const joining = requiredKey === key ? version : (chosen(requiredKey) ?? installedModules.get(requiredKey));
+        if (required.type !== 'module' || present.has(requiredKey) || joining === undefined) continue;
+        present.add(requiredKey);
+        // Pushed onto the list being walked, so what it requires in turn joins too.
+        modules.push({ package: requiredKey, version: joining });
+      }
+    }
+    return { core, system: at(uses.system), modules };
   };
 
   /**

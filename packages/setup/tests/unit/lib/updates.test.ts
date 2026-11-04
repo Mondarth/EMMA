@@ -509,6 +509,42 @@ describe('updates of Foundry VTT itself', () => {
     expect(judge('module:app', '1.0.0', key => (key === 'core' ? '14.370' : undefined)).badge?.type).toBe('error');
   });
 
+  test('judge a version with the modules it requires that the plan installs, as the world will run them', async () => {
+    const found = await search(
+      [['app', '1.0.0']],
+      { a: [['app', '1.0.0']] },
+      [
+        ...DND,
+        release('module:app', '1.0.0'),
+        release('module:app', '2.0.0', { requires: { lib: {} } }),
+        // What lib requires joins too, but for app, which the world runs already.
+        release('module:lib', '1.0.0', { requires: { app: {}, base: {} } }),
+        release('module:base', '1.0.0'),
+      ],
+      undefined,
+      [],
+      CORES,
+    );
+    const { judge } = found;
+    // The plan takes app 2.0.0, and installs lib, which it newly requires.
+    const versions = new Map([
+      ['module:app', '2.0.0'],
+      ['module:lib', '1.0.0'],
+      ['module:base', '1.0.0'],
+    ]);
+    const planned = (key: string) => versions.get(key);
+
+    expect(judge('core', '14.370', planned).badge).toMatchObject({ type: 'success' });
+    expect(judge('module:app', '2.0.0', planned).badge?.type).toBe('success');
+    // Judging lib itself, at the version on offer.
+    expect(judge('module:lib', '1.0.0', key => (key === 'module:lib' ? undefined : planned(key))).badge?.type).toBe(
+      'success',
+    );
+    // Without lib, installed or planned, app 2.0.0 will not work.
+    const alone = (key: string) => (key === 'module:app' ? '2.0.0' : undefined);
+    expect(judge('core', '14.370', alone).badge).toMatchObject({ type: 'error', text: 'Will not work with it: app.' });
+  });
+
   test('hold a world without a record to the builds its installed system runs on', async () => {
     const found = await search(
       [],
