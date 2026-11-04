@@ -5,6 +5,9 @@
  * Activation is read from and written to the world setting `core.moduleConfiguration`, as Foundry's own Module
  * Management window does. A change only takes effect once the world reloads.
  */
+import type { Availability } from '@mondarth/fvtt-resolver';
+
+import { isIncompatible } from '@module/lib/incompatible';
 
 /** One of a module's authors, with the ways the manifest gives to reach them. */
 export interface ModuleAuthor {
@@ -85,6 +88,8 @@ export interface ModuleEntry {
   readonly version: string;
   /** The compatibility badge shown with the version, or `null` if Foundry gives none. */
   readonly badge: VersionBadge | null;
+  /** Whether Foundry's own check finds it incompatible (see `isIncompatible`), with this Foundry version or system. */
+  readonly incompatible?: true;
   /** The manifest's description: HTML, cleaned by Foundry so it is safe to insert. */
   readonly description: string;
   /** The module's authors, in manifest order. */
@@ -120,6 +125,8 @@ export function listInstalledModules(): ModuleEntry[] {
     title: pkg.title,
     version: pkg.version,
     badge: toBadge(pkg.getVersionBadge()),
+    // Foundry's codes are the resolver's, as in 14.368.
+    ...(isIncompatible(pkg.availability as Availability) && { incompatible: true as const }),
     description: foundry.utils.cleanHTML(pkg.description),
     authors: Array.from(pkg.authors, toAuthor),
     languages: Array.from(pkg.languages, ({ lang, name }) => ({

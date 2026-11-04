@@ -92,6 +92,16 @@ require each other do not lock one another, so neither is ever stuck.
 
 A module that conflicts with one that is checked is shown in red, with a warning icon whose tooltip reads **Conflict**.
 
+A module judged **incompatible** cannot be checked: one that cannot run with this Foundry version, or misses what it
+needs, such as one needing a newer Foundry version, whose badge is red; or one none of whose declared game systems, at
+the versions it declares, is the one in use, which Foundry badges **Incompatible Systems** though it only warns. Its
+checkbox is dimmed and disabled, and hovering over it says why. Neither can a module that requires one, directly or
+through a chain, as checking it would check the incompatible module too; a module it only recommends is left unchecked
+instead. The judgement is that of the badges shown: EMMA's checks, or Foundry's own if you chose those (see
+[Settings](#settings)). A module that is only unverified with this build or generation of Foundry, or whose
+compatibility is unknown, can still be checked. An incompatible module already active can be unchecked, but not checked
+again. Hypothetical mode does not stop you checking one, as nothing is saved there, so you can see what it would take.
+
 ### Related modules in the split view
 
 The split view follows the same rules, with selecting in place of checking:
@@ -106,8 +116,9 @@ The split view follows the same rules, with selecting in place of checking:
   inactive are grouped under it on the active side, each with a checkbox. Check it to activate that module too;
   uncheck it to change your mind.
 
-A module required by an active module cannot be selected on the active side, and an inactive module that conflicts
-with an active one is shown in red with a warning icon, as in the list view.
+A module required by an active module cannot be selected on the active side, nor an incompatible module, or one
+requiring one, on the inactive side, so it cannot be activated. An inactive module that conflicts with an active one is
+shown in red with a warning icon, as in the list view.
 
 ### Module details
 

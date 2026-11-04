@@ -33,4 +33,13 @@ describe('lockedTooltip', () => {
       'MONDARTH-EMMA.Requirements.LockedMany {"module":"Library","parents":"App and Tool"}',
     );
   });
+
+  test('says a module judged incompatible cannot be activated, or one requiring it', () => {
+    const state = new ModuleState(ENTRIES, {}, { incompatible: id => id === 'lib' });
+
+    expect(lockedTooltip(state, LIB)).toBe('MONDARTH-EMMA.Requirements.Incompatible {"module":"Library"}');
+    expect(lockedTooltip(state, ENTRIES[0] as typeof LIB)).toBe(
+      'MONDARTH-EMMA.Requirements.RequiresIncompatible {"module":"App","modules":"Library"}',
+    );
+  });
 });

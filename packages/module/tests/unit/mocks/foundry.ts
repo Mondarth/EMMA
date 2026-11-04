@@ -65,6 +65,8 @@ export interface ModuleMockData {
   version?: string;
   /** What `getVersionBadge` returns. Defaults to `null`, as for a package Foundry cannot place. */
   badge?: BadgeMockData | null;
+  /** Foundry's verdict, `Module#availability`. Defaults to verified, 1. */
+  availability?: number;
   /** Defaults to empty. */
   description?: string;
   /** Authors: a name, or a name with contact details. */
@@ -162,6 +164,7 @@ function createModuleMock(id: string, data: ModuleMockData) {
     title = id,
     version = '1.0.0',
     badge = null,
+    availability = 1,
     description = '',
     authors = [],
     languages = [],
@@ -187,6 +190,7 @@ function createModuleMock(id: string, data: ModuleMockData) {
     title,
     version,
     getVersionBadge: () => badge,
+    availability,
     // The module's manifest, as Foundry keeps it.
     toObject: () => ({
       id,
