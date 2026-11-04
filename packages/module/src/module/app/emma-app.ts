@@ -123,12 +123,12 @@ export class EmmaApp extends foundry.applications.api.ApplicationV2 {
     const judgeInstalled = createInstalledJudge();
     // An inactive module is judged against the Foundry version and game system alone, so one judgement serves.
     let judged: ReadonlySet<string> | undefined;
-    const foundryUnavailable = new Set(entries.flatMap(({ id, unavailable }) => (unavailable ? [id] : [])));
+    const foundryIncompatible = new Set(entries.flatMap(({ id, incompatible }) => (incompatible ? [id] : [])));
     const modules = new ModuleState(entries, readActivation(), {
       autoRecommended: isAutoRecommended,
       // Incompatible by the checks the badges show: EMMA's, or Foundry's own where the user chose those.
       incompatible: id =>
-        (badgeChecks.value === 'emma' ? (judged ??= incompatibleModules()) : foundryUnavailable).has(id),
+        (badgeChecks.value === 'emma' ? (judged ??= incompatibleModules()) : foundryIncompatible).has(id),
     });
     this.#modules = modules;
     drawerFields.set(getDrawerFields());

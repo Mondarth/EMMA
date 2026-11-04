@@ -131,9 +131,11 @@ describe('EmmaApp', () => {
 
   test('keeps a module judged incompatible from being activated, by the checks the badges show', async () => {
     const modules = {
-      // Needs a Foundry version to come, by its manifest; Foundry's own check finds another module unavailable.
+      // Needs a Foundry version to come, by its manifest. Foundry's own check finds another not for the system in
+      // use, and a third needing a newer Foundry.
       future: { title: 'Future', compatibility: { minimum: '15' } },
-      flagged: { title: 'Flagged', unavailable: true },
+      flagged: { title: 'Flagged', availability: 3 },
+      newer: { title: 'Newer', availability: 8 },
     };
     const emma = await loadApp({ modules });
     await new emma.EmmaApp().render({ force: true });
@@ -150,6 +152,7 @@ describe('EmmaApp', () => {
     await new foundry.EmmaApp().render({ force: true });
 
     expect(screen.getByRole('checkbox', { name: 'Flagged' })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'Newer' })).toBeDisabled();
     expect(screen.getByRole('checkbox', { name: 'Future' })).toBeEnabled();
   });
 

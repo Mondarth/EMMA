@@ -1366,12 +1366,15 @@ describe('incompatibleModules', () => {
         future: { compatibility: { minimum: '15' } },
         past: { compatibility: { minimum: '12', maximum: '13' } },
         other: { ...verified, systems: ['pf2e'] },
+        // As Covin 0.1.3: for D&D 5e, but not the version in use, the mocks' 5.1.0.
+        covin: { ...verified, systems: [{ id: 'dnd5e', compatibility: { minimum: '6.0.0' } }] },
         unknown: {},
         tool: verified,
       },
     });
 
-    // One for another game system, or whose compatibility is unknown, is only unverified, as Foundry badges it.
-    expect([...incompatibleModules()].sort()).toEqual(['future', 'past']);
+    // One whose declared systems leave out the one in use is too, which Foundry badges "Incompatible Systems"; one
+    // whose compatibility is unknown is only unverified.
+    expect([...incompatibleModules()].sort()).toEqual(['covin', 'future', 'other', 'past']);
   });
 });

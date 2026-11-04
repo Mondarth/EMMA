@@ -26,7 +26,6 @@ import type {
 import {
   check,
   isNewerVersion,
-  isUnavailable,
   missingManifest,
   normaliseManifest,
   packageKey,
@@ -48,6 +47,7 @@ import {
 } from '@mondarth/fvtt-resolver/sources';
 
 import { format, formatList, localize } from '@module/lib/i18n';
+import { isIncompatible } from '@module/lib/incompatible';
 
 import { explanationMessages } from './explanation';
 import type { VersionBadge } from './modules';
@@ -382,8 +382,8 @@ function installedChecks() {
 }
 
 /**
- * The installed modules EMMA judges incompatible with the Foundry version and game system in use, as their manifests
- * declare: those that cannot run here whatever else is active, which is how an inactive module's badge is judged.
+ * The installed modules EMMA judges incompatible (see `isIncompatible`) with the Foundry version and game system in
+ * use, as their manifests declare, whatever else is active, which is how an inactive module's badge is judged.
  * @returns Their IDs
  */
 export function incompatibleModules(): ReadonlySet<string> {
@@ -394,7 +394,7 @@ export function incompatibleModules(): ReadonlySet<string> {
   }));
   return new Set(
     checked(alone).flatMap(({ release: { package: pkg }, availability }) =>
-      pkg.type === 'module' && isUnavailable(availability) ? [pkg.id] : [],
+      pkg.type === 'module' && isIncompatible(availability) ? [pkg.id] : [],
     ),
   );
 }
