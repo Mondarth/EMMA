@@ -1,4 +1,5 @@
 import { screen } from '@testing-library/svelte';
+import { EMMA_VERSION } from '../../../src/lib/alpha';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
@@ -182,6 +183,14 @@ describe('startEmmaSetup', () => {
         manifest: 'https://example.org/app/2.0.0/module.json',
       },
     ];
+
+    // Not until the user acknowledges this version is an alpha, which is kept for it.
+    expect(setup.isAlpha).toBe(true);
+    expect(setup.alphaAcknowledged).toBe(false);
+    await setup.runPlan();
+    expect(setup.run).toBeNull();
+    setup.acknowledgeAlpha();
+    expect(localStorage.getItem('mondarth-emma.setup.alpha-acknowledged')).toBe(EMMA_VERSION);
 
     await setup.runPlan();
 

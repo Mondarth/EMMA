@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import {
+  ALPHA_ACKNOWLEDGED_KEY,
+  readAlphaAcknowledged,
+  writeAlphaAcknowledged,
   DEFAULT_LAYOUT,
   GUARD_KEY,
   LAYOUT_KEY,
@@ -46,6 +49,29 @@ describe("EMMA's lock of Foundry VTT", () => {
     expect(readCoreLocked()).toBe(false);
     expect(() => {
       writeCoreLocked(true);
+    }).not.toThrow();
+  });
+});
+
+describe('acknowledging the alpha', () => {
+  test('is for one version: a new one asks again', () => {
+    expect(readAlphaAcknowledged('0.1.1')).toBe(false);
+
+    writeAlphaAcknowledged('0.1.1');
+    expect(localStorage.getItem(ALPHA_ACKNOWLEDGED_KEY)).toBe('0.1.1');
+    expect(readAlphaAcknowledged('0.1.1')).toBe(true);
+    expect(readAlphaAcknowledged('0.2.0')).toBe(false);
+  });
+
+  test('is not, and is not kept, when the storage refuses', () => {
+    const blocked = () => {
+      throw new Error('blocked');
+    };
+    vi.stubGlobal('localStorage', { getItem: blocked, setItem: blocked, removeItem: blocked });
+
+    expect(readAlphaAcknowledged('0.1.1')).toBe(false);
+    expect(() => {
+      writeAlphaAcknowledged('0.1.1');
     }).not.toThrow();
   });
 });

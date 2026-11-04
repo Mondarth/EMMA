@@ -45,6 +45,11 @@ export interface SetupStateOptions {
   readonly lockPackage?: (type: 'module' | 'system', id: string, lock: boolean) => Promise<void>;
   /** Read Foundry's listing of the packages of a type that may be installed; none where it cannot be read. */
   readonly listPackages?: (type: 'module' | 'system') => Promise<readonly ListedPackage[]>;
+  /**
+   * Where EMMA is in alpha testing: whether the user has acknowledged it for this version, and how to keep that they
+   * have. None where EMMA is not an alpha.
+   */
+  readonly alpha?: { readonly acknowledged: boolean; readonly acknowledge: () => void };
 }
 
 /** What is known of Foundry's listing of a type of package: `loading`, `failed`, or the packages; `null` before. */
@@ -97,6 +102,11 @@ export class SetupState {
   installing = $state(false);
   /** Whether EMMA guards Foundry's own Install, Update and Update All buttons. */
   guardOn = $state(true);
+  /**
+   * Whether the user has acknowledged that this version of EMMA is in alpha testing, which running the plan needs;
+   * `true` where EMMA is not an alpha.
+   */
+  alphaAcknowledged = $state(true);
   /** The installation's updates, searched for each time it is read. */
   readonly updates: UpdateState;
   /** The space a snapshot needs and the space free, once asked, until the installation is read again. */
@@ -159,7 +169,22 @@ export class SetupState {
   constructor(options: SetupStateOptions) {
     this.#options = options;
     this.guardOn = options.guardOn;
+    this.alphaAcknowledged = options.alpha?.acknowledged ?? true;
     this.updates = new UpdateState(options.findUpdates);
+  }
+
+  /**
+   * Whether EMMA is in alpha testing, as the footer warns.
+   * @returns `true` for an alpha
+   */
+  get isAlpha(): boolean {
+    return this.#options.alpha !== undefined;
+  }
+
+  /** Keep that the user acknowledged this version of EMMA is in alpha testing, so that the plan can be run. */
+  acknowledgeAlpha(): void {
+    this.#options.alpha?.acknowledge();
+    this.alphaAcknowledged = true;
   }
 
   /**
@@ -332,7 +357,8 @@ export class SetupState {
    */
   async runPlan(): Promise<void> {
     const runStep = this.#options.runStep;
-    if (runStep === undefined || this.running) return;
+    // Running is the one thing that changes the installation, so an alpha's state must be acknowledged first.
+    if (runStep === undefined || this.running || !this.alphaAcknowledged) return;
     const { updates } = this;
     const steps = runSteps(updates.safeguards, updates.runPlan, key => updates.titleOf(key));
     let states: Record<string, StepState> = Object.fromEntries(steps.map(({ key }) => [key, 'waiting']));

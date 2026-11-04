@@ -6,8 +6,8 @@ modules cannot change. So EMMA comes with a browser extension that adds EMMA to 
 choose.
 
 :::{warning}
-The extension is an **alpha**, for testing. It is not listed in the Chrome Web Store or on Firefox Add-ons; you install
-it by hand, as described below. For now it only shows the installation: it does not install or update anything.
+The extension is an **alpha**, for testing: use it at your own risk, on a test installation. It is not listed in the
+Chrome Web Store or on Firefox Add-ons; you install it by hand, as described below. See [EMMA's alpha](alpha.md).
 :::
 
 ## Requirements
@@ -81,7 +81,10 @@ Once a server is activated, the extension's button offers:
 
 With EMMA open, the setup screen changes in two ways.
 
-**EMMA's button** joins the menu at the top of the screen, beside Foundry's own. It opens EMMA's window.
+**EMMA's button** joins the menu at the top of the screen, beside Foundry's own. It opens EMMA's window, whose title
+gives EMMA's version, such as **EMMA - installation (0.1.1)**. While EMMA is an alpha, the window's footer warns of it,
+with a link to [EMMA's alpha](alpha.md), and asks once for each new version that you acknowledge it with **I
+understand**: until you do, the plan cannot be run.
 
 **Foundry's own installs, updates, uninstalls and locks are disabled**: the **Install** button, **Update All**, and the
 update button on each package are greyed out, and say that EMMA manages packages on this screen if chosen. So do
@@ -467,8 +470,9 @@ and the extension's version. EMMA sends nothing about your worlds, your server o
 
 ## Limitations of the alpha
 
-- EMMA shows the installation and finds updates for it, but does not install them yet, nor update Foundry VTT
-  itself.
+- It is tested on few installations: a plan may fail part-way, or do what you did not expect. Back up your worlds
+  before running one.
+- Each new version must be acknowledged as an alpha before EMMA runs a plan (see [EMMA's alpha](alpha.md)).
 - EMMA disables Foundry's package buttons only in a browser where the extension is installed and has opened EMMA. It
   cannot stop installs from other browsers.
 - Finding updates needs the EMMA module installed (see [Updates](#updates)).

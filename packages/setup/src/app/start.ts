@@ -6,11 +6,14 @@ import type { Guard } from '../foundry/guard';
 import { installGuard } from '../foundry/guard';
 import { installEmma } from '../foundry/install-emma';
 import { keepMenuButton } from '../foundry/menu-button';
+import { IN_ALPHA } from '../lib/alpha';
 import {
+  readAlphaAcknowledged,
   readCoreLocked,
   readIgnored,
   readGuardOn,
   readPendingPlan,
+  writeAlphaAcknowledged,
   writeCoreLocked,
   writeIgnored,
   writeGuardOn,
@@ -127,6 +130,14 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
       update: () => startCoreUpdate(game, readCoreUpdate(game).channel),
     },
     listPackages: type => listPackages(game, type),
+    ...(IN_ALPHA && {
+      alpha: {
+        acknowledged: readAlphaAcknowledged(__EMMA_EXTENSION_VERSION__),
+        acknowledge: () => {
+          writeAlphaAcknowledged(__EMMA_EXTENSION_VERSION__);
+        },
+      },
+    }),
     lockPackage: async (type, id, lock) => {
       if (placed.guard !== undefined) await placed.guard.allowing(() => lockPackage(game, type, id, lock));
     },
