@@ -6,6 +6,14 @@
     "LoadFailed": "EMMA could not read the installation.",
     "Refresh": "Read again"
   },
+  "Alpha": {
+    "Label": "Alpha build",
+    "Heading": "EMMA {version} is an alpha build.",
+    "Warning": "Use it at your own risk, and only on a test installation: not on a server whose worlds you play. Back up your worlds before running a plan.",
+    "Details": "About the alpha, the documentation and the Discord server",
+    "Acknowledge": "I understand",
+    "BeforeRun": "This is an alpha build of EMMA. Running the plan changes your installation: acknowledge that you understand EMMA is in alpha testing before you run it."
+  },
   "Tree": {
     "Label": "Installation",
     "Root": "Foundry VTT",

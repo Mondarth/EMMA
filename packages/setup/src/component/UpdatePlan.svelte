@@ -26,9 +26,22 @@
     run?: PlanRun | null;
     /** Run the plan, once the user confirms it; the plan cannot be run without. */
     onRun?: (() => void) | undefined;
+    /** Whether the user has acknowledged that EMMA is in alpha testing, which running the plan needs. */
+    acknowledged?: boolean;
+    /** Acknowledge it, from the confirmation. */
+    onAcknowledge?: (() => void) | undefined;
   }
 
-  let { overview, updates, space = null, coreBlocked, run = null, onRun }: Props = $props();
+  let {
+    overview,
+    updates,
+    space = null,
+    coreBlocked,
+    run = null,
+    onRun,
+    acknowledged = true,
+    onAcknowledge,
+  }: Props = $props();
 
   /** The newest build of Foundry VTT's generation, when the plan has an older one, and whether the plan can take it. */
   let newerCore = $state.raw<NewerCore | undefined>(undefined);
@@ -134,8 +147,22 @@
           <li>{stepText(step)}</li>
         {/each}
       </ol>
+      {#if !acknowledged}
+        <!-- Running is the one thing that changes the installation, so an alpha's state is acknowledged first. -->
+        <p class="emma-plan-alpha">
+          <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+          {localize('Alpha.BeforeRun')}
+          {#if onAcknowledge !== undefined}
+            <button type="button" onclick={onAcknowledge}>
+              <i class="fa-solid fa-check" aria-hidden="true"></i>
+              {localize('Alpha.Acknowledge')}
+            </button>
+          {/if}
+        </p>
+      {/if}
       <button
         type="button"
+        disabled={!acknowledged}
         onclick={() => {
           confirming = false;
           onRun();
@@ -461,5 +488,17 @@
 
   td {
     font-family: var(--font-mono, monospace);
+  }
+
+  .emma-plan-alpha {
+    padding: 0.25rem 0.5rem;
+    border-left: 3px solid #a06c00;
+    background: #fff3cd;
+    color: #3d2c00;
+  }
+
+  .emma-plan-alpha button {
+    width: auto;
+    margin-left: 0.5rem;
   }
 </style>

@@ -14,6 +14,7 @@
   import { UNINSTALL } from '../lib/plans';
   import { stepText } from '../lib/run';
   import { groupDetail, moduleDetail, systemDetail } from '../lib/details';
+  import { EMMA_VERSION } from '../lib/alpha';
   import { format, localize } from '../lib/i18n';
   import { isIgnored } from '../lib/overview';
   import type { TreeRow, TreeSelection } from '../lib/tree';
@@ -25,6 +26,7 @@
   import Splitter from './Splitter.svelte';
   import SystemPanel from './SystemPanel.svelte';
   import CoreStep from './CoreStep.svelte';
+  import AlphaNotice from './AlphaNotice.svelte';
   import BestSection from './BestSection.svelte';
   import InstallSection from './InstallSection.svelte';
   import IgnoreSection from './IgnoreSection.svelte';
@@ -377,6 +379,10 @@
             space={setup.snapshotSpace}
             {coreBlocked}
             run={setup.shownRun}
+            acknowledged={setup.alphaAcknowledged}
+            onAcknowledge={() => {
+              setup.acknowledgeAlpha();
+            }}
             onRun={setup.canRun
               ? () => {
                   void setup.runPlan();
@@ -387,6 +393,14 @@
     </div>
   {/if}
   <footer class="emma-setup-footer">
+    {#if setup.isAlpha}
+      <AlphaNotice
+        version={EMMA_VERSION}
+        acknowledged={setup.alphaAcknowledged}
+        onAcknowledge={() => {
+          setup.acknowledgeAlpha();
+        }} />
+    {/if}
     {#if overview !== null}
       <p class="emma-setup-status" role="status">
         {updateStatus}
@@ -509,6 +523,7 @@
 
   .emma-setup-footer {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem;
     padding-top: 0.5rem;
