@@ -10,7 +10,8 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { filesHolding } from '../build/default-proxy.ts';
+import { filesHolding } from '@mondarth/emma-core/files-holding';
+import { requireReleaseDefaults } from '@mondarth/emma-core/release-defaults';
 
 /** The module's package, `packages/module`. */
 const ROOT = path.resolve(import.meta.dirname, '../..');
@@ -128,6 +129,8 @@ if (!releaseVersion || !/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(releaseVersion)
   process.exit(1);
 }
 
+// Before anything changes: a build without them succeeds, and the release would have no catalogue or proxy.
+requireReleaseDefaults(process.env);
 stampManifest(releaseVersion);
 stampDocs(releaseVersion);
 build();

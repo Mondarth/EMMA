@@ -117,7 +117,19 @@ module:
 `packages/core` (`@mondarth/emma-core`)
 : Code that more than one package needs, and that uses no Foundry or browser globals: so far the world record's format
   (`src/world-record.ts`), which the module writes and the setup screen reads, with `parseWorldRecord` to read a record
-  that anything may have written. Packages import it from its source, through its `exports`.
+  that anything may have written; EMMA's package catalogue and version lookup proxy, obscured in a build
+  (`src/obscure.ts`, `src/default-catalogue.ts`, `src/default-proxy.ts`), with what builds them in and checks a
+  release for their keys in plain text, which run under Node (`scripts/`); and the setup kit's API
+  (`src/setup-kit.ts`). The setup kit is the code the EMMA extension imports from the installed module, rather than
+  carry its own copy: the resolver and its sources, and how the module badges a version
+  (`src/module/adapters/badges.ts`), so the extension's version lists are coloured as the module's are. It holds no
+  catalogue or proxy: each bundle builds in its own. The module builds it as `dist/emma-setup-kit.js`
+  (`src/setup-kit.ts`, `vite.kit.config.ts`) and names it, with its API version `<major>.<minor>`, in its manifest's
+  `flags.setupKit`; the EMMA extension checks that version against the one it was built with (`kitFit`) before it
+  imports the kit, and again after. Raise the minor when the kit gives more, and the major when it gives less or
+  changes what it gives, as a resolver release that changes a function the EMMA extension calls would; keep
+  `module.json`'s flag in step, which a unit test checks. Packages import core from its source, through its
+  `exports`.
 
 `packages/setup` (`@mondarth/emma-setup`)
 : EMMA on the setup screen, built into one classic script with its styles inside, `dist/emma-setup.js`, which is all
@@ -128,7 +140,19 @@ module:
   `renderSetupMenu` hook; and `guard.ts`, the fragile part, stops clicks on the Install, Update and Update All buttons
   in the capture phase and wraps `game.post` to refuse `installPackage`. libWrapper is a module, not loaded on the
   setup screen, so the guard wraps `game.post` itself. `src/lib/overview.ts` compares each world's record with what is
-  installed and summarises the installation; `src/lib/tree.ts` gives the tree's rows and keyboard moves. The window,
+  installed and summarises the installation; `src/lib/tree.ts` gives the tree's rows and keyboard moves, working out the
+  rows under a row only while it shows, as a module's requirements nest; `src/lib/details.ts` gives what the panel
+  beside the tree shows for a system, a module or a group. As a module shows in many places, a row's key is its path
+  from the root, and the window keeps the selected row's key. Updates: `src/foundry/setup-kit.ts` finds the setup kit
+  in the installed EMMA module and imports it, and `src/foundry/install-emma.ts` installs or updates the module when
+  the kit is missing or does not fit, letting the install through the guard with `allowing`;
+  `src/foundry/releases.ts`, the only code that fetches, looks up the releases of the installed packages with the
+  kit's sources, the catalogue first, and the rest through EMMA's proxy, reading the installed manifests
+  `setup-game.ts` gives; `src/lib/updates.ts` resolves each recorded world's
+  setup with the packages free to move up, and offers each package the lowest of the bests of the worlds that use it,
+  or, if none does, its newest version the installed core can run; `src/app/update-state.svelte.ts` keeps what the
+  search found, whether Update mode is on, and the versions chosen. `Splitter.svelte` resizes the panels, whose shares
+  `src/foundry/preferences.ts` keeps in local storage. The window,
   `EmmaSetupApp`, is an `ApplicationV2`, as on the module, mounting `SetupRoot`. Its text is its own
   (`src/lang/en.json`), as Foundry's translations on the setup screen do not include EMMA's.
 

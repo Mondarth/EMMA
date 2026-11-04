@@ -1,6 +1,19 @@
 import { describe, expect, test, vi } from 'vitest';
 
-import { isSetupGame, readInstallation, setupGame } from '../../../src/foundry/setup-game';
+import {
+  checkCoreUpdate,
+  checkSnapshotSpace,
+  isSetupGame,
+  listPackages,
+  lockPackage,
+  readIndex,
+  readCoreUpdate,
+  readInstallation,
+  readManifests,
+  setupGame,
+  startCoreUpdate,
+} from '../../../src/foundry/setup-game';
+import type { SetupGame } from '../../../src/foundry/setup-game';
 import { installSetupMocks } from '../../mocks/foundry';
 
 describe('isSetupGame', () => {
@@ -51,7 +64,10 @@ describe('readInstallation', () => {
         { id: 'y', title: 'Zed', version: '1.0.0' },
         { id: 'n', version: undefined },
       ],
-      systems: [{ id: 'dnd5e', title: 'D&D 5e', version: '5.3.3' }],
+      systems: [
+        { id: 'dnd5e', title: 'D&D 5e', version: '5.3.3' },
+        { id: 'pf2e', title: 'Pathfinder', version: '7.0.0', locked: true },
+      ],
     });
     game.worlds.set('broken', null);
     game.modules.set('broken', null);
@@ -63,10 +79,345 @@ describe('readInstallation', () => {
         { id: 'b', title: 'Beta', system: 'pf2e' },
       ],
       modules: [
-        { id: 'y', title: 'Zed', version: '1.0.0' },
-        { id: 'z', title: 'Zed', version: '2.0.0' },
+        { id: 'y', title: 'Zed', version: '1.0.0', systems: [], requires: [] },
+        { id: 'z', title: 'Zed', version: '2.0.0', systems: [], requires: [] },
       ],
-      systems: [{ id: 'dnd5e', title: 'D&D 5e', version: '5.3.3' }],
+      // Only a package locked says so.
+      systems: [
+        { id: 'dnd5e', title: 'D&D 5e', version: '5.3.3' },
+        { id: 'pf2e', title: 'Pathfinder', version: '7.0.0', locked: true },
+      ],
     });
+  });
+
+  test("reads the game systems each module is for and the modules it requires and recommends, from Foundry's sets", () => {
+    const { game } = installSetupMocks({
+      modules: [
+        {
+          id: 'app',
+          relationships: {
+            systems: new Set([{ id: 'dnd5e', type: 'system' }, { id: 'pf2e' }]),
+            requires: new Set([
+              { id: 'lib', type: 'module' },
+              { id: 'lib', type: 'module' },
+              { id: 'old' },
+              { id: 'dnd5e', type: 'system' },
+              { id: 'app', type: 'module' },
+              { type: 'module' },
+              null,
+            ]),
+            recommends: new Set([{ id: 'dice', type: 'module' }, { id: 'app' }, { id: 'pf2e', type: 'system' }]),
+          },
+        },
+        { id: 'loose', relationships: { systems: 'dnd5e', requires: undefined } },
+      ],
+    });
+
+    expect(readInstallation(game as never).modules).toEqual([
+      {
+        id: 'app',
+        title: 'app',
+        version: '1.0.0',
+        systems: ['dnd5e', 'pf2e'],
+        requires: ['lib', 'old'],
+        // What it recommends, of modules other than itself; nothing for one recommending none.
+        recommends: ['dice'],
+      },
+      { id: 'loose', title: 'loose', version: '1.0.0', systems: [], requires: [] },
+    ]);
+  });
+});
+
+describe('readManifests', () => {
+  test("reads each installed package's manifest and manifest URL, and the Foundry build", () => {
+    const { game } = installSetupMocks({
+      core: '14.370',
+      release: { generation: 14, channel: 'testing' },
+      modules: [
+        { id: 'app', version: '2.0.0', manifest: 'https://packages.example.test/app/module.json' },
+        { id: 'n', version: undefined },
+      ],
+      systems: [{ id: 'dnd5e', version: '5.3.3', manifest: '' }],
+    });
+    game.modules.set('broken', null);
+    game.modules.set('flat', { id: 'flat', version: '1.0.0' });
+
+    expect(readManifests(game as never)).toEqual({
+      core: { version: '14.370', generation: 14, channel: 'testing' },
+      manifests: [
+        {
+          type: 'system',
+          id: 'dnd5e',
+          version: '5.3.3',
+          json: { id: 'dnd5e', title: 'dnd5e', version: '5.3.3', flags: {} },
+          origin: 'systems/dnd5e/system.json',
+        },
+        {
+          type: 'module',
+          id: 'app',
+          version: '2.0.0',
+          json: { id: 'app', title: 'app', version: '2.0.0', flags: {} },
+          origin: 'modules/app/module.json',
+          manifest: 'https://packages.example.test/app/module.json',
+        },
+      ],
+    });
+  });
+
+  test("takes a stable build of the version's generation when Foundry does not say", () => {
+    const { game } = installSetupMocks({ core: '15.001', release: undefined });
+
+    expect(readManifests(game as never).core).toEqual({ version: '15.001', generation: 15, channel: 'stable' });
+  });
+});
+
+describe('checkSnapshotSpace', () => {
+  test("asks the server, as Foundry's Manage Backups dialog does, waiting as long as it takes", async () => {
+    const { game, post } = installSetupMocks();
+    post.mockResolvedValueOnce({ required: 1_000, available: 5_000 });
+
+    await expect(checkSnapshotSpace(game as unknown as SetupGame)).resolves.toEqual({
+      required: 1_000,
+      available: 5_000,
+    });
+    expect(post).toHaveBeenCalledWith({ action: 'checkCreateSnapshotDiskSpace' }, { timeoutMs: null });
+  });
+
+  test.each([null, 'busy', { required: '1 GB', available: 5_000 }])(
+    'fails on an answer it cannot read: %j',
+    async answer => {
+      const { game, post } = installSetupMocks();
+      post.mockResolvedValueOnce(answer);
+
+      await expect(checkSnapshotSpace(game as unknown as SetupGame)).rejects.toThrow('did not say how much space');
+    },
+  );
+});
+
+describe("Foundry's updater", () => {
+  /**
+   * The setup screen's `game`, with what the server sent it and how it answers.
+   * @param data - What the server sent
+   * @param answer - How it answers a request
+   * @param translates - Whether it has Foundry's translations
+   * @returns The game, and its `post`
+   */
+  function gameWith(data: unknown, answer: unknown = {}, translates = true) {
+    const post = vi.fn((_request: object, _options?: object) => Promise.resolve(answer));
+    const game = {
+      view: 'setup',
+      version: '14.368',
+      worlds: [],
+      modules: [],
+      systems: [],
+      data,
+      post,
+      ...(translates && { i18n: { localize: (key: string) => `[${key}]` } }),
+    } as unknown as SetupGame;
+    return { game, post };
+  }
+
+  test('reads whether Foundry can update itself, and its channel', () => {
+    expect(
+      readCoreUpdate(gameWith({ coreUpdate: { canUpdate: true }, options: { updateChannel: 'testing' } }).game),
+    ).toEqual({ canUpdate: true, channel: 'testing' });
+    // Launched with --noupdate, or the server says nothing of it.
+    expect(readCoreUpdate(gameWith({ coreUpdate: { canUpdate: false } }).game)).toEqual({
+      canUpdate: false,
+      channel: 'stable',
+    });
+    expect(readCoreUpdate(gameWith(undefined).game)).toEqual({ canUpdate: false, channel: 'stable' });
+  });
+
+  test("asks which build the updater would install, as the Update Software form's first step does", async () => {
+    const { game, post } = gameWith({}, { generation: 14, build: 370, channel: 'stable', flags: {} });
+
+    await expect(checkCoreUpdate(game, 'stable')).resolves.toEqual({ version: '14.370', manual: false });
+    expect(post).toHaveBeenCalledWith(
+      { action: 'updateCheck', updateChannel: 'stable', forceUpdate: false },
+      { notify: false },
+    );
+    post.mockResolvedValueOnce({ generation: 15, build: 300, flags: { requires_generation_reinstall: true } });
+    await expect(checkCoreUpdate(game, 'stable')).resolves.toEqual({ version: '15.300', manual: true });
+  });
+
+  test("gives Foundry's word when there is no build to update to, or fails on what it cannot read", async () => {
+    const { game, post } = gameWith({}, { info: 'SETUP.UpdateNoneFound' });
+    await expect(checkCoreUpdate(game, 'stable')).resolves.toEqual({ none: '[SETUP.UpdateNoneFound]' });
+
+    const untranslated = gameWith({}, { warn: 'SETUP.Slow' }, false).game;
+    await expect(checkCoreUpdate(untranslated, 'stable')).resolves.toEqual({ none: 'SETUP.Slow' });
+
+    post.mockResolvedValueOnce(null);
+    await expect(checkCoreUpdate(game, 'stable')).rejects.toThrow('did not say which build');
+  });
+
+  test("starts the update, as the form's second step does, failing with Foundry's word", async () => {
+    const { game, post } = gameWith({});
+    await startCoreUpdate(game, 'stable');
+    expect(post).toHaveBeenCalledWith(
+      { action: 'updateDownload', updateChannel: 'stable', forceUpdate: false },
+      { notify: false },
+    );
+
+    post.mockResolvedValueOnce({ error: 'SETUP.UpdateRefused' });
+    await expect(startCoreUpdate(game, 'stable')).rejects.toThrow('[SETUP.UpdateRefused]');
+    const untranslated = gameWith({}, { error: 'Not allowed' }, false).game;
+    await expect(startCoreUpdate(untranslated, 'stable')).rejects.toThrow('Not allowed');
+  });
+});
+
+describe('listPackages', () => {
+  test("reads Foundry's listing as its Install dialog does, sorted by title, leaving out what is incomplete", async () => {
+    const getPackages = vi.fn(() =>
+      Promise.resolve(
+        new Map<string, unknown>([
+          [
+            'midi',
+            {
+              id: 'midi',
+              title: 'Midi QOL',
+              version: '13.0.1',
+              authors: [{ name: 'tposney' }, { name: 'Helper' }, 'odd'],
+              compatibility: { minimum: '14', verified: 14.368, maximum: null },
+              relationships: { systems: [{ id: 'dnd5e' }] },
+              protected: false,
+              exclusive: true,
+              description:
+                '<p>Automates\n  <b>combat</b>.</p><script>alert(1)</script><img src="x" onerror="alert(2)">',
+              url: 'https://example.org/midi',
+              manifest: 'https://example.org/midi/module.json',
+              tags: ['combat', 7, 'automation'],
+            },
+          ],
+          [
+            'dice',
+            { id: 'dice', title: 'Dice', version: '1.0.0', authors: [{ name: '' }], protected: true, owned: true },
+          ],
+          [
+            'paid',
+            {
+              id: 'paid',
+              title: 'Paid',
+              version: '2.0.0',
+              protected: true,
+              url: 'javascript:alert(1)',
+              description: ' ',
+            },
+          ],
+          ['broken', { id: 'broken' }],
+        ]),
+      ),
+    );
+    const { game } = installSetupMocks();
+    Object.assign(game, { getPackages });
+
+    await expect(listPackages(game as never, 'module')).resolves.toEqual([
+      {
+        type: 'module',
+        id: 'dice',
+        title: 'Dice',
+        version: '1.0.0',
+        compatibility: {},
+        systems: [],
+        unowned: false,
+        premium: true,
+      },
+      {
+        type: 'module',
+        id: 'midi',
+        title: 'Midi QOL',
+        version: '13.0.1',
+        author: 'tposney',
+        compatibility: { minimum: '14', verified: '14.368' },
+        systems: ['dnd5e'],
+        unowned: false,
+        // Its description's text alone: what the HTML would run or load is gone.
+        description: 'Automates combat.',
+        authors: ['tposney', 'Helper'],
+        url: 'https://example.org/midi',
+        manifest: 'https://example.org/midi/module.json',
+        tags: ['combat', 'automation'],
+        exclusive: true,
+      },
+      // A web page that is not one is left out.
+      {
+        type: 'module',
+        id: 'paid',
+        title: 'Paid',
+        version: '2.0.0',
+        compatibility: {},
+        systems: [],
+        unowned: true,
+        premium: true,
+      },
+    ]);
+    expect(getPackages).toHaveBeenCalledWith({ type: 'module' });
+    // A system names no systems.
+    const [system] = await listPackages(game as never, 'system');
+    expect(system).toMatchObject({ type: 'system', systems: [] });
+  });
+
+  test("reads Foundry's index: the newest version of each game system and module listed", async () => {
+    const { game } = installSetupMocks();
+    Object.assign(game, {
+      getPackages: ({ type }: { type: string }) =>
+        Promise.resolve(
+          new Map([[type, { id: `${type}-one`, title: 'One', version: type === 'system' ? '2.0' : '1.0' }]]),
+        ),
+    });
+
+    await expect(readIndex(game as never)).resolves.toEqual(
+      new Map([
+        ['system:system-one', '2.0'],
+        ['module:module-one', '1.0'],
+      ]),
+    );
+  });
+
+  test('lists nothing where Foundry offers no listing, or an odd one', async () => {
+    const { game } = installSetupMocks();
+    await expect(listPackages(game as never, 'module')).resolves.toEqual([]);
+    Object.assign(game, { getPackages: () => Promise.resolve([]) });
+    await expect(listPackages(game as never, 'module')).resolves.toEqual([]);
+  });
+});
+
+describe('lockPackage', () => {
+  test("locks a package as Foundry's package menu does, then shows it so in Foundry's list", async () => {
+    const { game } = installSetupMocks({ modules: [{ id: 'midi-qol', title: 'Midi', version: '14.0.15' }] });
+    const post = vi.fn(() => Promise.resolve({}));
+    Object.assign(game, { post });
+    const render = vi.fn();
+    vi.stubGlobal('ui', { setupPackages: { render } });
+    try {
+      await lockPackage(game as never, 'module', 'midi-qol', true);
+
+      expect(post).toHaveBeenCalledWith(
+        { action: 'lockPackage', type: 'module', id: 'midi-qol', shouldLock: true },
+        { notify: false },
+      );
+      expect([...game.modules].find(pkg => (pkg as { id: string }).id === 'midi-qol')).toMatchObject({ locked: true });
+      expect(render).toHaveBeenCalledOnce();
+
+      // A package Foundry does not show, and a screen without its list, are let be.
+      vi.stubGlobal('ui', {});
+      await lockPackage(game as never, 'system', 'gone', false);
+      expect(post).toHaveBeenLastCalledWith(
+        { action: 'lockPackage', type: 'system', id: 'gone', shouldLock: false },
+        { notify: false },
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  test('fails if the server refuses, changing nothing', async () => {
+    const { game } = installSetupMocks({ modules: [{ id: 'midi-qol', title: 'Midi', version: '14.0.15' }] });
+    Object.assign(game, { post: vi.fn(() => Promise.reject(new Error('No such package'))) });
+
+    await expect(lockPackage(game as never, 'module', 'midi-qol', true)).rejects.toThrow('No such package');
+
+    expect([...game.modules].find(pkg => (pkg as { id: string }).id === 'midi-qol')).not.toHaveProperty('locked', true);
   });
 });

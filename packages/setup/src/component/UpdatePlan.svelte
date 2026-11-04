@@ -1,0 +1,504 @@
+<!--
+  The update plan, below the tree and the panel beside it while versions are chosen. First what to keep before anything
+  changes: a snapshot of the installation, and a backup of each world that uses a package the plan changes, each with a
+  box to check and the note Foundry keeps with it, and the space a snapshot needs and the space free. Then each package
+  whose chosen version differs from the one installed, with both, in the order they are to be installed, and the
+  manifest URL that installs the version chosen, then each package to uninstall. **Run plan** asks to confirm, listing the steps, then runs them, each
+  row saying how far its step has got.
+-->
+<script lang="ts">
+  import type { PlanRun, SnapshotSpaceState } from '../app/setup-state.svelte';
+  import type { NewerCore, UpdateState } from '../app/update-state.svelte';
+  import { format, formatSize, localize } from '../lib/i18n';
+  import type { Overview } from '../lib/overview';
+  import { UNINSTALL } from '../lib/plans';
+  import { runSteps, stepText } from '../lib/run';
+  import type { Safeguard } from '../lib/safeguards';
+
+  interface Props {
+    overview: Overview;
+    updates: UpdateState;
+    /** The space a snapshot needs and the space free, as far as it is known. */
+    space?: SnapshotSpaceState;
+    /** Why Foundry VTT cannot be updated in place to the build chosen, if it cannot: its row is marked, saying why. */
+    coreBlocked?: string | undefined;
+    /** The last run of the plan, if any. */
+    run?: PlanRun | null;
+    /** Run the plan, once the user confirms it; the plan cannot be run without. */
+    onRun?: (() => void) | undefined;
+    /** Whether the user has acknowledged that EMMA is in alpha testing, which running the plan needs. */
+    acknowledged?: boolean;
+    /** Acknowledge it, from the confirmation. */
+    onAcknowledge?: (() => void) | undefined;
+  }
+
+  let {
+    overview,
+    updates,
+    space = null,
+    coreBlocked,
+    run = null,
+    onRun,
+    acknowledged = true,
+    onAcknowledge,
+  }: Props = $props();
+
+  /** The newest build of Foundry VTT's generation, when the plan has an older one, and whether the plan can take it. */
+  let newerCore = $state.raw<NewerCore | undefined>(undefined);
+  $effect(() => {
+    const { plan } = updates;
+    void updates.newerCore().then(newer => {
+      // An answer for a plan since changed is dropped.
+      if (plan === updates.plan) newerCore = newer;
+    });
+  });
+
+  /** Whether the user is asked to confirm a run. */
+  let confirming = $state(false);
+  const running = $derived(run !== null && !run.over);
+  /** The steps a run would take now. */
+  const steps = $derived(runSteps(updates.safeguards, updates.plan, key => updates.titleOf(key)));
+
+  /**
+   * A safeguard's name.
+   * @param guard - The snapshot or backup
+   * @returns Its name
+   */
+  function nameOf(guard: Safeguard): string {
+    return guard.world === undefined ? localize('Plan.Snapshot') : format('Plan.Backup', { world: guard.world.title });
+  }
+
+  /**
+   * What is known of the space a safeguard needs: a snapshot's size and the space free; only the space free for a
+   * backup, as Foundry does not say what one needs.
+   * @param guard - The snapshot or backup
+   * @returns The space, in words, and whether there is too little
+   */
+  function spaceOf(guard: Safeguard): { text: string; short: boolean } {
+    if (space === 'checking') return { text: localize('Plan.Checking'), short: false };
+    if (space === null || space === 'failed') {
+      return {
+        text: localize(guard.kind === 'snapshot' ? 'Plan.SpaceUnknown' : 'Plan.BackupSizeUnknown'),
+        short: false,
+      };
+    }
+    const sizes = { required: formatSize(space.required), available: formatSize(space.available) };
+    if (guard.kind === 'backup') return { text: format('Plan.BackupSpace', sizes), short: false };
+    const short = space.required > space.available;
+    return { text: format(short ? 'Plan.NotEnough' : 'Plan.SnapshotSpace', sizes), short };
+  }
+
+  const uid = $props.id();
+
+  /** The installed packages' titles, by package key. */
+  const titles = $derived(
+    new Map<string, string>([
+      ['core', localize('Tree.Root')],
+      ...overview.systems.map(({ id, title }) => [`system:${id}`, title] as const),
+      ...overview.modules.map(({ module: { id, title } }) => [`module:${id}`, title] as const),
+    ]),
+  );
+</script>
+
+{#snippet stateOf(key: string)}
+  {@const state = run?.states[key]}
+  {#if state !== undefined}
+    <span class={['emma-plan-state', `emma-plan-state-${state}`]}>
+      <i
+        class={[
+          'fa-solid',
+          { waiting: 'fa-hourglass', running: 'fa-spinner fa-spin', done: 'fa-check', failed: 'fa-xmark' }[state],
+        ]}
+        aria-hidden="true"></i>
+      {localize(`Run.State.${state}`)}
+    </span>
+  {/if}
+{/snippet}
+
+<section class="emma-update-plan" aria-labelledby="{uid}-heading">
+  <header>
+    <h3 id="{uid}-heading">{localize('Update.Plan')}</h3>
+    {#if onRun !== undefined}
+      <button
+        type="button"
+        disabled={running || confirming}
+        onclick={() => {
+          confirming = true;
+        }}>
+        <i class="fa-solid fa-play" aria-hidden="true"></i>
+        {localize('Run.Run')}
+      </button>
+    {/if}
+    <button
+      type="button"
+      disabled={running}
+      onclick={() => {
+        updates.clear();
+      }}>
+      <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+      {localize('Update.Clear')}
+    </button>
+  </header>
+  {#if confirming && onRun !== undefined}
+    <div class="emma-plan-confirm" role="alertdialog" aria-labelledby="{uid}-confirm">
+      <p id="{uid}-confirm">{localize('Run.Confirm')}</p>
+      <ol>
+        {#each steps as step (step.key)}
+          <li>{stepText(step)}</li>
+        {/each}
+      </ol>
+      {#if !acknowledged}
+        <!-- Running is the one thing that changes the installation, so an alpha's state is acknowledged first. -->
+        <p class="emma-plan-alpha">
+          <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+          {localize('Alpha.BeforeRun')}
+          {#if onAcknowledge !== undefined}
+            <button type="button" onclick={onAcknowledge}>
+              <i class="fa-solid fa-check" aria-hidden="true"></i>
+              {localize('Alpha.Acknowledge')}
+            </button>
+          {/if}
+        </p>
+      {/if}
+      <button
+        type="button"
+        disabled={!acknowledged}
+        onclick={() => {
+          confirming = false;
+          onRun();
+        }}>
+        <i class="fa-solid fa-play" aria-hidden="true"></i>
+        {localize('Run.Go')}
+      </button>
+      <button
+        type="button"
+        onclick={() => {
+          confirming = false;
+        }}>
+        {localize('Run.Cancel')}
+      </button>
+    </div>
+  {/if}
+  {#if updates.safeguards.length > 0}
+    <table aria-label={localize('Plan.Safeguards')}>
+      <thead>
+        <tr>
+          <th scope="col">{localize('Plan.Keep')}</th>
+          <th scope="col">{localize('Plan.Note')}</th>
+          <th scope="col">{localize('Plan.Space')}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {#each updates.safeguards as guard (guard.key)}
+          {@const room = spaceOf(guard)}
+          <tr>
+            <th scope="row">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={guard.checked}
+                  onchange={event => {
+                    updates.setSafeguard(guard.key, { checked: event.currentTarget.checked });
+                  }} />
+                {nameOf(guard)}
+              </label>
+              {@render stateOf(guard.key)}
+              {#if guard.recommended}
+                <span class="emma-plan-needed">{localize('Plan.Recommended')}</span>
+              {:else if guard.packages !== undefined}
+                <span class="emma-plan-needed"
+                  >{format('Plan.BackupUses', { packages: guard.packages.join(', ') })}</span>
+              {/if}
+            </th>
+            <td>
+              <input
+                type="text"
+                class="emma-plan-note-input"
+                aria-label={format('Plan.NoteOf', { name: nameOf(guard) })}
+                value={guard.note}
+                oninput={event => {
+                  updates.setSafeguard(guard.key, { note: event.currentTarget.value });
+                }} />
+            </td>
+            <td class={['emma-plan-space', room.short && 'emma-plan-missing']}>{room.text}</td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  {/if}
+  <table aria-label={localize('Plan.Changes')}>
+    <thead>
+      <tr>
+        <th scope="col">{localize('Update.Package')}</th>
+        <th scope="col">{localize('Update.Installed')}</th>
+        <th scope="col">{localize('Update.Chosen')}</th>
+        <th scope="col">{localize('Update.Manifest')}</th>
+        <th scope="col" aria-label={localize('Plan.Remove')}></th>
+      </tr>
+    </thead>
+    <tbody>
+      {#each updates.choices as choice (choice.key)}
+        {@const older = choice.key === 'core' ? newerCore : undefined}
+        {@const name = titles.get(choice.key) ?? updates.titleOf(choice.key)}
+        <tr class={[choice.forced && 'emma-plan-forced']}>
+          <th scope="row">
+            {#if choice.key === 'core' && coreBlocked !== undefined}
+              <i
+                class="fa-solid fa-triangle-exclamation emma-plan-blocked"
+                role="img"
+                aria-label={format('Plan.CoreBlocked', { reason: coreBlocked })}
+                data-tooltip={coreBlocked}></i>
+            {/if}
+            {name}{@render stateOf(choice.key)}
+          </th>
+          <td>
+            {#if choice.installed === undefined}
+              <span class="emma-plan-note">{localize('Install.NotInstalled')}</span>
+            {:else}
+              {choice.installed}
+            {/if}
+          </td>
+          <td>
+            {#if choice.chosen === UNINSTALL}
+              <span class="emma-plan-uninstall">{localize('Update.Uninstall')}</span>
+            {:else}
+              <span class={[older !== undefined && 'emma-plan-older']}>{choice.chosen}</span>
+            {/if}
+            {#if choice.by !== undefined}
+              <span class="emma-plan-needed">
+                {choice.through === undefined
+                  ? format('Update.NeededBy', choice.by)
+                  : format('Update.NeededThrough', {
+                      ...choice.by,
+                      through: new Intl.ListFormat('en').format(
+                        choice.through.map(({ title, version }) => `${title} ${version}`),
+                      ),
+                    })}
+              </span>
+            {/if}
+            {#if choice.recommendedBy !== undefined}
+              <span class="emma-plan-needed">{format('Update.RecommendedBy', { title: choice.recommendedBy })}</span>
+            {/if}
+            {#if choice.forced}
+              <span class="emma-plan-against">
+                <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                {localize('Manifest.AgainstAdvice')}
+              </span>
+            {/if}
+            {#if older !== undefined}
+              <span class="emma-plan-newer">
+                {format('Plan.NotNewest', { version: older.version })}
+                {#if older.kind === 'coherent'}
+                  <button
+                    type="button"
+                    disabled={running || updates.locked}
+                    onclick={() => {
+                      void updates.choose('core', older.version);
+                    }}>{format('Plan.ChooseNewest', { version: older.version })}</button>
+                {:else if older.kind === 'conflict'}
+                  {format('Plan.NewestNeeds', {
+                    choices: older.remove.map(({ title, version }) => `${title} ${version}`).join(', '),
+                  })}
+                {:else}
+                  {localize('Plan.NewestUnavailable')}
+                {/if}
+              </span>
+            {/if}
+          </td>
+          <td class="emma-plan-manifest">
+            {#if choice.chosen === UNINSTALL}
+              <span class="emma-plan-note">{localize('Update.NothingToInstall')}</span>
+            {:else if choice.manifest !== undefined}
+              <a href={choice.manifest} target="_blank" rel="noopener noreferrer">{choice.manifest}</a>
+            {:else if choice.key === 'core'}
+              <span class="emma-plan-note">{localize('Update.CoreManifest')}</span>
+            {:else}
+              <span class="emma-plan-missing">{localize('Update.NoManifest')}</span>
+            {/if}
+          </td>
+          <td class="emma-plan-remove">
+            {#if updates.canTakeOut(choice.key)}
+              <button
+                type="button"
+                aria-label={format('Plan.TakeOut', { title: name })}
+                data-tooltip={format('Plan.TakeOutHint', { title: name })}
+                disabled={running || updates.locked}
+                onclick={event => {
+                  void updates.takeOut(choice.key, event.shiftKey);
+                }}>
+                <i class="fa-solid fa-minus" aria-hidden="true"></i>
+              </button>
+            {/if}
+          </td>
+        </tr>
+      {/each}
+    </tbody>
+  </table>
+</section>
+
+<style>
+  /*
+   * A package added against EMMA's advice: dark red on pale red, 10.2:1, whatever the theme, with its link the same, and
+   * the triangle and the words saying it as well as the colour.
+   */
+  .emma-plan-forced {
+    background: #f8d7da;
+    color: #58151c;
+  }
+
+  .emma-plan-forced a,
+  .emma-plan-forced .emma-plan-note {
+    color: inherit;
+  }
+
+  .emma-plan-against {
+    display: block;
+    font-size: 0.85em;
+    font-weight: bold;
+  }
+
+  .emma-plan-remove {
+    width: 1%;
+    text-align: right;
+  }
+
+  .emma-plan-remove button {
+    width: auto;
+    padding: 0 0.4rem;
+    line-height: 1.6;
+  }
+
+  .emma-plan-needed {
+    font-size: 0.85em;
+    opacity: 0.8;
+    font-style: italic;
+  }
+
+  .emma-plan-confirm {
+    margin: 0.5rem 0;
+    padding: 0.5rem;
+    border: 1px solid var(--color-border, #555);
+    border-radius: 4px;
+  }
+
+  .emma-plan-confirm button {
+    width: auto;
+  }
+
+  .emma-plan-state {
+    margin-left: 0.5rem;
+    font-size: 0.85em;
+  }
+
+  .emma-plan-uninstall {
+    color: var(--color-level-error, #c00);
+    font-family: var(--font-primary, sans-serif);
+    font-weight: bold;
+  }
+
+  .emma-plan-older {
+    color: var(--color-level-warning, #ec3);
+    font-weight: bold;
+  }
+
+  .emma-plan-newer {
+    display: block;
+    font-family: var(--font-primary, sans-serif);
+    font-size: 0.85em;
+  }
+
+  .emma-plan-newer button {
+    width: auto;
+  }
+
+  .emma-plan-blocked {
+    margin-right: 0.25rem;
+    color: var(--color-level-warning, #ec3);
+  }
+
+  .emma-plan-state-done {
+    color: var(--color-level-success, #2a2);
+  }
+
+  .emma-plan-state-failed {
+    color: var(--color-level-error, #c00);
+  }
+
+  .emma-plan-note-input {
+    width: 100%;
+  }
+
+  .emma-plan-space {
+    font-family: var(--font-primary, sans-serif);
+    font-size: 0.85em;
+  }
+
+  .emma-plan-manifest {
+    font-size: 0.85em;
+    overflow-wrap: anywhere;
+  }
+
+  .emma-plan-note,
+  .emma-plan-missing {
+    font-family: var(--font-primary, sans-serif);
+    font-style: italic;
+  }
+
+  .emma-plan-missing {
+    color: var(--color-level-error, #c00);
+  }
+
+  .emma-update-plan {
+    overflow: auto;
+    padding: 0 0.5rem;
+  }
+
+  /* The title and the buttons stay in view as the plan's tables scroll, on the window's own background. */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--background, var(--color-cool-5, #1b1d24));
+    border-bottom: 1px solid var(--color-border, #555);
+  }
+
+  header button {
+    flex: none;
+    width: auto;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  th,
+  td {
+    text-align: left;
+    padding: 0.15rem 0.5rem;
+  }
+
+  tbody th {
+    font-weight: normal;
+  }
+
+  td {
+    font-family: var(--font-mono, monospace);
+  }
+
+  .emma-plan-alpha {
+    padding: 0.25rem 0.5rem;
+    border-left: 3px solid #a06c00;
+    background: #fff3cd;
+    color: #3d2c00;
+  }
+
+  .emma-plan-alpha button {
+    width: auto;
+    margin-left: 0.5rem;
+  }
+</style>

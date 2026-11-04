@@ -65,6 +65,8 @@ export interface ModuleMockData {
   version?: string;
   /** What `getVersionBadge` returns. Defaults to `null`, as for a package Foundry cannot place. */
   badge?: BadgeMockData | null;
+  /** Foundry's verdict, `Module#availability`. Defaults to verified, 1. */
+  availability?: number;
   /** Defaults to empty. */
   description?: string;
   /** Authors: a name, or a name with contact details. */
@@ -162,6 +164,7 @@ function createModuleMock(id: string, data: ModuleMockData) {
     title = id,
     version = '1.0.0',
     badge = null,
+    availability = 1,
     description = '',
     authors = [],
     languages = [],
@@ -187,6 +190,7 @@ function createModuleMock(id: string, data: ModuleMockData) {
     title,
     version,
     getVersionBadge: () => badge,
+    availability,
     // The module's manifest, as Foundry keeps it.
     toObject: () => ({
       id,
@@ -243,6 +247,7 @@ export function createGameMock(options: GameMockOptions = {}) {
       isGM === null
         ? null
         : {
+            id: 'user-1',
             isGM,
             can: vi.fn(
               (permission: string): boolean =>
@@ -359,6 +364,7 @@ export function createFoundryNamespaceMock() {
   const reloadConfirm = vi.fn((_options?: { world?: boolean }) => Promise.resolve());
   // Resolves as a dismissed dialog does, unless a test says otherwise.
   const confirm = vi.fn((_config?: object): Promise<boolean | null> => Promise.resolve(null));
+  const prompt = vi.fn((_config?: object): Promise<unknown> => Promise.resolve(null));
   // Foundry removes every tag and attribute it does not allow; removing scripts is enough to see it was called. The
   // HTML is parsed rather than matched with a regular expression, which cannot reliably find script elements.
   const cleanHTML = vi.fn((raw: string): string => {
@@ -430,7 +436,7 @@ export function createFoundryNamespaceMock() {
 
   return {
     applications: {
-      api: { ApplicationV2: ApplicationV2Mock, DialogV2: { confirm } },
+      api: { ApplicationV2: ApplicationV2Mock, DialogV2: { confirm, prompt } },
       apps: { FilePicker: { implementation: { browse, upload } } },
       settings: { SettingsConfig: { reloadConfirm } },
       // Foundry's context menu, recorded: its container, selector, entries and options.
@@ -460,6 +466,15 @@ export function createFoundryNamespaceMock() {
       escapeHTML: (raw: string): string => raw.replaceAll('&', '&amp;').replaceAll('<', '&lt;'),
       saveDataToFile,
       getRoute: (path: string): string => `/${path}`,
+      // Dotted numbers compared part by part, as Foundry compares versions.
+      isNewerVersion: (v1: string, v0: string): boolean => {
+        const [a, b] = [v1, v0].map(version => version.split('.').map(Number));
+        for (let index = 0; index < Math.max(a?.length ?? 0, b?.length ?? 0); index++) {
+          const [x = 0, y = 0] = [a?.[index], b?.[index]];
+          if (x !== y) return x > y;
+        }
+        return false;
+      },
     },
     /** Called each time a native Module Management window is rendered. */
     moduleManagementRender,
@@ -467,6 +482,8 @@ export function createFoundryNamespaceMock() {
     reloadConfirm,
     /** `DialogV2.confirm`, which asks the user a yes-or-no question. */
     confirm,
+    /** `DialogV2.prompt`, which tells the user something, with one button. */
+    prompt,
     /** `utils.cleanHTML`, which makes HTML safe to insert. */
     cleanHTML,
     /** `packages.Module.getVersionBadge`, which gives the badge for a package's availability. */
@@ -492,7 +509,7 @@ export interface FoundryMockOptions extends GameMockOptions {
 }
 
 /**
- * Install mock Foundry globals (`foundry`, `Hooks`, `game`, `ui`, `CONFIG`, `libWrapper`) for the current test.
+ * Install mock Foundry globals (`foundry`, `Hooks`, `game`, `ui`, `CONFIG`, `libWrapper`, `ChatMessage`) for the current test.
  * Undo with `vi.unstubAllGlobals()`.
  * @param options - Initial state
  * @returns Handles to the installed mocks
@@ -516,6 +533,9 @@ export function installFoundryMocks(options: FoundryMockOptions = {}) {
   // libWrapper, which only records the wrappers registered.
   const wrappers = { register: vi.fn((..._args: Parameters<libWrapper.Api['register']>) => 1) };
   vi.stubGlobal('libWrapper', wrappers);
+  // Chat messages, recorded as they are made.
+  const chat = { create: vi.fn((_data: object): Promise<object> => Promise.resolve({})) };
+  vi.stubGlobal('ChatMessage', { implementation: chat });
 
-  return { foundry, hooks, game, ui, config, libWrapper: wrappers };
+  return { foundry, hooks, game, ui, config, libWrapper: wrappers, chat };
 }

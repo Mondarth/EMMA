@@ -1,0 +1,746 @@
+/**
+ * Coherent update plans. Foundry installs one version of each package, which every world that uses it shares, so a
+ * version chosen may need others to change with it: a newer game system may need newer modules, and they a newer
+ * Foundry build, and the other way round. A plan is the versions chosen, completed with every other change that each
+ * world that uses them needs to keep working, as one set; when there is no such set, there is no plan.
+ *
+ * A set of choices is completed world by world:
+ *
+ * - each recorded world's setup is found with the choices pinned and everything else it uses preferred at its
+ *   installed version, so that nothing changes that need not;
+ * - a world without a record keeps its game system as it is, and the Foundry build must still run it;
+ * - where worlds that share a package, or Foundry VTT itself, settle on different versions, the newest is pinned, as some
+ *   world needs it, and every world is found again, until they agree or one has no setup;
+ * - a version chosen of a package no recorded world uses has a setup of its own: it, with the game system it runs in and
+ *   the packages it requires, the plan's versions preferred and else the installed ones, so that what it needs is
+ *   brought in, and the worlds that use that brought in with it.
+ *
+ * The resolver is the one the setup kit gives. Its loading of releases is kept for the next completion. Its words explain
+ * what a version needs, and why a set of choices cannot be completed, naming the installed packages by their titles.
+ */
+import type {
+  Compatibility,
+  ExplanationMessages,
+  PackageKey,
+  PackageRef,
+  PackageVersion,
+  Policy,
+  Release,
+  Requirements,
+  Resolution,
+  Setup,
+  Universe,
+} from '@mondarth/fvtt-resolver';
+
+import type { KitResolver } from '@mondarth/emma-core/setup-kit';
+
+import { format, localize } from './i18n';
+import type { Overview } from './overview';
+import type { WorldUses } from './setups';
+import { keepsLocked, newerIn, newestFirst, runsOn, usedBy } from './setups';
+
+/**
+ * The version a package is chosen at to uninstall it. A plan uninstalls such a package only if nothing it keeps needs
+ * it: no world's setup, and no version chosen, may have it.
+ */
+export const UNINSTALL = 'uninstall';
+
+/**
+ * Why a world holds a package's update back:
+ * - `unrecorded`: the world has no record, so which modules it runs, and whether they would work, is not known;
+ * - `unresolved`: no working setup was found for the world at all, so nothing it uses moves;
+ * - `inconsistent`: the world's other packages cannot all work with the newer version.
+ */
+export interface UpdateHold {
+  readonly reason: 'unrecorded' | 'unresolved' | 'inconsistent';
+  /** The world's ID and title. */
+  readonly world: { readonly id: string; readonly title: string };
+}
+
+/** A set of choices, completed, or why it cannot be. */
+export type Completion =
+  | {
+      readonly ok: true;
+      /** Every package that changes, Foundry VTT among them, at its new version, by package key. */
+      readonly versions: ReadonlyMap<PackageKey, string>;
+    }
+  | {
+      readonly ok: false;
+      /** The world that cannot work with the choices, when one is to blame. */
+      readonly hold?: UpdateHold;
+      /** Why that world's setup cannot be found, in the resolver's words, one sentence to a line. */
+      readonly explanation?: readonly string[];
+    };
+
+/** A change in a plan. */
+export interface PlanEntry {
+  readonly key: PackageKey;
+  /** The version installed; none for a package the plan installs anew. */
+  readonly installed?: string;
+  /** The version to install, or {@link UNINSTALL}. */
+  readonly version: string;
+  /** The choice that needs it; none for a version chosen. */
+  readonly by?: PackageVersion;
+  /**
+   * The other changes it is needed through, from the choice that needs it, in order, where the choice does not name it
+   * itself: as a module needed only because a game system the choice needs changes. None where the choice names it, or
+   * where no such changes are found.
+   */
+  readonly through?: readonly PackageVersion[];
+  /** The manifest URL to install the version from, one for that version alone; none for Foundry VTT, or if none is found. */
+  readonly manifest?: string;
+}
+
+/** Plans updates of an installation. */
+export interface Planner {
+  /** Every release found, with those loaded since. */
+  readonly universe: Universe;
+  /**
+   * Complete a set of choices.
+   * @param picks - The versions chosen, by package key; `core` for Foundry VTT
+   * @returns The changes they need, or why there are none that work
+   */
+  complete(picks: ReadonlyMap<PackageKey, string>): Promise<Completion>;
+  /**
+   * Plan a set of choices: complete them, saying which choice needs each change it does not choose.
+   * @param picks - The versions chosen, in the order they were chosen
+   * @returns The changes, in the order to install them (see {@link installOrder}), or `undefined` if they cannot be
+   *   completed
+   */
+  plan(picks: ReadonlyMap<PackageKey, string>): Promise<readonly PlanEntry[] | undefined>;
+  /**
+   * The versions of a package that may be chosen: those newer than the installed one, or any of a package not
+   * installed once {@link add}ed, newest first, that run on a Foundry build from the installed one up.
+   * @param key - The package, or `core`
+   * @returns The versions
+   */
+  candidates(key: PackageKey): readonly string[];
+  /**
+   * Look up the releases of a package not installed, so that it can be chosen, as for installing it. Once found, they
+   * are kept, with those of the packages they need loaded as they are needed.
+   * @param key - The package
+   * @param manifest - Its manifest URL, as Foundry's listing gives it, to find its releases by
+   * @returns Whether any release of it is known
+   */
+  add(key: PackageKey, manifest?: string): Promise<boolean>;
+  /**
+   * Know more releases, as one read from a manifest the user gives, in place of any of the same version.
+   * @param releases - The releases
+   */
+  include(releases: readonly Release[]): void;
+  /**
+   * What a version of a package needs, as its manifest declares it: the Foundry builds it runs on, the packages it
+   * requires, the game systems it runs in, and those it conflicts with.
+   * @param key - The package
+   * @param version - The version
+   * @returns One sentence for each, in the resolver's words; none for a release not found, or for Foundry VTT
+   */
+  needsOf(key: PackageKey, version: string): readonly string[];
+  /**
+   * The modules a version of a module recommends, as its manifest declares them: they work with it, but it runs
+   * without them.
+   * @param key - The module
+   * @param version - The version
+   * @returns Each by its key, with the manifest URL the recommendation gives, if any; none for a release not found
+   */
+  recommendsOf(key: PackageKey, version: string): readonly { readonly key: PackageKey; readonly manifest?: string }[];
+  /**
+   * Whether a version of a package was found, but no manifest URL for it alone was, so that it cannot be installed and
+   * is never planned.
+   * @param key - The package
+   * @param version - The version
+   * @returns `true` for such a version; `false` for one installed, one not found, or Foundry VTT
+   */
+  missingManifest(key: PackageKey, version: string): boolean;
+  /**
+   * A package's title.
+   * @param key - The package, or `core`
+   * @returns Its title, or its key if it is not installed
+   */
+  titleOf(key: PackageKey): string;
+}
+
+/** What the planner works on. */
+export interface PlannerInputs {
+  readonly resolver: KitResolver;
+  readonly overview: Overview;
+  /** Every release found, from the installed versions up, and Foundry's builds from the installed one up. */
+  readonly universe: Universe;
+  readonly load: (needs: readonly Release[]) => Promise<readonly Release[]>;
+  /** Look up the releases of packages not installed; none are found without it. */
+  readonly lookUp?: (
+    packages: readonly PackageRef[],
+    manifests?: Readonly<Record<PackageKey, readonly string[]>>,
+  ) => Promise<readonly Release[]>;
+  /** How setups are found, as the search finds them. */
+  readonly policy: Partial<Policy>;
+  /** Foundry VTT's title. */
+  readonly coreTitle: string;
+}
+
+/**
+ * The versions chosen, with one package's choice changed.
+ * @param picks - The versions chosen, in the order they were chosen
+ * @param key - The package
+ * @param version - Its version, or `null` to take its choice back
+ * @returns The versions chosen, a new choice last
+ */
+export function withChoice(
+  picks: ReadonlyMap<PackageKey, string>,
+  key: PackageKey,
+  version: string | null,
+): ReadonlyMap<PackageKey, string> {
+  const changed = new Map(picks);
+  if (version === null) changed.delete(key);
+  else changed.set(key, version);
+  return changed;
+}
+
+/**
+ * Some of the versions chosen.
+ * @param picks - The versions chosen, in the order they were chosen
+ * @param keep - Whether to keep a package's choice
+ * @returns The choices kept, in the same order
+ */
+export function keepChoices(
+  picks: ReadonlyMap<PackageKey, string>,
+  keep: (key: PackageKey, version: string) => boolean,
+): ReadonlyMap<PackageKey, string> {
+  return new Map([...picks].filter(([key, version]) => keep(key, version)));
+}
+
+/**
+ * A plan's changes in the order to install them: Foundry VTT, then the game systems, then the modules, each after the
+ * modules in the plan it requires, then what is uninstalled, once nothing needs it. Otherwise they keep their order, the
+ * choices first.
+ * @param entries - The changes
+ * @param requiresOf - The packages a change's version requires
+ * @returns The changes, in order
+ */
+export function installOrder(
+  entries: readonly PlanEntry[],
+  requiresOf: (entry: PlanEntry) => readonly PackageKey[],
+): PlanEntry[] {
+  const rank = ({ key, version }: PlanEntry) =>
+    version === UNINSTALL ? 3 : key === 'core' ? 0 : key.startsWith('system:') ? 1 : 2;
+  const ranked = [...entries].sort((a, b) => rank(a) - rank(b));
+  const byKey = new Map(entries.map(entry => [entry.key, entry]));
+  const ordered: PlanEntry[] = [];
+  const seen = new Set<PackageKey>();
+  const visit = (entry: PlanEntry): void => {
+    if (seen.has(entry.key)) return;
+    seen.add(entry.key);
+    if (rank(entry) === 2) {
+      for (const required of requiresOf(entry)) {
+        const other = byKey.get(required);
+        if (other !== undefined) visit(other);
+      }
+    }
+    ordered.push(entry);
+  };
+  for (const entry of ranked) visit(entry);
+  return ordered;
+}
+
+/**
+ * The resolver's words, told of a world rather than of the resolver's requirements, and of the versions in the plan
+ * rather than of the versions pinned.
+ * @param messages - The words
+ * @param world - The world's title
+ * @returns The words, told of the world
+ */
+export function toldOfWorld(messages: ExplanationMessages, world: string): ExplanationMessages {
+  return {
+    ...messages,
+    requirement: on => format('Explain.Runs', { world, package: on }),
+    requirementsNeed: needed => format('Explain.Needs', { world, package: needed }),
+    pin: on => format('Explain.Installed', { package: on }),
+    failed: format('Explain.Fails', { world }),
+  };
+}
+
+/** The most times the worlds are found again before choices are given up as not settling. */
+const MAX_ROUNDS = 8;
+
+/**
+ * Set up planning an installation's updates.
+ * @param inputs - The installation, the releases found, and how setups are found
+ * @returns The planner
+ */
+export function createPlanner(inputs: PlannerInputs): Planner {
+  const { resolver, overview, load, policy } = inputs;
+  const { CORE, chooseOrders, describeReason, explain, packageKey, releaseConstraints, resolveInRounds, sameVersion } =
+    resolver;
+  const newer = newerIn(resolver);
+  const core = overview.core;
+  const installed = new Map<PackageKey, string>([
+    [CORE, core],
+    ...overview.systems.map(({ id, version }) => [packageKey({ type: 'system', id }), version] as const),
+    ...overview.modules.map(({ module: { id, version } }) => [packageKey({ type: 'module', id }), version] as const),
+  ]);
+  // The versions installed need no manifest URL of their own: nothing has to install them.
+  const declarations = {
+    installed: [...installed].filter(([key]) => key !== CORE).map(([key, version]) => ({ package: key, version })),
+  };
+  const titles = new Map<PackageKey, string>([
+    [CORE, inputs.coreTitle],
+    ...overview.systems.map(({ id, title }) => [packageKey({ type: 'system', id }), title] as const),
+    ...overview.modules.map(({ module: { id, title } }) => [packageKey({ type: 'module', id }), title] as const),
+  ]);
+  const recorded = overview.worlds.flatMap(world => {
+    const uses = usedBy(resolver, world);
+    return uses === undefined ? [] : [{ id: world.world.id, title: world.world.title, uses }];
+  });
+  const usedByRecorded = new Set(recorded.flatMap(({ uses }) => [uses.system, ...uses.modules].map(({ key }) => key)));
+  const unrecorded = overview.worlds.flatMap(({ world, record, system }) =>
+    record !== undefined || system === undefined
+      ? []
+      : [
+          {
+            id: world.id,
+            title: world.title,
+            system: packageKey({ type: 'system', id: system.id }),
+            version: system.version,
+          },
+        ],
+  );
+  const channels = policy.coreChannels ?? ['stable'];
+  // A package locked in Foundry keeps its installed release alone, however releases are found.
+  const unlocked = keepsLocked(resolver, overview);
+  // So does Foundry VTT locked in EMMA: its installed build alone.
+  const { core: builtFrom } = inputs.universe;
+  let universe = {
+    core:
+      overview.coreLocked === true ? builtFrom.filter(build => sameVersion(build.version, overview.core)) : builtFrom,
+    releases: inputs.universe.releases.filter(unlocked),
+  };
+
+  const builds = () =>
+    newestFirst(
+      resolver,
+      universe.core.filter(build => channels.includes(build.channel)).map(({ version }) => version),
+    );
+  const releaseOf = (key: PackageKey, version: string) =>
+    universe.releases.find(release => packageKey(release.package) === key && sameVersion(release.version, version));
+  /**
+   * Whether a version is within a relationship's bounds, read exactly, as Foundry reads them: from its minimum, and up
+   * to its maximum. Bounds it does not give are no limit.
+   * @param bounds - The relationship's bounds
+   * @param version - The version
+   * @returns `true` if it is within them
+   */
+  const within = (bounds: Compatibility | undefined, version: string): boolean => {
+    const { minimum, maximum } = bounds ?? {};
+    return !(minimum !== undefined && newer(minimum, version)) && !(maximum !== undefined && newer(version, maximum));
+  };
+  /**
+   * How the changes of a plan lead to each other. A change to one package leads to a change to another where a
+   * relationship between them no longer holds: one the first's version in the plan declares, of a version of the
+   * second it does not take, or one the second's installed version declares, which does not take the first's new
+   * version. A relationship that still holds leads nowhere, though it names the package. Foundry VTT's builds are
+   * declared as core compatibility instead: a version that does not run on the installed build leads to Foundry VTT's
+   * change, which leads to a package whose installed version does not run on the new build.
+   * @param versions - The plan's versions, by package
+   * @returns The changes between a choice and a change it needs: each that leads straight to it, with the way there
+   */
+  const chains = (versions: ReadonlyMap<PackageKey, string>) => {
+    /**
+     * Whether a package's release has a relationship with another package that a version of that package breaks.
+     * @param key - The package
+     * @param version - The release's version; none if it is not installed
+     * @param other - The other package
+     * @param at - The other's version; none if it is not installed, which breaks a requirement
+     * @returns `true` if the relationship breaks
+     */
+    const breaks = (key: PackageKey, version: string | undefined, other: PackageKey, at: string | undefined) => {
+      const release = version === undefined || key === CORE ? undefined : releaseOf(key, version);
+      if (release === undefined) return false;
+      const { requires, systems, conflicts } = release.relationships;
+      const of = ({ package: ref }: { readonly package: PackageRef }) => packageKey(ref) === other;
+      return (
+        [...requires, ...systems].some(
+          related => of(related) && (at === undefined || !within(related.compatibility, at)),
+        ) || conflicts.some(related => of(related) && at !== undefined && within(related.compatibility, at))
+      );
+    };
+    /**
+     * Whether a package's release, if found, runs on a Foundry build, by the core compatibility it declares.
+     * @param key - The package
+     * @param version - The release's version; none if it is not installed
+     * @param build - The build
+     * @returns `false` only for a release found that does not run on it
+     */
+    const runsOnBuild = (key: PackageKey, version: string | undefined, build: string): boolean => {
+      const release = version === undefined ? undefined : releaseOf(key, version);
+      const { coreAvailability, isUnavailable } = resolver;
+      return (
+        release === undefined ||
+        !isUnavailable(coreAvailability({ ...release.compatibility, ...release.listing }, build, universe.core))
+      );
+    };
+    const coreFrom = installed.get(CORE) ?? core;
+    const coreTo = versions.get(CORE);
+    // Foundry VTT changes with the rest: a package's version in the plan that does not run on the installed build leads
+    // to it, and it leads to a package whose installed version does not run on its new build.
+    const linked = (key: PackageKey, other: PackageKey): boolean =>
+      key === CORE
+        ? coreTo !== undefined && !runsOnBuild(other, installed.get(other), coreTo)
+        : other === CORE
+          ? !runsOnBuild(key, versions.get(key), coreFrom)
+          : breaks(key, versions.get(key), other, installed.get(other)) ||
+            breaks(other, installed.get(other), key, versions.get(key));
+    const changed = [...versions.keys()];
+    const next = new Map(changed.map(key => [key, changed.filter(other => other !== key && linked(key, other))]));
+    // Every change that leads straight to the one needed, as each is a reason for it, with the changes on the shortest
+    // way to it from the choice, nearest the choice first. A way does not go through the change needed, as the changes
+    // it leads to in turn are no reason for it.
+    return (from: PackageKey, to: PackageKey): PackageVersion[] => {
+      const came = new Map<PackageKey, PackageKey>();
+      const steps = new Map<PackageKey, number>([[from, 0]]);
+      const queue = [from];
+      for (let at = queue.shift(); at !== undefined; at = queue.shift()) {
+        if (at === to) continue;
+        for (const other of next.get(at) ?? []) {
+          if (steps.has(other)) continue;
+          came.set(other, at);
+          steps.set(other, (steps.get(at) ?? 0) + 1);
+          queue.push(other);
+        }
+      }
+      const through = new Set<PackageKey>();
+      for (const cause of changed.filter(key => key !== to && steps.has(key) && next.get(key)?.includes(to) === true)) {
+        for (let at: PackageKey | undefined = cause; at !== undefined && at !== from; at = came.get(at))
+          through.add(at);
+      }
+      return [...through]
+        .sort((a, b) => (steps.get(a) ?? 0) - (steps.get(b) ?? 0))
+        .map(key => ({ package: key, version: versions.get(key) ?? '' }));
+    };
+  };
+
+  // The same choices are completed again as lists open and close.
+  const completions = new Map<string, Promise<Completion>>();
+  // The resolver's words, naming the installed packages by their titles.
+  const messages: ExplanationMessages = {
+    ...resolver.englishMessages,
+    name: key => titles.get(key) ?? resolver.englishMessages.name(key),
+  };
+
+  /**
+   * Why a world's setup cannot be found, in the resolver's words, told of the world.
+   * @param resolution - The resolution that failed
+   * @param world - The world's title
+   * @returns One sentence to a line, a numbered one ending with its number; none if it only lacked releases
+   */
+  function explained(resolution: Exclude<Resolution, { ok: true }>, world: string): string[] {
+    return 'failure' in resolution
+      ? explain(resolution.failure, toldOfWorld(messages, world)).map(({ text, number }) =>
+          number === undefined ? text : `${text} (${String(number)})`,
+        )
+      : [];
+  }
+
+  /**
+   * Find a setup, keeping what was loaded.
+   * @param requirements - What it must meet
+   * @returns The resolution
+   */
+  async function setupFor(requirements: Requirements) {
+    const rounds = await resolveInRounds(universe, requirements, load, { policy, declarations });
+    // An update never goes back.
+    const releases = rounds.universe.releases.filter(release => {
+      const from = installed.get(packageKey(release.package));
+      return (from === undefined || !newer(from, release.version)) && unlocked(release);
+    });
+    universe = { core: universe.core, releases };
+    return rounds.resolution;
+  }
+
+  /**
+   * The requirements of a recorded world's setup, with some versions pinned.
+   * @param uses - What the world uses
+   * @param pins - The versions pinned
+   * @returns The requirements: the pinned versions, and the installed ones preferred for everything else
+   */
+  function worldRequirements(uses: WorldUses, pins: ReadonlyMap<PackageKey, string>): Requirements {
+    const keys = [{ key: CORE, installed: core }, uses.system, ...uses.modules];
+    return {
+      require: [uses.system, ...uses.modules].map(({ key }) => ({ package: key })),
+      pins: keys.flatMap(({ key }) => {
+        const version = pins.get(key);
+        return version === undefined ? [] : [{ package: key, version }];
+      }),
+      prefer: keys
+        .filter(({ key }) => !pins.has(key))
+        .map(({ key, installed: version }) => ({ package: key, version })),
+    };
+  }
+
+  /**
+   * Complete a set of choices, found afresh, moving Foundry VTT, if the choices need it moved and do not choose it, to
+   * the oldest build that works: where the installed one cannot be kept, the resolver takes the newest.
+   * @param picks - The versions chosen
+   * @returns The completion
+   */
+  async function completeAfresh(picks: ReadonlyMap<PackageKey, string>): Promise<Completion> {
+    const completion = await completeAt(picks);
+    const moved = completion.ok ? completion.versions.get(CORE) : undefined;
+    if (moved === undefined || picks.has(CORE)) return completion;
+    for (const build of [...builds()].reverse()) {
+      if (!newer(build, core) || !newer(moved, build)) continue;
+      const lower = await completeAt(withChoice(picks, CORE, build));
+      if (lower.ok) return lower;
+    }
+    return completion;
+  }
+
+  /**
+   * Complete a set of choices, found afresh.
+   * @param picks - The versions chosen
+   * @returns The completion
+   */
+  async function completeAt(picks: ReadonlyMap<PackageKey, string>): Promise<Completion> {
+    const removed = new Set([...picks].filter(([, version]) => version === UNINSTALL).map(([key]) => key));
+    const pins = new Map([...picks].filter(([key]) => !removed.has(key)));
+    // The packages chosen that no recorded world uses, each set up on its own.
+    const alone = [...pins.keys()].filter(key => key !== CORE && !usedByRecorded.has(key));
+    /**
+     * Why a setup cannot be had: it has a package the plan uninstalls.
+     * @param setup - The setup
+     * @param world - Whose it is, by title
+     * @returns Why, one sentence to a line; none if it has none
+     */
+    const needsRemoved = (setup: Setup, world: string): string[] =>
+      [setup.system, ...setup.modules]
+        .map(release => packageKey(release.package))
+        .filter(key => removed.has(key))
+        .map(key => format('Explain.Uninstalled', { world, package: titles.get(key) ?? key }));
+    for (let round = 0; round < MAX_ROUNDS; round++) {
+      for (const world of unrecorded) {
+        const chosen = pins.get(world.system);
+        if (removed.has(world.system) || (chosen !== undefined && !sameVersion(chosen, world.version))) {
+          return { ok: false, hold: { reason: 'unrecorded', world: { id: world.id, title: world.title } } };
+        }
+      }
+      const found = new Map<PackageKey, Set<string>>();
+      const note = (key: PackageKey, version: string): void => {
+        found.set(key, (found.get(key) ?? new Set()).add(version));
+      };
+      for (const world of recorded) {
+        const resolution = await setupFor(worldRequirements(world.uses, pins));
+        const hold: UpdateHold = { reason: 'inconsistent', world: { id: world.id, title: world.title } };
+        if (!resolution.ok) return { ok: false, hold, explanation: explained(resolution, world.title) };
+        const missing = needsRemoved(resolution.setup, world.title);
+        if (missing.length > 0) return { ok: false, hold, explanation: missing };
+        note(CORE, resolution.setup.core);
+        for (const release of [resolution.setup.system, ...resolution.setup.modules]) {
+          note(packageKey(release.package), release.version);
+        }
+      }
+      for (const world of unrecorded) {
+        const pinned = pins.get(CORE);
+        const resolution = await setupFor({
+          require: [{ package: world.system }],
+          pins: [
+            { package: world.system, version: world.version },
+            ...(pinned === undefined ? [] : [{ package: CORE, version: pinned }]),
+          ],
+          prefer: pinned === undefined ? [{ package: CORE, version: core }] : [],
+        });
+        const hold: UpdateHold = { reason: 'unrecorded', world: { id: world.id, title: world.title } };
+        if (!resolution.ok) return { ok: false, hold, explanation: explained(resolution, world.title) };
+        note(CORE, resolution.setup.core);
+        note(world.system, world.version);
+      }
+      for (const key of alone) {
+        const version = pins.get(key) ?? picks.get(key) ?? '';
+        const pinned = pins.get(CORE);
+        // Preferred rather than pinned, as a pin would bring a package in that the version does not need.
+        const preferred = [...installed]
+          .filter(([other]) => other !== key && other !== CORE && !removed.has(other))
+          .map(([other, from]) => ({ package: other, version: pins.get(other) ?? from }));
+        const requirements = {
+          require: [{ package: key }],
+          pins: [{ package: key, version }, ...(pinned === undefined ? [] : [{ package: CORE, version: pinned }])],
+          prefer: [...(pinned === undefined ? [{ package: CORE, version: core }] : []), ...preferred],
+        };
+        let resolution = await setupFor(requirements);
+        // A version chosen is never moved to meet what this one needs: found otherwise, it is pinned, to say why not.
+        const moved = resolution.ok
+          ? [resolution.setup.system, ...resolution.setup.modules].flatMap(release => {
+              const chosen = pins.get(packageKey(release.package));
+              return chosen === undefined || sameVersion(chosen, release.version)
+                ? []
+                : [{ package: packageKey(release.package), version: chosen }];
+            })
+          : [];
+        if (moved.length > 0) resolution = await setupFor({ ...requirements, pins: [...requirements.pins, ...moved] });
+        if (!resolution.ok) return { ok: false, explanation: explained(resolution, localize('Explain.Plan')) };
+        const missing = needsRemoved(resolution.setup, localize('Explain.Plan'));
+        if (missing.length > 0) return { ok: false, explanation: missing };
+        note(CORE, resolution.setup.core);
+        for (const release of [resolution.setup.system, ...resolution.setup.modules]) {
+          note(packageKey(release.package), release.version);
+        }
+      }
+
+      // Where the worlds disagree, some world needs the newest.
+      let settled = true;
+      for (const [key, seen] of found) {
+        const [newest] = newestFirst(resolver, [...seen]);
+        if (seen.size > 1 && newest !== undefined) {
+          pins.set(key, newest);
+          settled = false;
+        }
+      }
+      if (!settled) continue;
+
+      const build = [...(found.get(CORE) ?? [])][0] ?? pins.get(CORE) ?? core;
+
+      const versions = new Map<PackageKey, string>();
+      const change = (key: PackageKey, version: string): void => {
+        const from = installed.get(key);
+        if (from === undefined || !sameVersion(from, version)) versions.set(key, version);
+      };
+      for (const [key, set] of found) {
+        const [version] = [...set];
+        if (version !== undefined) change(key, version);
+      }
+      for (const [key, version] of picks) if (!found.has(key)) change(key, version);
+      if (!found.has(CORE)) change(CORE, build);
+      return { ok: true, versions };
+    }
+    return { ok: false };
+  }
+
+  return {
+    get universe() {
+      return universe;
+    },
+
+    complete(picks) {
+      const signature = JSON.stringify([...picks].sort(([a], [b]) => a.localeCompare(b)));
+      const known = completions.get(signature);
+      if (known !== undefined) return known;
+      const completing = completeAfresh(picks);
+      completions.set(signature, completing);
+      return completing;
+    },
+
+    async plan(picks) {
+      const order = [...picks];
+      const by = new Map<PackageKey, PackageVersion>();
+      let versions: ReadonlyMap<PackageKey, string> = new Map();
+      for (const [index, [key, version]] of order.entries()) {
+        const completion = await this.complete(new Map(order.slice(0, index + 1)));
+        if (!completion.ok) return undefined;
+        // A change the choices so far did not make, or made otherwise, is this choice's.
+        for (const [changed, to] of completion.versions) {
+          if (!picks.has(changed) && versions.get(changed) !== to) by.set(changed, { package: key, version });
+        }
+        versions = completion.versions;
+      }
+      const chainOf = chains(versions);
+      const entry = (key: PackageKey, version: string): PlanEntry => {
+        const needer = picks.has(key) ? undefined : by.get(key);
+        const through = needer === undefined ? [] : chainOf(needer.package, key);
+        const manifest = key === CORE || version === UNINSTALL ? undefined : releaseOf(key, version)?.versionManifest;
+        const from = installed.get(key);
+        return {
+          key,
+          ...(from !== undefined && { installed: from }),
+          version,
+          ...(needer !== undefined && { by: needer }),
+          ...(through.length > 0 && { through }),
+          ...(manifest !== undefined && { manifest }),
+        };
+      };
+      return installOrder(
+        [
+          ...order.filter(([key]) => versions.has(key)).map(([key, version]) => entry(key, version)),
+          ...[...versions].filter(([key]) => !picks.has(key)).map(([key, version]) => entry(key, version)),
+        ],
+        ({ key, version }) =>
+          releaseOf(key, version)?.relationships.requires.map(required => packageKey(required.package)) ?? [],
+      );
+    },
+
+    candidates(key) {
+      const from = installed.get(key);
+      if (key === CORE) return builds().filter(build => newer(build, core));
+      const runnable = builds();
+      return newestFirst(
+        resolver,
+        universe.releases
+          .filter(
+            release => packageKey(release.package) === key && (from === undefined || newer(release.version, from)),
+          )
+          .filter(release => runnable.some(build => runsOn(resolver, release, build, universe)))
+          .map(({ version }) => version),
+      );
+    },
+
+    include(read) {
+      const releases = read.filter(unlocked);
+      const given = new Set(releases.map(release => `${packageKey(release.package)}@${release.version}`));
+      universe = {
+        core: universe.core,
+        releases: [
+          ...universe.releases.filter(release => !given.has(`${packageKey(release.package)}@${release.version}`)),
+          ...releases,
+        ],
+      };
+      completions.clear();
+    },
+
+    async add(key, manifest) {
+      const known = () => universe.releases.some(release => packageKey(release.package) === key);
+      if (known() || installed.has(key) || inputs.lookUp === undefined) return known();
+      const type = key.startsWith('system:') ? 'system' : 'module';
+      const found = await inputs.lookUp(
+        [{ type, id: key.slice(key.indexOf(':') + 1) }],
+        manifest === undefined ? {} : { [key]: [manifest] },
+      );
+      const have = new Set(universe.releases.map(release => `${packageKey(release.package)}@${release.version}`));
+      const added = found.filter(unlocked).filter(release => {
+        const id = `${packageKey(release.package)}@${release.version}`;
+        if (have.has(id)) return false;
+        have.add(id);
+        return true;
+      });
+      universe = { core: universe.core, releases: [...universe.releases, ...added] };
+      // What could not be completed before may be now.
+      completions.clear();
+      return known();
+    },
+
+    missingManifest(key, version) {
+      const release = key === CORE ? undefined : releaseOf(key, version);
+      const at = installed.get(key);
+      return (
+        release !== undefined && !(at !== undefined && sameVersion(at, version)) && resolver.missingManifest(release)
+      );
+    },
+
+    titleOf(key) {
+      return titles.get(key) ?? key;
+    },
+
+    recommendsOf(key, version) {
+      const release = key === CORE ? undefined : releaseOf(key, version);
+      return (release?.relationships.recommends ?? [])
+        .filter(({ package: ref }) => ref.type === 'module' && packageKey(ref) !== key)
+        .map(({ package: ref, manifest }) => ({ key: packageKey(ref), ...(manifest !== undefined && { manifest }) }));
+    },
+
+    needsOf(key, version) {
+      const release = key === CORE ? undefined : releaseOf(key, version);
+      if (release === undefined) return [];
+      const full = resolver.withDefaults(policy);
+      const orders = chooseOrders(universe, full);
+      return releaseConstraints(release, { orders, policy: full })
+        .filter(({ kind }) => kind === 'dependency' || kind === 'choice' || kind === 'exclusion')
+        .map(constraint => describeReason({ kind: 'constraint', constraint }, messages));
+    },
+  };
+}

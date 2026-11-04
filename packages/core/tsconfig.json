@@ -15,5 +15,7 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src/**/*", "tests/**/*"]
+  "include": ["src/**/*", "tests/**/*"],
+  // Under Node, so checked with tsconfig.node.json.
+  "exclude": ["tests/scripts/**/*"]
 }

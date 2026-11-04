@@ -1,11 +1,13 @@
 /**
  * EMMA's window on the setup screen: an `ApplicationV2` frame, as Foundry's own windows there are, whose content is
  * rendered entirely by the {@link SetupRoot} Svelte component. The component is mounted when the window first renders
- * and unmounted when it closes.
+ * and unmounted when it closes. The window opens where the user last left it, at the size they left it, as the panels
+ * inside keep their shares (see `SetupRoot`).
  */
 import { mount, unmount } from 'svelte';
 
 import SetupRoot from '../component/SetupRoot.svelte';
+import { readGeometry, writeGeometry } from '../foundry/preferences';
 import { localize } from '../lib/i18n';
 import type { SetupState } from './setup-state.svelte';
 
@@ -17,7 +19,12 @@ export class EmmaSetupApp extends foundry.applications.api.ApplicationV2 {
   static override DEFAULT_OPTIONS = {
     id: APP_ID,
     classes: [APP_ID],
-    window: { title: localize('App.Title'), icon: 'fa-solid fa-cubes', resizable: true },
+    // The version says which EMMA is running, as an alpha changes often.
+    window: {
+      title: `${localize('App.Title')} (${__EMMA_EXTENSION_VERSION__})`,
+      icon: 'fa-solid fa-cubes',
+      resizable: true,
+    },
     position: { width: 820, height: 600 },
   };
 
@@ -31,8 +38,23 @@ export class EmmaSetupApp extends foundry.applications.api.ApplicationV2 {
    * @param setup - What the window shows
    */
   constructor(setup: SetupState) {
-    super();
+    const geometry = readGeometry();
+    super(geometry === null ? {} : { position: geometry });
     this.setup = setup;
+  }
+
+  /**
+   * Keep where the window is, and how big, each time it moves or is resized, but not while it is minimised, when only
+   * its title bar shows.
+   * @param position - Where it is
+   */
+  protected override _onPosition(position: Parameters<foundry.applications.api.ApplicationV2['_onPosition']>[0]): void {
+    super._onPosition(position);
+    if (this.minimized) return;
+    // Foundry gives a width or height of `auto` for a window sized by its content, which is not kept.
+    const { left, top, width, height } = position;
+    if (typeof left === 'number' && typeof top === 'number' && typeof width === 'number' && typeof height === 'number')
+      writeGeometry({ left, top, width, height });
   }
 
   /**

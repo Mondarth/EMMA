@@ -52,6 +52,7 @@ export function explanationMessages(titleOf: (key: PackageKey) => string | undef
     conflictsWith: (release, on) => say('ConflictsWith', { release, on }),
     runsIn: (release, systems) => say('RunsIn', { release, systems }),
     unusable: release => say('Unusable', { release }),
+    missingManifest: release => say('MissingManifest', { release }),
     excluded: (release, reason) => say('Excluded', { release, reason }),
     excludedWith: (release, on, reason) => say('ExcludedWith', { release, on, reason }),
     overridden: (text, reason) => say('Overridden', { text, reason }),

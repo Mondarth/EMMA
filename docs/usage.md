@@ -92,6 +92,16 @@ require each other do not lock one another, so neither is ever stuck.
 
 A module that conflicts with one that is checked is shown in red, with a warning icon whose tooltip reads **Conflict**.
 
+A module judged **incompatible** cannot be checked: one that cannot run with this Foundry version, or misses what it
+needs, such as one needing a newer Foundry version, whose badge is red; or one none of whose declared game systems, at
+the versions it declares, is the one in use, which Foundry badges **Incompatible Systems** though it only warns. Its
+checkbox is dimmed and disabled, and hovering over it says why. Neither can a module that requires one, directly or
+through a chain, as checking it would check the incompatible module too; a module it only recommends is left unchecked
+instead. The judgement is that of the badges shown: EMMA's checks, or Foundry's own if you chose those (see
+[Settings](#settings)). A module that is only unverified with this build or generation of Foundry, or whose
+compatibility is unknown, can still be checked. An incompatible module already active can be unchecked, but not checked
+again. Hypothetical mode does not stop you checking one, as nothing is saved there, so you can see what it would take.
+
 ### Related modules in the split view
 
 The split view follows the same rules, with selecting in place of checking:
@@ -106,8 +116,9 @@ The split view follows the same rules, with selecting in place of checking:
   inactive are grouped under it on the active side, each with a checkbox. Check it to activate that module too;
   uncheck it to change your mind.
 
-A module required by an active module cannot be selected on the active side, and an inactive module that conflicts
-with an active one is shown in red with a warning icon, as in the list view.
+A module required by an active module cannot be selected on the active side, nor an incompatible module, or one
+requiring one, on the inactive side, so it cannot be activated. An inactive module that conflicts with an active one is
+shown in red with a warning icon, as in the list view.
 
 ### Module details
 
@@ -287,6 +298,10 @@ The catalogue also keeps versions an author has published ahead of Foundry's pac
 GitLab not yet on the listing. EMMA offers them marked with a flask, and their tooltip says they are not on Foundry's
 package listing: Foundry's own installer does not offer them, so choose one knowingly.
 
+To install a version, EMMA needs a manifest URL for that version alone: a package's own manifest URL usually gives only
+its newest. A version EMMA found but could not locate such a URL for is listed with a lock, and its tooltip says why: it
+cannot be chosen, and **Update** never recommends it. The versions in use need none.
+
 The catalogue also knows which packages cannot be had: those whose Foundry listing is **archived**, which Foundry's
 Setup screen no longer offers (often because the author removed them), and those the catalogue's maintainers found
 **gone**, their files no longer available. Hypothetical mode never looks such a module up or judges it, and leaves it
@@ -363,6 +378,23 @@ The file is rewritten only when the setup has changed. Closing the browser tab, 
 update it; the next start does. A world backup holds the whole world folder, so it includes the record, and restoring
 the backup restores the record that matches it.
 
+### Changes since the world last ran
+
+When the world starts, its active GM's check compares the record with the installation before writing it again, and
+tells that GM what changed since the world last ran: changes made outside the world, such as on the setup screen. It
+lists, as they apply:
+
+- Foundry VTT's build, before and now;
+- the game system's version, or another game system;
+- each module updated or downgraded, with its versions;
+- each module now active, and each no longer active, or no longer installed.
+
+Nothing is said when nothing changed, when only the EMMA that wrote the record differs, or when there is no record yet.
+How it is told is each GM's own setting, **Changes since the world last ran** (see [Settings](#settings)): a dialog,
+the default, which only informs and changes nothing; a chat card whispered to that GM alone, which stays in the chat
+log; both; or neither. Only the active GM is told, as only that GM checks the record when the world starts: a GM
+joining later finds it written already.
+
 The file holds nothing private, but like everything in a world's folder, anyone who can reach your Foundry server can
 read it. Only a GM or assistant GM allowed to browse and upload files can write it.
 
@@ -393,6 +425,12 @@ Show older versions
   made before updating. Each version shown is judged against every other, so showing many older versions can make
   hypothetical mode noticeably slower. A change applies the next time versions are judged, such as when you next open
   a drop-down or a report. Players are not offered it, as only GMs have hypothetical mode.
+
+Changes since the world last ran
+: A setting for each GM, under **Game Settings**: how EMMA tells them, as the world starts, what changed since it last
+  ran (see [Changes since the world last ran](#changes-since-the-world-last-ran)). **Dialog** (the default) only
+  informs; **Chat card** whispers the changes to them alone; **Dialog and chat card** does both; **Do not tell me**
+  turns it off. Players are not offered it.
 
 Module details
 : A menu every user can open under **Game Settings**, choosing the details their drawers show for themselves. See

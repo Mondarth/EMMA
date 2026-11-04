@@ -4,13 +4,46 @@
  */
 import type { Guard } from '../foundry/guard';
 import { installGuard } from '../foundry/guard';
+import { installEmma } from '../foundry/install-emma';
 import { keepMenuButton } from '../foundry/menu-button';
-import { readGuardOn, writeGuardOn } from '../foundry/preferences';
+import { IN_ALPHA } from '../lib/alpha';
+import {
+  readAlphaAcknowledged,
+  readBestInUseOnly,
+  readCoreLocked,
+  readIgnored,
+  readGuardOn,
+  readPendingPlan,
+  writeAlphaAcknowledged,
+  writeBestInUseOnly,
+  writeCoreLocked,
+  writeIgnored,
+  writeGuardOn,
+  writePendingPlan,
+} from '../foundry/preferences';
 import { readRecords } from '../foundry/records';
+import { runStep } from '../foundry/run-step';
 import type { SetupGame } from '../foundry/setup-game';
-import { readInstallation, setupGame } from '../foundry/setup-game';
+import {
+  checkCoreUpdate,
+  checkSnapshotSpace,
+  listPackages,
+  lockPackage,
+  readCoreUpdate,
+  readIndex,
+  readInstallation,
+  readManifests,
+  setupGame,
+  startCoreUpdate,
+} from '../foundry/setup-game';
+import { KitUnavailable, loadKit, locateKit } from '../foundry/setup-kit';
+import { revealCatalogue } from '@mondarth/emma-core/default-catalogue';
+import { revealProxy } from '@mondarth/emma-core/default-proxy';
+
+import { lookUpReleases } from '../foundry/releases';
 import { localize } from '../lib/i18n';
 import { buildOverview } from '../lib/overview';
+import { findUpdates } from '../lib/updates';
 import { openEmmaSetup } from './emma-setup-app';
 import { SetupState } from './setup-state.svelte';
 
@@ -57,8 +90,65 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
   const placed: { guard?: Guard } = {};
   const setup = new SetupState({
     load: async () => {
-      const installation = readInstallation(game);
+      const installation = {
+        ...readInstallation(game),
+        ...(readCoreLocked() && { coreLocked: true as const }),
+        ignored: readIgnored(),
+      };
       return buildOverview(installation, await readRecords(installation.worlds.map(({ id }) => id)));
+    },
+    lockCore: writeCoreLocked,
+    ignore: writeIgnored,
+    bestInUseOnly: readBestInUseOnly(),
+    onBestInUseOnlyChange: writeBestInUseOnly,
+    findUpdates: async overview => {
+      const installed = readManifests(game);
+      // The resolver comes from the installed EMMA module's setup kit, if it fits.
+      const found = locateKit(installed, path => foundry.utils.getRoute(path));
+      if (!found.ok) throw new KitUnavailable(found.problem);
+      const kit = await loadKit(found);
+      const { universe, load, lookUp, readManifest } = await lookUpReleases(installed, {
+        kit,
+        catalogue: revealCatalogue(__EMMA_DEFAULT_CATALOGUE__),
+        proxy: revealProxy(__EMMA_DEFAULT_PROXY__),
+        clientVersion: __EMMA_EXTENSION_VERSION__,
+        index: () => readIndex(game),
+      });
+      return findUpdates({
+        resolver: kit.resolver,
+        badges: kit.badges,
+        overview,
+        universe,
+        load,
+        lookUp,
+        readManifest,
+      });
+    },
+    installModule: async () => {
+      if (placed.guard !== undefined) await installEmma(game, placed.guard);
+    },
+    snapshotSpace: () => checkSnapshotSpace(game),
+    core: {
+      state: () => readCoreUpdate(game),
+      check: () => checkCoreUpdate(game, readCoreUpdate(game).channel),
+      update: () => startCoreUpdate(game, readCoreUpdate(game).channel),
+    },
+    listPackages: type => listPackages(game, type),
+    ...(IN_ALPHA && {
+      alpha: {
+        acknowledged: readAlphaAcknowledged(__EMMA_EXTENSION_VERSION__),
+        acknowledge: () => {
+          writeAlphaAcknowledged(__EMMA_EXTENSION_VERSION__);
+        },
+      },
+    }),
+    lockPackage: async (type, id, lock) => {
+      if (placed.guard !== undefined) await placed.guard.allowing(() => lockPackage(game, type, id, lock));
+    },
+    keepPendingPlan: writePendingPlan,
+    pendingPlan: readPendingPlan,
+    runStep: async step => {
+      if (placed.guard !== undefined) await runStep(game, placed.guard, step);
     },
     guardOn: readGuardOn(),
     onGuardChange: on => {

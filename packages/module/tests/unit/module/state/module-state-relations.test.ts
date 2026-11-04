@@ -494,3 +494,83 @@ describe('setAllActive', () => {
     expect(state.noneActive).toBe(true);
   });
 });
+
+describe('a module judged incompatible', () => {
+  /**
+   * A state over {@link ENTRIES} where some modules are judged incompatible.
+   * @param incompatible - Their IDs
+   * @param saved - The saved activation
+   * @param options - The state's other options
+   * @returns The state
+   */
+  const judged = (incompatible: string[], saved: ActivationMap = {}, options: ModuleStateOptions = {}) =>
+    createState(saved, { ...options, incompatible: id => incompatible.includes(id) });
+
+  test('cannot be activated, from its checkbox, the other side, or with every module', () => {
+    const state = judged(['rival']);
+
+    expect(state.blockedBy('rival').map(({ id }) => id)).toEqual(['rival']);
+    expect(state.isLocked('rival')).toBe(true);
+    state.setActive('rival', true);
+    expect(state.isActive('rival')).toBe(false);
+
+    state.select('inactive', 'rival');
+    expect(state.selected('inactive').has('rival')).toBe(false);
+    state.selectAll('inactive');
+    expect(state.selected('inactive').has('rival')).toBe(false);
+
+    state.setAllActive(true);
+    expect(activeIds(state)).toEqual(['app', 'core', 'extra', 'lib', 'tool']);
+    // Every module that can be is active, so the select-all checkbox is checked, and can deactivate them all.
+    expect(state.allActive).toBe(true);
+    state.setAllActive(false);
+    expect(state.noneActive).toBe(true);
+    expect(state.allActive).toBe(false);
+  });
+
+  test('keeps a module requiring it, directly or through a chain, from being activated too', () => {
+    const state = judged(['core']);
+
+    expect(state.blockedBy('app').map(({ id }) => id)).toEqual(['core']);
+    expect(state.blockedBy('lib').map(({ id }) => id)).toEqual(['core']);
+    state.setActive('app', true);
+    expect(activeIds(state)).toEqual([]);
+    // One it would only recommend is left out instead.
+    expect(judged(['extra'], {}, { autoRecommended: () => true }).blockedBy('app')).toEqual([]);
+  });
+
+  test('is left out of what a module recommends, which is activated without it', () => {
+    const state = judged(['extra'], {}, { autoRecommended: () => true });
+
+    state.setActive('app', true);
+
+    expect(activeIds(state)).toEqual(['app', 'core', 'lib']);
+  });
+
+  test('stays as it is when it is active already, and may be deactivated', () => {
+    const state = judged(['rival'], { rival: true });
+
+    expect(state.blockedBy('rival')).toEqual([]);
+    state.setActive('rival', false);
+    expect(state.isActive('rival')).toBe(false);
+    // Once inactive, it cannot come back.
+    state.setActive('rival', true);
+    expect(state.isActive('rival')).toBe(false);
+  });
+
+  test('can be tried in hypothetical mode, where nothing is saved', () => {
+    const state = judged(['rival']);
+    state.enterHypothetical();
+
+    expect(state.blockedBy('rival')).toEqual([]);
+    state.setActive('rival', true);
+    expect(state.isActive('rival')).toBe(true);
+
+    state.leaveHypothetical();
+    expect(state.isActive('rival')).toBe(false);
+  });
+
+  test('is known only of modules that are installed', () => {
+    expect(judged(['rival']).blockedBy('gone')).toEqual([]);
+  });
+});

@@ -3,16 +3,30 @@
   EMMA guards Foundry's own package buttons.
 -->
 <script lang="ts">
+  import type { ExplainedVersion } from '../app/update-state.svelte';
   import { format, localize } from '../lib/i18n';
   import type { Overview, WorldStatus } from '../lib/overview';
+  import type { BlockedUpdate as Blocked } from '../lib/updates';
+
+  import type { TreeSelection } from '../lib/tree';
+
+  import BlockedUpdate from './BlockedUpdate.svelte';
+  import TreeLink from './TreeLink.svelte';
+  import VersionExplanation from './VersionExplanation.svelte';
 
   interface Props {
     overview: Overview;
     guardOn: boolean;
     onGuardChange: (on: boolean) => void;
+    /** A newer Foundry build EMMA cannot offer, if there is one. */
+    blocked?: Blocked | undefined;
+    /** The build looked at in its list, or chosen, to explain, if any. */
+    explained?: ExplainedVersion | undefined;
+    /** Open the tree to a row a name links to, and select it; without it, names do not link. */
+    onOpen?: ((link: TreeSelection) => void) | undefined;
   }
 
-  let { overview, guardOn, onGuardChange }: Props = $props();
+  let { overview, guardOn, onGuardChange, blocked, explained, onOpen }: Props = $props();
 
   const STATUSES: readonly WorldStatus[] = ['matches', 'differs', 'unrecorded', 'unreadable'];
   const worlds = $derived(overview.summary.worlds);
@@ -20,6 +34,14 @@
 </script>
 
 <h2>{format('Root.Heading', { version: overview.core })}</h2>
+
+{#if explained !== undefined}
+  <VersionExplanation {explained} />
+{/if}
+
+{#if blocked !== undefined}
+  <BlockedUpdate {blocked} />
+{/if}
 
 <section aria-labelledby="emma-setup-worlds">
   <h3 id="emma-setup-worlds">{localize('Root.Worlds')}</h3>
@@ -37,7 +59,10 @@
     <h4>{localize('Root.Systems')}</h4>
     <ul>
       {#each worlds.systems as system (system.id)}
-        <li>{format('Root.SystemCount', { title: system.title, count: system.count })}</li>
+        <li>
+          <TreeLink title={system.title} link={{ kind: 'system', system: system.id }} {onOpen} />:
+          {system.count}
+        </li>
       {/each}
     </ul>
   {/if}
@@ -56,6 +81,9 @@
     <dt>{localize('Root.Unused')}</dt>
     <dd>{modules.unused}</dd>
   </dl>
+  {#if modules.pending > 0}
+    <p class="emma-note">{format('Root.PendingNote', { count: modules.pending })}</p>
+  {/if}
   {#if worlds.byStatus.unrecorded > 0}
     <p class="emma-note">{localize('Root.UnusedNote')}</p>
   {/if}

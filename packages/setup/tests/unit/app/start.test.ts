@@ -1,12 +1,31 @@
 import { screen } from '@testing-library/svelte';
+import { EMMA_VERSION } from '../../../src/lib/alpha';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
-import { closeEmmaSetup } from '../../../src/app/emma-setup-app';
+import type * as EmmaSetupApp from '../../../src/app/emma-setup-app';
+import { closeEmmaSetup, openEmmaSetup } from '../../../src/app/emma-setup-app';
+import type { SetupState } from '../../../src/app/setup-state.svelte';
 import { startEmmaSetup, waitForSetup } from '../../../src/app/start';
 import { GUARDED_CLASS } from '../../../src/foundry/guard';
 import { GUARD_KEY } from '../../../src/foundry/preferences';
+import { SETUP_KIT_API } from '@mondarth/emma-core/setup-kit';
+
+import type * as SetupKitModule from '../../../src/foundry/setup-kit';
 import { installSetupMocks } from '../../mocks/foundry';
+import { KIT } from '../../mocks/kit';
+
+// The browser imports the kit from the server, which the tests have none of.
+vi.mock('../../../src/foundry/setup-kit', async importOriginal => ({
+  ...(await importOriginal<typeof SetupKitModule>()),
+  loadKit: vi.fn(() => Promise.resolve(KIT)),
+}));
+
+// The window opens as ever; the tests may read the state it shows.
+vi.mock('../../../src/app/emma-setup-app', async importOriginal => {
+  const actual = await importOriginal<typeof EmmaSetupApp>();
+  return { ...actual, openEmmaSetup: vi.fn(actual.openEmmaSetup) };
+});
 
 const STARTED = Symbol.for('mondarth-emma.setup');
 
@@ -69,7 +88,7 @@ describe('startEmmaSetup', () => {
     menu.querySelector('button')?.click();
 
     const box = await screen.findByRole('checkbox', { name: 'Let Foundry install and update packages here' });
-    expect(screen.getByRole('treeitem', { name: /World/ })).toBeInTheDocument();
+    expect(screen.getByRole('treeitem', { name: /Game systems/ })).toBeInTheDocument();
     await userEvent.click(box);
 
     expect(document.body).not.toHaveClass(GUARDED_CLASS);
@@ -100,5 +119,149 @@ describe('startEmmaSetup', () => {
 
     installSetupMocks();
     await expect(startEmmaSetup()).resolves.toBe(true);
+  });
+
+  test('finds updates with the kit of the installed EMMA module', async () => {
+    installSetupMocks({
+      modules: [{ id: 'mondarth-emma', flags: { setupKit: { api: SETUP_KIT_API, path: 'dist/emma-setup-kit.js' } } }],
+    });
+    const menu = showMenu();
+    await startEmmaSetup();
+
+    menu.querySelector('button')?.click();
+
+    expect(await screen.findByText('No updates found')).toBeInTheDocument();
+  });
+
+  test("reads Foundry's listing of what may be installed, as its Install dialog does", async () => {
+    const { game } = installSetupMocks();
+    const getPackages = vi.fn(() =>
+      Promise.resolve(new Map([['dice', { id: 'dice', title: 'Dice', version: '1.0.0' }]])),
+    );
+    Object.assign(game, { getPackages });
+    const menu = showMenu();
+    await startEmmaSetup();
+    menu.querySelector('button')?.click();
+    const setup = vi.mocked(openEmmaSetup).mock.lastCall?.[0] as SetupState;
+
+    await setup.loadListing('module');
+
+    expect(setup.listings.module).toEqual([expect.objectContaining({ id: 'dice' })]);
+    expect(setup.canInstall).toBe(true);
+  });
+
+  test("asks the server for the space a snapshot needs, as Foundry's own dialog does", async () => {
+    const { post } = installSetupMocks();
+    post.mockResolvedValue({ required: 10, available: 20 });
+    const menu = showMenu();
+    await startEmmaSetup();
+    menu.querySelector('button')?.click();
+    const setup = vi.mocked(openEmmaSetup).mock.lastCall?.[0] as SetupState;
+
+    await setup.checkSnapshotSpace();
+
+    expect(setup.snapshotSpace).toEqual({ required: 10, available: 20 });
+    expect(post).toHaveBeenCalledWith({ action: 'checkCreateSnapshotDiskSpace' }, { timeoutMs: null });
+  });
+
+  test("runs the plan's steps with Foundry's own install, through the guard", async () => {
+    const { game, post, ui } = installSetupMocks();
+    const installPackage = vi.fn(() => game.post({ action: 'installPackage', id: 'app' }));
+    Object.assign(game, { installPackage });
+    const menu = showMenu();
+    await startEmmaSetup();
+    menu.querySelector('button')?.click();
+    const setup = vi.mocked(openEmmaSetup).mock.lastCall?.[0] as SetupState;
+    await vi.waitFor(() => {
+      expect(setup.updates.status).not.toBe('searching');
+    });
+    setup.updates.plan = [
+      {
+        key: 'module:app',
+        installed: '1.0.0',
+        version: '2.0.0',
+        manifest: 'https://example.org/app/2.0.0/module.json',
+      },
+    ];
+
+    // Not until the user acknowledges this version is an alpha, which is kept for it.
+    expect(setup.isAlpha).toBe(true);
+    expect(setup.alphaAcknowledged).toBe(false);
+    await setup.runPlan();
+    expect(setup.run).toBeNull();
+    setup.acknowledgeAlpha();
+    expect(localStorage.getItem('mondarth-emma.setup.alpha-acknowledged')).toBe(EMMA_VERSION);
+
+    await setup.runPlan();
+
+    expect(setup.run).toMatchObject({ over: true, states: { 'module:app': 'done' } });
+    expect(installPackage).toHaveBeenCalledWith(expect.objectContaining({ id: 'app', dependencies: false }));
+    // The guard let the install through, and said nothing.
+    expect(post).toHaveBeenCalledWith({ action: 'installPackage', id: 'app' }, undefined);
+    expect(ui.notifications.info).not.toHaveBeenCalled();
+  });
+
+  test("drives Foundry's own updater, as its Update Software form does, keeping the rest of the plan", async () => {
+    const { game, post } = installSetupMocks();
+    Object.assign(game, { data: { coreUpdate: { canUpdate: true }, options: { updateChannel: 'stable' } } });
+    post.mockImplementation((request: object) =>
+      Promise.resolve('action' in request && request.action === 'updateCheck' ? { generation: 14, build: 369 } : {}),
+    );
+    const menu = showMenu();
+    await startEmmaSetup();
+    menu.querySelector('button')?.click();
+    const setup = vi.mocked(openEmmaSetup).mock.lastCall?.[0] as SetupState;
+    expect(setup.coreUpdate).toEqual({ canUpdate: true, channel: 'stable' });
+
+    setup.run = { steps: [], states: {}, over: true, beforeCore: '14.369' };
+    await setup.checkCoreTarget();
+    await setup.updateCoreInPlace();
+
+    expect(post).toHaveBeenCalledWith(
+      { action: 'updateCheck', updateChannel: 'stable', forceUpdate: false },
+      { notify: false },
+    );
+    expect(post).toHaveBeenCalledWith(
+      { action: 'updateDownload', updateChannel: 'stable', forceUpdate: false },
+      { notify: false },
+    );
+    expect(setup.coreUpdating).toEqual({ kind: 'begun', version: '14.369', kept: true });
+    expect(JSON.parse(localStorage.getItem('mondarth-emma.setup.pending-plan') ?? 'null')).toEqual({
+      core: '14.369',
+      picks: [],
+    });
+  });
+
+  test("locks a package as Foundry's package menu does, through the guard", async () => {
+    const { game, post } = installSetupMocks({ modules: [{ id: 'midi-qol', title: 'Midi', version: '14.0.15' }] });
+    const menu = showMenu();
+    await startEmmaSetup();
+    menu.querySelector('button')?.click();
+    const setup = vi.mocked(openEmmaSetup).mock.lastCall?.[0] as SetupState;
+
+    await expect(setup.setLocked('module:midi-qol', true)).resolves.toBe(true);
+
+    expect(post).toHaveBeenCalledWith(
+      { action: 'lockPackage', type: 'module', id: 'midi-qol', shouldLock: true },
+      { notify: false },
+    );
+    expect([...game.modules].find(pkg => (pkg as { id: string }).id === 'midi-qol')).toMatchObject({ locked: true });
+  });
+
+  test('installs the EMMA module from its prompt, through the guard', async () => {
+    const { game, post, ui } = installSetupMocks();
+    const installPackage = vi.fn(() => game.post({ action: 'installPackage', id: 'mondarth-emma' }));
+    Object.assign(game, { installPackage });
+    const menu = showMenu();
+    await startEmmaSetup();
+    menu.querySelector('button')?.click();
+
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Install the EMMA module' }));
+
+    await vi.waitFor(() => {
+      expect(installPackage).toHaveBeenCalledOnce();
+    });
+    expect(post).toHaveBeenCalledOnce();
+    expect(ui.notifications.info).not.toHaveBeenCalled();
   });
 });

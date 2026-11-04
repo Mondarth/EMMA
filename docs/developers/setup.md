@@ -15,7 +15,9 @@ reach a release, and `CONTRIBUTING.md` the checks and commit message rules.
 ## Running a development Foundry VTT
 
 The compose file in `.foundryvtt/` runs the pinned Foundry VTT release (`VERSION` in `.foundryvtt/.env`) with
-`packages/module` mounted as the `mondarth-emma` module.
+`packages/module/module.json` and `packages/module/dist` mounted, read-only, as the `mondarth-emma` module: only what
+Foundry VTT loads, as the release package lays it out. Mounting the whole of `packages/module` would bring in its
+`node_modules` too, whose links point outside it, so that Foundry VTT's **Create a Snapshot** fails on them.
 
 1. Copy `.foundryvtt/secrets.example.json` to `.foundryvtt/secrets.json` and fill in your foundryvtt.com credentials,
    your licence key and an admin password for the server. The file is ignored by {program}`git`.
@@ -32,10 +34,14 @@ The compose file in `.foundryvtt/` runs the pinned Foundry VTT release (`VERSION
    ```
 
    The server keeps its data in `.foundryvtt/data`, which is ignored by {program}`git`. The script creates the
-   directory if it is missing, down to where this project is mounted inside it, so that it belongs to you: left to
-   Docker, it would be created as root. It then runs Foundry VTT as you rather than as the image's own user (uid
+   directory if it is missing, down to the places this project is mounted inside it, so that they belong to you: left
+   to Docker, they would be created as root. It then runs Foundry VTT as you rather than as the image's own user (uid
    1000), so that Foundry VTT can write there; otherwise it hangs. For the same reason, do not start the server with
    `docker compose up` directly.
+
+   The `dist` folder must exist when the server starts, so build first. `pnpm build` writes into it without removing
+   it, so the server sees each build. Anything that removes `dist` and makes it again, such as packaging a release,
+   leaves the server with the old, removed folder: restart it with `docker compose restart` in `.foundryvtt/`.
 
    If this is the first time the VTT server has been run then it will take a few seconds to become available (the Foundry VTT xip is downloaded and installed). You will also need to complete the initial setup of Foundry (accepting the license etc.).
 
@@ -59,6 +65,42 @@ The compose file in `.foundryvtt/` runs the pinned Foundry VTT release (`VERSION
 
    Set the `PDT_MOUNT_CONFIG` environment variable to read the settings from a different file; a relative path is
    resolved from the root of the repository.
+
+## Working on the EMMA extension
+
+The **EMMA extension** is EMMA on Foundry VTT's setup screen, as the browser extension brings it in
+(`packages/setup`); "the browser extension" is the extension itself (`packages/extension`). The EMMA extension can be
+worked on without the browser extension: its own development server passes a local Foundry VTT through, and adds the
+EMMA extension's source to the setup page.
+
+1. Start Foundry VTT, as above, and return it to the setup screen if a world is running.
+2. Start the EMMA extension's development server:
+
+   ```sh
+   pnpm dev:setup
+   ```
+
+3. Open <http://localhost:31003/setup> rather than port 30000, and the EMMA button in the setup screen's menu. Each
+   change to `packages/setup/src/` reloads the page.
+
+The server reads `hostname` and `ports.base` from `.pdt/mount.json`, as the module's does, and its own port from
+`ports.setup`:
+
+```json
+{ "hostname": "my-dev-box", "ports": { "base": 30000, "dev": 31002, "setup": 31003 } }
+```
+
+Finding updates needs the EMMA module installed in that Foundry, with its setup kit built: `pnpm build` in
+`packages/module` builds both into `dist/`, which the development Foundry loads (see {doc}`architecture`). Rebuild it
+after changing `src/setup-kit.ts` and read the installation again.
+
+A development build has no package catalogue or version lookup proxy, so it finds fewer updates (see
+{doc}`default-proxy`). To try the EMMA extension with them, start the server with `EMMA_DEFAULT_CATALOGUE_URL` and
+`EMMA_DEFAULT_CATALOGUE_KEY` set to a catalogue of your own, and `EMMA_DEFAULT_PROXY_URL` and `EMMA_DEFAULT_PROXY_KEY`
+to a proxy of your own; never commit them.
+
+Do not have the browser extension active for the development server's address as well: the EMMA extension starts once
+on a page, so the one that starts first would win.
 
 ## The module manifest
 

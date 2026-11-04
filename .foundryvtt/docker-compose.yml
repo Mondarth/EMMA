@@ -13,9 +13,16 @@ services:
       - type: bind
         source: ./data
         target: /data
+      # Only what Foundry VTT loads, as the release package lays it out. The whole of packages/module would bring in its
+      # node_modules too, whose links point outside it and so break Foundry's snapshots, and its sources and coverage.
       - type: bind
-        source: ../packages/module
-        target: /data/Data/modules/mondarth-emma
+        source: ../packages/module/module.json
+        target: /data/Data/modules/mondarth-emma/module.json
+        read_only: true
+      - type: bind
+        source: ../packages/module/dist
+        target: /data/Data/modules/mondarth-emma/dist
+        read_only: true
     environment:
       - CONTAINER_PRESERVE_CONFIG=true
       - FOUNDRY_HOT_RELOAD=true

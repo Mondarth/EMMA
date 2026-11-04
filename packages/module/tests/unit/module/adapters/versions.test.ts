@@ -4,7 +4,7 @@ import { describe, expect, test, vi } from 'vitest';
 
 import type { SetupSolve } from '@module/adapters/report';
 import { AVAILABILITY } from '@mondarth/fvtt-resolver';
-import { createInstalledJudge, createVersionJudge } from '@module/adapters/versions';
+import { createInstalledJudge, createVersionJudge, incompatibleModules } from '@module/adapters/versions';
 import type { FoundryMockOptions, ModuleMockData } from '../../mocks/foundry';
 import { installFoundryMocks } from '../../mocks/foundry';
 
@@ -565,9 +565,16 @@ describe('the core and the system', () => {
       ['5.2.0', 'warning'],
       ['5.1.0', 'success'],
     ]);
-    expect(systems[0]?.badge?.text).toBe('MONDARTH-EMMA.Versions.Fit.Unverified {"packages":"Dice & Co"}');
+    // 5.2.0 is known only from the system's manifest URL, which gives the newest, so it has no manifest of its own.
+    expect(systems[0]?.missingManifest).toBe(true);
+    expect(systems[1]?.missingManifest).toBeUndefined();
+    expect(systems[0]?.badge?.text).toBe(
+      'MONDARTH-EMMA.Versions.Fit.Unverified {"packages":"Dice & Co"} MONDARTH-EMMA.Versions.NoManifest',
+    );
     // The tooltip is HTML, so the titles in it are escaped.
-    expect(systems[0]?.badge?.tooltip).toBe('MONDARTH-EMMA.Versions.Fit.Unverified {"packages":"Dice &amp; Co"}');
+    expect(systems[0]?.badge?.tooltip).toBe(
+      'MONDARTH-EMMA.Versions.Fit.Unverified {"packages":"Dice &amp; Co"}<br>MONDARTH-EMMA.Versions.NoManifest',
+    );
     expect(systems[0]?.badge?.icon).toBe('fa-solid icon-3');
     expect(systems[1]?.badge).toEqual({
       type: 'success',
@@ -751,6 +758,7 @@ describe('createVersionJudge with EMMA’s catalogue', () => {
       relationships: { requires: [], systems: [], conflicts: [], recommends: [] },
       protected: false,
       origin: `https://files.test/${id}/${version}/module.json`,
+      versionManifest: `https://files.test/${id}/${version}/module.json`,
       detail: 'loaded',
     };
   }
@@ -1232,6 +1240,32 @@ describe('createVersionJudge with EMMA’s catalogue', () => {
     });
   });
 
+  test('never recommends or offers a version with no manifest of its own, except the one installed', async () => {
+    // Known only from a manifest URL that gives the newest.
+    const bare = (version: string) => {
+      const { versionManifest, ...rest } = held('dice', version);
+      return { ...rest, manifest: versionManifest.replace(`/${version}/`, '/latest/') };
+    };
+    const { judge } = await lookUpWithCatalogue({ modules: { dice: onGithub('owner/dice', { version: '1.0.0' }) } }, [
+      universe([bare('1.0.0'), held('dice', '1.1.0'), bare('2.0.0')]),
+    ]);
+
+    const solved = await judge.reportSolve(['dice'], { modules: new Map() });
+    const listed = judge.judgeVersions(['dice'], { modules: new Map() }, 'dice');
+
+    expect(solved.solution).toEqual({
+      kind: 'found',
+      changes: [
+        { package: { type: 'module', id: 'dice' }, title: expect.any(String) as string, from: '1.0.0', to: '1.1.0' },
+      ],
+    });
+    expect(listed.map(({ version, missingManifest }) => [version, missingManifest])).toEqual([
+      ['2.0.0', true],
+      ['1.1.0', undefined],
+      ['1.0.0', undefined],
+    ]);
+  });
+
   // Regression: a module looked up before it was ignored kept its own releases in the reports' universe, which the
   // check found before the release standing for it: the check called the setup unusable, and the update changed it.
   test('reports a module ignored after it was looked up as left out, judging none of its own releases', async () => {
@@ -1319,5 +1353,28 @@ describe('createInstalledJudge', () => {
     installFoundryMocks({ modules: { 'bad id': { ...verified, active: true } } });
 
     expect(createInstalledJudge()(['bad id']).has('bad id')).toBe(false);
+  });
+});
+
+describe('incompatibleModules', () => {
+  const verified = { compatibility: { minimum: '14', verified: '14' } };
+
+  test('finds the modules that cannot run with the Foundry version or game system in use, whatever is active', () => {
+    installFoundryMocks({
+      modules: {
+        dice: { ...verified, requires: ['lib'], conflicts: ['tool'] },
+        future: { compatibility: { minimum: '15' } },
+        past: { compatibility: { minimum: '12', maximum: '13' } },
+        other: { ...verified, systems: ['pf2e'] },
+        // As Covin 0.1.3: for D&D 5e, but not the version in use, the mocks' 5.1.0.
+        covin: { ...verified, systems: [{ id: 'dnd5e', compatibility: { minimum: '6.0.0' } }] },
+        unknown: {},
+        tool: verified,
+      },
+    });
+
+    // One whose declared systems leave out the one in use is too, which Foundry badges "Incompatible Systems"; one
+    // whose compatibility is unknown is only unverified.
+    expect([...incompatibleModules()].sort()).toEqual(['covin', 'future', 'other', 'past']);
   });
 });

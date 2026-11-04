@@ -2,7 +2,8 @@
 
 /**
  * Prepare a release of the browser extension: stamp the version into its `package.json`, which its manifests take it
- * from, build it for each browser, check the Firefox build, and package both builds into `releases/`:
+ * from, build it for each browser with EMMA's catalogue and proxy, which it refuses to release without, check the
+ * Firefox build and that their keys are not in either build in plain text, and package both builds into `releases/`:
  *
  * - the Chromium build, zipped, for loading unpacked;
  * - the Firefox build, signed by Mozilla as an unlisted add-on when `AMO_JWT_ISSUER` and `AMO_JWT_SECRET` hold an API
@@ -14,6 +15,9 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+
+import { filesHolding } from '@mondarth/emma-core/files-holding';
+import { requireReleaseDefaults } from '@mondarth/emma-core/release-defaults';
 
 /** The extension's package, `packages/extension`. */
 const ROOT = path.resolve(import.meta.dirname, '../..');
@@ -33,12 +37,25 @@ function stampVersion(version: string): void {
   execFileSync('pnpm', ['exec', 'prettier', '--write', PACKAGE_JSON], { cwd: ROOT, stdio: 'inherit' });
 }
 
-/** Build the extension, and the setup screen's script it takes in, from a clean `dist/`, and lint the Firefox build. */
+/**
+ * Build the extension, and the setup screen's script it takes in, from a clean `dist/`, and lint the Firefox build.
+ * Refuse a build that holds EMMA's catalogue or proxy key in plain text: they are only ever to be built in obscured.
+ */
 function build(): void {
   fs.rmSync(DIST, { recursive: true, force: true });
   // `<package>...` builds the package after the workspace packages it depends on.
   execFileSync('pnpm', ['--filter', '@mondarth/emma-extension...', 'run', 'build'], { cwd: ROOT, stdio: 'inherit' });
   execFileSync('pnpm', ['run', 'lint:firefox'], { cwd: ROOT, stdio: 'inherit' });
+  for (const [name, variable] of [
+    ["The default catalogue's key", 'EMMA_DEFAULT_CATALOGUE_KEY'],
+    ["The default proxy's key", 'EMMA_DEFAULT_PROXY_KEY'],
+  ] as const) {
+    const key = process.env[variable];
+    const leaks = key ? filesHolding(DIST, key) : [];
+    if (leaks.length > 0) {
+      throw new Error(`${name} is in plain text in: ${leaks.map(file => path.relative(ROOT, file)).join(', ')}`);
+    }
+  }
 }
 
 /**
@@ -104,6 +121,8 @@ if (!releaseVersion || !/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(releaseVersion)
   process.exit(1);
 }
 
+// Before anything changes: a build without them succeeds, and the release would have no catalogue or proxy.
+requireReleaseDefaults(process.env);
 stampVersion(releaseVersion);
 build();
 for (const created of createPackages(releaseVersion)) console.log(`Created ${path.relative(ROOT, created)}`);

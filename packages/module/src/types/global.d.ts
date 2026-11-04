@@ -5,7 +5,8 @@
  * `fvtt-types/configuration` (`SettingConfig`, `FlagConfig`, `ModuleConfig`, `Hooks.HookConfig`).
  * @see https://github.com/League-of-Foundry-Developers/foundry-vtt-types
  */
-import type { Obscured } from '@module/lib/obscure';
+import type { BuiltCatalogue } from '@mondarth/emma-core/default-catalogue';
+import type { BuiltProxy } from '@mondarth/emma-core/default-proxy';
 
 declare module 'fvtt-types/configuration' {
   /** Everything EMMA runs is started from the `init` hook, so the parts of `game` set up by then can be assumed. */
@@ -25,20 +26,21 @@ declare module 'fvtt-types/configuration' {
     'mondarth-emma.versionProxyKey': string;
     'mondarth-emma.versionProxyMode': string;
     'mondarth-emma.hypotheticalIgnored': string[];
+    'mondarth-emma.startupChanges': 'none' | 'dialog' | 'chat' | 'both';
   }
 }
 
 declare global {
   /**
    * The default version lookup proxy a release is built with, obscured, or `null` for a build without one. Set by
-   * Vite's `define` from `scripts/build/default-proxy.ts`; read only through `defaultProxy()`.
+   * Vite's `define` from `@mondarth/emma-core/default-proxy-define`; read only through `defaultProxy()`.
    */
-  const __EMMA_DEFAULT_PROXY__: { readonly url: Obscured; readonly key: Obscured } | null;
+  const __EMMA_DEFAULT_PROXY__: BuiltProxy;
   /**
    * The default package catalogue a release is built with, obscured, or `null` for a build without one. Set by Vite's
-   * `define` from `scripts/build/default-catalogue.ts`; read only through `defaultCatalogue()`.
+   * `define` from `@mondarth/emma-core/default-catalogue-define`; read only through `defaultCatalogue()`.
    */
-  const __EMMA_DEFAULT_CATALOGUE__: { readonly url: Obscured; readonly key: Obscured } | null;
+  const __EMMA_DEFAULT_CATALOGUE__: BuiltCatalogue;
 }
 
 export {};

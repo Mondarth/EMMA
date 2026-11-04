@@ -2,7 +2,7 @@
   import type { Snippet } from 'svelte';
 
   import type { VersionOption } from '@module/adapters/versions';
-  import { format } from '@module/lib/i18n';
+  import { format, localize } from '@module/lib/i18n';
 
   import VersionBadge from './VersionBadge.svelte';
 
@@ -78,6 +78,8 @@
    */
   function choose(index: number): void {
     const option = options[index];
+    // A version with no manifest of its own stays in the list, its badge's tooltip saying why it cannot be chosen.
+    if (option?.missingManifest === true) return;
     hide(true);
     if (option !== undefined) onChoose(option.version);
   }
@@ -161,7 +163,8 @@
         id={optionId(index)}
         role="option"
         aria-selected={index === active}
-        class={{ active: index === active }}
+        aria-disabled={option.missingManifest === true}
+        class={{ active: index === active, locked: option.missingManifest === true }}
         onclick={() => {
           choose(index);
         }}
@@ -170,6 +173,12 @@
           active = index;
         }}>
         <VersionBadge version={option.version} badge={option.badge} unlisted={option.unlisted === true} />
+        {#if option.missingManifest === true}
+          <i
+            class="fa-solid fa-lock emma-version-lock"
+            data-tooltip={localize('MONDARTH-EMMA.Versions.NoManifest')}
+            aria-label={localize('MONDARTH-EMMA.Versions.NoManifest')}></i>
+        {/if}
       </li>
     {/each}
   </ul>
@@ -232,5 +241,15 @@
 
   .emma-version-popup li.active {
     background: var(--color-hover-bg, rgb(255 255 255 / 10%));
+  }
+
+  .emma-version-popup li.locked {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  .emma-version-lock {
+    align-self: center;
+    margin-left: 0.25rem;
   }
 </style>

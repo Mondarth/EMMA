@@ -3,7 +3,10 @@
  * which Foundry's types do not describe. Everything else works on the plain values returned here.
  *
  * Checked on Foundry 14.368: the setup screen's `game.view` is `"setup"`, and `game.worlds`, `game.modules` and
- * `game.systems` are collections of the installed packages.
+ * `game.systems` are collections of the installed packages, as `foundry.packages` instances. A module's
+ * `relationships.systems` and `relationships.requires` are sets of the packages it relates to, each with its `id`.
+ * Each package's `toObject()` gives its manifest as Foundry read it, and `manifest` the URL it declares; `game.release`
+ * gives the Foundry build's `generation` and `channel`.
  */
 
 /** An installed package, as EMMA shows it. */
@@ -11,6 +14,18 @@ export interface InstalledPackage {
   readonly id: string;
   readonly title: string;
   readonly version: string;
+  /** Whether it is locked in Foundry, which then refuses to update or uninstall it. */
+  readonly locked?: true;
+}
+
+/** An installed module, with what its manifest says it needs. */
+export interface InstalledModule extends InstalledPackage {
+  /** The IDs of the game systems it is for; empty if it is for any system. */
+  readonly systems: readonly string[];
+  /** The IDs of the modules it requires. */
+  readonly requires: readonly string[];
+  /** The IDs of the modules it recommends, if any: they work with it, but it runs without them. */
+  readonly recommends?: readonly string[];
 }
 
 /** An installed world. Unlike a module or a system, a world need not have a version. */
@@ -25,9 +40,45 @@ export interface InstalledWorld {
 export interface Installation {
   /** The Foundry version, such as `14.368`. */
   readonly core: string;
+  /** Whether EMMA keeps Foundry VTT at that version, as the user locked it in EMMA: Foundry has no lock for itself. */
+  readonly coreLocked?: true;
+  /**
+   * What the user has EMMA ignore, by key, such as `world:alpha`, `system:dnd5e` or `module:dice`: kept by EMMA alone,
+   * as Foundry has no such setting.
+   */
+  readonly ignored?: readonly string[];
   readonly worlds: readonly InstalledWorld[];
-  readonly modules: readonly InstalledPackage[];
+  readonly modules: readonly InstalledModule[];
   readonly systems: readonly InstalledPackage[];
+}
+
+/** The Foundry build the server runs. */
+export interface CoreBuild {
+  /** Such as `14.368`. */
+  readonly version: string;
+  readonly generation: number;
+  /** Such as `stable`, as Foundry names it. */
+  readonly channel: string;
+}
+
+/** An installed package's manifest, as Foundry read it. */
+export interface PackageManifest {
+  readonly type: 'module' | 'system';
+  readonly id: string;
+  readonly version: string;
+  /** The manifest, as plain data. */
+  readonly json: unknown;
+  /** Where Foundry read it from, such as `modules/<id>/module.json`. */
+  readonly origin: string;
+  /** The manifest URL it declares, if any: where newer versions are found. */
+  readonly manifest?: string;
+}
+
+/** What the installed packages' manifests say, to look up their releases with. */
+export interface InstalledManifests {
+  readonly core: CoreBuild;
+  /** The installed systems' and modules' manifests; those Foundry could not give are left out. */
+  readonly manifests: readonly PackageManifest[];
 }
 
 /** A request the setup screen sends its server, such as `{ action: "installPackage", … }`. */
@@ -40,11 +91,343 @@ export interface SetupRequest {
 export interface SetupGame {
   readonly view: 'setup';
   readonly version: string;
+  /** The Foundry build; read with care, as Foundry's types do not describe it here. */
+  readonly release?: unknown;
+  /** What the server sent the setup screen, such as `coreUpdate` and `options`; read with care, as for `release`. */
+  readonly data?: unknown;
   readonly worlds: Iterable<unknown>;
   readonly modules: Iterable<unknown>;
   readonly systems: Iterable<unknown>;
+  /** Foundry's translations, for the messages its server answers with. */
+  readonly i18n?: { localize(key: string): string };
   /** Sends a request to the server; every package installation and update goes through it. */
   post: (request: SetupRequest, options?: object) => Promise<unknown>;
+  /** Installs a package, or updates it, through {@link post}; the package installed, once it is. */
+  installPackage?: (options: PackageInstall) => Promise<unknown>;
+  /** Asks the user whether to install a package's missing dependencies, and installs those chosen. */
+  installDependencies?: (pkg: unknown) => Promise<unknown>;
+  /** Foundry's listing of the packages of a type that may be installed, by ID, as its Install dialog shows it. */
+  getPackages?: (options: { readonly type: 'module' | 'system' }) => Promise<unknown>;
+  /**
+   * Asks the user to confirm uninstalling a package, a world among them, as Foundry's **Uninstall** does, and
+   * uninstalls it through {@link post} if they do.
+   */
+  uninstallPackage?: (pkg: { readonly type?: unknown; readonly id?: unknown }) => Promise<unknown>;
+  /** Reads what is installed from the server again, and shows it, as Foundry does after uninstalling a package. */
+  reload?: () => Promise<unknown>;
+  /** Makes a snapshot of the installation, as **Manage Backups** does, with a note; it says itself if it fails. */
+  createSnapshot?: (options: { readonly note?: string }) => Promise<unknown>;
+  /** Backs a package up, such as a world, with a note; whether it did. */
+  createBackup?: (
+    pkg: { readonly type: 'world' | 'module' | 'system'; readonly id: string; readonly title: string },
+    options: { readonly note?: string },
+  ) => Promise<boolean>;
+}
+
+/** The disk space a snapshot of the installation needs, and the space free, in bytes. */
+export interface SnapshotSpace {
+  readonly required: number;
+  readonly available: number;
+}
+
+/**
+ * Ask the server how much disk space a snapshot of the installation needs, and how much is free, as Foundry's own
+ * **Manage Backups** dialog does before it makes one. The server works it out from every package installed, so it may
+ * take a while.
+ *
+ * The request's action, `checkCreateSnapshotDiskSpace`, is the server's, not a documented API: Foundry 14.368's
+ * `SnapshotOperationDialog` sends it through `game.post` and reads `required` and `available` from the answer. This is
+ * the one place EMMA sends it; refactor here should Foundry give it an API.
+ * @param game - The setup screen's `game`
+ * @returns The space
+ * @throws {Error} When the answer is not as Foundry 14.368 gives it
+ */
+export async function checkSnapshotSpace(game: SetupGame): Promise<SnapshotSpace> {
+  const answer = await game.post({ action: 'checkCreateSnapshotDiskSpace' }, { timeoutMs: null });
+  const { required, available } = (typeof answer === 'object' && answer !== null ? answer : {}) as Record<
+    string,
+    unknown
+  >;
+  if (typeof required !== 'number' || typeof available !== 'number') {
+    throw new Error('The server did not say how much space a snapshot needs');
+  }
+  return { required, available };
+}
+
+/** Whether Foundry can update itself in place, and the channel its updater takes builds from. */
+export interface CoreUpdateState {
+  /** `false` when the server was started with `--noupdate`, which refuses every update in place. */
+  readonly canUpdate: boolean;
+  /** Such as `stable`. */
+  readonly channel: string;
+}
+
+/**
+ * Whether Foundry can update itself in place, from what the server sent the setup screen.
+ *
+ * Checked on Foundry 14.368: `game.data.coreUpdate.canUpdate` is `!options.noupdate`, and `game.data.options` has the
+ * `updateChannel` the Update Software form sends. Neither is a documented API.
+ * @param game - The setup screen's `game`
+ * @returns Whether it can, and the channel; it cannot if the server does not say
+ */
+export function readCoreUpdate(game: SetupGame): CoreUpdateState {
+  const { coreUpdate, options } = record(game.data);
+  const channel = record(options).updateChannel;
+  return {
+    canUpdate: record(coreUpdate).canUpdate === true,
+    channel: typeof channel === 'string' ? channel : 'stable',
+  };
+}
+
+/** The build Foundry's updater would install: the newest on its channel, or why there is none. */
+export type CoreTarget =
+  | {
+      readonly version: string;
+      /** Whether Foundry installs it only by hand, as a new generation. */
+      readonly manual: boolean;
+    }
+  | { readonly none: string };
+
+/**
+ * Ask Foundry's updater which build it would install, as the Update Software form's first step does. The server asks
+ * Foundry's website, which gives only the newest build on the channel.
+ *
+ * Checked on Foundry 14.368: the form posts `{ action: "updateCheck", updateChannel, forceUpdate }`; the answer is the
+ * build's release data (`generation`, `build`, and `flags` that say whether it must be installed by hand), or an
+ * `info` or `warn` message key when there is none.
+ * @param game - The setup screen's `game`
+ * @param channel - The channel
+ * @returns The build, or why there is none
+ * @throws {Error} When the answer is not as Foundry 14.368 gives it
+ */
+export async function checkCoreUpdate(game: SetupGame, channel: string): Promise<CoreTarget> {
+  const answer = record(
+    await game.post({ action: 'updateCheck', updateChannel: channel, forceUpdate: false }, { notify: false }),
+  );
+  const message = answer.info ?? answer.warn;
+  if (typeof message === 'string') return { none: game.i18n?.localize(message) ?? message };
+  const { generation, build, flags } = answer;
+  if (typeof generation !== 'number' || typeof build !== 'number') {
+    throw new Error('Foundry did not say which build its updater would install');
+  }
+  const { requires_generation_reinstall, requires_electron_reinstall, requires_full_reinstall } = record(flags);
+  return {
+    version: `${String(generation)}.${String(build)}`,
+    manual: [requires_generation_reinstall, requires_electron_reinstall, requires_full_reinstall].some(Boolean),
+  };
+}
+
+/**
+ * Start Foundry's updater on the build {@link checkCoreUpdate} found, as the Update Software form's second step does.
+ * The server downloads and installs it, then stops, or restarts where it can; the setup screen loses it meanwhile.
+ *
+ * Checked on Foundry 14.368: the form posts `{ action: "updateDownload", updateChannel, forceUpdate }`, which answers
+ * once the download has begun, or with an `error`.
+ * @param game - The setup screen's `game`
+ * @param channel - The channel, as checked
+ * @returns Once the update has begun
+ * @throws {Error} If the server refuses it, saying why
+ */
+export async function startCoreUpdate(game: SetupGame, channel: string): Promise<void> {
+  const answer = record(
+    await game.post({ action: 'updateDownload', updateChannel: channel, forceUpdate: false }, { notify: false }),
+  );
+  if (typeof answer.error === 'string') throw new Error(game.i18n?.localize(answer.error) ?? answer.error);
+}
+
+/**
+ * A value's properties, if it is an object.
+ * @param value - Any value
+ * @returns Its properties; none for anything else
+ */
+function record(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
+}
+
+/**
+ * Uninstall a game system or module, as Foundry's **Uninstall** does once the user confirms it: the server deletes it,
+ * then the setup screen forgets it, and reads what is installed again.
+ *
+ * FRAGILE: Foundry's `game.uninstallPackage` asks the user itself, so the steps it takes after asking are taken here.
+ * Checked on Foundry 14.368: it posts `{ action: "uninstallPackage", type, id }`, which throws if the server refuses;
+ * then `foundry.packages.PACKAGE_TYPES[type].uninstall(id)` drops the package from `game.data` and from `game.modules`
+ * or `game.systems`, and `game.reload()` reads the rest again.
+ * @param game - The setup screen's `game`
+ * @param type - The package's type
+ * @param id - The package's ID
+ * @returns Once uninstalled
+ * @throws {Error} If the server refuses, saying why
+ */
+export async function uninstallPackage(game: SetupGame, type: 'module' | 'system', id: string): Promise<void> {
+  await game.post({ action: 'uninstallPackage', type, id }, { notify: false });
+  const kind = field(field(field(globalThis, 'foundry'), 'packages'), 'PACKAGE_TYPES');
+  const forget = field(field(kind, type), 'uninstall');
+  if (typeof forget === 'function') (forget as (id: string) => void).call(field(kind, type), id);
+  await game.reload?.();
+}
+
+/**
+ * Lock a game system or module in Foundry, or unlock it, as Foundry's own **Lock** and **Unlock** do: a locked package
+ * cannot be updated or uninstalled, by Foundry or by EMMA.
+ *
+ * FRAGILE: Foundry offers this only from its package menu. Checked on Foundry 14.368: it posts
+ * `{ action: "lockPackage", type, id, shouldLock }`, which throws if the server refuses, then sets the package's
+ * `locked` and renders its package list, `ui.setupPackages`.
+ * @param game - The setup screen's `game`
+ * @param type - The package's type
+ * @param id - The package's ID
+ * @param lock - Whether to lock it, or unlock it
+ * @returns Once done
+ * @throws {Error} If the server refuses, saying why
+ */
+export async function lockPackage(
+  game: SetupGame,
+  type: 'module' | 'system',
+  id: string,
+  lock: boolean,
+): Promise<void> {
+  await game.post({ action: 'lockPackage', type, id, shouldLock: lock }, { notify: false });
+  const pkg = Array.from(type === 'system' ? game.systems : game.modules).find(entry => field(entry, 'id') === id);
+  if (typeof pkg === 'object' && pkg !== null) Reflect.set(pkg, 'locked', lock);
+  const list = field(field(globalThis, 'ui'), 'setupPackages');
+  const render = field(list, 'render');
+  if (typeof render === 'function') (render as () => unknown).call(list);
+}
+
+/**
+ * A field of a value, read with care.
+ * @param value - Any value
+ * @param name - The field's name
+ * @returns The field, or `undefined` if the value is not an object or function
+ */
+function field(value: unknown, name: string): unknown {
+  return (typeof value === 'object' && value !== null) || typeof value === 'function'
+    ? (Reflect.get(value, name) as unknown)
+    : undefined;
+}
+
+/** A package on Foundry's listing, which gives only its newest version. */
+export interface ListedPackage {
+  readonly type: 'module' | 'system';
+  readonly id: string;
+  readonly title: string;
+  /** Its newest version. */
+  readonly version: string;
+  readonly author?: string;
+  /** The Foundry builds its newest version runs on, as its manifest declares them. */
+  readonly compatibility: { readonly minimum?: string; readonly verified?: string; readonly maximum?: string };
+  /** The IDs of the game systems a module is for; empty if it is for any. */
+  readonly systems: readonly string[];
+  /** Whether it is a premium package the user does not own, which Foundry cannot install for them. */
+  readonly unowned: boolean;
+  /** Its description, as plain text. */
+  readonly description?: string;
+  /** All its authors' names. */
+  readonly authors?: readonly string[];
+  /** Its project's web page. */
+  readonly url?: string;
+  /** Its manifest's URL, which Foundry installs it from, and EMMA finds its releases by. */
+  readonly manifest?: string;
+  /** The listing's tags for it, such as `maps` or `combat`. */
+  readonly tags?: readonly string[];
+  /** Whether it is premium content, sold through Foundry. */
+  readonly premium?: true;
+  /** Whether it is exclusive content. */
+  readonly exclusive?: true;
+}
+
+/**
+ * Read Foundry's listing of the game systems or modules that may be installed, as its Install dialog does, through
+ * `game.getPackages`, which asks the server, so it needs no proxy. Checked on Foundry 14.368: it answers a `Map` of
+ * each package's data by ID, keeps it for the session, and says itself if the server fails, answering an empty map.
+ * The listing gives each package's newest version alone, without the modules it requires.
+ * @param game - The setup screen's `game`
+ * @param type - Which
+ * @returns The packages, sorted by title; none if Foundry offers no listing
+ */
+export async function listPackages(game: SetupGame, type: 'module' | 'system'): Promise<ListedPackage[]> {
+  const listing = await game.getPackages?.call(game, { type });
+  if (!(listing instanceof Map)) return [];
+  return sorted(Array.from(listing.values() as Iterable<unknown>, entry => toListed(entry, type)));
+}
+
+/**
+ * The newest version of each game system and module Foundry's listing gives, as the index a "latest" manifest's version
+ * is checked against (see `lib/latest.ts`).
+ * @param game - The setup screen's `game`
+ * @returns The versions, by package key
+ */
+export async function readIndex(game: SetupGame): Promise<Map<string, string>> {
+  const listed = await Promise.all([listPackages(game, 'system'), listPackages(game, 'module')]);
+  return new Map(listed.flat().map(({ type, id, version }) => [`${type}:${id}`, version]));
+}
+
+/**
+ * Describe a package on Foundry's listing.
+ * @param entry - Its data
+ * @param type - Its type
+ * @returns The package, or `undefined` if it lacks an ID, title or version
+ */
+function toListed(entry: unknown, type: 'module' | 'system'): ListedPackage | undefined {
+  const described = toPackage(entry);
+  if (described === undefined) return undefined;
+  const data = entry as Record<string, unknown>;
+  const compatibility = field(data, 'compatibility');
+  const version = (name: string) => {
+    const value = field(compatibility, name);
+    return typeof value === 'string' || typeof value === 'number' ? { [name]: String(value) } : {};
+  };
+  const names = field(data, 'authors');
+  const authors = (Array.isArray(names) ? names : [])
+    .map(person => field(person, 'name'))
+    .filter((name): name is string => typeof name === 'string' && name !== '');
+  const [author] = authors;
+  const description = field(data, 'description');
+  const text = typeof description === 'string' ? plainText(description) : '';
+  const url = field(data, 'url');
+  const manifest = field(data, 'manifest');
+  const tags = field(data, 'tags');
+  const tagList = (Array.isArray(tags) ? tags : []).filter((tag): tag is string => typeof tag === 'string');
+  return {
+    type,
+    id: described.id,
+    title: described.title,
+    version: described.version,
+    ...(author !== undefined && { author }),
+    compatibility: { ...version('minimum'), ...version('verified'), ...version('maximum') },
+    systems: type === 'module' ? relatedIds(field(field(data, 'relationships'), 'systems')) : [],
+    unowned: data.protected === true && data.owned !== true,
+    ...(text !== '' && { description: text }),
+    ...(authors.length > 0 && { authors }),
+    ...(typeof url === 'string' && /^https?:\/\//i.test(url) && { url }),
+    ...(typeof manifest === 'string' && /^https?:\/\//i.test(manifest) && { manifest }),
+    ...(tagList.length > 0 && { tags: tagList }),
+    ...(data.protected === true && { premium: true as const }),
+    ...(data.exclusive === true && { exclusive: true as const }),
+  };
+}
+
+/**
+ * The text of a package's description, which its manifest gives as HTML. It is parsed apart from the page, so nothing in
+ * it runs or loads, and only its text is kept, without that of its scripts and styles.
+ * @param html - The description
+ * @returns Its text, with its runs of white space made single spaces
+ */
+function plainText(html: string): string {
+  const parsed = new DOMParser().parseFromString(html, 'text/html');
+  for (const code of parsed.body.querySelectorAll('script, style')) code.remove();
+  return parsed.body.textContent.replace(/\s+/g, ' ').trim();
+}
+
+/** What `game.installPackage` is given. */
+export interface PackageInstall {
+  readonly type: 'module' | 'system';
+  readonly id: string;
+  readonly manifest: string;
+  /** Whether Foundry asks the user about the package's dependencies after it, by itself. */
+  readonly dependencies?: boolean;
+  /** Whether Foundry says itself that the package was installed, or why not. */
+  readonly notify?: boolean;
 }
 
 /**
@@ -81,8 +464,62 @@ export function readInstallation(game: SetupGame): Installation {
   return {
     core: game.version,
     worlds: sorted(Array.from(game.worlds, toWorld)),
-    modules: sorted(Array.from(game.modules, toPackage)),
+    modules: sorted(Array.from(game.modules, toModule)),
     systems: sorted(Array.from(game.systems, toPackage)),
+  };
+}
+
+/**
+ * Read the installed packages' manifests, and the Foundry build.
+ * @param game - The setup screen's `game`
+ * @returns The manifests
+ */
+export function readManifests(game: SetupGame): InstalledManifests {
+  return {
+    core: coreBuild(game),
+    manifests: [
+      ...Array.from(game.systems, pkg => toManifest(pkg, 'system')),
+      ...Array.from(game.modules, pkg => toManifest(pkg, 'module')),
+    ].filter(manifest => manifest !== undefined),
+  };
+}
+
+/**
+ * The Foundry build, from `game.release`; a stable build of the version's generation if Foundry does not say.
+ * @param game - The setup screen's `game`
+ * @returns The build
+ */
+function coreBuild(game: SetupGame): CoreBuild {
+  const release = (typeof game.release === 'object' && game.release !== null ? game.release : {}) as Record<
+    string,
+    unknown
+  >;
+  const { generation, channel } = release;
+  return {
+    version: game.version,
+    generation: typeof generation === 'number' ? generation : Number.parseInt(game.version, 10),
+    channel: typeof channel === 'string' ? channel : 'stable',
+  };
+}
+
+/**
+ * An installed package's manifest.
+ * @param pkg - A package from the setup screen's `game.systems` or `game.modules`
+ * @param type - Which
+ * @returns The manifest, or `undefined` if Foundry cannot give it, or it lacks an ID or version
+ */
+function toManifest(pkg: unknown, type: 'module' | 'system'): PackageManifest | undefined {
+  if (typeof pkg !== 'object' || pkg === null) return undefined;
+  const { id, version, manifest, toObject } = pkg as Record<string, unknown>;
+  if (typeof id !== 'string' || typeof version !== 'string' || typeof toObject !== 'function') return undefined;
+  const json: unknown = (toObject as () => unknown).call(pkg);
+  return {
+    type,
+    id,
+    version,
+    json,
+    origin: `${type}s/${id}/${type}.json`,
+    ...(typeof manifest === 'string' && manifest !== '' && { manifest }),
   };
 }
 
@@ -106,10 +543,46 @@ function toWorld(world: unknown): InstalledWorld | undefined {
  */
 function toPackage(pkg: unknown): InstalledPackage | undefined {
   if (typeof pkg !== 'object' || pkg === null) return undefined;
-  const { id, title, version } = pkg as Record<string, unknown>;
+  const { id, title, version, locked } = pkg as Record<string, unknown>;
   return typeof id === 'string' && typeof title === 'string' && typeof version === 'string'
-    ? { id, title, version }
+    ? { id, title, version, ...(locked === true && { locked }) }
     : undefined;
+}
+
+/**
+ * Describe an installed module.
+ * @param pkg - A module from the setup screen's `game.modules`
+ * @returns The module, or `undefined` if it lacks an ID, title or version
+ */
+function toModule(pkg: unknown): InstalledModule | undefined {
+  const described = toPackage(pkg);
+  if (described === undefined) return undefined;
+  const { relationships } = pkg as { relationships?: { systems?: unknown; requires?: unknown; recommends?: unknown } };
+  const recommends = relatedIds(relationships?.recommends, 'module').filter(id => id !== described.id);
+  return {
+    ...described,
+    systems: relatedIds(relationships?.systems),
+    // A module requires other modules: a system it needs is given by `systems`.
+    requires: relatedIds(relationships?.requires, 'module').filter(id => id !== described.id),
+    ...(recommends.length > 0 && { recommends }),
+  };
+}
+
+/**
+ * The IDs of the packages a relationship names.
+ * @param related - The relationship, a set of packages
+ * @param type - The type of package to keep, if the relationship says; any type if not given
+ * @returns The IDs, each once, in their order
+ */
+function relatedIds(related: unknown, type?: string): string[] {
+  if (!isIterable(related)) return [];
+  const ids = new Set<string>();
+  for (const entry of related) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const { id, type: kind } = entry as Record<string, unknown>;
+    if (typeof id === 'string' && (type === undefined || kind === undefined || kind === type)) ids.add(id);
+  }
+  return [...ids];
 }
 
 /**

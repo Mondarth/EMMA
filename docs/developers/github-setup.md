@@ -46,13 +46,14 @@ Under *Settings → Secrets and variables → Actions → Secrets*:
 | `FOUNDRY_LICENSE_KEY`   | E2E     | A Foundry VTT licence key for the test server                                     |
 | `FOUNDRY_ADMIN_KEY`     | E2E     | Any password; the tests use it to administer the test server                      |
 | `CODECOV_TOKEN`         | Dev CI  | Optional. Uploads coverage to [Codecov](https://about.codecov.io) (step 8)        |
-| `EMMA_DEFAULT_PROXY_KEY` | Release | Optional. The API key of the default version lookup proxy (see {doc}`default-proxy`) |
-| `EMMA_DEFAULT_CATALOGUE_KEY` | Release | Optional. The API key of the default package catalogue (see {doc}`default-proxy`) |
+| `EMMA_DEFAULT_PROXY_KEY` | Release | Required. The API key of the default version lookup proxy (see {doc}`default-proxy`) |
+| `EMMA_DEFAULT_CATALOGUE_KEY` | Release | Required. The API key of the default package catalogue (see {doc}`default-proxy`) |
 | `AMO_JWT_ISSUER`        | Release | Optional. The issuer of an API key from addons.mozilla.org, to have Mozilla sign the Firefox extension |
 | `AMO_JWT_SECRET`        | Release | Optional. That API key's secret                                          |
 
 And under *Variables*, `EMMA_DEFAULT_PROXY_URL`, the default proxy's URL template, and `EMMA_DEFAULT_CATALOGUE_URL`,
-the default catalogue's URL. Without both of a pair, a release has no default proxy, or no default catalogue.
+the default catalogue's URL. A release of the module or of the browser extension stops before it changes anything when
+any of the four is not set, as a build without them would ship with no default catalogue or proxy.
 
 Pull requests from forks cannot read secrets, so the end-to-end tests are skipped for them.
 

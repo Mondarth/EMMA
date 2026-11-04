@@ -8,6 +8,7 @@ Replaces the Foundry manage module app.
 
 usage.md
 extension.md
+alpha.md
 ```
 
 ```{toctree}

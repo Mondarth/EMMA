@@ -1,8 +1,11 @@
 import { describe, expect, test } from 'vitest';
 
-import { obscure, reveal } from '@module/lib/obscure';
+import { obscure, reveal } from '../src/obscure';
 
 const KEY = 'k3y-0123456789abcdef-0123456789abcdef';
+
+// This package is compiled without the browser's declarations, but the tests run where it has them.
+const web = globalThis as unknown as { btoa(text: string): string };
 
 /**
  * The longest run of the text's characters to be found, in order, anywhere in what it was obscured as.
@@ -29,7 +32,7 @@ describe('obscure', () => {
 
     // Digits are in the bytes by chance; no run of the key longer than a couple of them is.
     expect(longestRunIn(KEY, obscured)).toBeLessThanOrEqual(3);
-    expect(obscured).not.toContain(btoa(KEY).slice(0, 8));
+    expect(obscured).not.toContain(web.btoa(KEY).slice(0, 8));
   });
 
   test('splits the text into chunks, each masked by a pad of its own', () => {

@@ -7,8 +7,8 @@ import autoprefixer from 'autoprefixer';
 import dts from 'unplugin-dts/vite';
 
 import moduleJSON from './module.json' with { type: 'json' };
-import { defaultProxyDefine } from './scripts/build/default-proxy.ts';
-import { defaultCatalogueDefine } from './scripts/build/default-catalogue.ts';
+import { defaultCatalogueDefine } from '@mondarth/emma-core/default-catalogue-define';
+import { defaultProxyDefine } from '@mondarth/emma-core/default-proxy-define';
 
 import tsconfigPaths from 'vite-tsconfig-paths';
 import type { Plugin } from 'vite';
@@ -133,7 +133,7 @@ export default defineConfig(({ mode }) => {
       unstubGlobals: true,
       coverage: {
         provider: 'v8',
-        include: ['index.ts', 'module/**/*.ts', 'component/**/*.svelte'],
+        include: ['index.ts', 'setup-kit.ts', 'module/**/*.ts', 'component/**/*.svelte'],
         reportsDirectory: '../coverage',
         reporter: ['text', 'html', 'lcov'],
         // Ratchet these upward as coverage improves; never lower them to make a change pass. Branches stay below 100

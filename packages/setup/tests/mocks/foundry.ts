@@ -11,14 +11,30 @@ import type { WorldRecord } from '@mondarth/emma-core/world-record';
 export class ApplicationV2Mock {
   static DEFAULT_OPTIONS: object = {};
 
-  options: { id?: string };
+  options: { id?: string; position?: object };
   element: HTMLElement | null = null;
   rendered = false;
+  /** Whether the window is minimised, as Foundry's `minimized`. */
+  minimized = false;
+  /** Where the window is, as Foundry's `position`. */
+  position: Record<string, unknown> = {};
   bringToFront: Mock<() => void> = vi.fn();
 
   constructor(options: object = {}) {
     const ctor = this.constructor as typeof ApplicationV2Mock;
     this.options = { ...ctor.DEFAULT_OPTIONS, ...options };
+    this.position = { ...(this.options.position ?? {}) };
+  }
+
+  /**
+   * Move or resize the window, as Foundry's `setPosition`, then tell `_onPosition`.
+   * @param position - What changes
+   * @returns Where the window is
+   */
+  setPosition(position: object = {}): Record<string, unknown> {
+    Object.assign(this.position, position);
+    this._onPosition(this.position);
+    return this.position;
   }
 
   async render(options: object = {}): Promise<this> {
@@ -53,6 +69,10 @@ export class ApplicationV2Mock {
   protected _onClose(_options: object): void | Promise<void> {
     // The base class does nothing on close.
   }
+
+  protected _onPosition(_position: object): void {
+    // The base class does nothing once moved.
+  }
 }
 
 /** Foundry's `Collection`: a map by ID that iterates its values rather than its entries. */
@@ -78,6 +98,14 @@ export interface PackageData {
   id: string;
   title?: string | undefined;
   version?: string | undefined;
+  /** A module's relationships, as Foundry gives them: sets of the packages related. */
+  relationships?: { systems?: unknown; requires?: unknown; recommends?: unknown } | undefined;
+  /** The manifest URL it declares. */
+  manifest?: string | undefined;
+  /** Its manifest's flags, as the EMMA module names its setup kit in. */
+  flags?: unknown;
+  /** Whether it is locked in Foundry. */
+  locked?: boolean | undefined;
 }
 
 /** A world as `game.worlds` holds it. */
@@ -91,6 +119,8 @@ export interface WorldData {
 export interface SetupMockOptions {
   /** The Foundry version. Defaults to `14.368`. */
   core?: string;
+  /** What `game.release` holds; a stable build of Foundry 14 by default. */
+  release?: unknown;
   worlds?: WorldData[];
   modules?: PackageData[];
   systems?: PackageData[];
@@ -106,6 +136,15 @@ export interface SetupMockOptions {
  */
 export function installSetupMocks(options: SetupMockOptions = {}) {
   const { core = '14.368', worlds = [], modules = [], systems = [], records = {} } = options;
+  const release = 'release' in options ? options.release : { generation: 14, channel: 'stable' };
+  // A package as Foundry has it: its data, and its manifest as plain data from `toObject()`.
+  const packaged = (pkg: PackageData) => {
+    const data = { title: pkg.id, version: '1.0.0', ...pkg };
+    return {
+      ...data,
+      toObject: () => ({ id: data.id, title: data.title, version: data.version, flags: data.flags ?? {} }),
+    };
+  };
   // The user data folder, by path, as the server serves it.
   const files = new Map<string, string>(
     Object.entries(records).map(([id, record]) => [
@@ -117,11 +156,12 @@ export function installSetupMocks(options: SetupMockOptions = {}) {
   const game = {
     view: 'setup',
     version: core,
+    release,
     worlds: new CollectionMock<unknown>(
       worlds.map(world => [world.id, { title: world.id, system: 'dnd5e', ...world }]),
     ),
-    modules: new CollectionMock<unknown>(modules.map(pkg => [pkg.id, { title: pkg.id, version: '1.0.0', ...pkg }])),
-    systems: new CollectionMock<unknown>(systems.map(pkg => [pkg.id, { title: pkg.id, version: '1.0.0', ...pkg }])),
+    modules: new CollectionMock<unknown>(modules.map(pkg => [pkg.id, packaged(pkg)])),
+    systems: new CollectionMock<unknown>(systems.map(pkg => [pkg.id, packaged(pkg)])),
     post,
   };
 

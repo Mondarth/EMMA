@@ -29,6 +29,12 @@ export interface ModuleStateOptions {
    * change to the setting applies at once. By default it does not.
    */
   autoRecommended?: () => boolean;
+  /**
+   * Whether a module is judged incompatible with the Foundry version and game system in use, as its badge shows, so
+   * that it cannot be activated outside hypothetical mode. Read each time, so a change of badge checks applies at once.
+   * By default none is.
+   */
+  incompatible?: (id: string) => boolean;
 }
 
 /**
@@ -60,6 +66,8 @@ export class ModuleState {
    * once no active module does.
    */
   readonly #implied = new SvelteSet<string>();
+  /** Whether a module is judged incompatible, so that it cannot be activated (see {@link ModuleStateOptions}). */
+  readonly #incompatible: (id: string) => boolean;
   readonly #autoRecommended: () => boolean;
   /** What was staged when hypothetical mode was entered, restored when it is reset or left; `null` outside it. */
   #beforeHypothetical: { readonly pending: Record<string, boolean>; readonly implied: readonly string[] } | null =
@@ -163,6 +171,7 @@ export class ModuleState {
   constructor(entries: readonly ModuleEntry[], saved: ActivationMap, options: ModuleStateOptions = {}) {
     this.entries = entries;
     this.#autoRecommended = options.autoRecommended ?? (() => false);
+    this.#incompatible = options.incompatible ?? (() => false);
     this.#saved = this.#complete(saved);
     this.#pending = { ...this.#saved };
   }
@@ -326,13 +335,16 @@ export class ModuleState {
    * modules it requires, following the chain, and those it recommends if `autoRecommended` says so. Deactivating it
    * deactivates the modules activated only for it that no other active module still needs. A module changed here,
    * by the user, is never deactivated for them later. Every module changed is deselected on both sides, since it may
-   * move from one to the other. Unknown modules, and attempts to deactivate a locked module, are ignored.
+   * move from one to the other. Unknown modules, attempts to deactivate a module locked active, and attempts to
+   * activate one kept from it (see {@link ModuleState.blockedBy}) are ignored.
    * @param id - A module ID
    * @param active - Whether the module should be active
    */
   setActive(id: string, active: boolean): void {
     const entry = this.entries.find(each => each.id === id);
-    if (entry === undefined || (!active && this.isLocked(id))) return;
+    // Ticking a module active only for another makes it the user's own, so only activating it can be refused.
+    const refused = active ? this.blockedBy(id).length > 0 : this.lockedBy(id).length > 0;
+    if (entry === undefined || refused) return;
     this.#implied.delete(id);
     this.#stage(id, active);
     if (active) this.#activateRelated(entry);
@@ -354,20 +366,40 @@ export class ModuleState {
   }
 
   /**
-   * Whether a module is locked active because an active module requires it.
+   * The inactive modules that keep a module from being activated, outside hypothetical mode: itself, if it is judged
+   * incompatible, and the inactive modules it requires, directly or through a chain, that are, as activating it would
+   * activate them. In hypothetical mode nothing is saved, so any module may be tried.
    * @param id - A module ID
-   * @returns `true` if it cannot be deactivated or selected on the active side
+   * @returns The incompatible modules, in the order found; empty if it can be activated, or is active
    */
-  isLocked(id: string): boolean {
-    return this.lockedBy(id).length > 0;
+  blockedBy(id: string): readonly ModuleEntry[] {
+    const entry = this.entries.find(each => each.id === id);
+    if (entry === undefined || this.#pending[id] === true || this.hypothetical) return [];
+    return [entry, ...this.#requiredClosure(entry)].filter(
+      ({ id: each }) => this.#pending[each] !== true && this.#incompatible(each),
+    );
   }
 
   /**
-   * Whether every installed module will be active. Never, when none is installed.
+   * Whether a module is locked: active because an active module requires it, or kept from being activated as it, or a
+   * module it requires, is judged incompatible (see {@link ModuleState.blockedBy}).
+   * @param id - A module ID
+   * @returns `true` if it cannot be changed, nor selected on its side
+   */
+  isLocked(id: string): boolean {
+    return this.lockedBy(id).length > 0 || this.blockedBy(id).length > 0;
+  }
+
+  /**
+   * Whether every installed module that can be will be active. Never, when none is installed or none is active.
    * @returns `true` if all are active
    */
   get allActive(): boolean {
-    return this.entries.length > 0 && this.entries.every(({ id }) => this.#pending[id] === true);
+    // A module kept from being activated cannot follow the others, so does not count against them.
+    return (
+      this.entries.some(({ id }) => this.#pending[id] === true) &&
+      this.entries.every(({ id }) => this.#pending[id] === true || this.blockedBy(id).length > 0)
+    );
   }
 
   /**
@@ -386,7 +418,9 @@ export class ModuleState {
    */
   setAllActive(active: boolean): void {
     this.#implied.clear();
-    for (const { id } of this.entries) this.#stage(id, active);
+    // Those kept from being activated stay inactive; which they are is known before any is staged.
+    const blocked = active ? this.entries.filter(({ id }) => this.blockedBy(id).length > 0).map(({ id }) => id) : [];
+    for (const { id } of this.entries) if (!blocked.includes(id)) this.#stage(id, active);
   }
 
   /**
@@ -517,10 +551,26 @@ export class ModuleState {
    */
   #activateRelated(entry: ModuleEntry): void {
     for (const needed of this.#closure([entry])) {
-      if (this.#pending[needed.id] === true) continue;
+      // A recommended module kept from being activated is left out; a required one keeps the module itself inactive.
+      if (this.#pending[needed.id] === true || this.blockedBy(needed.id).length > 0) continue;
       this.#stage(needed.id, true);
       this.#implied.add(needed.id);
     }
+  }
+
+  /**
+   * The modules a module requires, and the modules those require in turn, recommendations aside.
+   * @param entry - The module
+   * @returns The modules required, in the order found
+   */
+  #requiredClosure(entry: ModuleEntry): ModuleEntry[] {
+    const found: ModuleEntry[] = [];
+    for (let index = -1; index < found.length; index++) {
+      const from = index === -1 ? entry : (found[index] as ModuleEntry);
+      for (const required of relatedModules(from, this.entries).required)
+        if (required !== entry && !found.includes(required)) found.push(required);
+    }
+    return found;
   }
 
   /**
