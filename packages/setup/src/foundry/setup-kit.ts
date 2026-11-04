@@ -33,7 +33,7 @@ export type KitProblem =
 
 /** Where the kit is. */
 export interface KitFound {
-  /** Its URL on the server. */
+  /** Its absolute URL on the server. */
   readonly url: string;
   /** The EMMA module's version. */
   readonly version: string;
@@ -73,7 +73,9 @@ export function locateKit(installed: InstalledManifests, route: (path: string) =
   if (fit !== 'fits') return { ok: false, problem: { reason: fit, version } };
   // The version in the query has the browser import an updated module's kit afresh, not the one it already has.
   const path = `modules/${EMMA_MODULE_ID}/${flag.path.replace(/^\/+/, '')}?v=${encodeURIComponent(version)}`;
-  return { ok: true, url: route(path), version };
+  // Absolute, on the page's own server: the browser extension injects this script, and Chrome resolves a path that an
+  // injected script imports against the extension, not the page.
+  return { ok: true, url: new URL(route(path), location.href).href, version };
 }
 
 /**
