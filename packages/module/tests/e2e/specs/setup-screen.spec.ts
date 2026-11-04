@@ -124,7 +124,7 @@ test.describe('EMMA on the setup screen', () => {
     // The world's title holds the module's, so the module's row is the one whose title its version follows.
     await tree.getByRole('treeitem', { name: new RegExp(`^${MODULE_TITLE} \\d`) }).click();
     await expect(emma.getByRole('heading', { name: MODULE_TITLE })).toBeVisible();
-    await expect(emma.getByRole('region', { name: 'Run by' })).toContainText(WORLD.title);
+    await expect(emma.getByRole('region', { name: 'Active in' })).toContainText(WORLD.title);
 
     await tree.getByRole('treeitem', { name: /^Foundry VTT/ }).click();
     await emma.getByRole('checkbox', { name: 'Let Foundry install and update packages here' }).check();
