@@ -1,3 +1,21 @@
+## [0.10.0](https://github.com/Mondarth/EMMA/compare/v0.9.0...v0.10.0) (2026-11-04)
+
+### Features
+
+* **core:** define the setup kit the EMMA extension takes from EMMA ([c33d26f](https://github.com/Mondarth/EMMA/commit/c33d26f3668dea41d6f08478733fd032b3ac8f32))
+* **module:** build the setup kit for the EMMA extension ([a2c779c](https://github.com/Mondarth/EMMA/commit/a2c779cd1688561bc3f03759d967f683ffb009b4))
+* **module:** give the setup kit how EMMA badges a version ([c758a82](https://github.com/Mondarth/EMMA/commit/c758a82c576969b30ab70cdf66dcaa29797dbfca))
+* **module:** keep incompatible modules from being activated ([586afc1](https://github.com/Mondarth/EMMA/commit/586afc1eace2bf2259d4708e17a4f326b36560b2))
+* **module:** lock versions with no manifest of their own ([d6a67e9](https://github.com/Mondarth/EMMA/commit/d6a67e91b98454423200381cef229883c09fe35b))
+* **module:** tell the GM what changed since the world last ran ([3d7a790](https://github.com/Mondarth/EMMA/commit/3d7a7900def82dc2b5e0fa246abd10b12b2c64b9))
+* **setup:** explain what versions need, and why updates are blocked ([bb6f78d](https://github.com/Mondarth/EMMA/commit/bb6f78d0ab269c26da4d16ee066cad0fe87dac42))
+* **setup:** lock versions with no manifest of their own ([dea3095](https://github.com/Mondarth/EMMA/commit/dea3095b5960d064279da5a4e98187788eb9463b))
+* **setup:** offer Foundry VTT updates through EMMA's proxy ([5656f90](https://github.com/Mondarth/EMMA/commit/5656f90c8a708fed8c75e96afdb8d742d021629d))
+
+### Bug Fixes
+
+* **module:** count a module for another system version as incompatible ([ec73894](https://github.com/Mondarth/EMMA/commit/ec738947a368c8083ab62184b2dfc8060bc4fb1c))
+
 ## [0.9.0](https://github.com/Mondarth/EMMA/compare/v0.8.2...v0.9.0) (2026-10-28)
 
 ### Features
