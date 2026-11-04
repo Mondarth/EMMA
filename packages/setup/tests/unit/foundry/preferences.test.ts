@@ -200,7 +200,7 @@ describe("the panels' sizes", () => {
   });
 });
 
-describe("the plan kept for after Foundry VTT's update", () => {
+describe('the plan a run has not finished', () => {
   const PLAN = { core: '14.369', picks: [['module:midi', '2.0.0']] as const };
 
   test('is kept, read, and forgotten', () => {
@@ -211,6 +211,11 @@ describe("the plan kept for after Foundry VTT's update", () => {
 
     expect(writePendingPlan(null)).toBe(true);
     expect(localStorage.getItem(PENDING_PLAN_KEY)).toBeNull();
+  });
+
+  test('is read without a build, as when the run did not stop before updating Foundry VTT', () => {
+    expect(writePendingPlan({ picks: PLAN.picks })).toBe(true);
+    expect(readPendingPlan()).toEqual({ picks: [['module:midi', '2.0.0']] });
   });
 
   test.each([

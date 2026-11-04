@@ -287,10 +287,18 @@
     "TypeCode": "To update in place, type {code}:",
     "Update": "Update Foundry VTT to {version} in place",
     "Begun": "Foundry VTT is updating to {version}. The server stops or restarts once it is done; open this page again then.",
-    "Kept": "EMMA kept the rest of the plan, and restores it once Foundry VTT is on that build.",
+    "Kept": "EMMA kept the rest of the plan, and restores it once Foundry VTT is on that build or a later one, however it is updated.",
     "NotKept": "EMMA could not keep the rest of the plan, as the browser refused to store it: plan it again then.",
     "Failed": "Foundry did not update: {message}",
-    "Resumed": "The plan from before Foundry VTT's update to {version} is back: run it to finish."
+    "Resumed": "The plan from before Foundry VTT's update to {version} is back: run it to finish.",
+    "NotRestored": "These choices could not be restored, as the versions are no longer offered: {packages}."
+  },
+  "Saved": {
+    "Label": "Saved plan",
+    "Offer": "A run of the plan did not finish, so EMMA saved what was left of it: {count} changes still to make. Resume it?",
+    "Resume": "Resume the plan",
+    "Discard": "Discard it",
+    "Resumed": "The saved plan is back: run it to finish."
   },
   "Layout": {
     "Tree": "Resize the installation tree",

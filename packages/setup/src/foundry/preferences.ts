@@ -237,19 +237,23 @@ export function writeGeometry(geometry: Geometry): void {
   }
 }
 
-/** The key the plan left for after Foundry VTT's update is kept under. */
+/** The key the plan a run has not finished is kept under. */
 export const PENDING_PLAN_KEY = 'mondarth-emma.setup.pending-plan';
 
-/** The choices of a plan that stopped to update Foundry VTT in place, to restore once it is on the build updated to. */
+/**
+ * The choices of a plan a run has not finished, kept as it runs, with what it has done taken out: to restore once
+ * Foundry VTT is on the build the run stopped before updating to, or else to offer to resume, as after a step failed,
+ * or the page closed while it ran.
+ */
 export interface PendingPlan {
-  /** The Foundry build updated to. */
-  readonly core: string;
-  /** The versions chosen besides Foundry VTT's, as `[key, version]`, in the order they were chosen. */
+  /** The Foundry build the run stopped before updating to, if it did. */
+  readonly core?: string;
+  /** The versions chosen that are not done yet, as `[key, version]`, in the order they were chosen. */
   readonly picks: readonly (readonly [string, string])[];
 }
 
 /**
- * The plan left for after Foundry VTT's update, if one was kept and can be read.
+ * The plan a run has not finished, if one was kept and can be read.
  * @returns The plan, or `undefined`
  */
 export function readPendingPlan(): PendingPlan | undefined {
@@ -259,14 +263,16 @@ export function readPendingPlan(): PendingPlan | undefined {
     const { core, picks } = kept as Record<string, unknown>;
     const pick = (value: unknown): value is [string, string] =>
       Array.isArray(value) && value.length === 2 && value.every(part => typeof part === 'string');
-    return typeof core === 'string' && Array.isArray(picks) && picks.every(pick) ? { core, picks } : undefined;
+    if (!Array.isArray(picks) || !picks.every(pick)) return undefined;
+    if (core === undefined) return { picks };
+    return typeof core === 'string' ? { core, picks } : undefined;
   } catch {
     return undefined;
   }
 }
 
 /**
- * Keep the plan to restore after Foundry VTT's update.
+ * Keep the plan a run has not finished.
  * @param plan - The plan, or `null` to forget it
  * @returns Whether it was kept, or forgotten; not if the storage cannot be written
  */

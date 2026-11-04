@@ -1806,6 +1806,50 @@ describe("the plan's snapshot and backups", () => {
     });
   });
 
+  test('offers to resume a plan a run did not finish, then says it is back, naming what could not be', async () => {
+    const keepPendingPlan = vi.fn(() => true);
+    const { setup, user } = await planning('module:lib', '1.5.0', undefined, undefined, {
+      pendingPlan: () => ({
+        picks: [
+          ['system:dnd5e', '5.4.0'],
+          ['module:gone', '1.0.0'],
+        ],
+      }),
+      keepPendingPlan,
+    });
+    const offer = await screen.findByRole('region', { name: 'Saved plan' });
+    expect(offer).toHaveTextContent('A run of the plan did not finish, so EMMA saved what was left of it: 2 changes');
+
+    await user.click(within(offer).getByRole('button', { name: 'Resume the plan' }));
+
+    expect(screen.queryByRole('region', { name: 'Saved plan' })).toBeNull();
+    await vi.waitFor(() => {
+      expect(setup.updates.picks).toEqual([
+        ['module:lib', '1.5.0'],
+        ['system:dnd5e', '5.4.0'],
+      ]);
+    });
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'The saved plan is back: run it to finish. These choices could not be restored, as the versions are no longer offered: module:gone.',
+    );
+    expect(keepPendingPlan).toHaveBeenCalledWith(null);
+  });
+
+  test('discards a plan a run did not finish, forgetting it', async () => {
+    const keepPendingPlan = vi.fn(() => true);
+    const { setup, user } = await planning('module:lib', '1.5.0', undefined, undefined, {
+      pendingPlan: () => ({ picks: [['system:dnd5e', '5.4.0']] }),
+      keepPendingPlan,
+    });
+    const offer = await screen.findByRole('region', { name: 'Saved plan' });
+
+    await user.click(within(offer).getByRole('button', { name: 'Discard it' }));
+
+    expect(screen.queryByRole('region', { name: 'Saved plan' })).toBeNull();
+    expect(keepPendingPlan).toHaveBeenCalledExactlyOnceWith(null);
+    expect(setup.updates.picks).toEqual([['module:lib', '1.5.0']]);
+  });
+
   test('offers no run where the plan cannot be run', async () => {
     const { plan } = await planning('module:lib', '1.5.0');
 
