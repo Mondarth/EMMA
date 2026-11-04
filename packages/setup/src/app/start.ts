@@ -9,11 +9,13 @@ import { keepMenuButton } from '../foundry/menu-button';
 import { IN_ALPHA } from '../lib/alpha';
 import {
   readAlphaAcknowledged,
+  readBestInUseOnly,
   readCoreLocked,
   readIgnored,
   readGuardOn,
   readPendingPlan,
   writeAlphaAcknowledged,
+  writeBestInUseOnly,
   writeCoreLocked,
   writeIgnored,
   writeGuardOn,
@@ -97,6 +99,8 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
     },
     lockCore: writeCoreLocked,
     ignore: writeIgnored,
+    bestInUseOnly: readBestInUseOnly(),
+    onBestInUseOnlyChange: writeBestInUseOnly,
     findUpdates: async overview => {
       const installed = readManifests(game);
       // The resolver comes from the installed EMMA module's setup kit, if it fits.

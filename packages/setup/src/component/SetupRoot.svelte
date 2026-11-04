@@ -336,7 +336,13 @@
               onGuardChange={(on: boolean) => {
                 setup.setGuardOn(on);
               }} />
-            <BestSection {updates} disabled={updates.locked || setup.running} />
+            <BestSection
+              {updates}
+              disabled={updates.locked || setup.running}
+              inUseOnly={setup.bestInUseOnly}
+              onInUseOnlyChange={(on: boolean) => {
+                setup.setBestInUseOnly(on);
+              }} />
             {#if setup.canLockCore}
               <LockSection
                 core
