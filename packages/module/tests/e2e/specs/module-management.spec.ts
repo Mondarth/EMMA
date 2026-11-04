@@ -581,7 +581,7 @@ test.describe('Badge checks', () => {
     await closeEmma(page);
   });
 
-  test('EMMA’s badges find a module that needs another system version, active or not; Foundry’s own do not, and say so', async ({
+  test('EMMA’s badges find a module that needs another system version and refuse it; Foundry’s own do not, and say so', async ({
     page,
   }) => {
     // The rival, as if its manifest needed a version of the game system no world has. Only in this page: the next
@@ -595,12 +595,12 @@ test.describe('Badge checks', () => {
     const emma = page.locator(EMMA_WINDOW);
     const rival = emma.getByRole('listitem').filter({ has: page.getByRole('checkbox', { name: RIVAL.title }) });
     const badge = rival.locator('.emma-module-version .emma-badge').first();
+    const checkbox = emma.getByRole('checkbox', { name: RIVAL.title });
     const warning = emma.getByText(/may be inaccurate/);
 
-    // Inactive, and staged active.
+    // Judged incompatible, so it cannot be activated.
     await expect(badge).toHaveClass(/warning/);
-    await emma.getByRole('checkbox', { name: RIVAL.title }).check();
-    await expect(badge).toHaveClass(/warning/);
+    await expect(checkbox).toBeDisabled();
     await expect(warning).toHaveCount(0);
 
     await page.evaluate(async () => {
@@ -609,6 +609,7 @@ test.describe('Badge checks', () => {
 
     // Foundry's own check the Foundry version alone, which the rival is verified for.
     await expect(badge).toHaveClass(/success/);
+    await expect(checkbox).toBeEnabled();
     await expect(warning).toBeVisible();
   });
 });
@@ -1249,7 +1250,14 @@ test.describe('Hypothetical versions', () => {
     await page.route(system.manifest, async route => {
       await route.fulfill({
         headers: { 'Access-Control-Allow-Origin': '*' },
-        json: { id: system.id, title: system.title, version: '99.0.0', compatibility: system.compatibility },
+        json: {
+          id: system.id,
+          title: system.title,
+          version: '99.0.0',
+          compatibility: system.compatibility,
+          // A manifest URL for this version alone, without which it could not be installed, nor chosen.
+          manifest: 'https://example.test/system/99.0.0/system.json',
+        },
       });
     });
     await (await moduleManagementButton(page)).click();

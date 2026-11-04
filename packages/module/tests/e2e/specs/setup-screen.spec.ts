@@ -15,6 +15,9 @@ const SETUP_SCRIPT = path.resolve(import.meta.dirname, '../../../../setup/dist/e
 
 const EMMA_WINDOW = '#mondarth-emma-setup';
 
+/** The title of the test world's game system, under which the tree shows the world. */
+const SYSTEM_TITLE = 'Dungeons & Dragons Fifth Edition';
+
 /**
  * Log in as the administrator and open the setup screen, returning from the test world first if it is running. The
  * usage-data question and the welcome tour, which Foundry shows a new browser, are dismissed.
@@ -107,6 +110,9 @@ test.describe('EMMA on the setup screen', () => {
 
     await expect(tree.getByRole('treeitem', { name: /^Foundry VTT 14\./ })).toHaveAttribute('aria-selected', 'true');
     await expect(emma.getByRole('heading', { name: /^Foundry VTT 14\./ })).toBeVisible();
+    // Worlds are shown under the game system they run.
+    await tree.getByRole('treeitem', { name: new RegExp(`^${SYSTEM_TITLE} `) }).click();
+    await page.keyboard.press('ArrowRight');
     const world = tree.getByRole('treeitem', { name: new RegExp(WORLD.title) });
     await expect(world).toContainText('Matches its record');
 
