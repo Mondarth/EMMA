@@ -3,7 +3,7 @@ import { mount, unmount } from 'svelte';
 import EmmaRoot from '@component/EmmaRoot.svelte';
 import { canManageModules, listInstalledModules, readActivation } from '@module/adapters/modules';
 import { isGM, readPlatform } from '@module/adapters/platform';
-import { createInstalledJudge, createVersionJudge } from '@module/adapters/versions';
+import { createInstalledJudge, createVersionJudge, incompatibleModules } from '@module/adapters/versions';
 import type { ReportAnchor, ReportStyle, SetupReportData, SetupReports } from '@module/app/setup-report';
 import { closeSetupReport, closeSetupReports, openSetupReports, showSetupReport } from '@module/app/setup-report';
 import type { DiscardClosingOptions, DiscardQuestion } from '@module/app/confirm-discard';
@@ -13,7 +13,7 @@ import { MODULE_ID } from '@module/lib/constants';
 import { log } from '@module/lib/logger';
 import type { View } from '@module/settings';
 import { localize } from '@module/lib/i18n';
-import { setBadgeChecks } from '@module/state/badge-checks.svelte';
+import { badgeChecks, setBadgeChecks } from '@module/state/badge-checks.svelte';
 import {
   getBadgeChecks,
   getDrawerFields,
@@ -118,7 +118,18 @@ export class EmmaApp extends foundry.applications.api.ApplicationV2 {
    */
   protected override _replaceHTML(_result: unknown, content: HTMLElement): void {
     if (this.#component !== null) return;
-    const modules = new ModuleState(listInstalledModules(), readActivation(), { autoRecommended: isAutoRecommended });
+    const entries = listInstalledModules();
+    // Read afresh each time the window opens, as modules may have been installed since.
+    const judgeInstalled = createInstalledJudge();
+    // An inactive module is judged against the Foundry version and game system alone, so one judgement serves.
+    let judged: ReadonlySet<string> | undefined;
+    const foundryUnavailable = new Set(entries.flatMap(({ id, unavailable }) => (unavailable ? [id] : [])));
+    const modules = new ModuleState(entries, readActivation(), {
+      autoRecommended: isAutoRecommended,
+      // Incompatible by the checks the badges show: EMMA's, or Foundry's own where the user chose those.
+      incompatible: id =>
+        (badgeChecks.value === 'emma' ? (judged ??= incompatibleModules()) : foundryUnavailable).has(id),
+    });
     this.#modules = modules;
     drawerFields.set(getDrawerFields());
     setIgnoredModules(getHypotheticallyIgnored());
@@ -140,8 +151,7 @@ export class EmmaApp extends foundry.applications.api.ApplicationV2 {
                 olderVersions: getOlderVersions,
               })
           : undefined,
-        // Read afresh each time the window opens, as modules may have been installed since.
-        judgeInstalled: createInstalledJudge(),
+        judgeInstalled,
         reports: isGM()
           ? reportsFor(() => {
               const bar = content.querySelector('[role="toolbar"]');

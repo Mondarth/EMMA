@@ -26,6 +26,7 @@ import type {
 import {
   check,
   isNewerVersion,
+  isUnavailable,
   missingManifest,
   normaliseManifest,
   packageKey,
@@ -349,14 +350,11 @@ function installedManifests(): LocalManifest[] {
 export type InstalledJudge = (active: Iterable<string>) => ReadonlyMap<string, VersionBadge | null>;
 
 /**
- * Set up judging the installed modules as EMMA does, which Foundry's own badges do not: what a module requires and
- * conflicts with, and the systems and system versions it runs in, as well as the core versions it supports. A module
- * staged active is judged in the setup of the modules staged active, the core and the system in use. One inactive is
- * judged against the core and the system alone, as what it requires and conflicts with matters only once it is
- * active; judging each in a setup of its own would cost a check for every module installed.
- * @returns The judge
+ * Checking the installed modules: their releases, as their manifests give them, and what checking finds of some of
+ * them in a setup of their own, with the Foundry version and the game system in use.
+ * @returns The modules' releases, by ID, and the check
  */
-export function createInstalledJudge(): InstalledJudge {
+function installedChecks() {
   const core = readCore();
   const releases = localReleases(installedManifests());
   const systemKey = packageKey({ type: 'system', id: game.system.id });
@@ -379,6 +377,38 @@ export function createInstalledJudge(): InstalledJudge {
     };
     return check({ core: [core], releases: [...systems, ...judged] }, setup).releases;
   }
+
+  return { modules, checked };
+}
+
+/**
+ * The installed modules EMMA judges incompatible with the Foundry version and game system in use, as their manifests
+ * declare: those that cannot run here whatever else is active, which is how an inactive module's badge is judged.
+ * @returns Their IDs
+ */
+export function incompatibleModules(): ReadonlySet<string> {
+  const { modules, checked } = installedChecks();
+  const alone = [...modules.values()].map(release => ({
+    ...release,
+    relationships: { ...release.relationships, requires: [], conflicts: [] },
+  }));
+  return new Set(
+    checked(alone).flatMap(({ release: { package: pkg }, availability }) =>
+      pkg.type === 'module' && isUnavailable(availability) ? [pkg.id] : [],
+    ),
+  );
+}
+
+/**
+ * Set up judging the installed modules as EMMA does, which Foundry's own badges do not: what a module requires and
+ * conflicts with, and the systems and system versions it runs in, as well as the core versions it supports. A module
+ * staged active is judged in the setup of the modules staged active, the core and the system in use. One inactive is
+ * judged against the core and the system alone, as what it requires and conflicts with matters only once it is
+ * active; judging each in a setup of its own would cost a check for every module installed.
+ * @returns The judge
+ */
+export function createInstalledJudge(): InstalledJudge {
+  const { modules, checked } = installedChecks();
 
   return active => {
     const on = new Set(active);

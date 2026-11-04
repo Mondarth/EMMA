@@ -129,6 +129,30 @@ describe('EmmaApp', () => {
     expect(screen.getByRole('checkbox', { name: /Extra/ })).toBeChecked();
   });
 
+  test('keeps a module judged incompatible from being activated, by the checks the badges show', async () => {
+    const modules = {
+      // Needs a Foundry version to come, by its manifest; Foundry's own check finds another module unavailable.
+      future: { title: 'Future', compatibility: { minimum: '15' } },
+      flagged: { title: 'Flagged', unavailable: true },
+    };
+    const emma = await loadApp({ modules });
+    await new emma.EmmaApp().render({ force: true });
+
+    expect(screen.getByRole('checkbox', { name: 'Future' })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'Flagged' })).toBeEnabled();
+    expect(screen.getByText('Future', { selector: '.emma-module-title' }).closest('.emma-module-row')).toHaveAttribute(
+      'data-tooltip',
+      'MONDARTH-EMMA.Requirements.Incompatible {"module":"Future"}',
+    );
+
+    document.body.replaceChildren();
+    const foundry = await loadApp({ modules, settings: { 'mondarth-emma.badgeChecks': 'foundry' } });
+    await new foundry.EmmaApp().render({ force: true });
+
+    expect(screen.getByRole('checkbox', { name: 'Flagged' })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'Future' })).toBeEnabled();
+  });
+
   test('shows the installed modules with their saved activation', async () => {
     const { EmmaApp } = await loadApp({ settings: { 'core.moduleConfiguration': { dice: true } } });
 

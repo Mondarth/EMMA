@@ -4,7 +4,7 @@ import { describe, expect, test, vi } from 'vitest';
 
 import type { SetupSolve } from '@module/adapters/report';
 import { AVAILABILITY } from '@mondarth/fvtt-resolver';
-import { createInstalledJudge, createVersionJudge } from '@module/adapters/versions';
+import { createInstalledJudge, createVersionJudge, incompatibleModules } from '@module/adapters/versions';
 import type { FoundryMockOptions, ModuleMockData } from '../../mocks/foundry';
 import { installFoundryMocks } from '../../mocks/foundry';
 
@@ -1353,5 +1353,25 @@ describe('createInstalledJudge', () => {
     installFoundryMocks({ modules: { 'bad id': { ...verified, active: true } } });
 
     expect(createInstalledJudge()(['bad id']).has('bad id')).toBe(false);
+  });
+});
+
+describe('incompatibleModules', () => {
+  const verified = { compatibility: { minimum: '14', verified: '14' } };
+
+  test('finds the modules that cannot run with the Foundry version or game system in use, whatever is active', () => {
+    installFoundryMocks({
+      modules: {
+        dice: { ...verified, requires: ['lib'], conflicts: ['tool'] },
+        future: { compatibility: { minimum: '15' } },
+        past: { compatibility: { minimum: '12', maximum: '13' } },
+        other: { ...verified, systems: ['pf2e'] },
+        unknown: {},
+        tool: verified,
+      },
+    });
+
+    // One for another game system, or whose compatibility is unknown, is only unverified, as Foundry badges it.
+    expect([...incompatibleModules()].sort()).toEqual(['future', 'past']);
   });
 });

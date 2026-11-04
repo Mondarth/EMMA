@@ -85,6 +85,8 @@ export interface ModuleEntry {
   readonly version: string;
   /** The compatibility badge shown with the version, or `null` if Foundry gives none. */
   readonly badge: VersionBadge | null;
+  /** Whether Foundry's own check finds it unavailable: incompatible with this Foundry version or game system. */
+  readonly unavailable?: true;
   /** The manifest's description: HTML, cleaned by Foundry so it is safe to insert. */
   readonly description: string;
   /** The module's authors, in manifest order. */
@@ -120,6 +122,7 @@ export function listInstalledModules(): ModuleEntry[] {
     title: pkg.title,
     version: pkg.version,
     badge: toBadge(pkg.getVersionBadge()),
+    ...(pkg.unavailable && { unavailable: true as const }),
     description: foundry.utils.cleanHTML(pkg.description),
     authors: Array.from(pkg.authors, toAuthor),
     languages: Array.from(pkg.languages, ({ lang, name }) => ({

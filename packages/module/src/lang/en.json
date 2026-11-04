@@ -244,7 +244,9 @@
     "Requirements": {
       "Unmet": "{module} requires {missing}, which must be active too.",
       "LockedOne": "{module} is required by {parent}, so it must stay active while it is.",
-      "LockedMany": "{module} is required by {parents}, so it must stay active while they are."
+      "LockedMany": "{module} is required by {parents}, so it must stay active while they are.",
+      "Incompatible": "{module} is incompatible with this Foundry version or game system, so it cannot be activated. Hypothetical mode can still try it.",
+      "RequiresIncompatible": "{module} cannot be activated: it requires {modules}, which is incompatible with this Foundry version or game system. Hypothetical mode can still try it."
     },
     "Relation": {
       "required": "Required",
