@@ -38,9 +38,15 @@ describe('locateKit', () => {
 
     expect(locateKit(installed, route)).toEqual({
       ok: true,
-      url: '/foundry/modules/mondarth-emma/dist/emma-setup-kit.js?v=1.2.0%2Bb',
+      url: `${location.origin}/foundry/modules/mondarth-emma/dist/emma-setup-kit.js?v=1.2.0%2Bb`,
       version: '1.2.0+b',
     });
+  });
+
+  test('gives the kit a URL on the page’s own server, as a script the extension injects would not resolve a path there', () => {
+    const found = locateKit(withEmma({ setupKit: { api: SETUP_KIT_API, path: 'kit.js' } }), route);
+
+    expect(found.ok && new URL(found.url).origin).toBe(location.origin);
   });
 
   test('says the EMMA module is missing, as a system of its ID is not it', () => {
