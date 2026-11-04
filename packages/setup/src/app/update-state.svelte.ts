@@ -14,6 +14,7 @@ import type { PlanEntry, Planner } from '../lib/plans';
 import { UNINSTALL, keepChoices, withChoice } from '../lib/plans';
 import type { Safeguard, SafeguardEdit } from '../lib/safeguards';
 import { safeguardsFor } from '../lib/safeguards';
+import { inUse } from '../lib/setups';
 import type { UninstallEffects } from '../lib/uninstall';
 import { uninstallEffects } from '../lib/uninstall';
 import type { BlockedUpdate, ManifestRead, PackageUpdate, UpdateSearch, VersionOption } from '../lib/updates';
@@ -819,18 +820,23 @@ export class UpdateState {
    * version to choose, so it stays as it is. What was chosen before goes, uninstalls and packages added against advice
    * among it. It is greedy: the order is a choice, and another might find newer versions of some packages at the cost
    * of others.
+   * @param options - How far it reaches
+   * @param options.inUseOnly - Whether to choose versions only of the game systems and modules worlds use (see
+   *   `inUse`), leaving the others as they are, though not ignored: what is used may still need one changed
    * @returns Whether the plan was replaced: not while it runs, nor before the search has found anything
    */
-  async planBest(): Promise<boolean> {
+  async planBest(options: { readonly inUseOnly?: boolean } = {}): Promise<boolean> {
     const search = this.search;
     const overview = this.#overview;
     if (search === null || overview === null || this.locked) return false;
     const { planner } = search;
+    // Limited to what the worlds use, the others are left as they are installed, unless what is used needs them changed.
+    const used = options.inUseOnly === true ? inUse(overview) : undefined;
     const keys = [
       'core',
       ...overview.systems.map(({ id }) => `system:${id}`),
       ...overview.modules.map(({ module: { id } }) => `module:${id}`),
-    ];
+    ].filter(key => key === 'core' || used === undefined || used.has(key));
     this.planning = true;
     try {
       let picks: ReadonlyMap<PackageKey, string> = new SvelteMap();

@@ -2059,6 +2059,47 @@ describe('planning the best versions', () => {
     expect(within(section).getByRole('button', { name: 'Replace the plan with the best versions' })).toBeEnabled();
     expect(within(section).queryByRole('status')).toBeNull();
   });
+
+  test('limits them to what worlds use when the user chooses, keeping the choice', async () => {
+    const onBestInUseOnlyChange = vi.fn();
+    const setup = new SetupState({
+      load: () => Promise.resolve(OVERVIEW),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: findingBlocked(),
+      installModule: noInstall,
+      onBestInUseOnlyChange,
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    await vi.waitFor(() => {
+      expect(setup.updates.status).toBe('found');
+    });
+    const planBest = vi.spyOn(setup.updates, 'planBest');
+    const user = userEvent.setup();
+    const section = screen.getByRole('region', { name: 'Best versions' });
+    const limit = within(section).getByRole('checkbox', { name: 'Only what worlds use' });
+    expect(limit).not.toBeChecked();
+
+    await user.click(limit);
+    expect(onBestInUseOnlyChange).toHaveBeenCalledWith(true);
+    expect(setup.bestInUseOnly).toBe(true);
+    await user.click(within(section).getByRole('button', { name: 'Plan the best versions' }));
+
+    expect(planBest).toHaveBeenCalledWith({ inUseOnly: true });
+    const kept = new SetupState({
+      load: () => Promise.resolve(OVERVIEW),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: findingBlocked(),
+      installModule: noInstall,
+      bestInUseOnly: true,
+    });
+    expect(kept.bestInUseOnly).toBe(true);
+    // Without a way to keep it, it changes for the visit alone.
+    kept.setBestInUseOnly(false);
+    expect(kept.bestInUseOnly).toBe(false);
+  });
 });
 
 describe('what a module recommends', () => {

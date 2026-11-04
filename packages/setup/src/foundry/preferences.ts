@@ -89,6 +89,36 @@ export function writeAlphaAcknowledged(version: string): void {
   }
 }
 
+/** The key whether the best versions are limited to what worlds use is kept under. */
+export const BEST_IN_USE_KEY = 'mondarth-emma.setup.best-in-use';
+
+/**
+ * Whether the best versions are limited to the game systems and modules worlds use: off unless switched on, and off
+ * when the storage cannot be read.
+ * @returns `true` if they are
+ */
+export function readBestInUseOnly(): boolean {
+  try {
+    return localStorage.getItem(BEST_IN_USE_KEY) === 'on';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Keep whether the best versions are limited to what worlds use. Kept for this visit only if the storage cannot be
+ * written.
+ * @param on - Whether they are
+ */
+export function writeBestInUseOnly(on: boolean): void {
+  try {
+    if (on) localStorage.setItem(BEST_IN_USE_KEY, 'on');
+    else localStorage.removeItem(BEST_IN_USE_KEY);
+  } catch {
+    // As for the guard's setting.
+  }
+}
+
 /** The key what EMMA ignores is kept under. */
 export const IGNORED_KEY = 'mondarth-emma.setup.ignored';
 

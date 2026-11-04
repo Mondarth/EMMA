@@ -80,6 +80,22 @@ describe('planning the best versions', () => {
     expect(updates.plan.some(({ key }) => key === 'module:old')).toBe(false);
   });
 
+  test('limited to what worlds use, leaves the others as they are, without ignoring them', async () => {
+    const updates = await searched();
+
+    await expect(updates.planBest({ inUseOnly: true })).resolves.toBe(true);
+
+    // Library, which no world runs, stays at 1.0.0; Alpha's Midi and D&D 5e move up with Foundry VTT.
+    expect(new Map(updates.picks)).toEqual(
+      new Map([
+        ['core', '14.370'],
+        ['system:dnd5e', '6.0.6'],
+        ['module:midi', '2.0.0'],
+      ]),
+    );
+    expect(updates.optionOf('module:lib', '2.0.0')).toBeDefined();
+  });
+
   test('keeps Foundry VTT locked in EMMA at its build, updating what runs on it', async () => {
     const updates = await searched(true);
 

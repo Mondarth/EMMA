@@ -185,3 +185,16 @@ export function considered(resolver: KitResolver, overview: Overview): Considere
     })),
   };
 }
+
+/**
+ * The game systems and modules the worlds use, which the best versions may be limited to: each world's system, recorded
+ * or not, and the modules a recorded world runs or will need. A world without a record may run others.
+ * @param overview - The installation
+ * @returns Their keys, such as `system:dnd5e` and `module:dice`
+ */
+export function inUse(overview: Overview): ReadonlySet<string> {
+  return new Set([
+    ...overview.worlds.flatMap(({ system }) => (system === undefined ? [] : [`system:${system.id}`])),
+    ...overview.modules.flatMap(({ module: { id }, worlds }) => (worlds.length === 0 ? [] : [`module:${id}`])),
+  ]);
+}

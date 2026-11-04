@@ -245,6 +245,12 @@ locked in EMMA, stay as they are. What was chosen before goes, uninstalls and pa
 Each is taken in that order, so another order might find newer versions of some packages at the cost of others. It
 covers every package installed, used by a world or not.
 
+Beside it, **Only what worlds use** limits it to the game systems the worlds use, recorded or not, and the modules the
+recorded worlds run or will need. The others stay as they are installed, unless what is used needs one changed. They
+are not ignored (see [Ignoring](#ignoring)): every other plan still takes them into account, and they can still be
+chosen by hand. A world without a record may run modules EMMA cannot see, which the option then leaves as they are. The
+browser remembers the choice for that server.
+
 Before the changes, under **Keep first**, the plan offers what Foundry's **Manage Backups** makes by hand:
 
 - a **snapshot of the installation**, unchecked unless the plan changes Foundry VTT, when EMMA checks it as a strong

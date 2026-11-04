@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import {
+  BEST_IN_USE_KEY,
+  readBestInUseOnly,
+  writeBestInUseOnly,
   ALPHA_ACKNOWLEDGED_KEY,
   readAlphaAcknowledged,
   writeAlphaAcknowledged,
@@ -72,6 +75,31 @@ describe('acknowledging the alpha', () => {
     expect(readAlphaAcknowledged('0.1.1')).toBe(false);
     expect(() => {
       writeAlphaAcknowledged('0.1.1');
+    }).not.toThrow();
+  });
+});
+
+describe('limiting the best versions to what worlds use', () => {
+  test('is off until switched on, and is kept', () => {
+    expect(readBestInUseOnly()).toBe(false);
+
+    writeBestInUseOnly(true);
+    expect(localStorage.getItem(BEST_IN_USE_KEY)).toBe('on');
+    expect(readBestInUseOnly()).toBe(true);
+
+    writeBestInUseOnly(false);
+    expect(localStorage.getItem(BEST_IN_USE_KEY)).toBeNull();
+  });
+
+  test('is off, and is not kept, when the storage refuses', () => {
+    const blocked = () => {
+      throw new Error('blocked');
+    };
+    vi.stubGlobal('localStorage', { getItem: blocked, setItem: blocked, removeItem: blocked });
+
+    expect(readBestInUseOnly()).toBe(false);
+    expect(() => {
+      writeBestInUseOnly(true);
     }).not.toThrow();
   });
 });

@@ -50,6 +50,10 @@ export interface SetupStateOptions {
    * have. None where EMMA is not an alpha.
    */
   readonly alpha?: { readonly acknowledged: boolean; readonly acknowledge: () => void };
+  /** Whether the best versions are limited to what worlds use, as the user last chose; off by default. */
+  readonly bestInUseOnly?: boolean;
+  /** Keep whether the best versions are limited to what worlds use. */
+  readonly onBestInUseOnlyChange?: (on: boolean) => void;
 }
 
 /** What is known of Foundry's listing of a type of package: `loading`, `failed`, or the packages; `null` before. */
@@ -107,6 +111,8 @@ export class SetupState {
    * `true` where EMMA is not an alpha.
    */
   alphaAcknowledged = $state(true);
+  /** Whether the best versions are limited to the game systems and modules worlds use. */
+  bestInUseOnly = $state(false);
   /** The installation's updates, searched for each time it is read. */
   readonly updates: UpdateState;
   /** The space a snapshot needs and the space free, once asked, until the installation is read again. */
@@ -170,6 +176,7 @@ export class SetupState {
     this.#options = options;
     this.guardOn = options.guardOn;
     this.alphaAcknowledged = options.alpha?.acknowledged ?? true;
+    this.bestInUseOnly = options.bestInUseOnly ?? false;
     this.updates = new UpdateState(options.findUpdates);
   }
 
@@ -462,5 +469,14 @@ export class SetupState {
   setGuardOn(on: boolean): void {
     this.guardOn = on;
     this.#options.onGuardChange(on);
+  }
+
+  /**
+   * Limit the best versions to the game systems and modules worlds use, or not, keeping the choice.
+   * @param on - Whether to limit them
+   */
+  setBestInUseOnly(on: boolean): void {
+    this.bestInUseOnly = on;
+    this.#options.onBestInUseOnlyChange?.(on);
   }
 }

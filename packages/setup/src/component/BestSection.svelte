@@ -10,9 +10,13 @@
     updates: UpdateState;
     /** Whether the plan cannot change now, as while it runs. */
     disabled: boolean;
+    /** Whether the best versions are limited to the game systems and modules worlds use. */
+    inUseOnly?: boolean;
+    /** Limit them, or not. */
+    onInUseOnlyChange?: (on: boolean) => void;
   }
 
-  let { updates, disabled }: Props = $props();
+  let { updates, disabled, inUseOnly = false, onInUseOnlyChange }: Props = $props();
 
   const uid = $props.id();
   /** Whether the best versions are being worked out. */
@@ -22,7 +26,7 @@
   async function planBest(): Promise<void> {
     working = true;
     try {
-      await updates.planBest();
+      await updates.planBest({ inUseOnly });
     } finally {
       working = false;
     }
@@ -41,6 +45,17 @@
     <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
     {localize(updates.choices.length > 0 ? 'Best.Replace' : 'Best.Plan')}
   </button>
+  <label class="emma-best-in-use">
+    <input
+      type="checkbox"
+      checked={inUseOnly}
+      disabled={disabled || working}
+      onchange={event => {
+        onInUseOnlyChange?.(event.currentTarget.checked);
+      }} />
+    {localize('Best.InUseOnly')}
+  </label>
+  <p class="emma-best-hint">{localize('Best.InUseOnlyHint')}</p>
   {#if working}
     <p role="status">{localize('Best.Working')}</p>
   {/if}
@@ -53,5 +68,22 @@
 
   .emma-best button {
     width: auto;
+  }
+
+  .emma-best-in-use {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .emma-best-in-use input {
+    margin: 0;
+  }
+
+  .emma-best-hint {
+    margin-top: 0.25rem;
+    font-size: 0.85em;
+    opacity: 0.85;
   }
 </style>
