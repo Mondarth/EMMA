@@ -1,3 +1,10 @@
+## [0.2.1](https://github.com/Mondarth/EMMA/compare/extension-v0.2.0...extension-v0.2.1) (2026-11-04)
+
+### Bug Fixes
+
+* **setup:** import the setup kit from an absolute URL ([a8caa17](https://github.com/Mondarth/EMMA/commit/a8caa17d8838e28f51d1cd0a05a77754c6fd615e))
+* **setup:** judge versions with the modules they newly require ([261bfb6](https://github.com/Mondarth/EMMA/commit/261bfb667908fb2572bc7f186ee8f50031faf792))
+
 ## [0.2.0](https://github.com/Mondarth/EMMA/compare/extension-v0.1.1...extension-v0.2.0) (2026-11-04)
 
 ### Features
