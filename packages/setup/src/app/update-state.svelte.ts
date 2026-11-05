@@ -489,6 +489,40 @@ export class UpdateState {
   }
 
   /**
+   * Restore choices kept from an earlier plan, as before Foundry VTT's update: all together, as one plan, as a new
+   * search keeps the choices it still offers, so a choice that needs a later one is not refused for want of it. If they
+   * cannot be planned together, each is chosen in turn instead. A package to install anew is looked up again; a choice
+   * of the version installed is done already, so needs nothing.
+   * @param choices - The versions chosen, as `[key, version]`, in the order they were chosen
+   * @returns The keys of the choices that could not be restored
+   */
+  async restore(choices: readonly (readonly [PackageKey, string])[]): Promise<PackageKey[]> {
+    const search = this.search;
+    const overview = this.#overview;
+    if (search === null || overview === null || this.locked) return choices.map(([key]) => key);
+    const waiting = choices.filter(([key, version]) => this.#installedOf(key) !== version);
+    for (const [key, version] of waiting) {
+      if (version !== UNINSTALL && this.#installedOf(key) === undefined) await search.planner.add(key);
+    }
+    const offered = (key: PackageKey, version: string) =>
+      version === UNINSTALL ? this.#installedOf(key) !== undefined : search.planner.candidates(key).includes(version);
+    let picks = keepChoices(this.#picks, () => true);
+    for (const [key, version] of waiting) if (offered(key, version)) picks = withChoice(picks, key, version);
+    const plan = this.#uninstallsAllowed(overview, picks) ? await search.planner.plan(picks) : undefined;
+    if (plan !== undefined && search === this.search) {
+      this.#picks.clear();
+      for (const [key, version] of picks) this.#picks.set(key, version);
+      this.plan = plan;
+      this.changes++;
+      return waiting.filter(([key, version]) => !offered(key, version)).map(([key]) => key);
+    }
+    // Not together, or a new search began meanwhile: each in turn, as choosing it would.
+    const refused: PackageKey[] = [];
+    for (const [key, version] of waiting) if (!(await this.choose(key, version))) refused.push(key);
+    return refused;
+  }
+
+  /**
    * Choose a version of a package, as {@link choose} does, without what it recommends.
    * @param key - The package's key
    * @param version - The version

@@ -201,7 +201,7 @@ describe('startEmmaSetup', () => {
     expect(ui.notifications.info).not.toHaveBeenCalled();
   });
 
-  test("drives Foundry's own updater, as its Update Software form does, keeping the rest of the plan", async () => {
+  test("drives Foundry's own updater, as its Update Software form does, the rest of the plan kept by the run", async () => {
     const { game, post } = installSetupMocks();
     Object.assign(game, { data: { coreUpdate: { canUpdate: true }, options: { updateChannel: 'stable' } } });
     post.mockImplementation((request: object) =>
@@ -213,7 +213,7 @@ describe('startEmmaSetup', () => {
     const setup = vi.mocked(openEmmaSetup).mock.lastCall?.[0] as SetupState;
     expect(setup.coreUpdate).toEqual({ canUpdate: true, channel: 'stable' });
 
-    setup.run = { steps: [], states: {}, over: true, beforeCore: '14.369' };
+    setup.run = { steps: [], states: {}, over: true, beforeCore: '14.369', kept: true };
     await setup.checkCoreTarget();
     await setup.updateCoreInPlace();
 
@@ -226,10 +226,6 @@ describe('startEmmaSetup', () => {
       { notify: false },
     );
     expect(setup.coreUpdating).toEqual({ kind: 'begun', version: '14.369', kept: true });
-    expect(JSON.parse(localStorage.getItem('mondarth-emma.setup.pending-plan') ?? 'null')).toEqual({
-      core: '14.369',
-      picks: [],
-    });
   });
 
   test("locks a package as Foundry's package menu does, through the guard", async () => {

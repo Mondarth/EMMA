@@ -442,9 +442,10 @@ describe('SetupState', () => {
      * A state whose plan updates Foundry VTT and a module, run up to Foundry's update.
      * @param core - Foundry's updater
      * @param kept - Where the plan kept for after the update goes
+     * @param stores - Whether the browser stores it
      * @returns The state
      */
-    async function stopped(core: CoreUpdater | undefined, kept: (PendingPlan | null)[] = []) {
+    async function stopped(core: CoreUpdater | undefined, kept: (PendingPlan | null)[] = [], stores = true) {
       const setup = new SetupState({
         load: () => Promise.resolve(OVERVIEW),
         guardOn: true,
@@ -462,7 +463,7 @@ describe('SetupState', () => {
         ...(core !== undefined && { core }),
         keepPendingPlan: plan => {
           kept.push(plan);
-          return true;
+          return stores;
         },
       });
       await setup.refresh();
@@ -495,30 +496,56 @@ describe('SetupState', () => {
       expect(setup.coreTarget).toBe('failed');
     });
 
-    test('keeps the rest of the plan, then starts the update', async () => {
+    test('keeps the rest of the plan as the run stops, as Foundry may be updated by other means, then updates', async () => {
       const kept: (PendingPlan | null)[] = [];
       const core = updater({ version: '14.369', manual: false });
       const setup = await stopped(core, kept);
-      await setup.checkCoreTarget();
 
+      // Kept as the run starts, after each step, then as it stops, before anything else is done, as in a container,
+      // where Foundry's updater is never used.
+      expect(kept[0]).toEqual({
+        picks: [
+          ['core', '14.369'],
+          ['module:app', '2.0.0'],
+        ],
+      });
+      expect(kept.at(-1)).toEqual({ core: '14.369', picks: [['module:app', '2.0.0']] });
+      expect(setup.run?.kept).toBe(true);
+      const saves = kept.length;
+
+      await setup.checkCoreTarget();
       await setup.updateCoreInPlace();
 
-      expect(kept).toEqual([{ core: '14.369', picks: [['module:app', '2.0.0']] }]);
+      expect(kept).toHaveLength(saves);
       expect(core.update).toHaveBeenCalledOnce();
       expect(setup.coreUpdating).toEqual({ kind: 'begun', version: '14.369', kept: true });
     });
 
-    test('forgets the plan kept when Foundry does not update, saying why', async () => {
+    test('says when the browser would not keep the rest of the plan', async () => {
+      const core = updater({ version: '14.369', manual: false });
+      const setup = await stopped(core, [], false);
+      expect(setup.run?.kept).toBe(false);
+
+      await setup.checkCoreTarget();
+      await setup.updateCoreInPlace();
+
+      expect(setup.coreUpdating).toEqual({ kind: 'begun', version: '14.369', kept: false });
+    });
+
+    test('keeps the plan kept when Foundry does not update, saying why', async () => {
       const kept: (PendingPlan | null)[] = [];
       const core = updater({ version: '14.369', manual: false });
-      vi.mocked(core.update).mockRejectedValueOnce(new Error('Not allowed'));
+      vi.mocked(core.update).mockRejectedValueOnce(new Error('Not allowed')).mockRejectedValueOnce('Offline');
       const setup = await stopped(core, kept);
       await setup.checkCoreTarget();
 
       await setup.updateCoreInPlace();
 
-      expect(kept).toEqual([expect.objectContaining({ core: '14.369' }), null]);
+      expect(kept.at(-1)).toEqual(expect.objectContaining({ core: '14.369' }));
+      expect(kept).not.toContain(null);
       expect(setup.coreUpdating).toEqual({ kind: 'failed', message: 'Not allowed' });
+      await setup.updateCoreInPlace();
+      expect(setup.coreUpdating).toEqual({ kind: 'failed', message: 'Offline' });
     });
 
     test.each([
@@ -554,9 +581,14 @@ describe('SetupState', () => {
      * A state that reads an installation, with a plan kept from before Foundry VTT's update.
      * @param overview - The installation
      * @param keepPendingPlan - Where the plan kept is forgotten
+     * @param picks - The choices kept
      * @returns The state, once its search is done
      */
-    async function readOn(overview: Overview, keepPendingPlan: (plan: PendingPlan | null) => boolean) {
+    async function readOn(
+      overview: Overview,
+      keepPendingPlan: (plan: PendingPlan | null) => boolean,
+      picks: PendingPlan['picks'] = [['module:app', '2.0.0']],
+    ) {
       const setup = new SetupState({
         load: () => Promise.resolve(overview),
         guardOn: true,
@@ -570,7 +602,7 @@ describe('SetupState', () => {
             planner: alone(APP),
           }),
         installModule: noInstall,
-        pendingPlan: () => ({ core: '14.369', picks: [['module:app', '2.0.0']] }),
+        pendingPlan: () => ({ core: '14.369', picks }),
         keepPendingPlan,
       });
       await setup.refresh();
@@ -585,17 +617,150 @@ describe('SetupState', () => {
       const setup = await readOn(buildOverview(installation({ core: '14.369' }), new Map()), keepPendingPlan);
 
       await vi.waitFor(() => {
-        expect(setup.resumedOn).toBe('14.369');
+        expect(setup.resumed).toEqual({ core: '14.369' });
       });
       expect(setup.updates.picks).toEqual([['module:app', '2.0.0']]);
       expect(keepPendingPlan).toHaveBeenCalledExactlyOnceWith(null);
+    });
+
+    test.each(['14.371', '15.300'])(
+      'restores it on a later build too, as on %s, as a container may be updated past it',
+      async core => {
+        const keepPendingPlan = vi.fn(() => true);
+        const setup = await readOn(buildOverview(installation({ core }), new Map()), keepPendingPlan);
+
+        await vi.waitFor(() => {
+          expect(setup.resumed).toEqual({ core: '14.369' });
+        });
+        expect(setup.updates.picks).toEqual([['module:app', '2.0.0']]);
+      },
+    );
+
+    test('takes a build named otherwise than generation.build as only itself', async () => {
+      const keepPendingPlan = vi.fn(() => true);
+      const setup = await readOn(buildOverview(installation({ core: '14.369-dev' }), new Map()), keepPendingPlan);
+
+      expect(setup.resumed).toBeNull();
+      expect(keepPendingPlan).not.toHaveBeenCalled();
+    });
+
+    test('names the choices it could not restore, as no longer offered, and forgets the plan all the same', async () => {
+      const keepPendingPlan = vi.fn(() => true);
+      const setup = await readOn(buildOverview(installation({ core: '14.369' }), new Map()), keepPendingPlan, [
+        ['module:app', '9.9.9'],
+      ]);
+
+      await vi.waitFor(() => {
+        expect(setup.resumed).toEqual({ core: '14.369' });
+      });
+      expect(setup.unrestored).toEqual(['module:app']);
+      expect(setup.updates.picks).toEqual([]);
+      expect(keepPendingPlan).toHaveBeenCalledExactlyOnceWith(null);
+    });
+
+    test('keeps what is left of the plan as a step fails, and forgets it once every step is done', async () => {
+      const kept: (PendingPlan | null)[] = [];
+      let fail = true;
+      const setup = new SetupState({
+        load: () => Promise.resolve(OVERVIEW),
+        guardOn: true,
+        onGuardChange: vi.fn(),
+        findUpdates: () =>
+          Promise.resolve({
+            updates: new Map([[APP.key, APP]]),
+            blocked: new Map(),
+            unresolved: [],
+            judge: unjudged,
+            planner: alone(APP),
+          }),
+        installModule: noInstall,
+        runStep: step => (fail && step.kind === 'install' ? Promise.reject(new Error('Refused')) : Promise.resolve()),
+        keepPendingPlan: plan => {
+          kept.push(plan);
+          return true;
+        },
+        pendingPlan: () => kept.at(-1) ?? undefined,
+      });
+      await setup.refresh();
+      await vi.waitFor(() => {
+        expect(setup.updates.status).toBe('found');
+      });
+      await setup.updates.choose('module:app', '2.0.0');
+
+      await setup.runPlan();
+      expect(kept.at(-1)).toEqual({ picks: [['module:app', '2.0.0']] });
+      // Its plan is still here, so it is not offered again in this visit.
+      expect(setup.savedPlan).toBeNull();
+
+      fail = false;
+      await setup.runPlan();
+      expect(kept.at(-1)).toBeNull();
+    });
+
+    test('offers a plan a run did not finish on a later visit, to resume or discard', async () => {
+      const keepPendingPlan = vi.fn(() => true);
+      const setup = await readOn(OVERVIEW, keepPendingPlan, [['module:app', '2.0.0']]);
+      // As readOn keeps the plan with a build, one without is read on another visit.
+      const saved = { picks: [['module:app', '2.0.0']] as const };
+      const later = new SetupState({
+        load: () => Promise.resolve(OVERVIEW),
+        guardOn: true,
+        onGuardChange: vi.fn(),
+        findUpdates: () =>
+          Promise.resolve({
+            updates: new Map([[APP.key, APP]]),
+            blocked: new Map(),
+            unresolved: [],
+            judge: unjudged,
+            planner: alone(APP),
+          }),
+        installModule: noInstall,
+        pendingPlan: () => saved,
+        keepPendingPlan,
+      });
+      await later.refresh();
+      await vi.waitFor(() => {
+        expect(later.savedPlan).toEqual(saved);
+      });
+
+      await later.resumeSaved();
+      expect(later.savedPlan).toBeNull();
+      expect(later.resumed).toEqual({});
+      expect(later.updates.picks).toEqual([['module:app', '2.0.0']]);
+      // Nothing more to resume.
+      await later.resumeSaved();
+
+      setup.savedPlan = saved;
+      setup.discardSaved();
+      expect(setup.savedPlan).toBeNull();
+      expect(keepPendingPlan).toHaveBeenLastCalledWith(null);
+    });
+
+    test('restores choices one by one when they cannot be planned together, and none while the plan runs', async () => {
+      const setup = await readOn(
+        OVERVIEW,
+        vi.fn(() => true),
+      );
+      const search = setup.updates.search;
+      if (search === null) throw new Error('No search');
+      vi.spyOn(search.planner, 'plan').mockResolvedValueOnce(undefined);
+
+      await expect(setup.updates.restore([['module:app', '2.0.0']])).resolves.toEqual([]);
+      expect(setup.updates.picks).toEqual([['module:app', '2.0.0']]);
+      // One by one, a version no longer offered is refused still.
+      vi.mocked(search.planner.plan).mockResolvedValueOnce(undefined);
+      await expect(setup.updates.restore([['module:app', '9.9.9']])).resolves.toEqual(['module:app']);
+
+      setup.updates.locked = true;
+      await expect(setup.updates.restore([['module:app', '2.0.0']])).resolves.toEqual(['module:app']);
     });
 
     test('keeps the plan kept while Foundry VTT is on another build', async () => {
       const keepPendingPlan = vi.fn(() => true);
       const setup = await readOn(OVERVIEW, keepPendingPlan);
 
-      expect(setup.resumedOn).toBeNull();
+      expect(setup.resumed).toBeNull();
+      expect(setup.savedPlan).toBeNull();
       expect(keepPendingPlan).not.toHaveBeenCalled();
     });
   });

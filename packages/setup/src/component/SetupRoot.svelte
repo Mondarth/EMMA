@@ -27,6 +27,7 @@
   import SystemPanel from './SystemPanel.svelte';
   import CoreStep from './CoreStep.svelte';
   import AlphaNotice from './AlphaNotice.svelte';
+  import SavedPlanNotice from './SavedPlanNotice.svelte';
   import BestSection from './BestSection.svelte';
   import InstallSection from './InstallSection.svelte';
   import IgnoreSection from './IgnoreSection.svelte';
@@ -99,13 +100,23 @@
   /** What the footer says of the last run of the plan. */
   const runStatus = $derived.by(() => {
     const run = setup.shownRun;
-    if (setup.resumedOn !== null && run === null) return format('Core.Resumed', { version: setup.resumedOn });
+    const { resumed: restored } = setup;
+    if (restored !== null && run === null) {
+      const resumed =
+        restored.core === undefined ? localize('Saved.Resumed') : format('Core.Resumed', { version: restored.core });
+      const { unrestored } = setup;
+      return unrestored.length === 0
+        ? resumed
+        : `${resumed} ${format('Core.NotRestored', { packages: unrestored.join(', ') })}`;
+    }
     if (run === null) return undefined;
     if (!run.over) return localize('Run.Running');
     if (run.failure !== undefined) {
       return format('Run.Failed', { step: stepText(run.failure.step), message: run.failure.message });
     }
-    return run.beforeCore === undefined ? localize('Run.Ran') : format('Run.BeforeCore', { version: run.beforeCore });
+    if (run.beforeCore === undefined) return localize('Run.Ran');
+    const stopped = format('Run.BeforeCore', { version: run.beforeCore });
+    return `${stopped} ${localize(run.kept === true ? 'Core.Kept' : 'Core.NotKept')}`;
   });
   const unresolved = $derived(updates.search?.unresolved.length ?? 0);
   const problem = $derived(updates.status === 'unavailable' ? updates.problem : null);
@@ -405,6 +416,16 @@
         acknowledged={setup.alphaAcknowledged}
         onAcknowledge={() => {
           setup.acknowledgeAlpha();
+        }} />
+    {/if}
+    {#if setup.savedPlan !== null}
+      <SavedPlanNotice
+        count={setup.savedPlan.picks.length}
+        onResume={() => {
+          void setup.resumeSaved();
+        }}
+        onDiscard={() => {
+          setup.discardSaved();
         }} />
     {/if}
     {#if overview !== null}
