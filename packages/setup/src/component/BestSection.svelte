@@ -21,12 +21,23 @@
   const uid = $props.id();
   /** Whether the best versions are being worked out. */
   let working = $state(false);
+  /**
+   * What the last planning came to, when the plan panel would not show it: nothing to change, or no plan at all. Kept
+   * with the plan's count of changes then, so it goes once the plan changes again.
+   */
+  let outcome = $state<{ readonly text: string; readonly at: number } | null>(null);
 
   /** Replace the plan with the best versions. */
   async function planBest(): Promise<void> {
     working = true;
+    outcome = null;
+    const limited = inUseOnly;
     try {
-      await updates.planBest({ inUseOnly });
+      const replaced = await updates.planBest({ inUseOnly: limited });
+      let key: string | undefined;
+      if (!replaced) key = 'Best.Failed';
+      else if (updates.choices.length === 0) key = limited ? 'Best.AlreadyBestInUse' : 'Best.AlreadyBest';
+      if (key !== undefined) outcome = { text: localize(key), at: updates.changes };
     } finally {
       working = false;
     }
@@ -58,6 +69,8 @@
   <p class="emma-best-hint">{localize('Best.InUseOnlyHint')}</p>
   {#if working}
     <p role="status">{localize('Best.Working')}</p>
+  {:else if outcome !== null && outcome.at === updates.changes}
+    <p role="status">{outcome.text}</p>
   {/if}
 </section>
 

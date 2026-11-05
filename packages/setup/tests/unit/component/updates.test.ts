@@ -2060,6 +2060,49 @@ describe('planning the best versions', () => {
     expect(within(section).queryByRole('status')).toBeNull();
   });
 
+  test('says when there is nothing to change, or no plan to be had, until the plan changes', async () => {
+    const setup = new SetupState({
+      load: () => Promise.resolve(OVERVIEW),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: findingBlocked(),
+      installModule: noInstall,
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    await vi.waitFor(() => {
+      expect(setup.updates.status).toBe('found');
+    });
+    // As when everything is at its best version already: the plan is replaced, with nothing in it.
+    const planBest = vi.spyOn(setup.updates, 'planBest').mockResolvedValue(true);
+    const user = userEvent.setup();
+    const section = screen.getByRole('region', { name: 'Best versions' });
+    const button = within(section).getByRole('button', { name: 'Plan the best versions' });
+
+    await user.click(button);
+    expect(within(section).getByRole('status')).toHaveTextContent(
+      'Everything is already at its best version: the plan has nothing to change.',
+    );
+
+    await user.click(within(section).getByRole('checkbox', { name: 'Only what worlds use' }));
+    await user.click(button);
+    expect(within(section).getByRole('status')).toHaveTextContent(
+      'Everything worlds use is already at its best version: the plan has nothing to change.',
+    );
+
+    planBest.mockResolvedValue(false);
+    await user.click(button);
+    expect(within(section).getByRole('status')).toHaveTextContent(
+      'The best versions could not be planned together, so the plan is as it was.',
+    );
+
+    // Once the plan changes, what the last planning came to is past.
+    setup.updates.changes++;
+    await vi.waitFor(() => {
+      expect(within(section).queryByRole('status')).toBeNull();
+    });
+  });
+
   test('limits them to what worlds use when the user chooses, keeping the choice', async () => {
     const onBestInUseOnlyChange = vi.fn();
     const setup = new SetupState({

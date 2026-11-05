@@ -356,7 +356,10 @@
     "Replace": "Replace the plan with the best versions",
     "InUseOnly": "Only what worlds use",
     "InUseOnlyHint": "Chooses versions only of the game systems worlds use, and of the modules recorded worlds run or will need; the others stay as they are installed, unless what is used needs one changed. They are not ignored: other plans still take them into account. A world without a record may run modules EMMA cannot see.",
-    "Working": "Working out the best versions…"
+    "Working": "Working out the best versions…",
+    "AlreadyBest": "Everything is already at its best version: the plan has nothing to change.",
+    "AlreadyBestInUse": "Everything worlds use is already at its best version: the plan has nothing to change.",
+    "Failed": "The best versions could not be planned together, so the plan is as it was."
   },
   "Recommends": {
     "Heading": "Recommends",
