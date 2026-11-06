@@ -1,3 +1,18 @@
+## [0.3.0](https://github.com/Mondarth/EMMA/compare/extension-v0.2.1...extension-v0.3.0) (2026-11-06)
+
+### Features
+
+* **module:** drop the version lookup proxy ([9802b80](https://github.com/Mondarth/EMMA/commit/9802b8020cba1b442d0ac072ef23f19ac98adf05))
+* **module:** give the catalogue's version 2 in the setup kit ([a8c8af2](https://github.com/Mondarth/EMMA/commit/a8c8af28ae4c17e0d3cbfa5e4bafca90d1f6e441))
+* **setup:** find updates with one catalogue lookup, and no proxy ([0f90ccd](https://github.com/Mondarth/EMMA/commit/0f90ccd0234c2f5884869f4eea876f8bb09ff9cd))
+* **setup:** keep the plan as it runs, to resume it ([0dddfa5](https://github.com/Mondarth/EMMA/commit/0dddfa590bccbbbd52f77fce745f150c5de67a76))
+* **setup:** read the Install listing from the catalogue ([235a847](https://github.com/Mondarth/EMMA/commit/235a8474adb8c7047e9d6311f068fcc4a80c6992))
+* **setup:** say how fresh the catalogue is, and let the user check live ([8ef1499](https://github.com/Mondarth/EMMA/commit/8ef14990e35952d87c8bba0506829b1ccdd41108))
+
+### Bug Fixes
+
+* **setup:** say what planning the best versions came to ([c90fe4b](https://github.com/Mondarth/EMMA/commit/c90fe4b41f3fdfae23847107d37ab5d01795fa41))
+
 ## [0.2.1](https://github.com/Mondarth/EMMA/compare/extension-v0.2.0...extension-v0.2.1) (2026-11-04)
 
 ### Bug Fixes
