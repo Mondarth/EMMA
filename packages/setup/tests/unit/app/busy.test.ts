@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
-import { BusyState, MINIMUM_BUSY_MS, busyTiming } from '../../../src/app/busy.svelte';
+import { BusyState, MINIMUM_BUSY_MS, afterPaint, busyTiming, paced } from '../../../src/app/busy.svelte';
 
 /**
  * Work that finishes when told to.
@@ -111,5 +111,40 @@ describe('BusyState', () => {
 
       expect(busy.activityOf('lock:a')).toBeUndefined();
     });
+  });
+});
+
+describe('letting the browser draw', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test('waits for a frame to be drawn, and then for the task after it', async () => {
+    vi.useFakeTimers();
+    let drawn = false;
+    const waiting = afterPaint().then(() => (drawn = true));
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(drawn).toBe(false);
+    await vi.advanceTimersByTimeAsync(20);
+    await waiting;
+    expect(drawn).toBe(true);
+  });
+
+  test('paces long work: on at once within a frame, and waiting for a frame once past it', async () => {
+    vi.useFakeTimers();
+    const pace = paced();
+    let passed = false;
+
+    await pace();
+    vi.setSystemTime(Date.now() + 60);
+    const waiting = pace().then(() => (passed = true));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(passed).toBe(false);
+    await vi.advanceTimersByTimeAsync(20);
+    await waiting;
+    expect(passed).toBe(true);
+    // Its budget starts again once it has let the browser draw.
+    await pace();
   });
 });

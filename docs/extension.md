@@ -99,7 +99,8 @@ doing, until it is done: a tree row while EMMA plans the version you chose there
 while EMMA plans without it, a package in an **Install** section while EMMA looks it up and plans it, the manifest URL
 while EMMA reads it (**Reading**), and the buttons that lock (**Locking**), ignore (**Ignoring**), uninstall, plan the
 best versions, resume a saved plan (**Resuming**), **Check live** (**Checking**) and **Refresh** (**Refreshing**). A
-button is disabled meanwhile, so that what it does is not asked for twice.
+button is disabled meanwhile, so that what it does is not asked for twice. A version list opens at once, with a spinner
+while EMMA checks which versions work with what is chosen, which can take a second or two for a package with many.
 
 ### The installation tree
 

@@ -7,7 +7,7 @@ import type { PackageKey, Release } from '@mondarth/fvtt-resolver';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
 import type { KitProblem } from '../foundry/setup-kit';
-import { BusyState } from './busy.svelte';
+import { BusyState, afterPaint, paced } from './busy.svelte';
 import { KitUnavailable } from '../foundry/setup-kit';
 import { format, localize, today } from '../lib/i18n';
 import type { Overview } from '../lib/overview';
@@ -445,7 +445,12 @@ export class UpdateState {
     const { planner } = search;
     const chosen = (other: PackageKey) => this.chosenOf(other);
     const options: VersionOption[] = [];
+    // The list that asked is drawn first, saying it is checking, and again as the work goes on, which would otherwise
+    // keep the browser from drawing anything until every version was judged.
+    await afterPaint();
+    const pace = paced();
     for (const version of [...planner.candidates(key), installed]) {
+      await pace();
       if (planner.missingManifest(key, version)) {
         const judged = search.judge(key, version, chosen);
         options.push({ ...this.#withNeeds(key, judged), missingManifest: true });

@@ -73,3 +73,33 @@ export class BusyState {
     else this.#items.set(item, { ...now, runs: now.runs - 1 });
   }
 }
+
+/** How long work may keep the browser from drawing before it lets it, in milliseconds. */
+const FRAME_BUDGET_MS = 50;
+
+/**
+ * Let the browser draw what has changed before going on: work done in a chain of promises that settle at once keeps it
+ * from drawing until the chain ends, so that a list opened to show it is checking appears only once it is done.
+ * @returns Once the browser has had a frame to draw in
+ */
+export function afterPaint(): Promise<void> {
+  return new Promise(resolve => {
+    // A task queued in a frame's callback runs once the frame is drawn.
+    requestAnimationFrame(() => {
+      setTimeout(resolve, 0);
+    });
+  });
+}
+
+/**
+ * A pacer for long work: each call lets the browser draw once the work has kept it from drawing for a frame's budget.
+ * @returns The pacer, to await between steps of the work
+ */
+export function paced(): () => Promise<void> {
+  let since = Date.now();
+  return async () => {
+    if (Date.now() - since < FRAME_BUDGET_MS) return;
+    await afterPaint();
+    since = Date.now();
+  };
+}

@@ -217,7 +217,10 @@
     aria-busy={checking}
     onkeydown={onKeydown}>
     {#if checking}
-      <li class="emma-version-note" role="presentation">{localize('Update.Checking')}</li>
+      <li class="emma-version-note" role="presentation">
+        <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
+        {localize('Update.Checking')}
+      </li>
     {:else if options.length === 0}
       <li class="emma-version-note" role="presentation">{localize('Update.NoneFit')}</li>
     {/if}
