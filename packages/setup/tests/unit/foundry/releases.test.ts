@@ -320,4 +320,81 @@ describe('lookUpReleases', () => {
       problem: 'no-catalogue',
     });
   });
+
+  describe('what the catalogue says beside the releases', () => {
+    const RECHECK = 'https://catalogue.example.test/api/v2/recheck';
+
+    test('says how fresh the installed packages are, what it is fetching, and checks them again when asked', async () => {
+      const send = catalogue({
+        [LOOKUP]: () =>
+          answer({
+            packages: [
+              {
+                ...looked('lib', [held('1.0.0')]),
+                own: { version: null, readAt: null, checkedAt: '2026-11-06T10:00:00.000Z' },
+              },
+              {
+                ...looked('dice', [held('1.0.0')]),
+                own: { version: null, readAt: null, checkedAt: '2026-11-06T09:00:00.000Z' },
+              },
+              { ...looked('new', [held('1.0.0')]), own: { version: null, readAt: null, checkedAt: null } },
+              // A package needed, not installed, says nothing of how fresh the installed ones are.
+              {
+                ...looked('needed', [held('1.0.0')]),
+                own: { version: null, readAt: null, checkedAt: '2026-11-01T00:00:00.000Z' },
+              },
+            ],
+            pending: [
+              { package: { type: 'module', id: 'fresh' }, retryAfter: 30 },
+              { package: { type: 'module', id: 'later' }, retryAfter: 60 },
+            ],
+          }),
+        [RECHECK]: () => ({ packages: [], pending: [] }),
+      });
+      const manifests = ['lib', 'dice', 'new', 'fresh', 'later'].map(id => moduleManifest(id, '1.0.0'));
+
+      const found = await lookUpReleases({ core: CORE, manifests }, { kit: KIT, catalogue: CATALOGUE, fetch: send });
+
+      expect(found.catalogue).toMatchObject({
+        reached: true,
+        pending: ['module:fresh', 'module:later'],
+        retryAfter: 60,
+        checkedAt: '2026-11-06T09:00:00.000Z',
+      });
+      await expect(found.catalogue.recheck()).resolves.toBe(true);
+      expect(sentBy(send).find(({ url }) => url === RECHECK)?.body).toEqual({
+        packages: manifests.map(({ type, id }) => ({ type, id })),
+      });
+    });
+
+    test('says when it was not reached, and that nothing was ever checked', async () => {
+      const send = catalogue({ [LOOKUP]: () => 503, [RECHECK]: () => 503 });
+
+      const found = await lookUpReleases(
+        { core: CORE, manifests: [moduleManifest('lib', '1.0.0')] },
+        { kit: KIT, catalogue: CATALOGUE, fetch: send },
+      );
+
+      expect(found.catalogue).toMatchObject({ reached: false, pending: [], checkedAt: null });
+      expect(found.catalogue).not.toHaveProperty('retryAfter');
+      await expect(found.catalogue.recheck()).resolves.toBe(false);
+    });
+
+    test('checks nothing without a catalogue, or with nothing installed', async () => {
+      const send = catalogue({ [LOOKUP]: () => answer() });
+      const none = await lookUpReleases(
+        { core: CORE, manifests: [moduleManifest('lib', '1.0.0')] },
+        { kit: KIT, catalogue: null, fetch: send },
+      );
+      const empty = await lookUpReleases(
+        { core: CORE, manifests: [] },
+        { kit: KIT, catalogue: CATALOGUE, fetch: send },
+      );
+
+      await expect(none.catalogue.recheck()).resolves.toBe(false);
+      await expect(empty.catalogue.recheck()).resolves.toBe(false);
+      expect(none.catalogue.reached).toBe(false);
+      expect(send).not.toHaveBeenCalled();
+    });
+  });
 });

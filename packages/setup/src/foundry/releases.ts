@@ -17,7 +17,7 @@ import type { DefaultCatalogue } from '@mondarth/emma-core/default-catalogue';
 import type { SetupKit } from '@mondarth/emma-core/setup-kit';
 
 import { acceptLatest, withCurrent } from '../lib/latest';
-import type { ReadManifest } from '../lib/updates';
+import type { CatalogueState, ReadManifest } from '../lib/updates';
 
 import type { CoreBuild, InstalledManifests } from './setup-game';
 
@@ -47,6 +47,8 @@ export interface ReleaseLookup {
    * `core`, when the catalogue could not be reached.
    */
   readonly unreached: readonly PackageKey[];
+  /** What the catalogue said beside the releases: whether it was reached, what it is fetching, how fresh it is. */
+  readonly catalogue: CatalogueState;
 }
 
 /** How {@link lookUpReleases} fetches. */
@@ -181,6 +183,18 @@ export async function lookUpReleases(installed: InstalledManifests, options: Loo
     return release === undefined ? [] : [{ ...release, manifest }];
   });
   const unavailable = new Set((set?.unavailable() ?? []).map(({ package: ref }) => packageKey(ref)));
+  const pending = set?.pending() ?? [];
+  const checked = refs
+    .map(ref => set?.packageOf(packageKey(ref))?.own.checkedAt ?? null)
+    .filter((time): time is string => time !== null)
+    .sort((a, b) => Date.parse(a) - Date.parse(b));
+  const catalogueState: CatalogueState = {
+    reached,
+    pending: pending.map(({ package: ref }) => packageKey(ref)),
+    ...(pending.length > 0 && { retryAfter: Math.max(...pending.map(({ retryAfter }) => retryAfter)) }),
+    checkedAt: checked[0] ?? null,
+    recheck: async () => (source === undefined || refs.length === 0 ? false : (await source.recheck(refs)).ok),
+  };
   const unreached = reached
     ? set
         .unreached()
@@ -214,5 +228,6 @@ export async function lookUpReleases(installed: InstalledManifests, options: Loo
     },
     unavailable,
     unreached,
+    catalogue: catalogueState,
   };
 }

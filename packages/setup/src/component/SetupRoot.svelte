@@ -82,6 +82,24 @@
     writeLayout(layout);
   }
 
+  /** What the catalogue said of the last search, if it was asked. */
+  const catalogue = $derived(updates.search?.catalogue);
+  /** What the footer says of how fresh the catalogue's versions are, and what it is fetching. */
+  const catalogueNotes = $derived.by(() => {
+    if (updates.status !== 'found' || catalogue === undefined || !catalogue.reached) return [];
+    const { pending, checkedAt } = catalogue;
+    return [
+      ...(pending.length > 0 ? [format('Update.Pending', { count: pending.length })] : []),
+      ...(checkedAt === null
+        ? []
+        : [
+            format('Update.Checked', {
+              time: new Date(checkedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }),
+            }),
+          ]),
+    ];
+  });
+
   /** What the footer says of the search for updates. */
   const updateStatus = $derived.by(() => {
     if (setup.installing) return localize('Update.Installing');
@@ -91,6 +109,7 @@
       case 'unavailable':
         return problemText();
       case 'found':
+        if (catalogue?.reached === false) return localize('Update.Unreachable');
         return updateCount === 0 ? localize('Update.None') : format('Update.Found', { count: updateCount });
       default:
         // The search starts as soon as the installation is read.
@@ -434,6 +453,9 @@
         {#if unresolved > 0}
           <span class="emma-setup-note">{format('Update.Unresolved', { count: unresolved })}</span>
         {/if}
+        {#each catalogueNotes as note (note)}
+          <span class="emma-setup-note">{note}</span>
+        {/each}
         {#if runStatus !== undefined}
           <span class="emma-setup-note">{runStatus}</span>
         {/if}
@@ -455,6 +477,19 @@
           {localize(problem.reason === 'missing' ? 'Update.InstallModule' : 'Update.UpdateModule')}
         </button>
       {/if}
+    {/if}
+    {#if catalogue?.reached === true}
+      <button
+        type="button"
+        class="emma-setup-check"
+        data-tooltip={localize('Update.CheckLiveHint')}
+        disabled={updates.checking || updates.locked || updates.status !== 'found'}
+        onclick={() => {
+          void updates.checkLive();
+        }}>
+        <i class="fa-solid fa-satellite-dish" aria-hidden="true"></i>
+        {localize('Update.CheckLive')}
+      </button>
     {/if}
     <button
       type="button"
@@ -562,8 +597,13 @@
     width: auto;
   }
 
+  .emma-setup-check,
   .emma-setup-refresh {
     margin-left: auto;
+  }
+
+  .emma-setup-check + .emma-setup-refresh {
+    margin-left: 0;
   }
 
   .emma-setup-status {
