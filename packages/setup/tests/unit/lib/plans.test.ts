@@ -285,6 +285,37 @@ describe('createPlanner', () => {
   });
 });
 
+describe('why a version is not taken', () => {
+  const RELEASES = [
+    ...DND,
+    ...MIDI,
+    release('module:midi', '3.0.0', { core: { minimum: '15', verified: '15' } }),
+    release('module:midi', '2.5.0', { versionManifest: null }),
+  ];
+
+  test('lists the versions newer than one, newest first, whether or not the plan could take them', () => {
+    const plans = planner([['midi', '1.0.0']], { a: [['midi', '1.0.0']] }, RELEASES);
+
+    expect(plans.newerThan('module:midi', '1.0.0')).toEqual(['3.0.0', '2.5.0', '2.0.0']);
+    expect(plans.newerThan('module:midi', '3.0.0')).toEqual([]);
+  });
+
+  test('says one needs a newer Foundry VTT, one has no manifest of its own, and one the plan cannot take', async () => {
+    const plans = planner([['midi', '1.0.0']], { a: [['midi', '1.0.0']] }, RELEASES);
+    // D&D 5e kept at 5.3.3, which Midi 2.0.0 does not run in.
+    const kept = picks(['system:dnd5e', '5.3.3']);
+
+    await expect(plans.whyNotTaken('module:midi', '3.0.0', kept)).resolves.toEqual({
+      reason: 'no-build',
+      minimum: '15',
+    });
+    await expect(plans.whyNotTaken('module:midi', '2.5.0', kept)).resolves.toEqual({ reason: 'no-manifest' });
+    await expect(plans.whyNotTaken('module:midi', '2.0.0', kept)).resolves.toMatchObject({ reason: 'conflict' });
+    // Free to change D&D 5e too, the plan could take it.
+    await expect(plans.whyNotTaken('module:midi', '2.0.0', picks())).resolves.toBeUndefined();
+  });
+});
+
 describe('installing anew', () => {
   /** Dice: 2.0.0 needs Foundry 15, 1.5.0 runs on 14, and 1.0.0 too. */
   const DICE = [

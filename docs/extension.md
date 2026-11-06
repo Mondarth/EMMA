@@ -184,6 +184,14 @@ in the tree. A package with a newer version that EMMA cannot offer has a red one
 version, and which worlds hold it back and why: EMMA cannot make every world that uses the package consistent with it. A
 closed row with either kind of package anywhere under it has the same arrow, fainter, so nothing is hidden.
 
+When the plan takes a version of a package other than its newest, whether you chose it, the plan needs it, or it is a
+package to install anew, the package's panel says why: **Why 2.1.0, not 3.4.0** lists each newer version and why the plan
+does not take it. It may run on no build of Foundry VTT the plan may choose, or need a newer one; there may be no
+manifest URL for that version alone, which installing it needs; or the plan may not take it with the other versions
+chosen, which EMMA explains. Versions one after another for one reason share a line. A package to install anew is
+expected at its newest version, so in the plan, one taken at another stands out in amber, with a warning sign: its
+tooltip names the newest version, and selecting the package says why.
+
 Looking for updates needs the EMMA module installed, as the extension uses the module's own code to work them out.
 Without it, the footer says so and offers **Install the EMMA module**, which installs it from its published manifest,
 through Foundry, even while EMMA guards Foundry's own Install buttons; Foundry then asks whether to install the
@@ -290,7 +298,9 @@ starting a new one. A package being installed or updated says how far, as Foundr
 **Installing 70%**, with a thin bar along the foot of its name, blue as it downloads and then green over it as it
 installs. A step done is underlined in green, with a tick and **Done**; a step that failed in red, as far as it got.
 Foundry says nothing of how far a snapshot, a backup or an uninstall has got, so those show a spinner until done. The plan's title and its **Run the plan** and **Clear choices** buttons stay in view as its tables
-scroll. The footer names the first step that failed, and why, and counts any others that failed or were not run. A
+scroll. The footer names the first step that failed, and why, and counts any others that failed or were not run. Each
+package's name in the plan opens its row in the tree, and its panel: a step that failed leads it with what EMMA asked
+Foundry to do (the version, and the manifest URL it was installed from) and what Foundry answered. A
 run stops before Foundry VTT's own update: updating Foundry in place restarts it, and is for the user to do with
 care. Meanwhile the choices cannot change. After a run, EMMA reads the installation again, so what was done leaves the
 plan and the rest stays in it, to run again.

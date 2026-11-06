@@ -100,6 +100,17 @@ export interface PlanEntry {
   readonly forced?: true;
 }
 
+/**
+ * Why the plan does not take a version:
+ * - `no-build`: it runs on no build of Foundry VTT the plan may choose, needing `minimum` or later, where it says;
+ * - `no-manifest`: there is no manifest URL for that version alone, which installing it needs;
+ * - `conflict`: the plan cannot take it with the other versions chosen, as the resolver explains.
+ */
+export type NotTaken =
+  | { readonly reason: 'no-build'; readonly minimum?: string }
+  | { readonly reason: 'no-manifest' }
+  | { readonly reason: 'conflict'; readonly explanation: readonly string[] };
+
 /** Plans updates of an installation. */
 export interface Planner {
   /** Every release found, with those loaded since. */
@@ -161,6 +172,22 @@ export interface Planner {
    * @returns `true` for such a version; `false` for one installed, one not found, or Foundry VTT
    */
   missingManifest(key: PackageKey, version: string): boolean;
+  /**
+   * The versions of a package newer than one, newest first: those known, whether or not the plan could take them.
+   * @param key - The package
+   * @param version - The version
+   * @returns The newer versions
+   */
+  newerThan(key: PackageKey, version: string): readonly string[];
+  /**
+   * Why the plan does not take a version of a package with the versions chosen: it runs on no build of Foundry VTT the
+   * plan may choose, there is no manifest URL for that version alone, or the plan cannot take it with the rest.
+   * @param key - The package
+   * @param version - The version
+   * @param picks - The versions chosen
+   * @returns Why, or `undefined` if the plan could take it
+   */
+  whyNotTaken(key: PackageKey, version: string, picks: ReadonlyMap<PackageKey, string>): Promise<NotTaken | undefined>;
   /**
    * A package's title.
    * @param key - The package, or `core`
@@ -707,6 +734,25 @@ export function createPlanner(inputs: PlannerInputs): Planner {
           .filter(release => runnable.some(build => runsOn(resolver, release, build, universe)))
           .map(({ version }) => version),
       );
+    },
+
+    newerThan(key, version) {
+      return newestFirst(
+        resolver,
+        universe.releases
+          .filter(release => packageKey(release.package) === key && newer(release.version, version))
+          .map(release => release.version),
+      );
+    },
+
+    async whyNotTaken(key, version, picks) {
+      if (!this.candidates(key).includes(version)) {
+        const minimum = releaseOf(key, version)?.compatibility.minimum;
+        return { reason: 'no-build', ...(minimum !== undefined && { minimum }) };
+      }
+      if (this.missingManifest(key, version)) return { reason: 'no-manifest' };
+      const completion = await this.complete(withChoice(picks, key, version));
+      return completion.ok ? undefined : { reason: 'conflict', explanation: completion.explanation ?? [] };
     },
 
     include(read) {

@@ -94,6 +94,8 @@ export interface PlanRun {
   readonly failure?: { readonly step: RunStep; readonly message: string };
   /** How many steps failed, the first among them; none if none did. */
   readonly failed?: number;
+  /** Why each step that failed failed, as Foundry said, by its key. */
+  readonly failures?: Readonly<Record<string, string>>;
   /** The steps not run, as steps they need failed or were not run either, each with those, by its key. */
   readonly needed?: Readonly<Record<string, readonly RunStep[]>>;
   /** The version of Foundry VTT it stopped before updating to. */
@@ -396,8 +398,9 @@ export class SetupState {
     let states: Record<string, StepState> = Object.fromEntries(steps.map(({ key }) => [key, 'waiting']));
     let progress: Record<string, StepProgress> = {};
     let needed: Record<string, readonly RunStep[]> = {};
+    let failures: Record<string, string> = {};
     const show = (): void => {
-      this.run = { steps, states, progress, needed, over: false };
+      this.run = { steps, states, progress, needed, failures, over: false };
     };
     const mark = (key: string, state: StepState): void => {
       states = { ...states, [key]: state };
@@ -443,7 +446,9 @@ export class SetupState {
           },
           onFail: (step, error) => {
             failed++;
-            failure ??= { step, message: error instanceof Error ? error.message : String(error) };
+            const message = error instanceof Error ? error.message : String(error);
+            failure ??= { step, message };
+            failures = { ...failures, [step.key]: message };
             mark(step.key, 'failed');
           },
           onSkip: (step, stopped) => {
@@ -458,7 +463,7 @@ export class SetupState {
       else this.#options.keepPendingPlan?.(null);
     } finally {
       updates.locked = false;
-      this.run = { steps, states, progress, needed, over: true, ...end };
+      this.run = { steps, states, progress, needed, failures, over: true, ...end };
       this.#ranUntil = updates.changes;
     }
     await this.refresh();
