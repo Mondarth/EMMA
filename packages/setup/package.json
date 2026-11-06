@@ -16,6 +16,6 @@
     "@mondarth/emma-core": "workspace:*"
   },
   "devDependencies": {
-    "@mondarth/fvtt-resolver": "0.9.1"
+    "@mondarth/fvtt-resolver": "0.10.0"
   }
 }

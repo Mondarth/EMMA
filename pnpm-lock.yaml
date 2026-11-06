@@ -248,8 +248,8 @@ importers:
   packages/core:
     dependencies:
       '@mondarth/fvtt-resolver':
-        specifier: 0.9.1
-        version: 0.9.1
+        specifier: 0.10.0
+        version: 0.10.0
 
   packages/extension:
     devDependencies:
@@ -272,8 +272,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@mondarth/fvtt-resolver':
-        specifier: 0.9.1
-        version: 0.9.1
+        specifier: 0.10.0
+        version: 0.10.0
 
   packages/release:
     dependencies:
@@ -294,8 +294,8 @@ importers:
         version: link:../core
     devDependencies:
       '@mondarth/fvtt-resolver':
-        specifier: 0.9.1
-        version: 0.9.1
+        specifier: 0.10.0
+        version: 0.10.0
 
 packages:
 
@@ -681,12 +681,12 @@ packages:
   '@mdn/browser-compat-data@8.1.4':
     resolution: {integrity: sha512-Cgp3OP3u9x57kT1sZPI115SP5H1IyaBhdDPnvnHRYZ1988kW83wuqcIdcMinLJXlMKOL5Y2cufWHzngh5cVtow==}
 
-  '@mondarth/fvtt-package-catalogue-contract@0.3.0':
-    resolution: {integrity: sha512-scwRUBIuysOwWQGh+eytqQ1Eo0nvRMgcaxDnAs9AdAq0og4u25kMayVnl+6JWioiwV9W58G/y3fIGfdK34O5Sg==}
+  '@mondarth/fvtt-package-catalogue-contract@0.4.0':
+    resolution: {integrity: sha512-L3QMIFGENKFk3PZXKYotnMRY8Vde2cKy3RVpYuQJVNgE3zCkMpNt89vF58azYR3WfySovXwAm8rKAiNidsTI7A==}
     engines: {node: '>=24'}
 
-  '@mondarth/fvtt-resolver@0.9.1':
-    resolution: {integrity: sha512-NF5B1MzQDC9oVf2usGZ1rCHfJrN6S7JDaoE13WDIcyRSGGejsZTlTVNBTk7lQyREN8zNRZBe21yqLgYRWX0tOQ==}
+  '@mondarth/fvtt-resolver@0.10.0':
+    resolution: {integrity: sha512-asS9va2VII5OtEZWs9Khhi/oLzIEyDCtd5khR8PQUoWcbLDtt9ribmRwROTkSX6+9yA0n1XYpJNFEPat6BQpqA==}
     engines: {node: '>=24'}
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
@@ -5528,13 +5528,13 @@ snapshots:
 
   '@mdn/browser-compat-data@8.1.4': {}
 
-  '@mondarth/fvtt-package-catalogue-contract@0.3.0':
+  '@mondarth/fvtt-package-catalogue-contract@0.4.0':
     dependencies:
       zod: 4.6.7
 
-  '@mondarth/fvtt-resolver@0.9.1':
+  '@mondarth/fvtt-resolver@0.10.0':
     dependencies:
-      '@mondarth/fvtt-package-catalogue-contract': 0.3.0
+      '@mondarth/fvtt-package-catalogue-contract': 0.4.0
       zod: 4.6.7
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':

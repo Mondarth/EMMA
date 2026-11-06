@@ -13,7 +13,7 @@ import type * as Resolver from '@mondarth/fvtt-resolver';
 import type * as Sources from '@mondarth/fvtt-resolver/sources';
 
 /** The kit's API version this build has, `<major>.<minor>`. */
-export const SETUP_KIT_API = '1.0';
+export const SETUP_KIT_API = '1.1';
 
 /** Where in the EMMA module's manifest's `flags` the kit is named. */
 export const SETUP_KIT_FLAG = 'setupKit';
@@ -48,9 +48,13 @@ export type KitResolver = Pick<
   | 'withDefaults'
 >;
 
-/** What the kit gives of `@mondarth/fvtt-resolver/sources`. */
+/**
+ * What the kit gives of `@mondarth/fvtt-resolver/sources`. Since 1.1, `catalogueSet`: the catalogue's version 2 as a
+ * source set of its own, with no other source behind it. The rest stay until the EMMA extension no longer uses them.
+ */
 export type KitSources = Pick<
   typeof Sources,
+  | 'catalogueSet'
   | 'catalogueSource'
   | 'foundryCoreReleases'
   | 'foundryIndexSource'

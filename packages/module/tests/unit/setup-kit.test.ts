@@ -14,6 +14,7 @@ describe('the setup kit', () => {
   test('gives the resolver and its sources', () => {
     expect(kit.resolver.packageKey({ type: 'module', id: 'lib' })).toBe('module:lib');
     expect(typeof kit.sources.sourceSet).toBe('function');
+    expect(typeof kit.sources.catalogueSet).toBe('function');
     expect(typeof kit.resolver.check).toBe('function');
   });
 

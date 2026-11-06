@@ -38,7 +38,7 @@
   "description": "Replaces the Foundry manage module app.",
   "flags": {
     "setupKit": {
-      "api": "1.0",
+      "api": "1.1",
       "path": "dist/emma-setup-kit.js"
     }
   },
