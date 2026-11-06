@@ -802,7 +802,7 @@ describe('installing from a manifest URL', () => {
       { key: 'module:dice', chosen: '9.0.0', manifest: DICE_URL, forced: true },
     ]);
     expect(updates.runPlan.filter(({ key }) => key === 'module:dice')).toEqual([
-      { key: 'module:dice', version: '9.0.0', manifest: DICE_URL },
+      { key: 'module:dice', version: '9.0.0', manifest: DICE_URL, forced: true },
     ]);
 
     const now = buildOverview(installation({ modules: [installedModule('dice', 'Dice', '9.0.0')] }), new Map());

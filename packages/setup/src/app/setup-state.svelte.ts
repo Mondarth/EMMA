@@ -8,7 +8,7 @@ import type { InstallFilters } from '../lib/install';
 import { DEFAULT_FILTERS } from '../lib/install';
 import type { Overview } from '../lib/overview';
 import type { RunStep, StepProgress, StepState } from '../lib/run';
-import { runSteps } from '../lib/run';
+import { runScheduled, runSteps } from '../lib/run';
 import type { UpdateSearch } from '../lib/updates';
 import { UpdateState } from './update-state.svelte';
 
@@ -90,8 +90,12 @@ export interface PlanRun {
   readonly progress?: Readonly<Record<string, StepProgress>>;
   /** Whether it is over: done, failed, or stopped before Foundry VTT's update. */
   readonly over: boolean;
-  /** The step that failed, and why. */
+  /** The first step that failed, and why. */
   readonly failure?: { readonly step: RunStep; readonly message: string };
+  /** How many steps failed, the first among them; none if none did. */
+  readonly failed?: number;
+  /** The steps not run, as steps they need failed or were not run either, each with those, by its key. */
+  readonly needed?: Readonly<Record<string, readonly RunStep[]>>;
   /** The version of Foundry VTT it stopped before updating to. */
   readonly beforeCore?: string;
   /**
@@ -376,8 +380,9 @@ export class SetupState {
   }
 
   /**
-   * Run the update plan: the snapshot and backups checked, then each change, in order (see `lib/run.ts`). It stops at
-   * the first step that fails, and before Foundry VTT's own update; the choices cannot change meanwhile. The
+   * Run the update plan: the snapshot and backups checked, then the changes, several installs at once, each once what it
+   * needs is done (see `runScheduled` in `lib/run.ts`). A step that fails stops only the steps that need it; the run
+   * stops before Foundry VTT's own update. The choices cannot change meanwhile. The
    * installation is read afresh after, so what was done leaves the plan and the rest stays in it. A failure is kept in
    * {@link run}, never thrown.
    * @returns Once the run is over, and the installation read again
@@ -390,13 +395,17 @@ export class SetupState {
     const steps = runSteps(updates.safeguards, updates.runPlan, key => updates.titleOf(key));
     let states: Record<string, StepState> = Object.fromEntries(steps.map(({ key }) => [key, 'waiting']));
     let progress: Record<string, StepProgress> = {};
+    let needed: Record<string, readonly RunStep[]> = {};
+    const show = (): void => {
+      this.run = { steps, states, progress, needed, over: false };
+    };
     const mark = (key: string, state: StepState): void => {
       states = { ...states, [key]: state };
-      this.run = { steps, states, progress, over: false };
+      show();
     };
     const advance = (key: string, reached: StepProgress): void => {
       progress = { ...progress, [key]: reached };
-      this.run = { steps, states, progress, over: false };
+      show();
     };
     // The plan is kept as it runs, with what is done taken out, so a run cut short can be resumed: by a step failing, or
     // the page closing; and one that stops before Foundry VTT's update, once Foundry is on that build, however it is
@@ -406,35 +415,50 @@ export class SetupState {
         ...(core !== undefined && { core }),
         picks: updates.picks.filter(([key]) => states[key] !== 'done' && (core === undefined || key !== 'core')),
       }) ?? false;
-    this.run = { steps, states, progress, over: false };
+    show();
     this.savedPlan = null;
     updates.locked = true;
-    let end: Pick<PlanRun, 'failure' | 'beforeCore' | 'kept'> = {};
+    let end: Pick<PlanRun, 'failure' | 'failed' | 'beforeCore' | 'kept'> = {};
+    // Foundry VTT's own update ends the run: what comes before it runs, which is the snapshot and backups, as the plan
+    // orders Foundry VTT first of the changes.
+    const coreStep = steps.find(step => step.kind === 'core');
+    const before = coreStep === undefined ? steps : steps.slice(0, steps.indexOf(coreStep));
+    let failed = 0;
+    let failure: PlanRun['failure'];
     try {
       keep();
-      for (const step of steps) {
-        if (step.kind === 'core') {
-          end = { beforeCore: step.version, kept: keep(step.version) };
-          break;
-        }
-        mark(step.key, 'running');
-        try {
-          await runStep(step, reached => {
-            advance(step.key, reached);
-          });
-        } catch (error) {
-          mark(step.key, 'failed');
-          end = { failure: { step, message: error instanceof Error ? error.message : String(error) } };
-          break;
-        }
-        mark(step.key, 'done');
-        keep();
-      }
+      await runScheduled(
+        before.filter(step => step.kind !== 'core'),
+        {
+          run: step =>
+            runStep(step, reached => {
+              advance(step.key, reached);
+            }),
+          onStart: step => {
+            mark(step.key, 'running');
+          },
+          onDone: step => {
+            mark(step.key, 'done');
+            keep();
+          },
+          onFail: (step, error) => {
+            failed++;
+            failure ??= { step, message: error instanceof Error ? error.message : String(error) };
+            mark(step.key, 'failed');
+          },
+          onSkip: (step, stopped) => {
+            needed = { ...needed, [step.key]: stopped };
+            mark(step.key, 'skipped');
+          },
+        },
+      );
+      if (failure !== undefined) end = { failure, failed };
+      else if (coreStep !== undefined) end = { beforeCore: coreStep.version, kept: keep(coreStep.version) };
       // Every step done: nothing is left to resume.
-      if (end.failure === undefined && end.beforeCore === undefined) this.#options.keepPendingPlan?.(null);
+      else this.#options.keepPendingPlan?.(null);
     } finally {
       updates.locked = false;
-      this.run = { steps, states, progress, over: true, ...end };
+      this.run = { steps, states, progress, needed, over: true, ...end };
       this.#ranUntil = updates.changes;
     }
     await this.refresh();

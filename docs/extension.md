@@ -270,21 +270,28 @@ Each has a note, which Foundry keeps with it, written for it at first and free t
 space it needs and the space free, as Foundry's own dialog does, and says when there is too little; Foundry does not
 say what a world's backup needs, so its row gives the space free alone. What is checked is made before anything changes.
 
-**Run plan** lists the steps and asks to confirm them, then runs them in order:
+**Run plan** lists the steps and asks to confirm them, then runs them:
 
-1. the snapshot and backups checked, as Foundry's **Manage Backups** makes them;
-2. each package change, a package installed anew among them, installed from the manifest URL of the version chosen,
-   as Foundry's Install button installs one; the guard lets EMMA's installs through. Foundry's dependency dialog is
-   not shown, as the plan already has what each change needs;
-3. each package to uninstall, last, once nothing installed needs it (see [Uninstalling](#uninstalling)).
+1. the snapshot and backups checked, one at a time, as Foundry's **Manage Backups** makes them;
+2. the package changes, a package installed anew among them, each installed from the manifest URL of the version
+   chosen, as Foundry's Install button installs one; the guard lets EMMA's installs through. Up to five run at once,
+   as Foundry's own **Update All** runs them, each as soon as the changes it needs are done: the game systems it runs
+   in and the modules it requires, that the plan changes. Foundry's dependency dialog is not shown, as the plan
+   already has what each change needs. What you added against EMMA's advice is installed once the rest are over;
+3. each package to uninstall, last, one at a time, once the changes of the packages that needed it are done (see
+   [Uninstalling](#uninstalling)).
+
+A step that fails stops only the steps that need it, and those that need them in turn: they are **Not run**, each
+saying which step it needed. Every other step goes on. Every change needs the snapshot and backups, so if one of
+those fails, nothing changes.
 
 Each row says how far its step has got, and the footer how the run went, until the plan is changed again, as by
 starting a new one. A package being installed or updated says how far, as Foundry tells it: **Downloading 42%**, then
 **Installing 70%**, with a thin bar along the foot of its name, blue as it downloads and then green over it as it
 installs. A step done is underlined in green, with a tick and **Done**; a step that failed in red, as far as it got.
 Foundry says nothing of how far a snapshot, a backup or an uninstall has got, so those show a spinner until done. The plan's title and its **Run the plan** and **Clear choices** buttons stay in view as its tables
-scroll. A run stops at the first step that fails,
-saying why, and before Foundry VTT's own update: updating Foundry in place restarts it, and is for the user to do with
+scroll. The footer names the first step that failed, and why, and counts any others that failed or were not run. A
+run stops before Foundry VTT's own update: updating Foundry in place restarts it, and is for the user to do with
 care. Meanwhile the choices cannot change. After a run, EMMA reads the installation again, so what was done leaves the
 plan and the rest stays in it, to run again.
 

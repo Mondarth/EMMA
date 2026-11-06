@@ -220,7 +220,12 @@ export class UpdateState {
    */
   readonly runPlan: readonly PlanEntry[] = $derived.by(() => {
     const kept = this.plan.filter(({ key }) => !this.#forced.has(key));
-    const forced = [...this.#forced.values()].map(({ key, version, manifest }) => ({ key, version, manifest }));
+    const forced = [...this.#forced.values()].map(({ key, version, manifest }) => ({
+      key,
+      version,
+      manifest,
+      forced: true as const,
+    }));
     const uninstalls = kept.filter(({ version }) => version === UNINSTALL);
     return [...kept.filter(({ version }) => version !== UNINSTALL), ...forced, ...uninstalls];
   });

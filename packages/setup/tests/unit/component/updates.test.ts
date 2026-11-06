@@ -1617,9 +1617,7 @@ describe("the plan's snapshot and backups", () => {
     fail(new Error('The download failed'));
 
     await vi.waitFor(() => {
-      expect(screen.getByRole('status')).toHaveTextContent(
-        'The plan stopped at “install Library 1.5.0”: The download failed',
-      );
+      expect(screen.getByRole('status')).toHaveTextContent('“install Library 1.5.0” failed: The download failed');
     });
     expect(setup.run?.over).toBe(true);
   });
