@@ -1,3 +1,11 @@
+## [0.11.0](https://github.com/Mondarth/EMMA/compare/v0.10.0...v0.11.0) (2026-11-06)
+
+### Features
+
+* **module:** drop the version lookup proxy ([9802b80](https://github.com/Mondarth/EMMA/commit/9802b8020cba1b442d0ac072ef23f19ac98adf05))
+* **module:** give the catalogue's version 2 in the setup kit ([a8c8af2](https://github.com/Mondarth/EMMA/commit/a8c8af28ae4c17e0d3cbfa5e4bafca90d1f6e441))
+* **module:** look versions up in one catalogue lookup, and no proxy ([598f2c8](https://github.com/Mondarth/EMMA/commit/598f2c81699eb660afec001ead91cc1d40c162c3))
+
 ## [0.10.0](https://github.com/Mondarth/EMMA/compare/v0.9.0...v0.10.0) (2026-11-04)
 
 ### Features
