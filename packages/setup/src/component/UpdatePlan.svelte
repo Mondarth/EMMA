@@ -14,6 +14,7 @@
   import { UNINSTALL } from '../lib/plans';
   import { runSteps, stepText } from '../lib/run';
   import type { Safeguard } from '../lib/safeguards';
+  import BusyMark from './BusyMark.svelte';
 
   interface Props {
     overview: Overview;
@@ -240,7 +241,9 @@
       {#each updates.choices as choice (choice.key)}
         {@const older = choice.key === 'core' ? newerCore : undefined}
         {@const name = titles.get(choice.key) ?? updates.titleOf(choice.key)}
-        <tr class={[choice.forced && 'emma-plan-forced']}>
+        <tr
+          class={['emma-busy-host', choice.forced && 'emma-plan-forced']}
+          aria-busy={updates.busy.activityOf(`plan:${choice.key}`) !== undefined}>
           <th scope="row">
             {#if choice.key === 'core' && coreBlocked !== undefined}
               <i
@@ -293,7 +296,7 @@
                     type="button"
                     disabled={running || updates.locked}
                     onclick={() => {
-                      void updates.choose('core', older.version);
+                      void updates.busy.run('plan:core', 'planning', () => updates.choose('core', older.version));
                     }}>{format('Plan.ChooseNewest', { version: older.version })}</button>
                 {:else if older.kind === 'conflict'}
                   {format('Plan.NewestNeeds', {
@@ -324,11 +327,14 @@
                 data-tooltip={format('Plan.TakeOutHint', { title: name })}
                 disabled={running || updates.locked}
                 onclick={event => {
-                  void updates.takeOut(choice.key, event.shiftKey);
+                  const withNeeds = event.shiftKey;
+                  void updates.busy.run(`plan:${choice.key}`, 'planning', () => updates.takeOut(choice.key, withNeeds));
                 }}>
                 <i class="fa-solid fa-minus" aria-hidden="true"></i>
               </button>
             {/if}
+            <!-- Laid over the whole row, which it is placed against. -->
+            <BusyMark activity={updates.busy.activityOf(`plan:${choice.key}`)} />
           </td>
         </tr>
       {/each}

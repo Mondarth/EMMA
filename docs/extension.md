@@ -94,6 +94,13 @@ affected: uninstalling, locking, creating and launching them. To let Foundry ins
 the root of EMMA's tree and check **Let Foundry install and update packages here**. The browser remembers the choice
 for that server.
 
+**While EMMA works on something you did**, the item you did it to is covered by a spinner and a word for what EMMA is
+doing, until it is done: a tree row while EMMA plans the version you chose there (**Planning**), a row of the plan
+while EMMA plans without it, a package in an **Install** section while EMMA looks it up and plans it, the manifest URL
+while EMMA reads it (**Reading**), and the buttons that lock (**Locking**), ignore (**Ignoring**), uninstall, plan the
+best versions, resume a saved plan (**Resuming**), **Check live** (**Checking**) and **Refresh** (**Refreshing**). A
+button is disabled meanwhile, so that what it does is not asked for twice.
+
 ### The installation tree
 
 EMMA's window shows the installation as a tree, and beside it what is selected in it. The tree is in two halves, the

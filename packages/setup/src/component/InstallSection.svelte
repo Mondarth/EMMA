@@ -15,6 +15,8 @@
   import type { InstallFilters } from '../lib/install';
   import { compatibilityText, matching, tagsAmong, tagText, toggleTag, UNTAGGED, withTags } from '../lib/install';
 
+  import BusyMark from './BusyMark.svelte';
+
   interface Props {
     type: 'module' | 'system';
     /** Foundry's listing, as far as it is read. */
@@ -120,7 +122,8 @@
   /** Add the package the manifest URL gives to the plan, if the plan can take it. */
   async function addFromUrl(): Promise<void> {
     fromUrl = 'reading';
-    fromUrl = await updates.installFrom(manifestUrl.trim(), type);
+    const url = manifestUrl.trim();
+    fromUrl = await updates.busy.run(`manifest:${type}`, 'reading', () => updates.installFrom(url, type));
     if (fromUrl.ok) manifestUrl = '';
   }
 
@@ -147,11 +150,13 @@
     box.checked = !adding;
     if (!adding) {
       added.delete(key);
-      await updates.forget(key);
+      await updates.busy.run(`install:${key}`, 'planning', () => updates.forget(key));
       return;
     }
     added.set(key, 'adding');
-    const result = await updates.install(key, pkg.title, pkg.manifest);
+    const result = await updates.busy.run(`install:${key}`, 'planning', () =>
+      updates.install(key, pkg.title, pkg.manifest),
+    );
     if (result.ok) added.delete(key);
     else added.set(key, result);
   }
@@ -191,7 +196,10 @@
                 disabled={updates.locked || updates.isInstalled(recommended)}
                 aria-label={format('Recommends.Want', { title: nameOf(recommended), by: pkg.title })}
                 onchange={event => {
-                  void updates.setRecommended(key, recommended, event.currentTarget.checked);
+                  const wanted = event.currentTarget.checked;
+                  void updates.busy.run(`install:${key}`, 'planning', () =>
+                    updates.setRecommended(key, recommended, wanted),
+                  );
                 }} />
               {nameOf(recommended)}
             </label>
@@ -229,7 +237,8 @@
         : format(takesAn(scope) ? 'Install.ModulesForAn' : 'Install.ModulesForA', { scope })}
   </h3>
   <form
-    class="emma-install-manifest"
+    class="emma-install-manifest emma-busy-host"
+    aria-busy={updates.busy.activityOf(`manifest:${type}`) !== undefined}
     onsubmit={event => {
       event.preventDefault();
       void addFromUrl();
@@ -251,6 +260,7 @@
       disabled={updates.locked || fromUrl === 'reading' || manifestUrl.trim() === ''}>
       <i class="fa-solid fa-plus" aria-hidden="true"></i>
     </button>
+    <BusyMark activity={updates.busy.activityOf(`manifest:${type}`)} />
   </form>
   {#if fromUrl === 'reading'}
     <p role="status">{localize('Manifest.Reading')}</p>
@@ -371,7 +381,7 @@
         {@const key = `${pkg.type}:${pkg.id}`}
         {@const planned = updates.chosenOf(key)}
         {@const state = added.get(key)}
-        <li>
+        <li class="emma-busy-host" aria-busy={updates.busy.activityOf(`install:${key}`) !== undefined}>
           <input
             type="checkbox"
             class="emma-install-choose"
@@ -453,6 +463,7 @@
               {/if}
             </div>
           {/if}
+          <BusyMark activity={updates.busy.activityOf(`install:${key}`)} />
         </li>
       {/each}
     </ul>

@@ -389,5 +389,14 @@
     "Requires": "Requires",
     "ComesWith": "Comes into the plan with it",
     "None": "It requires and recommends no other module."
+  },
+  "Busy": {
+    "Planning": "Planning",
+    "Reading": "Reading",
+    "Checking": "Checking",
+    "Refreshing": "Refreshing",
+    "Locking": "Locking",
+    "Ignoring": "Ignoring",
+    "Resuming": "Resuming"
   }
 }

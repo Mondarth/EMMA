@@ -7,6 +7,7 @@ import type { PackageKey, Release } from '@mondarth/fvtt-resolver';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
 import type { KitProblem } from '../foundry/setup-kit';
+import { BusyState } from './busy.svelte';
 import { KitUnavailable } from '../foundry/setup-kit';
 import { format, localize, today } from '../lib/i18n';
 import type { Overview } from '../lib/overview';
@@ -150,6 +151,8 @@ export class UpdateState {
   changes = $state(0);
   /** Whether the catalogue is checking the installed packages' own manifests again, as "check live" asks. */
   checking = $state(false);
+  /** What EMMA is busy with, by the item the user acted on, for that item to show it. */
+  readonly busy = new BusyState();
 
   /** The versions chosen, by package key, in the order they were chosen. */
   readonly #picks = new SvelteMap<PackageKey, string>();
