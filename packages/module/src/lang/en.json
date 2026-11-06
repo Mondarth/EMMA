@@ -278,37 +278,6 @@
         "Name": "Automatically activate/deactivate recommended modules",
         "Hint": "When you activate a module in EMMA, also activate the modules it recommends, and deactivate them again with it. Required modules always follow the module that requires them."
       },
-      "VersionProxy": {
-        "Name": "Version lookup proxy",
-        "Label": "Set proxy",
-        "Hint": "Browsers may not read Foundry's package listing, its release notes or most module manifests, so hypothetical mode looks versions up through a CORS proxy: EMMA's own, unless you set one you trust.",
-        "Title": "EMMA - version lookup proxy",
-        "Choice": "Look versions up through",
-        "Modes": {
-          "Default": "EMMA's proxy",
-          "DefaultHint": "Recommended. EMMA's package catalogue, which keeps every version of the packages asked for, then a proxy run for EMMA for anything the catalogue does not have yet. Both deal only in package information: release lists, manifests and Foundry's package listing. They see this server's address and the packages it looks up.",
-          "Own": "My own proxy",
-          "OwnHint": "A CORS proxy you run or trust, with its API key if it asks for one.",
-          "None": "No proxy",
-          "NoneHint": "Looks versions up directly, so finds far fewer of them and nothing newer of Foundry."
-        },
-        "Url": "Proxy URL",
-        "UrlHint": "The URL of a CORS proxy you trust, with {url} where the address to fetch goes, such as https://proxy.example.com/?url={url}. Every lookup is sent through it.",
-        "Invalid": "The URL needs {url} where the address to fetch goes.",
-        "Key": "API key",
-        "KeyHint": "Sent to the proxy in an X-API-Key header, for a proxy that asks for one. Kept in this browser only, so other users never see it: enter it again on each browser you use. Leave blank to send none.",
-        "Save": "Save",
-        "NoProxy": {
-          "Title": "Look versions up without a proxy?",
-          "Body": "Without a proxy, hypothetical mode can read only GitHub's and GitLab's release lists and the manifests installed modules came with. It cannot read Foundry's package listing or release notes, nor the manifests of most releases, so it finds far fewer versions, offers no newer Foundry version, and judges many versions without knowing which Foundry or system they suit. GitHub also allows only 60 lookups an hour from this browser's address, which a large world can use up. EMMA's proxy has none of these limits.",
-          "Confirm": "Use no proxy",
-          "Cancel": "Keep a proxy"
-        },
-        "Discard": {
-          "Title": "Discard proxy changes?",
-          "Body": "The proxy changes you made have not been saved. Closing the window discards them."
-        }
-      },
       "Fields": {
         "Name": "Module details",
         "Label": "Choose details",
@@ -340,7 +309,6 @@
       "OpenFailed": "EMMA could not open, so Foundry's Module Management window has been opened instead. See the console for details.",
       "SaveFailed": "EMMA could not save which modules are active. See the console for details.",
       "FieldsFailed": "EMMA could not save which module details to show. See the console for details.",
-      "ProxyFailed": "EMMA could not save the version lookup proxy. See the console for details.",
       "IgnoreFailed": "EMMA could not save which modules hypothetical mode ignores. See the console for details."
     }
   }

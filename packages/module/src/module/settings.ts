@@ -19,12 +19,6 @@ export const SETTINGS = {
   autoRecommended: 'autoRecommended',
   /** Whether this user's list view groups related modules under the modules that relate to them, or lists them flat. */
   grouped: 'grouped',
-  /** A CORS proxy that hypothetical mode fetches version data through, as a URL template containing `{url}`. */
-  versionProxy: 'versionProxy',
-  /** The API key sent to the proxy, kept in the GM's browser only. */
-  versionProxyKey: 'versionProxyKey',
-  /** Which proxy hypothetical mode looks versions up through: EMMA's, the GM's own, or none. */
-  versionProxyMode: 'versionProxyMode',
   /** The IDs of the modules hypothetical mode ignores, shared by the world's GMs. */
   hypotheticalIgnored: 'hypotheticalIgnored',
   /** Whose checks the badges outside hypothetical mode show: EMMA's, or Foundry's own. */
@@ -42,14 +36,6 @@ const STARTUP_CHANGES: readonly string[] = ['none', 'dialog', 'chat', 'both'] sa
 
 /** The most older versions a GM may choose to be shown: more cost more to judge, for little more use. */
 export const MAX_OLDER_VERSIONS = 20;
-
-/** Which proxy hypothetical mode looks versions up through: EMMA's own (the default), the GM's own, or none. */
-export type ProxyMode = 'default' | 'own' | 'none';
-
-const PROXY_MODES: readonly string[] = ['default', 'own', 'none'] satisfies ProxyMode[];
-
-/** Where a proxy URL template puts the URL it fetches. */
-export const PROXY_PLACEHOLDER = '{url}';
 
 /** EMMA's main views. */
 export type View = 'list' | 'split';
@@ -100,30 +86,6 @@ export function registerSettings(): void {
     config: false,
     type: Boolean,
     default: true,
-  });
-
-  // Both are set in the GM-only Version lookup proxy menu. The key is a client setting, kept in the browser it is
-  // entered in: every world and user setting is sent to every user who joins, so any player could read it.
-  game.settings.register(MODULE_ID, SETTINGS.versionProxy, {
-    scope: 'world',
-    config: false,
-    type: String,
-    default: '',
-  });
-
-  game.settings.register(MODULE_ID, SETTINGS.versionProxyKey, {
-    scope: 'client',
-    config: false,
-    type: String,
-    default: '',
-  });
-
-  // Blank until a GM chooses, so that a world which set its own proxy before there was a choice keeps it.
-  game.settings.register(MODULE_ID, SETTINGS.versionProxyMode, {
-    scope: 'world',
-    config: false,
-    type: String,
-    default: '',
   });
 
   game.settings.register(MODULE_ID, SETTINGS.hypotheticalIgnored, {
@@ -308,36 +270,6 @@ export async function setGrouped(grouped: boolean): Promise<void> {
   await game.settings.set(MODULE_ID, SETTINGS.grouped, grouped);
 }
 
-/**
- * The CORS proxy the GM has set for hypothetical mode to fetch version data through.
- * @returns The URL template, containing {@link PROXY_PLACEHOLDER}; `null` if none is set, or the value set has no
- *   placeholder and so cannot be used
- */
-export function getVersionProxy(): string | null {
-  const proxy = game.settings.get(MODULE_ID, SETTINGS.versionProxy).trim();
-  return proxy.includes(PROXY_PLACEHOLDER) ? proxy : null;
-}
-
-/**
- * The API key the GM has set for the version lookup proxy, in this browser.
- * @returns The key, trimmed; `null` if none is set
- */
-export function getVersionProxyKey(): string | null {
-  const key = game.settings.get(MODULE_ID, SETTINGS.versionProxyKey).trim();
-  return key === '' ? null : key;
-}
-
-/**
- * Which proxy hypothetical mode looks versions up through. Until a GM chooses, it is EMMA's own, unless the world set
- * its own proxy before there was a choice, which it keeps.
- * @returns The proxy chosen
- */
-export function getVersionProxyMode(): ProxyMode {
-  const mode = game.settings.get(MODULE_ID, SETTINGS.versionProxyMode);
-  if (PROXY_MODES.includes(mode)) return mode as ProxyMode;
-  return game.settings.get(MODULE_ID, SETTINGS.versionProxy).trim() === '' ? 'default' : 'own';
-}
-
 /** Where versions are looked up: EMMA's package catalogue, alone. */
 export interface VersionLookup {
   /** EMMA's package catalogue, with its key; `null` for none, when only the installed versions are known. */
@@ -345,28 +277,14 @@ export interface VersionLookup {
 }
 
 /**
- * Where versions are looked up: EMMA's catalogue, with EMMA's key for it, in the `default` mode. A GM who chose their
- * own proxy, or none, is never sent to EMMA's catalogue: until those choices go, hypothetical mode knows only the
- * installed versions for them.
+ * Where versions are looked up: EMMA's catalogue, with EMMA's key for it.
  * @param builtCatalogue - EMMA's catalogue as this build has it; this build's own unless given
- * @returns The catalogue, or `null`
+ * @returns The catalogue, or `null` for a build without one
  */
 export function versionLookup(
   builtCatalogue: Parameters<typeof defaultCatalogue>[0] = __EMMA_DEFAULT_CATALOGUE__,
 ): VersionLookup {
-  return { catalogue: getVersionProxyMode() === 'default' ? defaultCatalogue(builtCatalogue) : null };
-}
-
-/**
- * Remember the proxy chosen, and the GM's own proxy and its API key.
- * @param mode - The proxy chosen
- * @param proxy - The GM's own proxy URL template, or blank for none
- * @param key - The API key for it, kept in this browser only, or blank for none
- */
-export async function setVersionProxy(mode: ProxyMode, proxy: string, key: string): Promise<void> {
-  await game.settings.set(MODULE_ID, SETTINGS.versionProxyMode, mode);
-  await game.settings.set(MODULE_ID, SETTINGS.versionProxy, proxy.trim());
-  await game.settings.set(MODULE_ID, SETTINGS.versionProxyKey, key.trim());
+  return { catalogue: defaultCatalogue(builtCatalogue) };
 }
 
 /**

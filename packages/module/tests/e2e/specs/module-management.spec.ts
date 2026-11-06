@@ -1326,27 +1326,7 @@ test.describe('Hypothetical versions', () => {
   });
 });
 
-test.describe('Version lookup proxy', () => {
-  const PROXY = 'https://proxy.test/?url={url}';
-
-  /**
-   * Set the version lookup proxy and its key, without the menu.
-   * @param page - A page logged in as the GM
-   * @param proxy - The proxy URL template, or blank for none
-   * @param key - The API key, or blank for none
-   * @param mode - The proxy chosen, or blank for none chosen yet
-   */
-  async function setProxy(page: Page, proxy: string, key: string, mode = ''): Promise<void> {
-    await page.evaluate(
-      async ([id, url, apiKey, choice]) => {
-        await game.settings.set(id, 'versionProxyMode', choice);
-        await game.settings.set(id, 'versionProxy', url);
-        await game.settings.set(id, 'versionProxyKey', apiKey);
-      },
-      [MODULE_ID, proxy, key, mode] as const,
-    );
-  }
-
+test.describe('Settings', () => {
   /**
    * Open EMMA's section of Game Settings.
    * @param page - A logged-in page
@@ -1399,11 +1379,9 @@ test.describe('Version lookup proxy', () => {
     await expect(settings.getByText('Show older versions')).toHaveCount(0);
   });
 
-  test('hypothetical mode asks EMMA’s catalogue, with its key and EMMA’s version, and never a proxy a GM sets', async ({
-    page,
-  }) => {
+  test('hypothetical mode asks EMMA’s catalogue, once, with its key and EMMA’s version', async ({ page }) => {
     const asked: { url: string; key: string | undefined; client: string | undefined }[] = [];
-    await routeCatalogue(page, (path, _body, request) => {
+    await routeCatalogue(page, (_path, _body, request) => {
       asked.push({
         url: request.url(),
         key: request.headers()['x-api-key'],
@@ -1411,14 +1389,8 @@ test.describe('Version lookup proxy', () => {
       });
       return undefined;
     });
-    const proxied: string[] = [];
-    await page.route('https://proxy.test/**', async route => {
-      proxied.push(route.request().url());
-      await route.fulfill({ headers: { 'Access-Control-Allow-Origin': '*' }, json: [] });
-    });
     await joinAs(page, USERS.gm);
     await setDisabled(page, false);
-    await setProxy(page, '', '');
     const version = await page.evaluate(id => game.modules.get(id)?.version, MODULE_ID);
 
     await (await moduleManagementButton(page)).click();
@@ -1427,70 +1399,12 @@ test.describe('Version lookup proxy', () => {
 
     await expect.poll(() => asked.length).toBe(1);
     expect(asked).toEqual([{ url: `${CATALOGUE}api/v2/lookup`, key: CATALOGUE_KEY, client: `EMMA/${version ?? ''}` }]);
-    await closeEmma(page);
-
-    // A GM's own proxy, set in the menu, is never asked, nor is the catalogue: only what is installed is known.
-    const settings = await openEmmaSettings(page);
-    await settings.getByRole('button', { name: 'Set proxy' }).click();
-    const menu = page.locator(`#${MODULE_ID}-proxy`);
-    // A test build has no proxy of EMMA's own to offer.
-    await expect(menu.getByRole('radio')).toHaveCount(2);
-    await expect(menu.getByRole('radio', { name: 'No proxy' })).toBeChecked();
-    await menu.getByRole('radio', { name: 'My own proxy' }).check();
-    const url = menu.getByLabel('Proxy URL');
-    await url.fill('https://proxy.test/');
-    await expect(menu.getByRole('alert')).toHaveText(/needs \{url\}/);
-    await expect(menu.getByRole('button', { name: 'Save' })).toBeDisabled();
-    await url.fill(PROXY);
-    await menu.getByLabel('API key').fill('k3y');
-    await menu.getByRole('button', { name: 'Save' }).click();
-    await expect(menu).toHaveCount(0);
-    await clickClose(page, '#settings-config');
-
-    await (await moduleManagementButton(page)).click();
-    await emma.getByRole('button', { name: 'Hypothetical mode', exact: true }).click();
-
-    await expect(emma.getByText(/Catalogue unreachable: hypothetical mode/)).toBeVisible();
-    expect(proxied).toEqual([]);
-    expect(asked).toHaveLength(1);
-
-    await closeEmma(page);
-    await setProxy(page, '', '');
+    await expect(emma.getByText(/Catalogue unreachable: hypothetical mode/)).toHaveCount(0);
   });
 
-  test('choosing no proxy asks first, saying what is lost', async ({ page }) => {
+  test('no one is offered a version lookup proxy, as there is none', async ({ page }) => {
     await joinAs(page, USERS.gm);
     await setDisabled(page, false);
-    await setProxy(page, PROXY, '', 'own');
-
-    const settings = await openEmmaSettings(page);
-    await settings.getByRole('button', { name: 'Set proxy' }).click();
-    const menu = page.locator(`#${MODULE_ID}-proxy`);
-    await expect(menu.getByRole('radio', { name: 'My own proxy' })).toBeChecked();
-    await menu.getByRole('radio', { name: 'No proxy' }).check();
-    await expect(menu.getByLabel('Proxy URL')).toHaveCount(0);
-
-    await menu.getByRole('button', { name: 'Save' }).click();
-    // Foundry's dialog has an ID, but no accessible name.
-    const dialog = page.locator(`#${MODULE_ID}-no-proxy`);
-    await expect(dialog).toContainText('Look versions up without a proxy?');
-    await expect(dialog).toContainText('finds far fewer versions');
-    await dialog.getByRole('button', { name: 'Keep a proxy' }).click();
-    await expect(dialog).toHaveCount(0);
-    await expect(menu).toBeVisible();
-    expect(await page.evaluate(() => game.settings.get('mondarth-emma', 'versionProxyMode'))).toBe('own');
-
-    await menu.getByRole('button', { name: 'Save' }).click();
-    await dialog.getByRole('button', { name: 'Use no proxy' }).click();
-    await expect(menu).toHaveCount(0);
-    expect(await page.evaluate(() => game.settings.get('mondarth-emma', 'versionProxyMode'))).toBe('none');
-
-    await clickClose(page, '#settings-config');
-    await setProxy(page, '', '');
-  });
-
-  test('players are not offered the menu', async ({ page }) => {
-    await joinAs(page, USERS.player);
 
     const settings = await openEmmaSettings(page);
 

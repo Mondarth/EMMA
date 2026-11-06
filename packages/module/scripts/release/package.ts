@@ -85,15 +85,12 @@ function stampDocs(version: string): void {
 
 /**
  * Build the bundle from a clean `dist/` so nothing stale ends up in the package, and refuse to package a build that
- * holds the default proxy's or catalogue's key in plain text: they are only ever to be built in obscured.
+ * holds the default catalogue's key in plain text: it is only ever to be built in obscured.
  */
 function build(): void {
   fs.rmSync(DIST, { recursive: true, force: true });
   execFileSync('pnpm', ['build'], { cwd: ROOT, stdio: 'inherit' });
-  for (const [name, variable] of [
-    ["The default proxy's key", 'EMMA_DEFAULT_PROXY_KEY'],
-    ["The default catalogue's key", 'EMMA_DEFAULT_CATALOGUE_KEY'],
-  ] as const) {
+  for (const [name, variable] of [["The default catalogue's key", 'EMMA_DEFAULT_CATALOGUE_KEY']] as const) {
     const key = process.env[variable];
     const leaks = key ? filesHolding(DIST, key) : [];
     if (leaks.length > 0) {
@@ -129,7 +126,7 @@ if (!releaseVersion || !/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(releaseVersion)
   process.exit(1);
 }
 
-// Before anything changes: a build without them succeeds, and the release would have no catalogue or proxy.
+// Before anything changes: a build without them succeeds, and the release would have no catalogue.
 requireReleaseDefaults(process.env);
 stampManifest(releaseVersion);
 stampDocs(releaseVersion);

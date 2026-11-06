@@ -95,7 +95,7 @@ Finding updates needs the EMMA module installed in that Foundry, with its setup 
 after changing `src/setup-kit.ts` and read the installation again.
 
 A development build has no package catalogue, so the EMMA extension finds no updates: it knows only what is
-installed (see {doc}`default-proxy`). To try it with one, start the server with `EMMA_DEFAULT_CATALOGUE_URL` and
+installed (see {doc}`default-catalogue`). To try it with one, start the server with `EMMA_DEFAULT_CATALOGUE_URL` and
 `EMMA_DEFAULT_CATALOGUE_KEY` set to a catalogue of your own; never commit them.
 
 Do not have the browser extension active for the development server's address as well: the EMMA extension starts once
