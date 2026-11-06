@@ -1,7 +1,12 @@
 // DOM matchers (`toBeInTheDocument`, `toHaveTextContent`, …) for every unit test.
 import '@testing-library/jest-dom/vitest';
 
+import { busyTiming } from '../src/app/busy.svelte';
 import { ApplicationV2Mock } from './mocks/foundry';
+
+// What EMMA is busy with is marked only while it works, so that a test may act on an item again at once; the tests of
+// the least time an item is marked give their states their own.
+busyTiming.minimumMs = 0;
 
 // EMMA's window extends Foundry's ApplicationV2 as soon as its module loads, before any test installs its mocks.
 Object.assign(globalThis, { foundry: { applications: { api: { ApplicationV2: ApplicationV2Mock } } } });
