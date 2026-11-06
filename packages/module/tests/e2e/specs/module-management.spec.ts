@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 
-import { expect, test } from '../support/fixtures';
+import { CATALOGUE, CATALOGUE_KEY, expect, routeCatalogue, test } from '../support/fixtures';
 import { joinAs, MODULE_ID, MODULE_TITLE, USERS } from '../support/foundry';
 
 const EMMA_TITLE = 'EMMA - module management';
@@ -921,42 +921,86 @@ test.describe('Hypothetical mode', () => {
 });
 
 test.describe('Hypothetical versions', () => {
-  const RELEASES = 'https://api.github.com/repos/Mondarth/EMMA/releases?per_page=100';
-  const LIBRARY_RELEASES = 'https://api.github.com/repos/emma-tests/emma-fixture-library/releases?per_page=100';
+  const LIBRARY_PLAN = 'https://files.e2e.test/emma-fixture-library/2.0.0/module.json';
+  const EMMA_PLAN = 'https://files.e2e.test/mondarth-emma/9.9.0/module.json';
 
   /**
-   * GitHub's list of releases, each with a module manifest attached.
-   * @param repo - The repository, `<owner>/<repo>`
-   * @param versions - The versions released
-   * @returns The list
+   * A release as the catalogue gives it, loaded from a manifest of its own, verified with Foundry 14.
+   * @param id - The module's ID
+   * @param version - Its version
+   * @param more - What else differs
+   * @returns The release
    */
-  function releases(repo: string, versions: string[]) {
-    return versions.map(version => ({
-      tag_name: `v${version}`,
-      assets: [
-        {
-          name: 'module.json',
-          browser_download_url: `https://github.com/${repo}/releases/download/v${version}/module.json`,
-        },
-      ],
-    }));
+  function release(id: string, version: string, more: Record<string, unknown> = {}) {
+    return {
+      version,
+      compatibility: { minimum: '14', verified: '14' },
+      relationships: { requires: [], systems: [], conflicts: [], recommends: [] },
+      protected: false,
+      origin: `https://files.e2e.test/${id}/${version}/module.json`,
+      versionManifest: `https://files.e2e.test/${id}/${version}/module.json`,
+      detail: 'loaded',
+      ...more,
+    };
+  }
+
+  /**
+   * What the catalogue's lookup answers.
+   * @param packages - The packages it holds, each with its releases
+   * @param more - What else it says
+   * @returns The answer
+   */
+  function lookup(
+    packages: { type?: 'module' | 'system'; id: string; releases: unknown[] }[],
+    more: Record<string, unknown> = {},
+  ) {
+    return {
+      core: [],
+      packages: packages.map(({ type = 'module', id, releases }) => ({
+        package: { type, id },
+        title: id,
+        latest: null,
+        premium: false,
+        syncedAt: null,
+        own: { version: null, readAt: null, checkedAt: null },
+        releases,
+      })),
+      pending: [],
+      unavailable: [],
+      unreached: [],
+      asOf: null,
+      ...more,
+    };
+  }
+
+  /**
+   * Have the catalogue answer every lookup with some packages.
+   * @param page - The page
+   * @param answer - What it answers
+   */
+  async function catalogueHolds(page: Page, answer: ReturnType<typeof lookup>): Promise<void> {
+    await routeCatalogue(page, path => (path === 'api/v2/lookup' ? answer : undefined));
   }
 
   test.beforeEach(async ({ page }) => {
-    // The GitHub releases are made up: EMMA's are newer than any it has, so none is the version installed, and the
-    // library's are one older and one newer than the fixture's 1.0.0.
-    await page.route(RELEASES, async route => {
-      await route.fulfill({
-        headers: { 'Access-Control-Allow-Origin': '*' },
-        json: releases('Mondarth/EMMA', ['9.9.0', '9.8.0']),
-      });
-    });
-    await page.route(LIBRARY_RELEASES, async route => {
-      await route.fulfill({
-        headers: { 'Access-Control-Allow-Origin': '*' },
-        json: releases('emma-tests/emma-fixture-library', ['0.9.0', '2.0.0']),
-      });
-    });
+    // The releases are made up. EMMA's are newer than any it has, so none is the version installed, and run only on
+    // Foundry 13, so they cannot be used here; the catalogue could not list all of EMMA's sources. The library's are
+    // one older and one newer than the fixture's 1.0.0.
+    await catalogueHolds(
+      page,
+      lookup(
+        [
+          {
+            id: MODULE_ID,
+            releases: ['9.9.0', '9.8.0'].map(version =>
+              release(MODULE_ID, version, { compatibility: { minimum: '13', verified: '13', maximum: '13' } }),
+            ),
+          },
+          { id: LIBRARY.id, releases: ['0.9.0', '2.0.0'].map(version => release(LIBRARY.id, version)) },
+        ],
+        { unreached: [{ type: 'module', id: MODULE_ID }] },
+      ),
+    );
     await joinAs(page, USERS.gm);
     await setDisabled(page, false);
     await setView(page, 'list');
@@ -982,7 +1026,7 @@ test.describe('Hypothetical versions', () => {
     const options = list.getByRole('option');
     // The installed version is on the button, so is left out.
     await expect(options).toHaveText([/^\s*9\.9\.0/, /^\s*9\.8\.0/]);
-    // Known only from GitHub's release list, so Foundry cannot place them.
+    // They run only on Foundry 13.
     await expect(options.first().locator('.emma-badge')).toHaveClass(/error/);
     await expect(
       emma.getByRole('status', { name: new RegExp(`^Not every version could be looked up for: .*${MODULE_TITLE}`) }),
@@ -1003,7 +1047,7 @@ test.describe('Hypothetical versions', () => {
     await expect(picker('9.8.0')).toHaveCount(0);
   });
 
-  test('a module staged active is looked up, offering its newer versions and the older ones asked for; staged inactive, it is not', async ({
+  test('a module staged active offers its newer versions and the older ones asked for; staged inactive, none', async ({
     page,
   }) => {
     await (await moduleManagementButton(page)).click();
@@ -1046,14 +1090,21 @@ test.describe('Hypothetical versions', () => {
   test('the report buttons open each report in its own window, beside the others, and download it as text', async ({
     page,
   }) => {
-    // GitHub lists the version installed too, so the plan has a manifest URL for that version alone.
+    // The catalogue holds the version installed too, so the plan has a manifest URL for that version alone.
     const installed = await page.evaluate(id => game.modules.get(id)?.version ?? '', MODULE_ID);
-    await page.route(RELEASES, async route => {
-      await route.fulfill({
-        headers: { 'Access-Control-Allow-Origin': '*' },
-        json: releases('Mondarth/EMMA', ['9.9.0', installed]),
-      });
-    });
+    const ownManifest = `https://github.com/Mondarth/EMMA/releases/download/v${installed}/module.json`;
+    await catalogueHolds(
+      page,
+      lookup([
+        {
+          id: MODULE_ID,
+          releases: [
+            release(MODULE_ID, '9.9.0', { compatibility: { minimum: '13', verified: '13', maximum: '13' } }),
+            release(MODULE_ID, installed, { versionManifest: ownManifest }),
+          ],
+        },
+      ]),
+    );
     await (await moduleManagementButton(page)).click();
     const emma = page.locator(EMMA_WINDOW);
     const reports = emma.getByRole('group', { name: REPORTS });
@@ -1086,12 +1137,12 @@ test.describe('Hypothetical versions', () => {
     await expect(page.getByLabel('Report style')).toHaveCount(0);
 
     await expect(planWindow.getByRole('region', { name: /^Plan: / }).locator('pre')).toContainText(
-      `mondarth-emma  EMMA - Enhanced Module Manager Application  https://github.com/Mondarth/EMMA/releases/download/v${installed}/module.json`,
+      `mondarth-emma  EMMA - Enhanced Module Manager Application  ${ownManifest}`,
     );
     await expect(checkWindow.getByRole('region', { name: 'Check of the setup chosen' })).toContainText(
       'Every package can be used in this setup.',
     );
-    // EMMA 9.9.0's manifest cannot be read without a proxy, so it declares no compatibility and is not taken.
+    // EMMA 9.9.0 runs only on Foundry 13, so it is not taken.
     await expect(updateWindow.getByRole('region', { name: /^Best versions of the active modules/ })).toContainText(
       'The best versions are found. Every active module is already at its best version.',
     );
@@ -1167,75 +1218,64 @@ test.describe('Hypothetical versions', () => {
 
   test('the update’s best versions can be chosen, and every report open then follows them', async ({ page }) => {
     const installed = await page.evaluate(id => game.modules.get(id)?.version ?? '', MODULE_ID);
-    const library = 'https://github.com/emma-tests/emma-fixture-library/releases/download/v2.0.0/module.json';
-    const emmaRelease = 'https://github.com/Mondarth/EMMA/releases/download/v9.9.0/module.json';
     // Library 2.0.0 needs EMMA 9.9.0 or later; both work with this Foundry, so both are the best versions.
-    const answers: Record<string, unknown> = {
-      [RELEASES]: releases('Mondarth/EMMA', ['9.9.0']),
-      [LIBRARY_RELEASES]: releases('emma-tests/emma-fixture-library', ['2.0.0']),
-      [library]: {
-        id: LIBRARY.id,
-        title: LIBRARY.title,
-        version: '2.0.0',
-        compatibility: { minimum: '14', verified: '14' },
-        relationships: { requires: [{ id: MODULE_ID, type: 'module', compatibility: { minimum: '9.9.0' } }] },
-      },
-      [emmaRelease]: {
-        id: MODULE_ID,
-        title: MODULE_TITLE,
-        version: '9.9.0',
-        compatibility: { minimum: '14', verified: '14' },
-      },
-    };
-    await page.route('https://proxy.test/**', async route => {
-      const target = new URL(route.request().url()).searchParams.get('url') ?? '';
-      await route.fulfill({ headers: { 'Access-Control-Allow-Origin': '*' }, json: answers[target] ?? [] });
-    });
-    await page.evaluate(async () => {
-      await game.settings.set('mondarth-emma', 'versionProxy', 'https://proxy.test/?url={url}');
-    });
-    try {
-      await (await moduleManagementButton(page)).click();
-      const emma = page.locator(EMMA_WINDOW);
-      await emma.getByRole('checkbox', { name: LIBRARY.title }).check();
-      await emma.getByRole('button', { name: 'Hypothetical mode', exact: true }).click();
-      const reports = emma.getByRole('group', { name: REPORTS });
-      await expect(reports.getByRole('button', { name: 'Update', exact: true })).toBeEnabled();
-      for (const button of ['Plan', 'Check', 'Update']) {
-        await reports.getByRole('button', { name: button, exact: true }).click();
-      }
-      const updateWindow = page.locator(`#${MODULE_ID}-report-update`);
-      const update = updateWindow.getByRole('region', { name: /^Best versions of the active modules/ });
-      await expect(update).toContainText(`${MODULE_TITLE}: ${installed} to 9.9.0`);
-      await expect(update).toContainText(`${LIBRARY.title}: 1.0.0 to 2.0.0`);
-
-      await updateWindow.getByRole('button', { name: 'Choose these versions in the hypothetical setup' }).click();
-
-      await expect(
-        emma.getByRole('button', { name: `${MODULE_TITLE} version 9.9.0: choose another version` }),
-      ).toBeVisible();
-      await expect(
-        emma.getByRole('button', { name: `${LIBRARY.title} version 2.0.0: choose another version` }),
-      ).toBeVisible();
-      // Every report open reports on the setup with the versions chosen, without opening it again.
-      await expect(update).toContainText('Every active module is already at its best version.');
-      await expect(
-        updateWindow.getByRole('button', { name: 'Choose these versions in the hypothetical setup' }),
-      ).toHaveCount(0);
-      const install = page.locator(`#${MODULE_ID}-report-plan`).getByRole('region', { name: /^Install:/ });
-      await expect(install).toContainText(library);
-      await expect(install).toContainText(emmaRelease);
-      await expect(
-        page.locator(`#${MODULE_ID}-report-check`).getByRole('region', { name: 'Check of the setup chosen' }),
-      ).toContainText('9.9.0');
-    } finally {
-      await page.evaluate(async () => {
-        await game.settings.set('mondarth-emma', 'versionProxy', '');
-      });
+    await catalogueHolds(
+      page,
+      lookup([
+        { id: MODULE_ID, releases: [release(MODULE_ID, '9.9.0')] },
+        {
+          id: LIBRARY.id,
+          releases: [
+            release(LIBRARY.id, '2.0.0', {
+              relationships: {
+                requires: [{ package: { type: 'module', id: MODULE_ID }, compatibility: { minimum: '9.9.0' } }],
+                systems: [],
+                conflicts: [],
+                recommends: [],
+              },
+            }),
+          ],
+        },
+      ]),
+    );
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+    await emma.getByRole('checkbox', { name: LIBRARY.title }).check();
+    await emma.getByRole('button', { name: 'Hypothetical mode', exact: true }).click();
+    const reports = emma.getByRole('group', { name: REPORTS });
+    await expect(reports.getByRole('button', { name: 'Update', exact: true })).toBeEnabled();
+    for (const button of ['Plan', 'Check', 'Update']) {
+      await reports.getByRole('button', { name: button, exact: true }).click();
     }
+    const updateWindow = page.locator(`#${MODULE_ID}-report-update`);
+    const update = updateWindow.getByRole('region', { name: /^Best versions of the active modules/ });
+    await expect(update).toContainText(`${MODULE_TITLE}: ${installed} to 9.9.0`);
+    await expect(update).toContainText(`${LIBRARY.title}: 1.0.0 to 2.0.0`);
+
+    await updateWindow.getByRole('button', { name: 'Choose these versions in the hypothetical setup' }).click();
+
+    await expect(
+      emma.getByRole('button', { name: `${MODULE_TITLE} version 9.9.0: choose another version` }),
+    ).toBeVisible();
+    await expect(
+      emma.getByRole('button', { name: `${LIBRARY.title} version 2.0.0: choose another version` }),
+    ).toBeVisible();
+    // Every report open reports on the setup with the versions chosen, without opening it again.
+    await expect(update).toContainText('Every active module is already at its best version.');
+    await expect(
+      updateWindow.getByRole('button', { name: 'Choose these versions in the hypothetical setup' }),
+    ).toHaveCount(0);
+    const install = page.locator(`#${MODULE_ID}-report-plan`).getByRole('region', { name: /^Install:/ });
+    await expect(install).toContainText(LIBRARY_PLAN);
+    await expect(install).toContainText(EMMA_PLAN);
+    await expect(
+      page.locator(`#${MODULE_ID}-report-check`).getByRole('region', { name: 'Check of the setup chosen' }),
+    ).toContainText('9.9.0');
   });
 
-  test('the system offers its newer versions without a proxy, which the footer explains', async ({ page }) => {
+  test('the system offers its newer versions from the catalogue, and no newer Foundry when it gives none', async ({
+    page,
+  }) => {
     const { core, system } = await page.evaluate(() => ({
       core: game.version,
       system: {
@@ -1246,30 +1286,32 @@ test.describe('Hypothetical versions', () => {
         compatibility: game.system.compatibility,
       },
     }));
-    // A made-up newer release, from the manifest the system declares.
-    await page.route(system.manifest, async route => {
-      await route.fulfill({
-        headers: { 'Access-Control-Allow-Origin': '*' },
-        json: {
+    // A made-up newer release, with a manifest URL for this version alone, without which it could not be installed,
+    // nor chosen.
+    await catalogueHolds(
+      page,
+      lookup([
+        {
+          type: 'system',
           id: system.id,
-          title: system.title,
-          version: '99.0.0',
-          compatibility: system.compatibility,
-          // A manifest URL for this version alone, without which it could not be installed, nor chosen.
-          manifest: 'https://example.test/system/99.0.0/system.json',
+          releases: [
+            release(system.id, '99.0.0', {
+              compatibility: system.compatibility,
+              versionManifest: 'https://example.test/system/99.0.0/system.json',
+            }),
+          ],
         },
-      });
-    });
+      ]),
+    );
     await (await moduleManagementButton(page)).click();
     const emma = page.locator(EMMA_WINDOW);
     const choose = (version: string) =>
       emma.getByRole('button', { name: `${system.title} version ${version}: choose another version`, exact: true });
-    const explanation = emma.getByText(/No version lookup proxy is used/);
-    await expect(explanation).toHaveCount(0);
+    const unreachable = emma.getByText(/Catalogue unreachable: hypothetical mode/);
 
     await emma.getByRole('button', { name: 'Hypothetical mode', exact: true }).click();
-    await expect(explanation).toBeVisible();
     await choose(system.version).click();
+    await expect(unreachable).toHaveCount(0);
 
     const options = page.getByRole('listbox', { name: `Versions of ${system.title}` }).getByRole('option');
     await expect(options).toHaveText([/^\s*99\.0\.0/]);
@@ -1277,11 +1319,10 @@ test.describe('Hypothetical versions', () => {
     await options.first().click();
 
     await expect(choose('99.0.0')).toHaveText(`${system.id} 99.0.0`);
-    // Without a proxy, Foundry's release notes are not read, so no newer core is offered.
+    // The catalogue gives no newer build of Foundry, so none is offered.
     await expect(emma.getByRole('button', { name: `Foundry Virtual Tabletop ${core}`, exact: true })).toBeVisible();
 
     await emma.getByRole('button', { name: 'Hypothetical mode', exact: true }).click();
-    await expect(explanation).toHaveCount(0);
   });
 });
 
@@ -1358,29 +1399,37 @@ test.describe('Version lookup proxy', () => {
     await expect(settings.getByText('Show older versions')).toHaveCount(0);
   });
 
-  test('a GM sets their own proxy and its key, and hypothetical mode sends the key and EMMA’s version to it', async ({
+  test('hypothetical mode asks EMMA’s catalogue, with its key and EMMA’s version, and never a proxy a GM sets', async ({
     page,
   }) => {
-    const keys: (string | undefined)[] = [];
-    const versions: (string | undefined)[] = [];
-    // Answers every lookup with nothing, as a proxy would for sites with nothing to give.
+    const asked: { url: string; key: string | undefined; client: string | undefined }[] = [];
+    await routeCatalogue(page, (path, _body, request) => {
+      asked.push({
+        url: request.url(),
+        key: request.headers()['x-api-key'],
+        client: request.headers()['x-catalogue-client'],
+      });
+      return undefined;
+    });
+    const proxied: string[] = [];
     await page.route('https://proxy.test/**', async route => {
-      const headers = {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'X-API-Key, X-EMMA-Version',
-      };
-      if (route.request().method() === 'OPTIONS') {
-        await route.fulfill({ status: 204, headers });
-        return;
-      }
-      keys.push(route.request().headers()['x-api-key']);
-      versions.push(route.request().headers()['x-emma-version']);
-      await route.fulfill({ headers, json: [] });
+      proxied.push(route.request().url());
+      await route.fulfill({ headers: { 'Access-Control-Allow-Origin': '*' }, json: [] });
     });
     await joinAs(page, USERS.gm);
     await setDisabled(page, false);
     await setProxy(page, '', '');
+    const version = await page.evaluate(id => game.modules.get(id)?.version, MODULE_ID);
 
+    await (await moduleManagementButton(page)).click();
+    const emma = page.locator(EMMA_WINDOW);
+    await emma.getByRole('button', { name: 'Hypothetical mode', exact: true }).click();
+
+    await expect.poll(() => asked.length).toBe(1);
+    expect(asked).toEqual([{ url: `${CATALOGUE}api/v2/lookup`, key: CATALOGUE_KEY, client: `EMMA/${version ?? ''}` }]);
+    await closeEmma(page);
+
+    // A GM's own proxy, set in the menu, is never asked, nor is the catalogue: only what is installed is known.
     const settings = await openEmmaSettings(page);
     await settings.getByRole('button', { name: 'Set proxy' }).click();
     const menu = page.locator(`#${MODULE_ID}-proxy`);
@@ -1396,17 +1445,14 @@ test.describe('Version lookup proxy', () => {
     await menu.getByLabel('API key').fill('k3y');
     await menu.getByRole('button', { name: 'Save' }).click();
     await expect(menu).toHaveCount(0);
-
     await clickClose(page, '#settings-config');
+
     await (await moduleManagementButton(page)).click();
-    const emma = page.locator(EMMA_WINDOW);
     await emma.getByRole('button', { name: 'Hypothetical mode', exact: true }).click();
 
-    await expect.poll(() => keys.length).toBeGreaterThan(0);
-    expect(new Set(keys)).toEqual(new Set(['k3y']));
-    const version = await page.evaluate(id => game.modules.get(id)?.version, MODULE_ID);
-    expect(new Set(versions)).toEqual(new Set([version]));
-    await expect(emma.getByText(/No version lookup proxy is used/)).toHaveCount(0);
+    await expect(emma.getByText(/Catalogue unreachable: hypothetical mode/)).toBeVisible();
+    expect(proxied).toEqual([]);
+    expect(asked).toHaveLength(1);
 
     await closeEmma(page);
     await setProxy(page, '', '');

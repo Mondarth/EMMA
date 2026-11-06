@@ -23,7 +23,7 @@
       "Loading": "Looking up module versions…",
       "Failed": "Module versions could not be looked up. See the console for details.",
       "Unreached": "Not every version could be looked up for: {packages}.",
-      "UnreachedNoProxy": "Not every version could be looked up for: {packages}. Choose a version lookup proxy in EMMA's settings to look further.",
+      "CatalogueUnreachable": "EMMA's package catalogue could not be reached: only the installed versions are known.",
       "Core": "Foundry Virtual Tabletop",
       "Unlisted": "Not on Foundry's package listing: its author has published it elsewhere, such as on GitLab, ahead of the listing, so Foundry's installer does not offer it.",
       "NoManifest": "EMMA identified this version, but could not locate a manifest URL for it alone, so it cannot be installed or chosen.",
@@ -239,7 +239,7 @@
       "ReadOnly": "Only a GM can change which modules are active.",
       "DisablesEmma": "Saving deactivates EMMA itself, so Foundry's own Module Management window will open from then on.",
       "NativeBadges": "The badges show Foundry VTT's own checks, which judge the Foundry version alone, not the game system or the modules each requires: they may be inaccurate. Choose EMMA's checks under Badge checks in EMMA's settings.",
-      "NoProxy": "No version lookup proxy is used, so Foundry's package listing and release notes can't be read: fewer module versions are found, and no newer Foundry version is offered. Choose a proxy in EMMA's settings to look further."
+      "CatalogueUnreachable": "Catalogue unreachable: hypothetical mode knows only the installed versions, so offers no others and no newer Foundry version. Close EMMA and open it again to try again."
     },
     "Requirements": {
       "Unmet": "{module} requires {missing}, which must be active too.",

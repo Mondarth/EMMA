@@ -11,8 +11,8 @@
     canManage: boolean;
     /** Saves the staged changes. */
     onSave: () => Promise<unknown>;
-    /** Whether hypothetical mode is looking up versions without a proxy, so finds fewer. */
-    unproxied?: boolean;
+    /** Whether hypothetical mode could not reach EMMA's catalogue, so knows only the installed versions. */
+    unreachable?: boolean;
     /** Whether the badges are Foundry's own checks, which may be inaccurate, as the user chose. */
     nativeBadges?: boolean;
     /**
@@ -22,7 +22,7 @@
     hypothetical?: { readonly canReset: boolean; readonly reset: () => void } | undefined;
   }
 
-  const { modules, canManage, onSave, unproxied = false, nativeBadges = false, hypothetical }: Props = $props();
+  const { modules, canManage, onSave, unreachable = false, nativeBadges = false, hypothetical }: Props = $props();
 
   let saving = $state(false);
 
@@ -69,10 +69,10 @@
     {:else if modules.dirty}
       <p>{format('MONDARTH-EMMA.Footer.Changes', { count: String(changeCount) })}</p>
     {/if}
-    {#if unproxied}
-      <p class="emma-unproxied">
+    {#if unreachable}
+      <p class="emma-unreachable">
         <i class="fa-solid fa-circle-info" inert></i>
-        {localize('MONDARTH-EMMA.Footer.NoProxy')}
+        {localize('MONDARTH-EMMA.Footer.CatalogueUnreachable')}
       </p>
     {/if}
     {#if nativeBadges}

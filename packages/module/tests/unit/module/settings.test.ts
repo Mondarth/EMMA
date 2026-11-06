@@ -457,72 +457,23 @@ describe('getVersionProxyMode', () => {
 });
 
 describe('versionLookup', () => {
-  /** The default proxy and catalogue of a release build. */
-  const built = { url: obscure('https://default.test/?url={url}'), key: obscure('default-k3y') };
+  /** The catalogue of a release build. */
   const catalogue = { url: obscure('https://catalogue.test/'), key: obscure('catalogue-k3y') };
 
-  test('is EMMA’s proxy with its key, by default', () => {
+  test('is EMMA’s catalogue, with its own key, by default', () => {
     installFoundryMocks();
     registerSettings();
 
-    expect(versionLookup(built)).toEqual({
-      proxy: 'https://default.test/?url={url}',
-      apiKey: 'default-k3y',
-      catalogue: null,
-    });
-  });
-
-  test('is no proxy by default in a build without one', () => {
-    installFoundryMocks();
-    registerSettings();
-
-    expect(versionLookup(null)).toEqual({ proxy: null, apiKey: null, catalogue: null });
-  });
-
-  test('is the GM’s own proxy with their own key, never EMMA’s key', () => {
-    installFoundryMocks({
-      settings: {
-        'mondarth-emma.versionProxyMode': 'own',
-        'mondarth-emma.versionProxy': 'https://own.test/?url={url}',
-      },
-    });
-    registerSettings();
-    expect(versionLookup(built)).toEqual({ proxy: 'https://own.test/?url={url}', apiKey: null, catalogue: null });
-
-    installFoundryMocks({
-      settings: {
-        'mondarth-emma.versionProxyMode': 'own',
-        'mondarth-emma.versionProxy': 'https://own.test/?url={url}',
-        'mondarth-emma.versionProxyKey': 'own-k3y',
-      },
-    });
-    registerSettings();
-    expect(versionLookup(built)).toEqual({ proxy: 'https://own.test/?url={url}', apiKey: 'own-k3y', catalogue: null });
-  });
-
-  test('is no proxy when the GM chose none, or their own has nowhere to put the URL', () => {
-    installFoundryMocks({
-      settings: { 'mondarth-emma.versionProxyMode': 'none', 'mondarth-emma.versionProxyKey': 'k' },
-    });
-    registerSettings();
-    expect(versionLookup(built)).toEqual({ proxy: null, apiKey: null, catalogue: null });
-
-    installFoundryMocks({
-      settings: { 'mondarth-emma.versionProxyMode': 'own', 'mondarth-emma.versionProxy': 'https://own.test/' },
-    });
-    registerSettings();
-    expect(versionLookup(built)).toEqual({ proxy: null, apiKey: null, catalogue: null });
-  });
-
-  test('asks EMMA’s catalogue first, with its own key, by default', () => {
-    installFoundryMocks();
-    registerSettings();
-
-    expect(versionLookup(built, catalogue)).toEqual({
-      proxy: 'https://default.test/?url={url}',
-      apiKey: 'default-k3y',
+    expect(versionLookup(catalogue)).toEqual({
       catalogue: { url: 'https://catalogue.test/', key: 'catalogue-k3y' },
     });
+  });
+
+  test('is no catalogue in a build without one', () => {
+    installFoundryMocks();
+    registerSettings();
+
+    expect(versionLookup(null)).toEqual({ catalogue: null });
   });
 
   test('never asks EMMA’s catalogue when the GM chose their own proxy, or none', () => {
@@ -532,7 +483,7 @@ describe('versionLookup', () => {
     ]) {
       installFoundryMocks({ settings });
       registerSettings();
-      expect(versionLookup(built, catalogue).catalogue).toBeNull();
+      expect(versionLookup(catalogue)).toEqual({ catalogue: null });
     }
   });
 });

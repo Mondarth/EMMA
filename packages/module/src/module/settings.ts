@@ -1,7 +1,6 @@
 import { MODULE_ID } from '@module/lib/constants';
 import { defaultCatalogue } from '@module/lib/default-catalogue';
 import type { DefaultCatalogue } from '@module/lib/default-catalogue';
-import { defaultProxy } from '@module/lib/default-proxy';
 import type { DrawerField } from '@module/state/drawer-fields.svelte';
 import { DEFAULT_DRAWER_FIELDS, DRAWER_FIELDS, drawerFields, isDrawerField } from '@module/state/drawer-fields.svelte';
 import type { BadgeChecks } from '@module/state/badge-checks.svelte';
@@ -339,45 +338,23 @@ export function getVersionProxyMode(): ProxyMode {
   return game.settings.get(MODULE_ID, SETTINGS.versionProxy).trim() === '' ? 'default' : 'own';
 }
 
-/** Where versions are looked up: the catalogue asked first, if any, and the proxy, with the API key to send it. */
+/** Where versions are looked up: EMMA's package catalogue, alone. */
 export interface VersionLookup {
-  /** The proxy's URL template, or `null` to look up directly. */
-  readonly proxy: string | null;
-  /** The key to send the proxy, or `null` for none. */
-  readonly apiKey: string | null;
-  /** EMMA's package catalogue, with its own key, asked before the proxy; `null` for none. */
+  /** EMMA's package catalogue, with its key; `null` for none, when only the installed versions are known. */
   readonly catalogue: DefaultCatalogue | null;
 }
 
 /**
- * Where versions are looked up: EMMA's catalogue first and then EMMA's proxy, each with EMMA's key for it; the GM's
- * own proxy with their key; or none. EMMA's keys only ever go to EMMA's services, so a proxy a GM sets never receives
- * them, and a GM who chose their own proxy, or none, is never sent to EMMA's catalogue.
- * @param built - EMMA's proxy as this build has it; this build's own unless given
+ * Where versions are looked up: EMMA's catalogue, with EMMA's key for it, in the `default` mode. A GM who chose their
+ * own proxy, or none, is never sent to EMMA's catalogue: until those choices go, hypothetical mode knows only the
+ * installed versions for them.
  * @param builtCatalogue - EMMA's catalogue as this build has it; this build's own unless given
- * @returns The catalogue, proxy and key, or nulls to look up directly
+ * @returns The catalogue, or `null`
  */
 export function versionLookup(
-  built: Parameters<typeof defaultProxy>[0] = __EMMA_DEFAULT_PROXY__,
   builtCatalogue: Parameters<typeof defaultCatalogue>[0] = __EMMA_DEFAULT_CATALOGUE__,
 ): VersionLookup {
-  switch (getVersionProxyMode()) {
-    case 'default': {
-      const proxy = defaultProxy(built);
-      const catalogue = defaultCatalogue(builtCatalogue);
-      return proxy === null
-        ? { proxy: null, apiKey: null, catalogue }
-        : { proxy: proxy.url, apiKey: proxy.key, catalogue };
-    }
-    case 'own': {
-      const proxy = getVersionProxy();
-      return proxy === null
-        ? { proxy: null, apiKey: null, catalogue: null }
-        : { proxy, apiKey: getVersionProxyKey(), catalogue: null };
-    }
-    default:
-      return { proxy: null, apiKey: null, catalogue: null };
-  }
+  return { catalogue: getVersionProxyMode() === 'default' ? defaultCatalogue(builtCatalogue) : null };
 }
 
 /**

@@ -213,16 +213,16 @@ describe('HypotheticalState', () => {
     expect(judge.judgePlatform.mock.lastCall?.[2]).toBe('core');
   });
 
-  test('says whether versions are looked up through a proxy once the lookup starts', async () => {
+  test('says whether EMMA’s catalogue answered once the lookup is done', async () => {
     const state = new HypotheticalState(
-      () => fakeJudge({}, { proxied: false }),
+      () => fakeJudge({}, { reached: false }),
       () => [],
     );
-    expect(state.proxied).toBeNull();
+    expect(state.reached).toBeNull();
 
     await state.load();
 
-    expect(state.proxied).toBe(false);
+    expect(state.reached).toBe(false);
   });
 
   test('reports on the setup chosen once versions are looked up, and not while more are', async () => {

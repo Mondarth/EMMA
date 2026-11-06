@@ -235,7 +235,7 @@ pressed while its report is open, and pressing it again closes the report:
   module's ID, its name, and a manifest URL for the version chosen alone, such as a GitHub release's own
   `module.json`, so that installing from it installs that version. A module's own manifest URL usually gives whatever
   version is newest, so it is never shown; where no source gives a URL for the version, the plan says _none for this
-  version_. The proxy lets EMMA find more of them. The plan is in two lists, each under its title and numbered from 1:
+  version_. The plan is in two lists, each under its title and numbered from 1:
   first the modules to install (a version other than the one installed, or a module not installed), then those kept at
   the version installed. In each, a module comes before the modules that depend on it: the modules are ordered by how
   deep the tree of active modules depending on each one goes, deepest first, so the libraries others build on come
@@ -255,8 +255,7 @@ pressed while its report is open, and pressing it again closes the report:
   no compatibility at all is not, nor is a pre-release. It lists the versions to change, and modules an active module
   needs that it would add; or, when no versions work together, explains why in numbered sentences. It may need the
   manifests of versions known only from a listing, which it tries to fetch, so it can take a moment; versions whose
-  manifests could not be loaded are named. Without a proxy, versions known only from GitHub cannot be read, so are not
-  taken.
+  manifests could not be loaded are named.
 
 When the **Update** changes any version, a button (a wand) just left of its download button chooses the versions it
 recommends in the hypothetical setup, as if you had picked each from its drop-down. Every other choice is left as it
@@ -283,16 +282,13 @@ with it.
 
 ### Where versions come from
 
-Browsers may not read Foundry's own package listing, its release notes, or the manifests attached to GitHub
-releases, because those sites send no CORS headers, so EMMA looks versions up through a CORS proxy: its own, unless a
-GM chooses another (see [Settings](#settings)). Through a proxy, EMMA reads Foundry's package listing and release
-notes, so each version is judged on the Foundry versions it declares, and newer Foundry builds are offered.
-
-With EMMA's own lookup, EMMA first asks its [package catalogue](https://github.com/Mondarth/fvtt-package-catalogue),
-which keeps every version of the packages asked for, each read from its own manifest, with what they require and run in.
-One request gives them all, so lookups are much quicker. A package the catalogue does not have yet it fetches, for next
-time, and EMMA looks it up through the proxy meanwhile; if the catalogue cannot be reached, EMMA looks everything up
-through the proxy, as before.
+EMMA looks every version up in its [package catalogue](https://github.com/Mondarth/fvtt-package-catalogue), which
+keeps every version of Foundry's listed packages and of those it is asked for, each read from its own manifest, with
+what they require and run in, and Foundry's own builds. When hypothetical mode is first turned on, one request gives
+the versions of the game system and every installed module, so turning modules on and off asks nothing more. EMMA
+sends the catalogue the IDs and versions of the installed packages, the manifest URLs they were installed from, and the
+Foundry generation in use. A package the catalogue does not have yet, such as one installed from a manifest only, it
+fetches by that URL, for next time; meanwhile EMMA knows only its installed version.
 
 The catalogue also keeps versions an author has published ahead of Foundry's package listing, such as releases on
 GitLab not yet on the listing. EMMA offers them marked with a flask, and their tooltip says they are not on Foundry's
@@ -309,10 +305,9 @@ out of the setup it reports on, so a module that requires it shows that requirem
 a **Not available** section naming each active module that cannot be had, and why. A module hypothetical mode ignores
 (see [below](#modules-hypothetical-mode-ignores)) is taken as present instead, and not named there.
 
-Without a proxy, EMMA lists the versions released on GitHub and GitLab, but does not know which Foundry versions
-those releases support, so Foundry marks them **Compatibility unknown**; and as it cannot read Foundry's release
-notes, it offers no newer Foundry version. A note in the footer says so while the mode is on. A warning beside the System button names the packages that could not be looked up. An old version
-whose manifest cannot be read is still listed, but does not raise the warning.
+When the catalogue cannot be reached, hypothetical mode knows only the installed versions, and offers no newer Foundry
+version: a note in the footer says **Catalogue unreachable** while the mode is on. Close EMMA and open it again to try
+again. A warning beside the System button names the packages the catalogue could not list every version of.
 
 ### Staging in hypothetical mode
 
@@ -441,11 +436,9 @@ Version lookup proxy
   settings). Its **Set proxy** button opens a window to choose what hypothetical mode looks versions up through,
   shared by the whole world:
 
-  - **EMMA's proxy** (the default): EMMA's package catalogue first, then a proxy run for EMMA for anything the
-    catalogue does not have yet. Both deal only in package information (release lists, release downloads, manifests
-    and Foundry's package listing) and cache it, so lookups are quick and stay within GitHub's limits. They see your
-    server's address and the packages it looks up. Their addresses and keys are built into EMMA and never shown. A
-    world that set its own proxy before there was a choice keeps it.
+  - **EMMA's proxy** (the default): EMMA's package catalogue, which deals only in package information and sees your
+    server's address and the packages it looks up. Its address and key are built into EMMA and never shown. A world
+    that set its own proxy before there was a choice keeps it.
   - **My own proxy**: a CORS proxy you run or trust, with two fields:
     - **Proxy URL**, with `{url}` where the address to fetch goes, such as `https://proxy.example.com/?url={url}`.
       Every request hypothetical mode makes is sent through it, so use only a proxy you trust. The window will not
@@ -460,11 +453,12 @@ Version lookup proxy
     versions without knowing which Foundry or system they suit. GitHub also allows only 60 lookups an hour from your
     browser's address.
 
-  Only EMMA's own lookup asks EMMA's catalogue: with your own proxy, or none, EMMA never contacts it.
+  EMMA now looks versions up in its catalogue alone, so **My own proxy** and **No proxy** are no longer used: with
+  either, EMMA never contacts the catalogue, and hypothetical mode knows only the installed versions. These choices
+  are going in a coming release.
 
-  Every request through a proxy, EMMA's or your own, carries EMMA's version in an `X-EMMA-Version` header, so the
-  proxy's logs can tell which version asks for what; requests to EMMA's catalogue carry it in `X-Catalogue-Client`.
-  Requests without a proxy carry nothing extra.
+  Requests to EMMA's catalogue carry EMMA's version in `X-Catalogue-Client`, so its logs can tell which version asks
+  for what.
 
   See [Where versions come from](#where-versions-come-from).
 
