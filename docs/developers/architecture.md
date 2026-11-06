@@ -128,7 +128,8 @@ module:
   `flags.setupKit`; the EMMA extension checks that version against the one it was built with (`kitFit`) before it
   imports the kit, and again after. Raise the minor when the kit gives more, and the major when it gives less or
   changes what it gives, as a resolver release that changes a function the EMMA extension calls would; keep
-  `module.json`'s flag in step, which a unit test checks. Packages import core from its source, through its
+  `module.json`'s flag in step, which a unit test checks. Kit 1.1 adds `catalogueSet`, the catalogue's version 2 as a
+  source set of its own. Packages import core from its source, through its
   `exports`.
 
 `packages/setup` (`@mondarth/emma-setup`)

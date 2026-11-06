@@ -26,6 +26,7 @@ import {
   withDefaults,
 } from '@mondarth/fvtt-resolver';
 import {
+  catalogueSet,
   catalogueSource,
   foundryCoreReleases,
   foundryIndexSource,
@@ -64,6 +65,7 @@ const kit: SetupKit = {
     withDefaults,
   },
   sources: {
+    catalogueSet,
     catalogueSource,
     foundryCoreReleases,
     foundryIndexSource,
