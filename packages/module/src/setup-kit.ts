@@ -25,20 +25,7 @@ import {
   sameVersion,
   withDefaults,
 } from '@mondarth/fvtt-resolver';
-import {
-  catalogueSet,
-  catalogueSource,
-  foundryCoreReleases,
-  foundryIndexSource,
-  githubSource,
-  gitlabSource,
-  httpClient,
-  localSource,
-  manifestUrlSource,
-  memoryCache,
-  proxiedFetch,
-  sourceSet,
-} from '@mondarth/fvtt-resolver/sources';
+import { catalogueSet, catalogueSource, localSource } from '@mondarth/fvtt-resolver/sources';
 
 import { releaseBadge } from './module/adapters/badges';
 
@@ -64,20 +51,7 @@ const kit: SetupKit = {
     sameVersion,
     withDefaults,
   },
-  sources: {
-    catalogueSet,
-    catalogueSource,
-    foundryCoreReleases,
-    foundryIndexSource,
-    githubSource,
-    gitlabSource,
-    httpClient,
-    localSource,
-    manifestUrlSource,
-    memoryCache,
-    proxiedFetch,
-    sourceSet,
-  },
+  sources: { catalogueSet, catalogueSource, localSource },
   badges: { releaseBadge },
 };
 

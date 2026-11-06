@@ -83,14 +83,10 @@ The module is the `packages/module` package of the repository's pnpm workspace; 
 `src/module/app/`
 : The `ApplicationV2` windows. `EmmaApp` is EMMA itself; `DrawerFieldsConfig` is the Module details settings menu,
   registered with `game.settings.registerMenu` and open to every user, in which they choose the details drawers show;
-  `SetupReportApp` (in `setup-report.ts`) is the hypothetical-mode report, opened from the toolbar, one at a time,
+  and `SetupReportApp` (in `setup-report.ts`) is the hypothetical-mode report, opened from the toolbar, one at a time,
   showing the plan, check or resolve picked, as `src/module/lib/report-text.ts` also writes them for download through
-  Foundry's `saveDataToFile`;
-  and `VersionProxyConfig` is the Version lookup proxy menu, registered `restricted`, so Foundry shows it only to
-  users who may change configuration settings, in which a GM sets the proxy (a world setting) and its API key. The key
-  is a client setting, kept in the browser's local storage, because Foundry sends every world and user setting to
-  every user who joins. Each mounts its Svelte component on first render and unmounts it on close. All but the report ask
-  before closing with unsaved changes (staged activation in `EmmaApp`, a changed draft in the menus), through
+  Foundry's `saveDataToFile`. Each mounts its Svelte component on first render and unmounts it on close. All but the
+  report ask before closing with unsaved changes (staged activation in `EmmaApp`, a changed draft in the menu), through
   `confirmDiscard` in `confirm-discard.ts`; `close({ discard: true })` closes without asking.
   `world-record.ts` keeps the world record in step with the world (`syncWorldRecord`), one check at a time, writing
   it only when it is missing or says something else. The active GM checks it on `ready`, `saveModules` (in
@@ -114,19 +110,18 @@ module:
 `packages/core` (`@mondarth/emma-core`)
 : Code that more than one package needs, and that uses no Foundry or browser globals: so far the world record's format
   (`src/world-record.ts`), which the module writes and the setup screen reads, with `parseWorldRecord` to read a record
-  that anything may have written; EMMA's package catalogue and version lookup proxy, obscured in a build
-  (`src/obscure.ts`, `src/default-catalogue.ts`, `src/default-proxy.ts`), with what builds them in and checks a
-  release for their keys in plain text, which run under Node (`scripts/`); and the setup kit's API
+  that anything may have written; EMMA's package catalogue, obscured in a build (`src/obscure.ts`,
+  `src/default-catalogue.ts`), with what builds it in and checks a release for its key in plain text, which run under Node (`scripts/`); and the setup kit's API
   (`src/setup-kit.ts`). The setup kit is the code the EMMA extension imports from the installed module, rather than
-  carry its own copy: the resolver and its sources, and how the module badges a version
+  carry its own copy: the resolver and the catalogue's sources, and how the module badges a version
   (`src/module/adapters/badges.ts`), so the extension's version lists are coloured as the module's are. It holds no
-  catalogue or proxy: each bundle builds in its own. The module builds it as `dist/emma-setup-kit.js`
+  catalogue: each bundle builds in its own. The module builds it as `dist/emma-setup-kit.js`
   (`src/setup-kit.ts`, `vite.kit.config.ts`) and names it, with its API version `<major>.<minor>`, in its manifest's
   `flags.setupKit`; the EMMA extension checks that version against the one it was built with (`kitFit`) before it
   imports the kit, and again after. Raise the minor when the kit gives more, and the major when it gives less or
   changes what it gives, as a resolver release that changes a function the EMMA extension calls would; keep
-  `module.json`'s flag in step, which a unit test checks. Kit 1.1 adds `catalogueSet`, the catalogue's version 2 as a
-  source set of its own. Packages import core from its source, through its
+  `module.json`'s flag in step, which a unit test checks. Kit 2.0 gives only the catalogue's sources (`catalogueSet`,
+  `catalogueSource`) and the installed manifests' (`localSource`). Packages import core from its source, through its
   `exports`.
 
 `packages/setup` (`@mondarth/emma-setup`)

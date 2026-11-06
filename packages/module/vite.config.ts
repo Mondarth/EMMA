@@ -8,7 +8,6 @@ import dts from 'unplugin-dts/vite';
 
 import moduleJSON from './module.json' with { type: 'json' };
 import { defaultCatalogueDefine } from '@mondarth/emma-core/default-catalogue-define';
-import { defaultProxyDefine } from '@mondarth/emma-core/default-proxy-define';
 
 import tsconfigPaths from 'vite-tsconfig-paths';
 import type { Plugin } from 'vite';
@@ -144,10 +143,8 @@ export default defineConfig(({ mode }) => {
     },
     define: {
       'import.meta.vitest': false,
-      // The default version lookup proxy, obscured, from the environment of a release build. Never in tests, so they
+      // The default package catalogue, obscured, from the environment of a release build. Never in tests, so they
       // run the same wherever they run.
-      __EMMA_DEFAULT_PROXY__: mode === 'test' ? 'null' : defaultProxyDefine(process.env),
-      // The default package catalogue, likewise.
       __EMMA_DEFAULT_CATALOGUE__: mode === 'test' ? 'null' : defaultCatalogueDefine(process.env),
     },
 

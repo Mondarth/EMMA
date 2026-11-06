@@ -440,12 +440,12 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
    */
   async function installedMissing(found: readonly Release[]): Promise<Release[]> {
     const missing = await Promise.all(
-      refs
-        .filter(ref => ref.type !== 'module' || !catalogue.unavailable.has(ref.id))
-        .map(async ref => {
-          const version = ref.type === 'system' ? system.version : catalogue.installed.get(ref.id);
+      requests
+        .filter(({ type, id }) => type !== 'module' || !catalogue.unavailable.has(id))
+        .map(async ({ type, id, installed: version }) => {
+          const ref = { type, id };
           const given = found.some(
-            release => packageKey(release.package) === packageKey(ref) && sameVersion(release.version, version ?? ''),
+            release => packageKey(release.package) === packageKey(ref) && sameVersion(release.version, version),
           );
           if (given) return [];
           const read = await local.releases(ref);
@@ -490,12 +490,12 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
     for (const release of releases.filter(({ package: { type } }) => type === 'module')) {
       versions.set(release.package.id, [...(versions.get(release.package.id) ?? []), release.version]);
     }
-    if (!reached) {
+    if (set === undefined || !reached) {
       unreached.push(...refs, CORE_REF);
       return;
     }
     const installedKeys = new Set(refs.map(packageKey));
-    unreached.push(...(set?.unreached() ?? []).filter(ref => installedKeys.has(packageKey(ref))));
+    unreached.push(...set.unreached().filter(ref => installedKeys.has(packageKey(ref))));
   }
 
   return {

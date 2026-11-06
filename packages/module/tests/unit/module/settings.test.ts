@@ -6,9 +6,6 @@ import {
   getHypotheticallyIgnored,
   getOlderVersions,
   getStartupChanges,
-  getVersionProxy,
-  getVersionProxyKey,
-  getVersionProxyMode,
   getView,
   isAutoRecommended,
   isEmmaDisabled,
@@ -18,7 +15,6 @@ import {
   setDrawerFields,
   setGrouped,
   setHypotheticallyIgnored,
-  setVersionProxy,
   setView,
   versionLookup,
 } from '@module/settings';
@@ -361,101 +357,6 @@ describe('isGrouped', () => {
   });
 });
 
-describe('getVersionProxy', () => {
-  test('registers a world setting, set in the GM-only menu, with no proxy by default', () => {
-    const { game } = installFoundryMocks();
-
-    registerSettings();
-
-    expect(game.settings.register).toHaveBeenCalledWith('mondarth-emma', 'versionProxy', {
-      scope: 'world',
-      config: false,
-      type: String,
-      default: '',
-    });
-    expect(getVersionProxy()).toBeNull();
-  });
-
-  test('is the URL template set, trimmed', () => {
-    installFoundryMocks({ settings: { 'mondarth-emma.versionProxy': ' https://proxy.test/?url={url} ' } });
-    registerSettings();
-
-    expect(getVersionProxy()).toBe('https://proxy.test/?url={url}');
-  });
-
-  test('is none when the template has nowhere to put the URL', () => {
-    installFoundryMocks({ settings: { 'mondarth-emma.versionProxy': 'https://proxy.test/' } });
-    registerSettings();
-
-    expect(getVersionProxy()).toBeNull();
-  });
-});
-
-describe('getVersionProxyKey', () => {
-  test('registers a client setting, kept in this browser, with no key by default', () => {
-    const { game } = installFoundryMocks();
-
-    registerSettings();
-
-    // Not world or user: Foundry sends those to every user who joins.
-    expect(game.settings.register).toHaveBeenCalledWith('mondarth-emma', 'versionProxyKey', {
-      scope: 'client',
-      config: false,
-      type: String,
-      default: '',
-    });
-    expect(getVersionProxyKey()).toBeNull();
-  });
-
-  test('is the key set, trimmed, or none when it is blank', () => {
-    installFoundryMocks({ settings: { 'mondarth-emma.versionProxyKey': ' k3y ' } });
-    registerSettings();
-    expect(getVersionProxyKey()).toBe('k3y');
-
-    installFoundryMocks({ settings: { 'mondarth-emma.versionProxyKey': '  ' } });
-    registerSettings();
-    expect(getVersionProxyKey()).toBeNull();
-  });
-});
-
-describe('getVersionProxyMode', () => {
-  test('registers a world setting, set in the GM-only menu, not yet chosen', () => {
-    const { game } = installFoundryMocks();
-
-    registerSettings();
-
-    expect(game.settings.register).toHaveBeenCalledWith('mondarth-emma', 'versionProxyMode', {
-      scope: 'world',
-      config: false,
-      type: String,
-      default: '',
-    });
-  });
-
-  test('is EMMA’s proxy until chosen, or the GM’s own where they set one before there was a choice', () => {
-    installFoundryMocks();
-    registerSettings();
-    expect(getVersionProxyMode()).toBe('default');
-
-    installFoundryMocks({ settings: { 'mondarth-emma.versionProxy': 'https://proxy.test/?url={url}' } });
-    registerSettings();
-    expect(getVersionProxyMode()).toBe('own');
-  });
-
-  test('is the choice made', () => {
-    for (const mode of ['default', 'own', 'none'] as const) {
-      installFoundryMocks({
-        settings: {
-          'mondarth-emma.versionProxyMode': mode,
-          'mondarth-emma.versionProxy': 'https://proxy.test/?url={url}',
-        },
-      });
-      registerSettings();
-      expect(getVersionProxyMode()).toBe(mode);
-    }
-  });
-});
-
 describe('versionLookup', () => {
   /** The catalogue of a release build. */
   const catalogue = { url: obscure('https://catalogue.test/'), key: obscure('catalogue-k3y') };
@@ -476,31 +377,16 @@ describe('versionLookup', () => {
     expect(versionLookup(null)).toEqual({ catalogue: null });
   });
 
-  test('never asks EMMA’s catalogue when the GM chose their own proxy, or none', () => {
-    for (const settings of [
-      { 'mondarth-emma.versionProxyMode': 'own', 'mondarth-emma.versionProxy': 'https://own.test/?url={url}' },
-      { 'mondarth-emma.versionProxyMode': 'none' },
-    ]) {
-      installFoundryMocks({ settings });
-      registerSettings();
-      expect(versionLookup(catalogue)).toEqual({ catalogue: null });
-    }
-  });
-});
-
-describe('setVersionProxy', () => {
-  test('saves the choice, and the GM’s own proxy and its key, trimmed', async () => {
-    const { game } = installFoundryMocks();
+  test('is EMMA’s catalogue whatever a world kept of the proxy settings that are gone', () => {
+    installFoundryMocks({
+      settings: {
+        'mondarth-emma.versionProxyMode': 'none',
+        'mondarth-emma.versionProxy': 'https://own.test/?url={url}',
+      },
+    });
     registerSettings();
 
-    await setVersionProxy('own', ' https://proxy.test/?url={url} ', ' k3y ');
-
-    expect(game.settings.set).toHaveBeenCalledWith('mondarth-emma', 'versionProxyMode', 'own');
-    expect(game.settings.set).toHaveBeenCalledWith('mondarth-emma', 'versionProxy', 'https://proxy.test/?url={url}');
-    expect(game.settings.set).toHaveBeenCalledWith('mondarth-emma', 'versionProxyKey', 'k3y');
-    expect(getVersionProxyMode()).toBe('own');
-    expect(getVersionProxy()).toBe('https://proxy.test/?url={url}');
-    expect(getVersionProxyKey()).toBe('k3y');
+    expect(versionLookup(catalogue).catalogue).toEqual({ url: 'https://catalogue.test/', key: 'catalogue-k3y' });
   });
 });
 

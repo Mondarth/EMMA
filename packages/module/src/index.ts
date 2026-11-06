@@ -1,5 +1,4 @@
 import { registerDrawerFieldsMenu } from '@module/app/drawer-fields-config';
-import { registerVersionProxyMenu } from '@module/app/version-proxy-config';
 import { startWorldRecord } from '@module/app/world-record';
 import { registerModuleManagementOverride } from '@module/foundry/settings-entry';
 import { log } from '@module/lib/logger';
@@ -9,7 +8,6 @@ Hooks.once('init', () => {
   log.info('Initializing');
   registerSettings();
   registerDrawerFieldsMenu();
-  registerVersionProxyMenu();
   registerModuleManagementOverride();
 });
 

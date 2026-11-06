@@ -4,7 +4,7 @@
  *
  * It is not encryption: everything needed to reveal the text ships beside it, and the browser sends the text to the
  * proxy for anyone to read in its network tab. It keeps a secret out of casual sight, nothing more; see
- * docs/developers/default-proxy.md.
+ * docs/developers/default-catalogue.md.
  */
 
 /**

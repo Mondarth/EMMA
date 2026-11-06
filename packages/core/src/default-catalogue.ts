@@ -3,7 +3,7 @@
  * variable) and `EMMA_DEFAULT_CATALOGUE_KEY` (a secret) the release workflow sets. Vite puts them, obscured, in each
  * bundle's `__EMMA_DEFAULT_CATALOGUE__` (see `scripts/default-catalogue-define.ts`), and the bundle reveals them as it asks the
  * catalogue (see {@link revealCatalogue}). A build with neither, as for development and CI, has no catalogue. Shared by
- * the module and the EMMA extension on the setup screen; see docs/developers/default-proxy.md.
+ * the module and the EMMA extension on the setup screen; see docs/developers/default-catalogue.md.
  */
 import type { Obscured } from './obscure';
 import { reveal } from './obscure';

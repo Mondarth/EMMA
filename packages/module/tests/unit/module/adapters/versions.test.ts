@@ -207,8 +207,9 @@ describe('createVersionJudge', () => {
       modules: {
         dice: installedModule('dice', { version: '1.0.0' }),
         lib: installedModule('lib', { active: false, version: '1.0.0' }),
-        // A manifest URL the catalogue would refuse is not sent.
+        // A manifest URL the catalogue would refuse is not sent: not a URL, or not a web address.
         local: { active: false, version: '0.1.0', links: { manifest: 'modules/local/module.json' } },
+        mirror: { active: false, version: '0.2.0', links: { manifest: 'ftp://files.test/mirror/module.json' } },
       },
       system: { id: 'dnd5e', title: 'D&D 5e', manifest: 'https://files.test/dnd5e/system.json' },
     });
@@ -233,6 +234,7 @@ describe('createVersionJudge', () => {
         { type: 'module', id: 'dice', installed: '1.0.0', manifest: 'https://files.test/dice/latest/module.json' },
         { type: 'module', id: 'lib', installed: '1.0.0', manifest: 'https://files.test/lib/latest/module.json' },
         { type: 'module', id: 'local', installed: '0.1.0' },
+        { type: 'module', id: 'mirror', installed: '0.2.0' },
       ],
       fromGeneration: 14,
     });
