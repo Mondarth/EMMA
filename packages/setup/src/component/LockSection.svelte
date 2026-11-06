@@ -5,7 +5,10 @@
   updates what runs on it. It takes effect at once, not in the plan.
 -->
 <script lang="ts">
+  import type { Activity } from '../app/busy.svelte';
   import { format, localize } from '../lib/i18n';
+
+  import BusyMark from './BusyMark.svelte';
 
   interface Props {
     /** The package's title. */
@@ -20,9 +23,11 @@
     onLock: (lock: boolean) => void;
     /** Whether it is Foundry VTT, locked in EMMA, rather than a package locked in Foundry. */
     core?: boolean;
+    /** What EMMA is busy with because of this section's button, shown over it; nothing by default. */
+    busy?: Activity | undefined;
   }
 
-  let { title, version, locked, disabled, onLock, core = false }: Props = $props();
+  let { title, version, locked, disabled, onLock, core = false, busy }: Props = $props();
   const said = $derived(
     core ? (locked ? 'Lock.CoreLocked' : 'Lock.CoreUnlocked') : locked ? 'Lock.Locked' : 'Lock.Unlocked',
   );
@@ -35,12 +40,15 @@
   <p>{format(said, { title, version })}</p>
   <button
     type="button"
-    {disabled}
+    class="emma-busy-host"
+    aria-busy={busy !== undefined}
+    disabled={disabled || busy !== undefined}
     onclick={() => {
       onLock(!locked);
     }}>
     <i class={['fa-solid', locked ? 'fa-unlock' : 'fa-lock']} aria-hidden="true"></i>
     {format(locked ? 'Lock.Unlock' : 'Lock.Lock', { title, version })}
+    <BusyMark activity={busy} />
   </button>
 </section>
 

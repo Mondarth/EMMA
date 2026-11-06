@@ -3,7 +3,10 @@
   module's hypothetical mode ignores a module (see `considered`). It takes effect at once, not in the plan.
 -->
 <script lang="ts">
+  import type { Activity } from '../app/busy.svelte';
   import { format, localize } from '../lib/i18n';
+
+  import BusyMark from './BusyMark.svelte';
 
   interface Props {
     /** Its title. */
@@ -16,9 +19,11 @@
     disabled: boolean;
     /** Ignore it, or stop ignoring it. */
     onIgnore: (ignore: boolean) => void;
+    /** What EMMA is busy with because of this section's button, shown over it; nothing by default. */
+    busy?: Activity | undefined;
   }
 
-  let { title, world = false, ignored, disabled, onIgnore }: Props = $props();
+  let { title, world = false, ignored, disabled, onIgnore, busy }: Props = $props();
   const said = $derived(
     ignored ? (world ? 'Ignore.IgnoredWorld' : 'Ignore.Ignored') : world ? 'Ignore.UnignoredWorld' : 'Ignore.Unignored',
   );
@@ -31,12 +36,15 @@
   <p>{format(said, { title })}</p>
   <button
     type="button"
-    {disabled}
+    class="emma-busy-host"
+    aria-busy={busy !== undefined}
+    disabled={disabled || busy !== undefined}
     onclick={() => {
       onIgnore(!ignored);
     }}>
     <i class={['fa-solid', ignored ? 'fa-eye' : 'fa-eye-slash']} aria-hidden="true"></i>
     {format(ignored ? 'Ignore.Unignore' : 'Ignore.Ignore', { title })}
+    <BusyMark activity={busy} />
   </button>
 </section>
 

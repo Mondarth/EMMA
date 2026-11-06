@@ -19,6 +19,7 @@
   import type { PendingPackage, TreeRow } from '../lib/tree';
   import { INITIALLY_EXPANDED, allRows, ancestorsOf, findRow, moveFor, packageOf, visibleRows } from '../lib/tree';
 
+  import BusyMark from './BusyMark.svelte';
   import VersionPicker from './VersionPicker.svelte';
 
   interface Props {
@@ -229,7 +230,12 @@
         updates !== undefined && anyOf(row.hides, under => updates.blockedOf(under) !== undefined)}
       <li
         role="treeitem"
-        class={['emma-tree-row', { 'emma-tree-pending': row.pending, 'emma-tree-ignored': row.ignored }]}
+        class={[
+          'emma-tree-row',
+          'emma-busy-host',
+          { 'emma-tree-pending': row.pending, 'emma-tree-ignored': row.ignored },
+        ]}
+        aria-busy={updates?.busy.activityOf(`tree:${row.key}`) !== undefined}
         data-key={row.key}
         aria-level={row.level}
         aria-selected={row.key === selected}
@@ -281,7 +287,8 @@
               event.stopPropagation();
             }}
             onchange={event => {
-              void updates.setRecommended(by, key, event.currentTarget.checked);
+              const wanted = event.currentTarget.checked;
+              void updates.busy.run(`tree:${row.key}`, 'planning', () => updates.setRecommended(by, key, wanted));
             }} />
         {/if}
         <span class="emma-tree-title">{row.title}</span>
@@ -304,7 +311,7 @@
             versions={() => updates.optionsFor(key)}
             installed={update.installed}
             onChoose={(version: string) => {
-              void updates.choose(key, version);
+              void updates.busy.run(`tree:${row.key}`, 'planning', () => updates.choose(key, version));
             }}
             onOpen={() => {
               // The panel beside the tree explains the versions looked at.
@@ -328,6 +335,7 @@
         {#if row.pending}
           <span class="emma-status emma-tree-pending-label">{localize('Tree.Pending')}</span>
         {/if}
+        <BusyMark activity={updates?.busy.activityOf(`tree:${row.key}`)} />
       </li>
     {/each}
   </ul>

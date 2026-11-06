@@ -254,7 +254,7 @@ describe('updates in the window', () => {
     await user.click(system);
     const list = screen.getByRole('listbox', { name: 'Versions of D&D 5e' });
     // The installed version, shown on the button, is left out.
-    const options = within(list).getAllByRole('option');
+    const options = await within(list).findAllByRole('option');
     expect(options.map(option => option.textContent.trim().split(/\s+/)[0])).toEqual(['5.4.0']);
     expect(options[0]?.querySelector('.emma-badge')).toHaveClass('warning');
     // Opening the list selected its row, for its panel to explain the versions; choosing one keeps it so.
