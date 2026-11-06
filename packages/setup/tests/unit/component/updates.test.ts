@@ -1422,13 +1422,10 @@ describe('uninstalling', () => {
     expect(within(plan).getByRole('alertdialog')).toHaveTextContent('uninstall Spare');
     await user.click(within(plan).getByRole('button', { name: 'Run' }));
     await vi.waitFor(() => {
-      expect(runStep).toHaveBeenCalledWith({
-        kind: 'uninstall',
-        key: 'module:spare',
-        type: 'module',
-        id: 'spare',
-        title: 'Spare',
-      });
+      expect(runStep).toHaveBeenCalledWith(
+        { kind: 'uninstall', key: 'module:spare', type: 'module', id: 'spare', title: 'Spare' },
+        expect.any(Function),
+      );
     });
     await vi.waitFor(() => {
       expect(setup.run?.over).toBe(true);

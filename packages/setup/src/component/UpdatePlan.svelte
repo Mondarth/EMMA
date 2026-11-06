@@ -103,7 +103,13 @@
 
 {#snippet stateOf(key: string)}
   {@const state = run?.states[key]}
-  {#if state !== undefined}
+  {@const reached = run?.progress?.[key]}
+  {#if state === 'running' && reached !== undefined}
+    <!-- Foundry says how far an install has got: the percentage takes the spinner's place. -->
+    <span class="emma-plan-state emma-plan-state-running">
+      {format(reached.phase === 'download' ? 'Run.Downloading' : 'Run.Installing', { pct: String(reached.pct) })}
+    </span>
+  {:else if state !== undefined}
     <span class={['emma-plan-state', `emma-plan-state-${state}`]}>
       <i
         class={[
@@ -112,6 +118,39 @@
         ]}
         aria-hidden="true"></i>
       {localize(`Run.State.${state}`)}
+    </span>
+  {/if}
+{/snippet}
+
+<!--
+  The bar along the foot of a step's title cell: blue as it downloads, then green over it as it installs, to the
+  percentage Foundry gives; full and green once it is done, as an underline; red where it stopped if it failed. A step
+  Foundry says nothing of the progress of has the underline alone, once done or failed.
+-->
+{#snippet barOf(key: string)}
+  {@const state = run?.states[key]}
+  {@const reached = run?.progress?.[key]}
+  {#if state === 'running' && reached !== undefined}
+    <!-- Only installs say how far they have got, so only a package is named. -->
+    {@const title = titles.get(key) ?? updates.titleOf(key)}
+    {@const label = format(reached.phase === 'download' ? 'Run.DownloadingOf' : 'Run.InstallingOf', { title })}
+    <span
+      class="emma-plan-bar"
+      role="progressbar"
+      aria-label={label}
+      aria-valuemin="0"
+      aria-valuemax="100"
+      aria-valuenow={reached.pct}>
+      <span class="emma-plan-bar-download" style:width="{reached.phase === 'download' ? reached.pct : 100}%"></span>
+      {#if reached.phase === 'install'}
+        <span class="emma-plan-bar-install" style:width="{reached.pct}%"></span>
+      {/if}
+    </span>
+  {:else if state === 'done'}
+    <span class="emma-plan-bar" aria-hidden="true"><span class="emma-plan-bar-install" style:width="100%"></span></span>
+  {:else if state === 'failed'}
+    <span class="emma-plan-bar" aria-hidden="true">
+      <span class="emma-plan-bar-failed" style:width="{reached?.pct ?? 100}%"></span>
     </span>
   {/if}
 {/snippet}
@@ -193,7 +232,7 @@
         {#each updates.safeguards as guard (guard.key)}
           {@const room = spaceOf(guard)}
           <tr>
-            <th scope="row">
+            <th scope="row" class="emma-plan-title">
               <label>
                 <input
                   type="checkbox"
@@ -204,6 +243,7 @@
                 {nameOf(guard)}
               </label>
               {@render stateOf(guard.key)}
+              {@render barOf(guard.key)}
               {#if guard.recommended}
                 <span class="emma-plan-needed">{localize('Plan.Recommended')}</span>
               {:else if guard.packages !== undefined}
@@ -244,7 +284,7 @@
         <tr
           class={['emma-busy-host', choice.forced && 'emma-plan-forced']}
           aria-busy={updates.busy.activityOf(`plan:${choice.key}`) !== undefined}>
-          <th scope="row">
+          <th scope="row" class="emma-plan-title">
             {#if choice.key === 'core' && coreBlocked !== undefined}
               <i
                 class="fa-solid fa-triangle-exclamation emma-plan-blocked"
@@ -252,6 +292,8 @@
                 aria-label={format('Plan.CoreBlocked', { reason: coreBlocked })}
                 data-tooltip={coreBlocked}></i>
             {/if}
+            <!-- Before the name, so that it adds no space between the name and what follows it. -->
+            {@render barOf(choice.key)}
             {name}{@render stateOf(choice.key)}
           </th>
           <td>
@@ -389,6 +431,40 @@
 
   .emma-plan-confirm button {
     width: auto;
+  }
+
+  .emma-plan-title {
+    position: relative;
+  }
+
+  /* Along the foot of the title cell, its full width: 3px deep. */
+  .emma-plan-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 3px;
+    overflow: hidden;
+  }
+
+  .emma-plan-bar > span {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    transition: width 0.2s linear;
+  }
+
+  .emma-plan-bar-download {
+    background: var(--color-level-info, #5aa7e0);
+  }
+
+  .emma-plan-bar-install {
+    background: var(--color-level-success, #18a558);
+  }
+
+  .emma-plan-bar-failed {
+    background: var(--color-level-error, #d33);
   }
 
   .emma-plan-state {

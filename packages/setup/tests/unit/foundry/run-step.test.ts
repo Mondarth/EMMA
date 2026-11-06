@@ -1,8 +1,8 @@
 import { describe, expect, test, vi } from 'vitest';
 
 import type { Guard } from '../../../src/foundry/guard';
-import { runStep } from '../../../src/foundry/run-step';
-import type { SetupGame } from '../../../src/foundry/setup-game';
+import { progressOf, runStep } from '../../../src/foundry/run-step';
+import type { PackageInstall, SetupGame } from '../../../src/foundry/setup-game';
 
 /**
  * The setup screen's `game`, with what a run calls.
@@ -139,6 +139,7 @@ describe('runStep', () => {
       manifest: 'https://example.org/midi/2.0.0/module.json',
       dependencies: false,
       notify: false,
+      onProgress: expect.any(Function) as unknown,
     });
   });
 
@@ -166,5 +167,59 @@ describe('runStep', () => {
   ] as const)('fails when Foundry offers no %s', async (method, step, message) => {
     const game = gameWith({ [method]: undefined });
     await expect(runStep(game, guardRecording([]), step)).rejects.toThrow(message);
+  });
+});
+
+describe('progressOf', () => {
+  test.each([
+    ['downloading', { step: 'download', pct: 41.6 }, { phase: 'download', pct: 42 }],
+    ['installing, extracting its files', { step: 'install', pct: 70 }, { phase: 'install', pct: 70 }],
+    ['past the end', { step: 'install', pct: 120 }, { phase: 'install', pct: 100 }],
+    ['before the start', { step: 'download', pct: -3 }, { phase: 'download', pct: 0 }],
+    ['done', { step: 'complete', pct: 100 }, undefined],
+    ['with no percentage', { step: 'download' }, undefined],
+    ['with a percentage that is not a number', { step: 'download', pct: Number.NaN }, undefined],
+    ['nothing', undefined, undefined],
+  ])('reads how far an install has got from a packet %s', (_, data, progress) => {
+    expect(progressOf(data)).toEqual(progress);
+  });
+});
+
+describe('runStep, telling how far an install has got', () => {
+  test("passes on Foundry's progress, each time it changes", async () => {
+    const told: unknown[] = [];
+    const game = gameWith({
+      installPackage: vi.fn(({ onProgress }: PackageInstall) => {
+        for (const data of [
+          { step: 'download', pct: 10 },
+          { step: 'download', pct: 10.2 },
+          { step: 'download', pct: 100 },
+          { step: 'install', pct: 50 },
+          { step: 'complete', pct: 100 },
+        ]) {
+          onProgress?.(Object.assign(new Event('progress'), { data }));
+        }
+        return Promise.resolve({});
+      }),
+    });
+
+    await runStep(game, guardRecording([]), INSTALL, progress => told.push(progress));
+
+    expect(told).toEqual([
+      { phase: 'download', pct: 10 },
+      { phase: 'download', pct: 100 },
+      { phase: 'install', pct: 50 },
+    ]);
+  });
+
+  test('installs as before when no one asks how far', async () => {
+    const game = gameWith({
+      installPackage: vi.fn(({ onProgress }: PackageInstall) => {
+        onProgress?.(Object.assign(new Event('progress'), { data: { step: 'download', pct: 10 } }));
+        return Promise.resolve({});
+      }),
+    });
+
+    await expect(runStep(game, guardRecording([]), INSTALL)).resolves.toBeUndefined();
   });
 });

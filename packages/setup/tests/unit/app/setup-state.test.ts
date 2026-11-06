@@ -340,7 +340,11 @@ describe('SetupState', () => {
       await setup.runPlan();
 
       expect(seen).toEqual(['snapshot true true', 'module:app true true', 'module:lib true true']);
-      expect(runStep).toHaveBeenNthCalledWith(1, { kind: 'snapshot', key: 'snapshot', note: 'Mine' });
+      expect(runStep).toHaveBeenNthCalledWith(
+        1,
+        { kind: 'snapshot', key: 'snapshot', note: 'Mine' },
+        expect.any(Function),
+      );
       expect(setup.run).toMatchObject({
         over: true,
         states: { snapshot: 'done', 'module:app': 'done', 'module:lib': 'done' },
@@ -389,7 +393,10 @@ describe('SetupState', () => {
 
       await setup.runPlan();
 
-      expect(runStep).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'snapshot' }));
+      expect(runStep).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ kind: 'snapshot' }),
+        expect.any(Function),
+      );
       expect(setup.run).toMatchObject({
         over: true,
         beforeCore: '14.369',
