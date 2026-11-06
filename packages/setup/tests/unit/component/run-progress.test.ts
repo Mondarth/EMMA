@@ -5,6 +5,7 @@ import { describe, expect, test, vi } from 'vitest';
 import { SetupState } from '../../../src/app/setup-state.svelte';
 import SetupRoot from '../../../src/component/SetupRoot.svelte';
 import { buildOverview } from '../../../src/lib/overview';
+import type { Planner } from '../../../src/lib/plans';
 import type { RunStep, StepProgress } from '../../../src/lib/run';
 import type { PackageUpdate } from '../../../src/lib/updates';
 import { alone, installation, installedModule, noInstall, unjudged } from '../../mocks/fixtures';
@@ -15,6 +16,23 @@ const OVERVIEW = buildOverview(
 );
 const LIB: PackageUpdate = { key: 'module:lib', installed: '1.0.0', newest: '2.0.0', versions: ['2.0.0', '1.0.0'] };
 const OLD: PackageUpdate = { key: 'module:old', installed: '1.0.0', newest: '1.1.0', versions: ['1.1.0', '1.0.0'] };
+
+/**
+ * A planner whose plans have Old wait for the Library, if asked to, as one whose version requires it would.
+ * @param planner - The planner
+ * @param oldNeedsLib - Whether Old waits for the Library
+ * @returns The planner
+ */
+function waiting(planner: Planner, oldNeedsLib: boolean): Planner {
+  if (!oldNeedsLib) return planner;
+  return {
+    ...planner,
+    plan: async picks =>
+      (await planner.plan(picks))?.map(entry =>
+        entry.key === 'module:old' ? { ...entry, after: ['module:lib'] } : entry,
+      ),
+  };
+}
 
 /** A run step held until it is let go, telling how far it has got as it is told to. */
 interface Held {
@@ -28,9 +46,10 @@ interface Held {
  * Render EMMA's window with Library and Old chosen to update, and run the plan, each step held until let go.
  * @param options - What else the plan has
  * @param options.snapshot - Whether it makes a snapshot first
+ * @param options.oldNeedsLib - Whether Old's version requires the Library's, so waits for it
  * @returns The steps as they start, and the plan's region
  */
-async function running({ snapshot = false } = {}) {
+async function running({ snapshot = false, oldNeedsLib = false } = {}) {
   const held: Held[] = [];
   const runStep = vi.fn(
     (step: Exclude<RunStep, { kind: 'core' }>, onProgress?: (progress: StepProgress) => void) =>
@@ -55,7 +74,7 @@ async function running({ snapshot = false } = {}) {
         blocked: new Map(),
         unresolved: [],
         judge: unjudged,
-        planner: alone(LIB, OLD),
+        planner: waiting(alone(LIB, OLD), oldNeedsLib),
       }),
     installModule: noInstall,
     runStep,
@@ -72,8 +91,9 @@ async function running({ snapshot = false } = {}) {
   const plan = await screen.findByRole('region', { name: 'Update plan' });
   await user.click(within(plan).getByRole('button', { name: 'Run plan' }));
   await user.click(within(plan).getByRole('button', { name: 'Run' }));
+  // The snapshot first, alone; or else both installs at once, as neither needs the other.
   await vi.waitFor(() => {
-    expect(held).toHaveLength(1);
+    expect(held).toHaveLength(snapshot || oldNeedsLib ? 1 : 2);
   });
   const changes = within(within(plan).getByRole('table', { name: 'Changes' }));
   const rowOf = (name: string) => changes.getByRole('rowheader', { name: new RegExp(`^${name}`) });
@@ -117,10 +137,8 @@ describe("a plan's run, step by step", () => {
     expect(lib.querySelector('.emma-plan-bar')).toBe(installing);
     expect(installing.querySelector('.emma-plan-bar-install')).toHaveStyle({ width: '100%' });
     expect(installing).toHaveAttribute('aria-hidden', 'true');
-    // The next step has started, and says nothing yet of how far.
-    await vi.waitFor(() => {
-      expect(held).toHaveLength(2);
-    });
+    // Old has run beside it all along, and says nothing yet of how far.
+    expect(held.map(({ step }) => step.key)).toEqual(['module:lib', 'module:old']);
     expect(rowOf('Old')).toHaveTextContent('Running…');
     expect(rowOf('Old').querySelector('.emma-plan-bar')).toBeNull();
   });
@@ -129,9 +147,8 @@ describe("a plan's run, step by step", () => {
     const { held, rowOf } = await running();
     held[0]?.finish();
     await vi.waitFor(() => {
-      expect(held).toHaveLength(2);
+      expect(rowOf('Library').querySelector('.emma-plan-bar-install')).toHaveStyle({ width: '100%' });
     });
-    expect(rowOf('Library').querySelector('.emma-plan-bar-install')).toHaveStyle({ width: '100%' });
 
     held[1]?.tell({ phase: 'download', pct: 30 });
     held[1]?.fail();
@@ -156,6 +173,33 @@ describe("a run's snapshot", () => {
 
     await vi.waitFor(() => {
       expect(snapshot.querySelector('.emma-plan-bar-install')).toHaveStyle({ width: '100%' });
+    });
+    // The installs wait for the snapshot, then start together.
+    await vi.waitFor(() => {
+      expect(held).toHaveLength(3);
+    });
+  });
+});
+
+describe('a step that needs one that failed', () => {
+  test('is not run, saying what it needed, while the footer counts what failed and what was not run', async () => {
+    const { held, rowOf } = await running({ oldNeedsLib: true });
+    expect(held.map(({ step }) => step.key)).toEqual(['module:lib']);
+    expect(rowOf('Old')).toHaveTextContent('Waiting');
+
+    held[0]?.fail();
+
+    await vi.waitFor(() => {
+      expect(rowOf('Old')).toHaveTextContent('Not run');
+    });
+    expect(rowOf('Old')).toHaveTextContent('It needs install Library 2.0.0, which failed or was not run.');
+    expect(rowOf('Old').querySelector('.fa-ban')).not.toBeNull();
+    expect(rowOf('Old').querySelector('.emma-plan-bar')).toBeNull();
+    expect(held).toHaveLength(1);
+    await vi.waitFor(() => {
+      expect(screen.getByText(/“install Library 2\.0\.0” failed/)).toHaveTextContent(
+        '“install Library 2.0.0” failed: The server refused it Steps not run, as steps they need failed: 1.',
+      );
     });
   });
 });

@@ -114,11 +114,21 @@
       <i
         class={[
           'fa-solid',
-          { waiting: 'fa-hourglass', running: 'fa-spinner fa-spin', done: 'fa-check', failed: 'fa-xmark' }[state],
+          {
+            waiting: 'fa-hourglass',
+            running: 'fa-spinner fa-spin',
+            done: 'fa-check',
+            failed: 'fa-xmark',
+            skipped: 'fa-ban',
+          }[state],
         ]}
         aria-hidden="true"></i>
       {localize(`Run.State.${state}`)}
     </span>
+    {@const stopped = run?.needed?.[key]}
+    {#if state === 'skipped' && stopped !== undefined}
+      <span class="emma-plan-needed">{format('Run.Needs', { steps: stopped.map(stepText).join(', ') })}</span>
+    {/if}
   {/if}
 {/snippet}
 
@@ -508,6 +518,10 @@
 
   .emma-plan-state-failed {
     color: var(--color-level-error, #c00);
+  }
+
+  .emma-plan-state-skipped {
+    color: var(--color-text-subtle, #888);
   }
 
   .emma-plan-note-input {

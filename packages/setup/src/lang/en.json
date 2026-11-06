@@ -265,10 +265,11 @@
       "waiting": "Waiting",
       "running": "Running…",
       "done": "Done",
-      "failed": "Failed"
+      "failed": "Failed",
+      "skipped": "Not run"
     },
     "Ran": "The plan ran: every step is done.",
-    "Failed": "The plan stopped at “{step}”: {message}",
+    "Failed": "“{step}” failed: {message}",
     "BeforeCore": "The plan stopped before updating Foundry VTT to {version}.",
     "Running": "Running the plan…",
     "NoSnapshots": "Foundry offers no way to make a snapshot here.",
@@ -279,7 +280,10 @@
     "Downloading": "Downloading {pct}%",
     "Installing": "Installing {pct}%",
     "DownloadingOf": "Downloading {title}",
-    "InstallingOf": "Installing {title}"
+    "InstallingOf": "Installing {title}",
+    "MoreFailed": "Steps that failed besides: {count}.",
+    "NotRun": "Steps not run, as steps they need failed: {count}.",
+    "Needs": "It needs {steps}, which failed or was not run."
   },
   "Core": {
     "Heading": "Updating Foundry VTT to {version}",

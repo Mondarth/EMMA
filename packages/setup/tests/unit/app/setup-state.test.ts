@@ -355,7 +355,7 @@ describe('SetupState', () => {
       expect(load).toHaveBeenCalledTimes(2);
     });
 
-    test('stops at the first step that fails, saying why, leaving the rest', async () => {
+    test('goes on past a step that fails with what does not need it, saying why it failed', async () => {
       const runStep = vi.fn((step: Exclude<RunStep, { kind: 'core' }>) =>
         step.key === 'module:app' ? Promise.reject(new Error('The download failed')) : Promise.resolve(),
       );
@@ -366,11 +366,13 @@ describe('SetupState', () => {
 
       await setup.runPlan();
 
-      expect(runStep).toHaveBeenCalledOnce();
+      // The library does not need the app, so is installed all the same.
+      expect(runStep).toHaveBeenCalledTimes(2);
       expect(setup.run).toMatchObject({
         over: true,
-        states: { 'module:app': 'failed', 'module:lib': 'waiting' },
+        states: { 'module:app': 'failed', 'module:lib': 'done' },
         failure: { step: { key: 'module:app' }, message: 'The download failed' },
+        failed: 1,
       });
     });
 

@@ -132,7 +132,12 @@
     if (run === null) return undefined;
     if (!run.over) return localize('Run.Running');
     if (run.failure !== undefined) {
-      return format('Run.Failed', { step: stepText(run.failure.step), message: run.failure.message });
+      const notRun = Object.keys(run.needed ?? {}).length;
+      return [
+        format('Run.Failed', { step: stepText(run.failure.step), message: run.failure.message }),
+        ...((run.failed ?? 1) > 1 ? [format('Run.MoreFailed', { count: String((run.failed ?? 1) - 1) })] : []),
+        ...(notRun > 0 ? [format('Run.NotRun', { count: String(notRun) })] : []),
+      ].join(' ');
     }
     if (run.beforeCore === undefined) return localize('Run.Ran');
     const stopped = format('Run.BeforeCore', { version: run.beforeCore });
