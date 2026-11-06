@@ -6,7 +6,6 @@
  * @see https://github.com/League-of-Foundry-Developers/foundry-vtt-types
  */
 import type { BuiltCatalogue } from '@mondarth/emma-core/default-catalogue';
-import type { BuiltProxy } from '@mondarth/emma-core/default-proxy';
 
 declare module 'fvtt-types/configuration' {
   /** Everything EMMA runs is started from the `init` hook, so the parts of `game` set up by then can be assumed. */
@@ -22,20 +21,12 @@ declare module 'fvtt-types/configuration' {
     'mondarth-emma.olderVersions': number;
     'mondarth-emma.grouped': boolean;
     'mondarth-emma.badgeChecks': 'emma' | 'foundry';
-    'mondarth-emma.versionProxy': string;
-    'mondarth-emma.versionProxyKey': string;
-    'mondarth-emma.versionProxyMode': string;
     'mondarth-emma.hypotheticalIgnored': string[];
     'mondarth-emma.startupChanges': 'none' | 'dialog' | 'chat' | 'both';
   }
 }
 
 declare global {
-  /**
-   * The default version lookup proxy a release is built with, obscured, or `null` for a build without one. Set by
-   * Vite's `define` from `@mondarth/emma-core/default-proxy-define`; read only through `defaultProxy()`.
-   */
-  const __EMMA_DEFAULT_PROXY__: BuiltProxy;
   /**
    * The default package catalogue a release is built with, obscured, or `null` for a build without one. Set by Vite's
    * `define` from `@mondarth/emma-core/default-catalogue-define`; read only through `defaultCatalogue()`.

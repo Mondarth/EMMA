@@ -237,19 +237,23 @@ export function writeGeometry(geometry: Geometry): void {
   }
 }
 
-/** The key the plan left for after Foundry VTT's update is kept under. */
+/** The key the plan a run has not finished is kept under. */
 export const PENDING_PLAN_KEY = 'mondarth-emma.setup.pending-plan';
 
-/** The choices of a plan that stopped to update Foundry VTT in place, to restore once it is on the build updated to. */
+/**
+ * The choices of a plan a run has not finished, kept as it runs, with what it has done taken out: to restore once
+ * Foundry VTT is on the build the run stopped before updating to, or else to offer to resume, as after a step failed,
+ * or the page closed while it ran.
+ */
 export interface PendingPlan {
-  /** The Foundry build updated to. */
-  readonly core: string;
-  /** The versions chosen besides Foundry VTT's, as `[key, version]`, in the order they were chosen. */
+  /** The Foundry build the run stopped before updating to, if it did. */
+  readonly core?: string;
+  /** The versions chosen that are not done yet, as `[key, version]`, in the order they were chosen. */
   readonly picks: readonly (readonly [string, string])[];
 }
 
 /**
- * The plan left for after Foundry VTT's update, if one was kept and can be read.
+ * The plan a run has not finished, if one was kept and can be read.
  * @returns The plan, or `undefined`
  */
 export function readPendingPlan(): PendingPlan | undefined {
@@ -259,14 +263,16 @@ export function readPendingPlan(): PendingPlan | undefined {
     const { core, picks } = kept as Record<string, unknown>;
     const pick = (value: unknown): value is [string, string] =>
       Array.isArray(value) && value.length === 2 && value.every(part => typeof part === 'string');
-    return typeof core === 'string' && Array.isArray(picks) && picks.every(pick) ? { core, picks } : undefined;
+    if (!Array.isArray(picks) || !picks.every(pick)) return undefined;
+    if (core === undefined) return { picks };
+    return typeof core === 'string' ? { core, picks } : undefined;
   } catch {
     return undefined;
   }
 }
 
 /**
- * Keep the plan to restore after Foundry VTT's update.
+ * Keep the plan a run has not finished.
  * @param plan - The plan, or `null` to forget it
  * @returns Whether it was kept, or forgotten; not if the storage cannot be written
  */
@@ -277,5 +283,44 @@ export function writePendingPlan(plan: PendingPlan | null): boolean {
     return true;
   } catch {
     return false;
+  }
+}
+
+/** The key the premium packages of a type the user owns are kept under, with when they were read. */
+export const OWNED_KEY = 'mondarth-emma.setup.owned';
+
+/** How long what the user owns is kept before Foundry is asked again: a package once owned stays owned. */
+export const OWNED_FOR_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * The premium packages of a type the user owns, as last read, if that was within {@link OWNED_FOR_MS}.
+ * @param type - Which
+ * @param now - The time now, in milliseconds
+ * @returns Their keys, or `undefined` if none were kept, or long ago
+ */
+export function readOwnedKept(type: 'module' | 'system', now: number = Date.now()): Set<string> | undefined {
+  try {
+    const kept: unknown = JSON.parse(localStorage.getItem(`${OWNED_KEY}.${type}`) ?? 'null');
+    if (typeof kept !== 'object' || kept === null) return undefined;
+    const { at, keys } = kept as Record<string, unknown>;
+    if (typeof at !== 'number' || !(now - at < OWNED_FOR_MS && at <= now)) return undefined;
+    if (!Array.isArray(keys) || !keys.every(key => typeof key === 'string')) return undefined;
+    return new Set(keys);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Keep the premium packages of a type the user owns.
+ * @param type - Which
+ * @param keys - Their keys
+ * @param now - The time they were read, in milliseconds
+ */
+export function writeOwnedKept(type: 'module' | 'system', keys: ReadonlySet<string>, now: number = Date.now()): void {
+  try {
+    localStorage.setItem(`${OWNED_KEY}.${type}`, JSON.stringify({ at: now, keys: [...keys] }));
+  } catch {
+    // As for the guard's setting: Foundry is asked again next visit.
   }
 }

@@ -414,7 +414,7 @@ describe('EmmaRoot', () => {
 
   describe('hypothetical versions', () => {
     const CHOOSE = /^MONDARTH-EMMA\.Versions\.Choose/;
-    const NO_PROXY = 'MONDARTH-EMMA.Footer.NoProxy';
+    const UNREACHABLE = 'MONDARTH-EMMA.Footer.CatalogueUnreachable';
 
     /**
      * Render the root for a GM. libWrapper, the one module active, and Dice So Nice! have newer versions.
@@ -448,24 +448,25 @@ describe('EmmaRoot', () => {
       expect(await screen.findAllByRole('button', { name: CHOOSE })).toHaveLength(1);
     });
 
-    test('explains in the footer, while the mode is on, what is not looked up without a proxy', async () => {
-      renderForGM('list', { proxied: false });
+    test('says in the footer, while the mode is on, that the catalogue could not be reached', async () => {
+      renderForGM('list', { reached: false });
       const footer = () => screen.getByRole('contentinfo');
-      expect(footer()).not.toHaveTextContent(NO_PROXY);
+      expect(footer()).not.toHaveTextContent(UNREACHABLE);
 
       await userEvent.click(screen.getByRole('button', { name: HYPOTHETICAL }));
-      expect(footer()).toHaveTextContent(NO_PROXY);
+      expect(await screen.findByText(UNREACHABLE)).toBeInTheDocument();
 
       await userEvent.click(screen.getByRole('button', { name: HYPOTHETICAL }));
-      expect(footer()).not.toHaveTextContent(NO_PROXY);
+      expect(footer()).not.toHaveTextContent(UNREACHABLE);
     });
 
-    test('says nothing of a proxy when one is set', async () => {
+    test('says nothing of the catalogue when it answered', async () => {
       renderForGM();
 
       await userEvent.click(screen.getByRole('button', { name: HYPOTHETICAL }));
+      await screen.findAllByRole('button', { name: CHOOSE });
 
-      expect(screen.getByRole('contentinfo')).not.toHaveTextContent(NO_PROXY);
+      expect(screen.getByRole('contentinfo')).not.toHaveTextContent(UNREACHABLE);
     });
 
     describe('reports', () => {

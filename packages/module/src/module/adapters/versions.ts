@@ -8,10 +8,10 @@
  * The core and the system may be chosen too. A version of either is judged by how well the setup it would make fits:
  * by the worst badge it would leave the system or an active module with.
  *
- * Browsers may not read Foundry's package listing, its release notes or the manifests attached to GitHub releases, as
- * none sends CORS headers. Without a proxy only GitHub's and GitLab's release lists, which do, the installed manifests,
- * and manifests on other sites that send CORS headers are read, and no newer core is found; a version known only from
- * a release list declares no compatibility, so Foundry judges it unknown.
+ * Every release comes from EMMA's package catalogue, in one lookup of the system and every installed module, as its
+ * version 2 gives them (see `catalogueSet` in `@mondarth/fvtt-resolver/sources`), with Foundry's builds: nothing else
+ * is asked. When there is no catalogue to ask, or it cannot be reached, only the installed versions are known, from
+ * their manifests, and every package is unreached.
  */
 import type {
   PackageRef as ResolverRef,
@@ -31,20 +31,8 @@ import {
   packageKey,
   sameVersion,
 } from '@mondarth/fvtt-resolver';
-import type { Cache as SourceCache, LocalManifest, ReleaseSource } from '@mondarth/fvtt-resolver/sources';
-import {
-  catalogueSource,
-  foundryCoreReleases,
-  foundryIndexSource,
-  githubSource,
-  gitlabSource,
-  httpClient,
-  localSource,
-  manifestUrlSource,
-  memoryCache,
-  proxiedFetch,
-  sourceSet,
-} from '@mondarth/fvtt-resolver/sources';
+import type { LocalManifest } from '@mondarth/fvtt-resolver/sources';
+import { catalogueSet, catalogueSource, localSource } from '@mondarth/fvtt-resolver/sources';
 
 import { format, formatList, localize } from '@module/lib/i18n';
 import { isIncompatible } from '@module/lib/incompatible';
@@ -79,8 +67,8 @@ export interface VersionOption {
 }
 
 /**
- * The versions found of the system and of the modules asked about, and how to judge them. Modules are looked up as
- * they are needed, as each lookup may cost requests GitHub limits to 60 an hour.
+ * The versions found of the system and the installed modules, and how to judge them. They are looked up once, all
+ * together, when first needed.
  */
 export interface VersionJudge {
   /**
@@ -88,13 +76,16 @@ export interface VersionJudge {
    * manifests declare.
    */
   readonly unreached: readonly PackageRef[];
-  /** Whether it fetches through a proxy, without which it finds fewer versions and no newer core. */
-  readonly proxied: boolean;
   /**
-   * Look up the versions of installed modules, and of the core and the system the first time. Modules already looked up, and IDs
-   * that are not installed modules, are skipped.
-   * @param ids - The module IDs
-   * @returns Once they are looked up; what could not be fetched is kept in {@link VersionJudge.unreached}
+   * Whether EMMA's catalogue answered the lookup: if not, as without one, only the installed versions are known.
+   * `false` until the lookup is done.
+   */
+  readonly reached: boolean;
+  /**
+   * Look up the versions of the core, the system and every installed module, in one request, the first time; later
+   * calls ask nothing more, as everything installed was looked up.
+   * @param ids - The module IDs needed now, which the first lookup includes with the others
+   * @returns Once they are looked up; what could not be had is kept in {@link VersionJudge.unreached}
    */
   lookUp(ids: Iterable<string>): Promise<void>;
   /**
@@ -219,34 +210,19 @@ export interface VersionChoices {
   readonly ignored?: ReadonlySet<string> | undefined;
 }
 
-/** The most requests one lookup makes, to stay within GitHub's limit of 60 an hour without a proxy. */
-const MAX_REQUESTS = 300;
-
 const CHANNELS: readonly CoreChannel[] = ['stable', 'testing', 'development', 'prototype'];
-
-// Kept for the session, so reopening EMMA or turning hypothetical mode on again does not fetch it all again.
-const sessionCache = memoryCache();
 
 /** How {@link createVersionJudge} fetches. */
 export interface FindOptions {
-  /** A CORS proxy URL template containing `{url}`, or `null` to fetch directly. */
-  readonly proxy: string | null;
-  /** An API key to send the proxy, in an `X-API-Key` header, or `null` for none. Never sent without a proxy. */
-  readonly apiKey?: string | null;
   /**
-   * EMMA's version, sent to the proxy in an `X-EMMA-Version` header so its logs can say which version asks for what,
-   * or `null` for none. Never sent without a proxy: GitHub's API refuses a request with a header it does not know.
+   * EMMA's version, named to the catalogue in `X-Catalogue-Client` so its logs can say which version asks for what, or
+   * `null` for none.
    */
   readonly clientVersion?: string | null;
-  /**
-   * EMMA's package catalogue, with its key, or `null` for none. Asked first, directly, as it sends CORS headers: it
-   * gives the packages it holds with every release loaded, and the proxy, or the direct sources, find the rest.
-   */
+  /** EMMA's package catalogue, with its key, or `null` for none: then only the installed versions are known. */
   readonly catalogue?: { readonly url: string; readonly key: string } | null;
   /** Fetches; the browser's by default. */
   readonly fetch?: typeof globalThis.fetch;
-  /** Where fetched data is kept; for the session by default. */
-  readonly cache?: SourceCache;
   /**
    * How many versions before the one installed, or chosen, are offered and considered: read on every judgement, so a
    * change is followed. None by default.
@@ -255,56 +231,17 @@ export interface FindOptions {
 }
 
 /**
- * Hosts that send no CORS headers, so a browser cannot read what they answer: GitHub's release downloads and Foundry's
- * package listing. Without a proxy they are not asked at all, as each refused request also puts an error in the
- * console; the resolver records them as not reached.
+ * A manifest URL, if it is one the catalogue takes, a web address: it refuses a lookup that gives any other.
+ * @param manifest - What the package's manifest declares
+ * @returns The URL, or `undefined`
  */
-const NO_CORS_HOSTS: ReadonlySet<string> = new Set([
-  'github.com',
-  'objects.githubusercontent.com',
-  'release-assets.githubusercontent.com',
-  'r2.foundryvtt.com',
-  'foundryvtt.com',
-]);
-
-/**
- * The URL a request is for.
- * @param input - What fetch was given
- * @returns The URL
- */
-function urlOf(input: RequestInfo | URL): string {
-  // The resolver fetches by URL string; a request is read for its URL all the same.
-  return input instanceof Request ? input.url : input.toString();
-}
-
-/**
- * Send requests directly, refusing those a browser could not read the answer to.
- * @param send - The fetch to send them with
- * @returns A fetch that refuses hosts that send no CORS headers
- */
-function direct(send: typeof globalThis.fetch): typeof globalThis.fetch {
-  return (input, init) =>
-    NO_CORS_HOSTS.has(new URL(urlOf(input)).hostname)
-      ? Promise.reject(new TypeError('Not fetched: the site sends no CORS headers'))
-      : send(input, init);
-}
-
-/**
- * Send requests with headers of the proxy's: its API key, and EMMA's version.
- * @param send - The fetch to send them with
- * @param extra - The headers, each left out when `null`
- * @returns A fetch that adds them to every request
- */
-function withHeaders(
-  send: typeof globalThis.fetch,
-  extra: Readonly<Record<string, string | null>>,
-): typeof globalThis.fetch {
-  const set = Object.entries(extra).filter((entry): entry is [string, string] => entry[1] !== null);
-  return (input, init) => {
-    const headers = new Headers(init?.headers);
-    for (const [name, value] of set) headers.set(name, value);
-    return send(input, { ...init, headers });
-  };
+function webManifest(manifest: unknown): string | undefined {
+  if (typeof manifest !== 'string') return undefined;
+  try {
+    return ['http:', 'https:'].includes(new URL(manifest).protocol) ? manifest : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -455,77 +392,65 @@ function localReleases(manifests: readonly LocalManifest[]): Release[] {
  * @returns The judge, with nothing looked up yet
  */
 export function createVersionJudge(options: FindOptions): VersionJudge {
-  const {
-    proxy,
-    apiKey = null,
-    clientVersion = null,
-    catalogue: lookupCatalogue = null,
-    cache = sessionCache,
-    olderVersions = () => 0,
-  } = options;
+  const { clientVersion = null, catalogue: lookupCatalogue = null, olderVersions = () => 0 } = options;
   const send = options.fetch ?? globalThis.fetch.bind(globalThis);
-  const http = httpClient({
-    fetch:
-      proxy === null
-        ? direct(send)
-        : proxiedFetch(withHeaders(send, { 'X-API-Key': apiKey, 'X-EMMA-Version': clientVersion }), proxy),
-    cache,
-    budget: { maxRequests: MAX_REQUESTS },
-  });
   const core = readCore();
   const system = game.system;
   const installed = Array.from(game.modules.values());
-
-  const manifests = installedManifests();
-  const declared = Object.fromEntries(
-    [
-      { key: packageKey({ type: 'system', id: system.id }), manifest: system.manifest },
-      ...installed.map(pkg => ({ key: packageKey({ type: 'module', id: pkg.id }), manifest: pkg.manifest })),
-    ].flatMap(({ key, manifest }) => (typeof manifest === 'string' && manifest !== '' ? [[key, [manifest]]] : [])),
-  );
-  const local = localSource(manifests);
-  const sources: ReleaseSource[] = [
-    // The installed releases come first, as they are loaded with everything their manifests declare.
-    local,
-    // Only reachable through a proxy: Foundry's listing sends no CORS headers.
-    ...(proxy === null ? [] : [foundryIndexSource(http)]),
-    githubSource(http),
-    gitlabSource(http),
-    manifestUrlSource(http),
+  const local = localSource(installedManifests());
+  // From the generation in use on: Foundry is never moved back, so nothing that runs only on an older one is chosen.
+  const set =
+    lookupCatalogue === null
+      ? undefined
+      : catalogueSet({
+          catalogue: catalogueSource({
+            ...lookupCatalogue,
+            fetch: send,
+            ...(clientVersion !== null && { client: `EMMA/${clientVersion}` }),
+          }),
+          fromGeneration: core.generation,
+        });
+  const refs: ResolverRef[] = [
+    { type: 'system', id: system.id },
+    ...installed.map(pkg => ({ type: 'module' as const, id: pkg.id })),
   ];
-  // No core releases are given, so no version is left out for needing a newer core: it is shown, and judged so.
-  const set = sourceSet({
-    sources,
-    http,
-    core: [],
-    manifests: declared,
-    ...(lookupCatalogue !== null && {
-      catalogue: catalogueSource({
-        ...lookupCatalogue,
-        fetch: send,
-        ...(clientVersion !== null && { client: `EMMA/${clientVersion}` }),
-      }),
-    }),
-  });
+  // Each package with the version installed, and the manifest it was installed from, which finds one the catalogue
+  // does not hold yet.
+  const requests = [
+    { type: 'system' as const, id: system.id, version: system.version, manifest: webManifest(system.manifest) },
+    ...installed.map(pkg => ({
+      type: 'module' as const,
+      id: pkg.id,
+      version: pkg.version,
+      manifest: webManifest(pkg.manifest),
+    })),
+  ].map(({ type, id, version, manifest }) => ({
+    type,
+    id,
+    installed: version,
+    ...(manifest !== undefined && { manifest }),
+  }));
 
   /**
-   * The installed release of each package looked up that no source gave, from its installed manifest: the catalogue,
-   * asked first, gives a package it holds without the local source, and so without a version only installed here.
-   * @param refs - The packages looked up
-   * @param found - The releases found for them
-   * @returns The installed releases missing from what was found
+   * The installed release of each package that the catalogue did not give, from its installed manifest: it gives
+   * nothing of a package that cannot be had or that it does not hold yet, and may not know a version only installed
+   * here.
+   * @param found - The releases it gave
+   * @returns The installed releases missing from them, but for the modules that cannot be had
    */
-  async function installedMissing(refs: readonly ResolverRef[], found: readonly Release[]): Promise<Release[]> {
+  async function installedMissing(found: readonly Release[]): Promise<Release[]> {
     const missing = await Promise.all(
-      refs.map(async ref => {
-        const version = ref.type === 'system' ? system.version : catalogue.installed.get(ref.id);
-        const given = found.some(
-          release => packageKey(release.package) === packageKey(ref) && sameVersion(release.version, version ?? ''),
-        );
-        if (given) return [];
-        const read = await local.releases(ref);
-        return read.ok ? read.value : [];
-      }),
+      requests
+        .filter(({ type, id }) => type !== 'module' || !catalogue.unavailable.has(id))
+        .map(async ({ type, id, installed: version }) => {
+          const ref = { type, id };
+          const given = found.some(
+            release => packageKey(release.package) === packageKey(ref) && sameVersion(release.version, version),
+          );
+          if (given) return [];
+          const read = await local.releases(ref);
+          return read.ok ? read.value : [];
+        }),
     );
     return missing.flat();
   }
@@ -547,75 +472,42 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
   // Only versions with a release, which every version found has, and the installed one does unless its manifest
   // could not be read; such a module is left at its installed version, unjudged.
   const versions = new Map<string, string[]>();
-  const asked = new Set<string>();
   const unreached: PackageRef[] = [];
+  let looked: Promise<void> | undefined;
+  let reached = false;
 
-  /**
-   * Look up the core releases, through the proxy only: Foundry's release notes send no CORS headers.
-   * @returns Whether they were found
-   */
-  async function lookUpCores(): Promise<boolean> {
-    if (proxy === null) return true;
-    const found = await foundryCoreReleases(http);
-    if (!found.ok) return false;
-    catalogue.cores.push(...found.value.filter(({ version }) => version !== core.version));
-    return true;
+  /** Look everything installed up, once. */
+  async function lookUpAll(): Promise<void> {
+    const found = await set?.lookUp(requests);
+    reached = set !== undefined && set.gaps().length === 0;
+    for (const { package: ref, reason, note } of set?.unavailable() ?? []) {
+      if (ref.type === 'module') catalogue.unavailable.set(ref.id, { reason, ...(note !== undefined && { note }) });
+    }
+    const given = found?.universe.releases ?? [];
+    const releases = [...given, ...(await installedMissing(given))];
+    catalogue.releases.push(...releases);
+    catalogue.cores.push(...(found?.universe.core ?? []).filter(({ version }) => !sameVersion(version, core.version)));
+    for (const release of releases.filter(({ package: { type } }) => type === 'module')) {
+      versions.set(release.package.id, [...(versions.get(release.package.id) ?? []), release.version]);
+    }
+    if (set === undefined || !reached) {
+      unreached.push(...refs, CORE_REF);
+      return;
+    }
+    const installedKeys = new Set(refs.map(packageKey));
+    unreached.push(...set.unreached().filter(ref => installedKeys.has(packageKey(ref))));
   }
 
   return {
-    proxied: proxy !== null,
+    get reached() {
+      return reached;
+    },
     get unreached() {
       return [...unreached];
     },
-    async lookUp(ids) {
-      // The core releases are looked up with the system, the first time.
-      const first = !asked.has(systemKey);
-      const refs: ResolverRef[] = [
-        { type: 'system' as const, id: system.id },
-        ...[...ids].filter(id => catalogue.installed.has(id)).map(id => ({ type: 'module' as const, id })),
-      ].filter(ref => !asked.has(packageKey(ref)));
-      if (refs.length === 0) return;
-      for (const ref of refs) asked.add(packageKey(ref));
-      const known = set.gaps().length;
-      let releases: readonly Release[];
-      let cores: boolean;
-      try {
-        [{ releases }, cores] = await Promise.all([set.universe(refs), first ? lookUpCores() : true]);
-      } catch (error: unknown) {
-        // Asked again next time.
-        for (const ref of refs) asked.delete(packageKey(ref));
-        throw error;
-      }
-      if (!cores) unreached.push(CORE_REF);
-      for (const { package: ref, reason, note } of set.unavailable()) {
-        if (ref.type === 'module') catalogue.unavailable.set(ref.id, { reason, ...(note !== undefined && { note }) });
-      }
-      // A module that cannot be had is not stood in for by its installed manifest: it is not resolved at all.
-      const available = refs.filter(ref => ref.type !== 'module' || !catalogue.unavailable.has(ref.id));
-      releases = [...releases, ...(await installedMissing(available, releases))];
-      // The catalogue answers each lookup with the whole closure, so with the system and the libraries found already:
-      // only what is new is kept, as a version found twice would be listed twice.
-      const held = new Set(catalogue.releases.map(releaseKey));
-      releases = releases.filter(release => {
-        const key = releaseKey(release);
-        if (held.has(key)) return false;
-        held.add(key);
-        return true;
-      });
-      catalogue.releases.push(...releases);
-      for (const release of releases.filter(({ package: { type } }) => type === 'module')) {
-        versions.set(release.package.id, [...(versions.get(release.package.id) ?? []), release.version]);
-      }
-      // Only a package that could not be listed is unreached: one old release whose manifest cannot be read is not,
-      // and the catalogue, which loads every release, meets such releases in most packages with a long history.
-      const failed = new Set(
-        set
-          .gaps()
-          .slice(known)
-          .filter(gap => gap.version === undefined)
-          .map(gap => gap.package),
-      );
-      unreached.push(...refs.filter(ref => failed.has(packageKey(ref))));
+    lookUp() {
+      looked ??= lookUpAll();
+      return looked;
     },
     versionsOf: id => choosable(catalogue, versions, id),
     platformVersions: part => platformVersions(catalogue, part),
@@ -656,8 +548,8 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
         reportUniverseOf(catalogue, setup),
         setup,
         messagesOf(catalogue),
-        // What loading finds, as the modules taken as present leave it, as the universe is.
-        async needs => withAssumed(await set.load(needs), setup),
+        // The catalogue gives every release it could load, loaded: there is nothing more to load.
+        () => Promise.resolve([]),
         setup.modules.filter(({ package: key }) => setup.assumed?.has(key) === true),
         [
           catalogue.base.system,
@@ -693,15 +585,6 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
           : [{ title: catalogue.titles.get(packageKey({ type: 'module', id })) ?? id, ...unavailable }];
       }),
   };
-}
-
-/**
- * A release's package and version, as one key: the same release, whatever source gave it.
- * @param release - The release
- * @returns `<type>:<id>@<version>`, the version without a leading `v`
- */
-function releaseKey(release: Release): string {
-  return `${packageKey(release.package)}@${unprefixed(release.version)}`;
 }
 
 /**

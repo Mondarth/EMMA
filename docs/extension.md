@@ -199,8 +199,8 @@ Foundry VTT itself is offered an update too, on the tree's root row: the newest 
 record can take, with its game system and modules free to move up as well. A world without a record holds Foundry VTT
 to the builds its installed game system runs on, and a world for which EMMA finds no working setup holds it where it
 is. Its versions are coloured by how well the recorded worlds' packages fit each build, naming those that will not work
-with it and those not verified with it. Foundry's builds come from its release notes, which only EMMA's proxy can read;
-without the proxy, Foundry VTT is not offered an update.
+with it and those not verified with it. Foundry's builds come from EMMA's package catalogue; without it, Foundry VTT
+is not offered an update.
 
 A version that needs other packages to change with it, or a newer Foundry VTT, is still offered if they can all change
 together and every world that uses them keeps working: dnd5e 6, say, with the newer modules a world runs that need it,
@@ -277,6 +277,14 @@ saying why, and before Foundry VTT's own update: updating Foundry in place resta
 care. Meanwhile the choices cannot change. After a run, EMMA reads the installation again, so what was done leaves the
 plan and the rest stays in it, to run again.
 
+EMMA keeps a copy of the plan in the browser as it runs: as the run starts, and again after each step, with what is
+done taken out. It forgets the copy once every step is done. A run that stops before Foundry VTT's own update keeps the
+rest of the plan with the build it stopped before: once the setup screen opens on that build, or a later one, however
+Foundry was updated (by its own updater, or by a new container image, for example), EMMA restores the plan, and the
+footer says so. A run cut short otherwise, by a step failing, or by the page closing while it ran, leaves its copy too:
+the next time EMMA opens, the footer offers to **Resume the plan** or **Discard it**. Either way the choices come back
+together, as one plan, and the footer names any that cannot, as their versions are no longer offered.
+
 A run that reaches Foundry VTT's own update stops there, and the plan shows the step with a warning: updating Foundry
 VTT in place is not recommended, as it replaces what every world runs on and cannot be undone from the setup screen.
 It points to Foundry's guide, [Updating Foundry VTT](https://foundryvtt.com/article/updating/), which shows how to
@@ -300,10 +308,11 @@ only without some of the other choices, the row names them; otherwise it says th
 newer generation is not suggested, as Foundry installs those only by hand.
 
 Where it is offered, the user must type a code of six letters and digits that EMMA shows, to enable **Update Foundry
-VTT to <version> in place**. EMMA then keeps the rest of the plan's choices in the browser and starts Foundry's updater,
-as its **Update Software** form does: Foundry downloads the build, installs it, and stops or restarts the server. Once
-the setup screen opens on that build, EMMA restores the choices kept, and the footer says so: running the plan then
-finishes it. If Foundry does not update, EMMA says why and forgets the choices kept. Each row gives the manifest URL that installs the version chosen: one for that
+VTT to <version> in place**. EMMA then starts Foundry's updater, as its **Update Software** form does: Foundry
+downloads the build, installs it, and stops or restarts the server. Once the setup screen opens on that build, EMMA
+restores the rest of the plan, which the run kept as it stopped, and the footer says so: running the plan then
+finishes it. If Foundry does not update, EMMA says why, and keeps the rest of the plan for when Foundry is updated by
+other means. Each row gives the manifest URL that installs the version chosen: one for that
 version alone, since a package's own manifest URL usually gives its newest. Foundry VTT updates itself, and a version for
 which none is found is marked so. **Clear choices**
 takes them all back, and choosing the installed version takes back one, with what it brought in. The plan is shown only while something is chosen.
@@ -314,18 +323,26 @@ resized, and the browser remembers the sizes. The window opens where it was last
 update plan, which shows only while it has changes, opens at the height it last had. Foundry keeps the window on the
 screen, so one left off a larger screen opens on it.
 
-EMMA finds versions in EMMA's package catalogue first, which holds every release of the packages it knows, with the
-Foundry VTT versions each works with. For packages the catalogue does not hold, EMMA reads the manifest each package
-declares, Foundry's package listing, and GitHub's and GitLab's lists of releases, through EMMA's version lookup proxy.
-A browser cannot read Foundry's listing or the manifests attached to GitHub releases itself, which the proxy lets it
-do. Without the proxy, as in a development build, a version found only in a release list says nothing of the Foundry
-VTT versions it works with, and is not offered.
+EMMA finds versions in EMMA's package catalogue alone, in one request: it holds every release of Foundry's listed
+packages and of those it is asked for, with the Foundry VTT versions each works with, and checks each package's own
+manifest about every hour, so it knows a version published by the manifest alone. A package it does not hold yet,
+such as one installed from a manifest only, it fetches by the manifest URL EMMA sends, to give it next time. When the
+catalogue cannot be reached, or in a development build without one, EMMA knows only what is installed, offers no
+updates, and its footer says **Catalogue unreachable**; **Refresh** tries again.
+
+The footer says how fresh the catalogue's versions are: as of when the installed packages' own manifests were last
+checked, the oldest of them. A version published since by a manifest alone is not known yet. **Check live** has the
+catalogue read each installed package's own manifest now, then looks again: a check takes a few seconds per package,
+and the catalogue checks a package at most once every five minutes, however often it is asked. A package the
+catalogue does not hold yet, it fetches, and the footer says how many it is fetching; EMMA looks again once, by
+itself, when the catalogue says they may be found.
 
 ### Installing
 
 The panels of the **Game systems** and **Modules** groups have an **Install** section below them, of the packages on
-Foundry's own package listing, which EMMA reads as Foundry's Install dialog does, through the server, so it needs no
-proxy. It offers those that fit the installation and the plan: not installed, not a premium package the user does not
+Foundry's own package listing, as EMMA's package catalogue keeps it, at the version Foundry offers for the installed
+build. Which premium packages you own only Foundry knows: EMMA asks it as its Install dialog does, and remembers the
+answer in your browser for a week, so a package bought since shows as not owned until then. It offers those that fit the installation and the plan: not installed, not a premium package the user does not
 own, whose newest version runs on the plan's Foundry VTT build, and, for a module, for a game system that stays
 installed, or for any. A game system's group of modules offers those for it, and the universal group those for any
 system. A search finds a package by its title, ID or author. The list shows enough packages to fill the panel, and
@@ -354,7 +371,7 @@ version fits, the section says why, in the resolver's words, and the box stays u
 the plan again, with what it brought in. A premium package you do not own has its box disabled.
 
 **Manifest URL**, at the top of the section, installs a package from a manifest you give, as Foundry's own Install
-dialog can. **+** (or Enter) reads it, through EMMA's proxy where a site sends no CORS headers, and checks that it is a
+dialog can. **+** (or Enter) has EMMA's package catalogue read it, and checks that it is a
 manifest of the section's type: by its file name, `module.json` or `system.json`, or failing that by the fields only a
 game system declares. A package installed already, or in the plan already, is refused. EMMA then looks up the modules
 it requires, and checks the version it gives against the plan, as for any other: if the plan can take it, it is added,
@@ -469,10 +486,11 @@ The extension reads the setup screen of the servers you allow it on, and the wor
 through the server's own pages. It keeps the list of servers you activated, the choice of whether EMMA opens by itself
 on each, and the sizes of EMMA's panels, in your browser.
 
-To find updates, EMMA sends the IDs of the installed game systems and modules to EMMA's package catalogue, and asks
-GitHub, GitLab, Foundry's package listing and the sites the packages' manifests are on for their releases, through
-EMMA's version lookup proxy. Each request to the catalogue or the proxy carries a key that says it comes from EMMA,
-and the extension's version. EMMA sends nothing about your worlds, your server or you.
+To find updates, EMMA sends EMMA's package catalogue the IDs and versions of the installed game systems and modules,
+the manifest URLs they were installed from, and the installed Foundry VTT generation; a manifest URL you give, to
+install from, goes to the catalogue too, which reads it. Each request to the catalogue carries a key that says it
+comes from EMMA, and the extension's version. EMMA asks nothing else, and sends nothing about your worlds, your server
+or you.
 
 ## Limitations of the alpha
 

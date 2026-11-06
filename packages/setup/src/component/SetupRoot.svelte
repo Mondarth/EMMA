@@ -27,6 +27,7 @@
   import SystemPanel from './SystemPanel.svelte';
   import CoreStep from './CoreStep.svelte';
   import AlphaNotice from './AlphaNotice.svelte';
+  import SavedPlanNotice from './SavedPlanNotice.svelte';
   import BestSection from './BestSection.svelte';
   import InstallSection from './InstallSection.svelte';
   import IgnoreSection from './IgnoreSection.svelte';
@@ -81,6 +82,24 @@
     writeLayout(layout);
   }
 
+  /** What the catalogue said of the last search, if it was asked. */
+  const catalogue = $derived(updates.search?.catalogue);
+  /** What the footer says of how fresh the catalogue's versions are, and what it is fetching. */
+  const catalogueNotes = $derived.by(() => {
+    if (updates.status !== 'found' || catalogue === undefined || !catalogue.reached) return [];
+    const { pending, checkedAt } = catalogue;
+    return [
+      ...(pending.length > 0 ? [format('Update.Pending', { count: pending.length })] : []),
+      ...(checkedAt === null
+        ? []
+        : [
+            format('Update.Checked', {
+              time: new Date(checkedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }),
+            }),
+          ]),
+    ];
+  });
+
   /** What the footer says of the search for updates. */
   const updateStatus = $derived.by(() => {
     if (setup.installing) return localize('Update.Installing');
@@ -90,6 +109,7 @@
       case 'unavailable':
         return problemText();
       case 'found':
+        if (catalogue?.reached === false) return localize('Update.Unreachable');
         return updateCount === 0 ? localize('Update.None') : format('Update.Found', { count: updateCount });
       default:
         // The search starts as soon as the installation is read.
@@ -99,13 +119,23 @@
   /** What the footer says of the last run of the plan. */
   const runStatus = $derived.by(() => {
     const run = setup.shownRun;
-    if (setup.resumedOn !== null && run === null) return format('Core.Resumed', { version: setup.resumedOn });
+    const { resumed: restored } = setup;
+    if (restored !== null && run === null) {
+      const resumed =
+        restored.core === undefined ? localize('Saved.Resumed') : format('Core.Resumed', { version: restored.core });
+      const { unrestored } = setup;
+      return unrestored.length === 0
+        ? resumed
+        : `${resumed} ${format('Core.NotRestored', { packages: unrestored.join(', ') })}`;
+    }
     if (run === null) return undefined;
     if (!run.over) return localize('Run.Running');
     if (run.failure !== undefined) {
       return format('Run.Failed', { step: stepText(run.failure.step), message: run.failure.message });
     }
-    return run.beforeCore === undefined ? localize('Run.Ran') : format('Run.BeforeCore', { version: run.beforeCore });
+    if (run.beforeCore === undefined) return localize('Run.Ran');
+    const stopped = format('Run.BeforeCore', { version: run.beforeCore });
+    return `${stopped} ${localize(run.kept === true ? 'Core.Kept' : 'Core.NotKept')}`;
   });
   const unresolved = $derived(updates.search?.unresolved.length ?? 0);
   const problem = $derived(updates.status === 'unavailable' ? updates.problem : null);
@@ -407,12 +437,25 @@
           setup.acknowledgeAlpha();
         }} />
     {/if}
+    {#if setup.savedPlan !== null}
+      <SavedPlanNotice
+        count={setup.savedPlan.picks.length}
+        onResume={() => {
+          void setup.resumeSaved();
+        }}
+        onDiscard={() => {
+          setup.discardSaved();
+        }} />
+    {/if}
     {#if overview !== null}
       <p class="emma-setup-status" role="status">
         {updateStatus}
         {#if unresolved > 0}
           <span class="emma-setup-note">{format('Update.Unresolved', { count: unresolved })}</span>
         {/if}
+        {#each catalogueNotes as note (note)}
+          <span class="emma-setup-note">{note}</span>
+        {/each}
         {#if runStatus !== undefined}
           <span class="emma-setup-note">{runStatus}</span>
         {/if}
@@ -434,6 +477,19 @@
           {localize(problem.reason === 'missing' ? 'Update.InstallModule' : 'Update.UpdateModule')}
         </button>
       {/if}
+    {/if}
+    {#if catalogue?.reached === true}
+      <button
+        type="button"
+        class="emma-setup-check"
+        data-tooltip={localize('Update.CheckLiveHint')}
+        disabled={updates.checking || updates.locked || updates.status !== 'found'}
+        onclick={() => {
+          void updates.checkLive();
+        }}>
+        <i class="fa-solid fa-satellite-dish" aria-hidden="true"></i>
+        {localize('Update.CheckLive')}
+      </button>
     {/if}
     <button
       type="button"
@@ -541,8 +597,13 @@
     width: auto;
   }
 
+  .emma-setup-check,
   .emma-setup-refresh {
     margin-left: auto;
+  }
+
+  .emma-setup-check + .emma-setup-refresh {
+    margin-left: 0;
   }
 
   .emma-setup-status {

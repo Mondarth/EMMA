@@ -1806,6 +1806,50 @@ describe("the plan's snapshot and backups", () => {
     });
   });
 
+  test('offers to resume a plan a run did not finish, then says it is back, naming what could not be', async () => {
+    const keepPendingPlan = vi.fn(() => true);
+    const { setup, user } = await planning('module:lib', '1.5.0', undefined, undefined, {
+      pendingPlan: () => ({
+        picks: [
+          ['system:dnd5e', '5.4.0'],
+          ['module:gone', '1.0.0'],
+        ],
+      }),
+      keepPendingPlan,
+    });
+    const offer = await screen.findByRole('region', { name: 'Saved plan' });
+    expect(offer).toHaveTextContent('A run of the plan did not finish, so EMMA saved what was left of it: 2 changes');
+
+    await user.click(within(offer).getByRole('button', { name: 'Resume the plan' }));
+
+    expect(screen.queryByRole('region', { name: 'Saved plan' })).toBeNull();
+    await vi.waitFor(() => {
+      expect(setup.updates.picks).toEqual([
+        ['module:lib', '1.5.0'],
+        ['system:dnd5e', '5.4.0'],
+      ]);
+    });
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'The saved plan is back: run it to finish. These choices could not be restored, as the versions are no longer offered: module:gone.',
+    );
+    expect(keepPendingPlan).toHaveBeenCalledWith(null);
+  });
+
+  test('discards a plan a run did not finish, forgetting it', async () => {
+    const keepPendingPlan = vi.fn(() => true);
+    const { setup, user } = await planning('module:lib', '1.5.0', undefined, undefined, {
+      pendingPlan: () => ({ picks: [['system:dnd5e', '5.4.0']] }),
+      keepPendingPlan,
+    });
+    const offer = await screen.findByRole('region', { name: 'Saved plan' });
+
+    await user.click(within(offer).getByRole('button', { name: 'Discard it' }));
+
+    expect(screen.queryByRole('region', { name: 'Saved plan' })).toBeNull();
+    expect(keepPendingPlan).toHaveBeenCalledExactlyOnceWith(null);
+    expect(setup.updates.picks).toEqual([['module:lib', '1.5.0']]);
+  });
+
   test('offers no run where the plan cannot be run', async () => {
     const { plan } = await planning('module:lib', '1.5.0');
 
@@ -2058,6 +2102,49 @@ describe('planning the best versions', () => {
     ).toEqual(['D&D 5e', 'Library']);
     expect(within(section).getByRole('button', { name: 'Replace the plan with the best versions' })).toBeEnabled();
     expect(within(section).queryByRole('status')).toBeNull();
+  });
+
+  test('says when there is nothing to change, or no plan to be had, until the plan changes', async () => {
+    const setup = new SetupState({
+      load: () => Promise.resolve(OVERVIEW),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: findingBlocked(),
+      installModule: noInstall,
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    await vi.waitFor(() => {
+      expect(setup.updates.status).toBe('found');
+    });
+    // As when everything is at its best version already: the plan is replaced, with nothing in it.
+    const planBest = vi.spyOn(setup.updates, 'planBest').mockResolvedValue(true);
+    const user = userEvent.setup();
+    const section = screen.getByRole('region', { name: 'Best versions' });
+    const button = within(section).getByRole('button', { name: 'Plan the best versions' });
+
+    await user.click(button);
+    expect(within(section).getByRole('status')).toHaveTextContent(
+      'Everything is already at its best version: the plan has nothing to change.',
+    );
+
+    await user.click(within(section).getByRole('checkbox', { name: 'Only what worlds use' }));
+    await user.click(button);
+    expect(within(section).getByRole('status')).toHaveTextContent(
+      'Everything worlds use is already at its best version: the plan has nothing to change.',
+    );
+
+    planBest.mockResolvedValue(false);
+    await user.click(button);
+    expect(within(section).getByRole('status')).toHaveTextContent(
+      'The best versions could not be planned together, so the plan is as it was.',
+    );
+
+    // Once the plan changes, what the last planning came to is past.
+    setup.updates.changes++;
+    await vi.waitFor(() => {
+      expect(within(section).queryByRole('status')).toBeNull();
+    });
   });
 
   test('limits them to what worlds use when the user chooses, keeping the choice', async () => {

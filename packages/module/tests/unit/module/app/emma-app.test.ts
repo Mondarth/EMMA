@@ -211,7 +211,7 @@ describe('EmmaApp', () => {
     ).toHaveTextContent('MONDARTH-EMMA.Toolbar.System {"id":"pf2e","version":"7.0.1"}');
   });
 
-  test('looks versions up for GMs through the proxy set, with its API key and EMMA’s version', async () => {
+  test('never looks versions up through a proxy a GM set; a build without the catalogue knows only what is installed', async () => {
     const send = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
       Promise.reject(new TypeError('Failed to fetch')),
     );
@@ -227,15 +227,8 @@ describe('EmmaApp', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'MONDARTH-EMMA.Toolbar.Hypothetical' }));
 
-    await vi.waitFor(() => {
-      expect(send).toHaveBeenCalled();
-    });
-    expect(send).toHaveBeenCalledWith(
-      `https://proxy.test/?url=${encodeURIComponent('https://r2.foundryvtt.com/package-api-public/index-latest.json')}`,
-      expect.anything(),
-    );
-    expect(new Headers(send.mock.calls[0]?.[1]?.headers).get('X-API-Key')).toBe('k3y');
-    expect(new Headers(send.mock.calls[0]?.[1]?.headers).get('X-EMMA-Version')).toBe('0.6.0');
+    expect(await screen.findByText('MONDARTH-EMMA.Footer.CatalogueUnreachable')).toBeInTheDocument();
+    expect(send).not.toHaveBeenCalled();
   });
 
   describe('reports', () => {

@@ -103,6 +103,11 @@
     "Found": "Updates available: {count}",
     "None": "No updates found",
     "Failed": "Could not look for updates",
+    "Unreachable": "Catalogue unreachable: EMMA knows only the installed versions, so offers no updates. Refresh to try again.",
+    "Pending": "The catalogue is fetching {count} packages it did not hold yet; EMMA looks again shortly.",
+    "Checked": "As of {time}: a version published since by a package's own manifest alone may not be known yet.",
+    "CheckLive": "Check live",
+    "CheckLiveHint": "Have the catalogue read each installed package's own manifest now, then look again",
     "Unresolved": "EMMA found no working setup for {count} recorded worlds, so nothing they use is offered an update.",
     "Available": "Update available",
     "Hidden": "Updates in the rows under it",
@@ -287,10 +292,18 @@
     "TypeCode": "To update in place, type {code}:",
     "Update": "Update Foundry VTT to {version} in place",
     "Begun": "Foundry VTT is updating to {version}. The server stops or restarts once it is done; open this page again then.",
-    "Kept": "EMMA kept the rest of the plan, and restores it once Foundry VTT is on that build.",
+    "Kept": "EMMA kept the rest of the plan, and restores it once Foundry VTT is on that build or a later one, however it is updated.",
     "NotKept": "EMMA could not keep the rest of the plan, as the browser refused to store it: plan it again then.",
     "Failed": "Foundry did not update: {message}",
-    "Resumed": "The plan from before Foundry VTT's update to {version} is back: run it to finish."
+    "Resumed": "The plan from before Foundry VTT's update to {version} is back: run it to finish.",
+    "NotRestored": "These choices could not be restored, as the versions are no longer offered: {packages}."
+  },
+  "Saved": {
+    "Label": "Saved plan",
+    "Offer": "A run of the plan did not finish, so EMMA saved what was left of it: {count} changes still to make. Resume it?",
+    "Resume": "Resume the plan",
+    "Discard": "Discard it",
+    "Resumed": "The saved plan is back: run it to finish."
   },
   "Layout": {
     "Tree": "Resize the installation tree",
@@ -319,11 +332,11 @@
     "Forced": "{title} {version} is in the plan against EMMA's advice.",
     "TakeOut": "Take {title} out of the plan",
     "AgainstAdvice": "Added against EMMA's advice",
-    "Forbidden": "EMMA's proxy refused to read it from {host} (403). The proxy reads only from the sites packages are known to be on, such as GitHub, GitLab and Foundry's own; or {host} itself refused it.",
     "Status": "{host} answered {status}, not the manifest.",
     "Unreached": "{host} could not be reached.",
-    "NoCors": "{host} could not be reached, or does not let a browser read it (it sends no CORS headers), and this build of EMMA has no proxy to read it through.",
-    "Budget": "EMMA has made as many requests as it may this session. Read the installation again later.",
+    "Barred": "EMMA's catalogue does not read from {host}: it reads only public web addresses, with few redirects.",
+    "TooLarge": "What the URL gives is too large to be a manifest.",
+    "NoCatalogue": "EMMA's catalogue, which reads the manifest, could not be reached. Try again later.",
     "NotJson": "What the URL gives is not a manifest's JSON."
   },
   "Lock": {
@@ -356,7 +369,10 @@
     "Replace": "Replace the plan with the best versions",
     "InUseOnly": "Only what worlds use",
     "InUseOnlyHint": "Chooses versions only of the game systems worlds use, and of the modules recorded worlds run or will need; the others stay as they are installed, unless what is used needs one changed. They are not ignored: other plans still take them into account. A world without a record may run modules EMMA cannot see.",
-    "Working": "Working out the best versions…"
+    "Working": "Working out the best versions…",
+    "AlreadyBest": "Everything is already at its best version: the plan has nothing to change.",
+    "AlreadyBestInUse": "Everything worlds use is already at its best version: the plan has nothing to change.",
+    "Failed": "The best versions could not be planned together, so the plan is as it was."
   },
   "Recommends": {
     "Heading": "Recommends",

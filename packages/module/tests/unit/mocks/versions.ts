@@ -37,7 +37,7 @@ function compare(a: string, b: string): number {
  * @param options.unreached - Packages whose versions could not all be looked up
  * @param options.needs - For each module, a module it is judged unusable without in the setup
  * @param options.platforms - The core's and the system's versions, the one in use first; only it by default
- * @param options.proxied - Whether it fetches through a proxy; by default it does
+ * @param options.reached - Whether the catalogue answered; by default it did
  * @returns The judge, with its methods as spies
  */
 export function fakeJudge(
@@ -47,13 +47,13 @@ export function fakeJudge(
     unreached = [],
     needs = {},
     platforms = {},
-    proxied = true,
+    reached = true,
   }: {
     bad?: readonly string[];
     unreached?: readonly PackageRef[];
     needs?: Readonly<Record<string, string>>;
     platforms?: Partial<Record<PlatformPart, readonly string[]>>;
-    proxied?: boolean;
+    reached?: boolean;
   } = {},
 ) {
   const unusable = new Set(bad);
@@ -65,7 +65,7 @@ export function fakeJudge(
     [...(platforms[part] ?? [part === 'core' ? '14.368' : '5.1.0'])].sort((a, b) => compare(b, a));
   return {
     unreached,
-    proxied,
+    reached,
     lookUp: vi.fn((_ids: Iterable<string>): Promise<void> => Promise.resolve()),
     versionsOf: vi.fn(choosable),
     judgeChoices: vi.fn((active: Iterable<string>, choices: VersionChoices): ReadonlyMap<string, VersionOption> => {

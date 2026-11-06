@@ -144,7 +144,7 @@
     {modules}
     {canManage}
     {onSave}
-    unproxied={hypothetical && versions?.proxied === false}
+    unreachable={hypothetical && versions?.reached === false}
     {nativeBadges}
     hypothetical={hypothetical
       ? {

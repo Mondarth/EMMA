@@ -303,18 +303,14 @@ describe('Toolbar', () => {
         ).not.toHaveClass('failed');
       });
 
-      test('advises setting a proxy only when none is set', async () => {
+      test('says the catalogue could not be reached, rather than naming every package', async () => {
         const unreached = [{ type: 'module' as const, id: 'dice' }];
-        renderOn((await loadedVersions({}, { unreached, proxied: true })).state);
-        expect(
-          screen.getByRole('status', { name: 'MONDARTH-EMMA.Versions.Unreached {"packages":"Dice So Nice!"}' }),
-        ).toHaveAttribute('data-tooltip', 'MONDARTH-EMMA.Versions.Unreached {"packages":"Dice So Nice!"}');
+        renderOn((await loadedVersions({}, { unreached, reached: false })).state);
 
-        document.body.replaceChildren();
-        renderOn((await loadedVersions({}, { unreached, proxied: false })).state);
-        expect(
-          screen.getByRole('status', { name: 'MONDARTH-EMMA.Versions.UnreachedNoProxy {"packages":"Dice So Nice!"}' }),
-        ).toHaveAttribute('data-tooltip', 'MONDARTH-EMMA.Versions.UnreachedNoProxy {"packages":"Dice So Nice!"}');
+        expect(screen.getByRole('status', { name: 'MONDARTH-EMMA.Versions.CatalogueUnreachable' })).toHaveAttribute(
+          'data-tooltip',
+          'MONDARTH-EMMA.Versions.CatalogueUnreachable',
+        );
       });
     });
 

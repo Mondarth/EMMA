@@ -142,7 +142,6 @@ export class EmmaApp extends foundry.applications.api.ApplicationV2 {
         initialGrouped: isGrouped(),
         canManage: canManageModules(),
         platform: isGM() ? readPlatform() : undefined,
-        // The proxy and its key are read when the first lookup starts, so a change made before then is used.
         createVersionJudge: isGM()
           ? () =>
               createVersionJudge({

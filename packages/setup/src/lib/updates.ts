@@ -15,7 +15,7 @@
  * Foundry VTT itself is offered the newest build every world can take: each recorded world's best setup with the build
  * free to move up too, a world without a record the newest build its installed system runs on, and a world no setup is
  * found for the installed build. The packages are offered versions for the installed build, so a version that needs a
- * newer one is not offered yet. Foundry's builds are known only through EMMA's proxy; without it, only the installed
+ * newer one is not offered yet. Foundry's builds are known only from EMMA's catalogue; without it, only the installed
  * one is, so it is kept.
  *
  * A newer version that is not offered is blocked, with the worlds that hold it back and why, or the Foundry build it
@@ -128,6 +128,28 @@ export interface UpdateSearch {
   readonly planner: Planner;
   /** Read a manifest the user gives, to install a package from; none can be without it. */
   readonly readManifest?: ReadManifest;
+  /** What EMMA's package catalogue said of the search, beside the releases; none where nothing asked it. */
+  readonly catalogue?: CatalogueState;
+}
+
+/** What EMMA's package catalogue said of a search, beside the releases, and how to have it check again. */
+export interface CatalogueState {
+  /** Whether it could be asked, and answered: if not, only what is installed is known. */
+  readonly reached: boolean;
+  /** The packages it does not hold yet, which it is fetching: looked up again, they may be found. */
+  readonly pending: readonly PackageKey[];
+  /** The seconds after which to look the pending packages up again; none when none are pending. */
+  readonly retryAfter?: number;
+  /**
+   * When the installed packages' own manifests were last checked, the oldest of them, as an ISO 8601 time: a version
+   * published since by a manifest alone is not known yet. `null` if none was ever checked.
+   */
+  readonly checkedAt: string | null;
+  /**
+   * Have the installed packages' own manifests checked again now, as "check live" asks.
+   * @returns Whether the catalogue answered
+   */
+  readonly recheck: () => Promise<boolean>;
 }
 
 /** What reading a manifest the user gives found: the release it describes, or why it is none. */
@@ -137,16 +159,19 @@ export type ManifestRead =
   | {
       readonly ok: false;
       readonly problem: 'unreadable';
-      /** Why: the server answered with an error, could not be reached, the budget of requests ran out, or not JSON. */
-      readonly reason: 'http' | 'network' | 'budget' | 'invalid';
+      /**
+       * Why, as the catalogue read it: the server answered with an error, could not be reached, or gave no JSON; or the
+       * catalogue would not read it, a URL it may not fetch (`refused`), or a file too large to be a manifest.
+       */
+      readonly reason: 'http' | 'network' | 'invalid' | 'refused' | 'too-large';
       /** The server's status, for an error. */
       readonly status?: number;
       /** The host asked. */
       readonly host: string;
-      /** Whether it was asked through EMMA's proxy. */
-      readonly proxied: boolean;
     }
-  | { readonly ok: false; readonly problem: 'other-type'; readonly type: 'module' | 'system' };
+  | { readonly ok: false; readonly problem: 'other-type'; readonly type: 'module' | 'system' }
+  /** EMMA's catalogue, which reads it, could not be asked or reached. */
+  | { readonly ok: false; readonly problem: 'no-catalogue' };
 
 /** Read a manifest the user gives, as of a type of package. */
 export type ReadManifest = (url: string, type: 'module' | 'system') => Promise<ManifestRead>;

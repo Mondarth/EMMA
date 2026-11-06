@@ -1,9 +1,9 @@
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { UpdateState } from '../../../src/app/update-state.svelte';
 import { KitUnavailable } from '../../../src/foundry/setup-kit';
 import { buildOverview } from '../../../src/lib/overview';
-import type { ManifestRead, PackageUpdate, UpdateSearch } from '../../../src/lib/updates';
+import type { CatalogueState, ManifestRead, PackageUpdate, UpdateSearch } from '../../../src/lib/updates';
 import type { PlanEntry, Planner } from '../../../src/lib/plans';
 import { UNINSTALL } from '../../../src/lib/plans';
 import { alone, installation, installedModule, release } from '../../mocks/fixtures';
@@ -703,14 +703,13 @@ describe('installing from a manifest URL', () => {
     const reasons = await Promise.all(
       (
         [
-          { ...unread, reason: 'http', status: 403, proxied: true },
-          { ...unread, reason: 'http', status: 404, proxied: true },
-          { ...unread, reason: 'http', status: 403, proxied: false },
-          { ...unread, reason: 'http', proxied: false },
-          { ...unread, reason: 'network', proxied: true },
-          { ...unread, reason: 'network', proxied: false },
-          { ...unread, reason: 'budget', proxied: true },
-          { ...unread, reason: 'invalid', proxied: true },
+          { ...unread, reason: 'http', status: 404 },
+          { ...unread, reason: 'http' },
+          { ...unread, reason: 'network' },
+          { ...unread, reason: 'refused' },
+          { ...unread, reason: 'too-large' },
+          { ...unread, reason: 'invalid' },
+          { ok: false, problem: 'no-catalogue' },
           { ok: false, problem: 'not-manifest' },
           { ok: false, problem: 'other-type', type: 'module' },
         ] satisfies ManifestRead[]
@@ -720,14 +719,13 @@ describe('installing from a manifest URL', () => {
       }),
     );
     expect(reasons).toEqual([
-      "EMMA's proxy refused to read it from example.org (403). The proxy reads only from the sites packages are known to be on, such as GitHub, GitLab and Foundry's own; or example.org itself refused it.",
       'example.org answered 404, not the manifest.',
-      'example.org answered 403, not the manifest.',
       'example.org answered , not the manifest.',
       'example.org could not be reached.',
-      'example.org could not be reached, or does not let a browser read it (it sends no CORS headers), and this build of EMMA has no proxy to read it through.',
-      'EMMA has made as many requests as it may this session. Read the installation again later.',
+      "EMMA's catalogue does not read from example.org: it reads only public web addresses, with few redirects.",
+      'What the URL gives is too large to be a manifest.',
       "What the URL gives is not a manifest's JSON.",
+      "EMMA's catalogue, which reads the manifest, could not be reached. Try again later.",
       "That is not a game system's or module's manifest.",
       "That is a module's manifest, not a game system's.",
     ]);
@@ -1237,5 +1235,106 @@ describe("the user's changes to the plan", () => {
     updates.clear();
     await updates.planBest();
     expect(updates.changes).toBe(8);
+  });
+});
+
+describe('what the catalogue says of a search', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /**
+   * What the catalogue says, with a recheck that answers.
+   * @param more - What else it says
+   * @returns What it says
+   */
+  const said = (more: Partial<CatalogueState> = {}): CatalogueState => ({
+    reached: true,
+    pending: [],
+    checkedAt: null,
+    recheck: vi.fn(() => Promise.resolve(true)),
+    ...more,
+  });
+
+  test('searches once more for the packages it was fetching, once it says they may be found', async () => {
+    vi.useFakeTimers();
+    const pending = said({ pending: ['module:new'], retryAfter: 30 });
+    const search = vi.fn(() => Promise.resolve({ ...finding(APP), catalogue: pending }));
+    const updates = new UpdateState(search);
+
+    await updates.searchFor(OVERVIEW);
+    expect(search).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(29_999);
+    expect(search).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(search).toHaveBeenCalledTimes(2);
+    // Only once: still pending, they are not searched for again.
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(search).toHaveBeenCalledTimes(2);
+    expect(updates.status).toBe('found');
+  });
+
+  test('searches not once more while a plan runs, nor after a search of its own', async () => {
+    vi.useFakeTimers();
+    const search = vi.fn(() =>
+      Promise.resolve({ ...finding(APP), catalogue: said({ pending: ['module:new'], retryAfter: 30 }) }),
+    );
+    const updates = new UpdateState(search);
+
+    await updates.searchFor(OVERVIEW);
+    updates.locked = true;
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(search).toHaveBeenCalledTimes(1);
+
+    updates.locked = false;
+    await updates.searchFor(OVERVIEW);
+    // A refresh before the time is up waits again from then, once.
+    await vi.advanceTimersByTimeAsync(15_000);
+    await updates.searchFor(OVERVIEW);
+    await vi.advanceTimersByTimeAsync(29_999);
+    expect(search).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(search).toHaveBeenCalledTimes(4);
+  });
+
+  test('checks live: has the catalogue check again, then searches again', async () => {
+    const catalogue = said();
+    let answer = () => {};
+    vi.mocked(catalogue.recheck).mockImplementation(
+      () =>
+        new Promise(resolve => {
+          answer = () => {
+            resolve(true);
+          };
+        }),
+    );
+    const search = vi.fn(() => Promise.resolve({ ...finding(APP), catalogue }));
+    const updates = new UpdateState(search);
+    await updates.searchFor(OVERVIEW);
+
+    const checked = updates.checkLive();
+    expect(updates.checking).toBe(true);
+    // A second check while one is under way does nothing.
+    await updates.checkLive();
+    answer();
+    await checked;
+
+    expect(catalogue.recheck).toHaveBeenCalledOnce();
+    expect(search).toHaveBeenCalledTimes(2);
+    expect(updates.checking).toBe(false);
+  });
+
+  test('checks nothing before a search, without the catalogue, or while a plan runs', async () => {
+    const catalogue = said();
+    await new UpdateState(() => Promise.resolve({ ...finding(APP), catalogue })).checkLive();
+    const without = new UpdateState(() => Promise.resolve(finding(APP)));
+    await without.searchFor(OVERVIEW);
+    await without.checkLive();
+    const running = new UpdateState(() => Promise.resolve({ ...finding(APP), catalogue }));
+    await running.searchFor(OVERVIEW);
+    running.locked = true;
+    await running.checkLive();
+
+    expect(catalogue.recheck).not.toHaveBeenCalled();
   });
 });

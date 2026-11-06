@@ -13,7 +13,7 @@ import type * as Resolver from '@mondarth/fvtt-resolver';
 import type * as Sources from '@mondarth/fvtt-resolver/sources';
 
 /** The kit's API version this build has, `<major>.<minor>`. */
-export const SETUP_KIT_API = '1.0';
+export const SETUP_KIT_API = '2.0';
 
 /** Where in the EMMA module's manifest's `flags` the kit is named. */
 export const SETUP_KIT_FLAG = 'setupKit';
@@ -48,21 +48,12 @@ export type KitResolver = Pick<
   | 'withDefaults'
 >;
 
-/** What the kit gives of `@mondarth/fvtt-resolver/sources`. */
-export type KitSources = Pick<
-  typeof Sources,
-  | 'catalogueSource'
-  | 'foundryCoreReleases'
-  | 'foundryIndexSource'
-  | 'githubSource'
-  | 'gitlabSource'
-  | 'httpClient'
-  | 'localSource'
-  | 'manifestUrlSource'
-  | 'memoryCache'
-  | 'proxiedFetch'
-  | 'sourceSet'
->;
+/**
+ * What the kit gives of `@mondarth/fvtt-resolver/sources`: the catalogue, which the EMMA extension asks alone, as a
+ * source set of its own (`catalogueSet`) and for its listing, rechecks and manifests (`catalogueSource`), and the
+ * installed manifests (`localSource`). Since 2.0, nothing else: the sources a proxy was needed for are gone.
+ */
+export type KitSources = Pick<typeof Sources, 'catalogueSet' | 'catalogueSource' | 'localSource'>;
 
 /** A version's badge, as the EMMA module shows it: Foundry's colours, icon and explanation. */
 export interface KitBadge {

@@ -89,6 +89,11 @@ export interface PlanRun {
   readonly failure?: { readonly step: RunStep; readonly message: string };
   /** The version of Foundry VTT it stopped before updating to. */
   readonly beforeCore?: string;
+  /**
+   * Whether, stopped before Foundry VTT's update, it kept the rest of the plan, to restore once Foundry is on that build
+   * however it is updated; not if the browser refused to store it.
+   */
+  readonly kept?: boolean;
 }
 
 /** Whether the space a snapshot needs is known: `checking`, `failed`, or the space; `null` before it is asked. */
@@ -125,8 +130,18 @@ export class SetupState {
   coreTarget = $state.raw<CoreTargetState>(null);
   /** Where updating Foundry VTT in place has got, once begun. */
   coreUpdating = $state.raw<CoreUpdating | null>(null);
-  /** The version of Foundry VTT the plan was restored on, after it was updated to it. */
-  resumedOn = $state<string | null>(null);
+  /**
+   * A plan restored from one a run did not finish: once Foundry VTT is on the build it stopped before updating to,
+   * naming that build, or else when the user resumed it.
+   */
+  resumed = $state.raw<{ readonly core?: string } | null>(null);
+  /** The titles of the packages whose choices could not be restored with the plan, as no longer offered. */
+  unrestored = $state.raw<readonly string[]>([]);
+  /**
+   * A plan a run did not finish, as when a step failed or the page closed while it ran, kept from an earlier visit:
+   * offered to resume, or to discard.
+   */
+  savedPlan = $state.raw<PendingPlan | null>(null);
   /** Foundry's listings of the game systems and modules that may be installed, once read, for the session. */
   listings = $state.raw<Readonly<Record<'module' | 'system', ListingState>>>({ module: null, system: null });
   /** How the user narrows what each listing offers, for the session. */
@@ -373,13 +388,23 @@ export class SetupState {
       states = { ...states, [key]: state };
       this.run = { steps, states, over: false };
     };
+    // The plan is kept as it runs, with what is done taken out, so a run cut short can be resumed: by a step failing, or
+    // the page closing; and one that stops before Foundry VTT's update, once Foundry is on that build, however it is
+    // updated, as in a container, where Foundry's own updater is not used.
+    const keep = (core?: string): boolean =>
+      this.#options.keepPendingPlan?.({
+        ...(core !== undefined && { core }),
+        picks: updates.picks.filter(([key]) => states[key] !== 'done' && (core === undefined || key !== 'core')),
+      }) ?? false;
     this.run = { steps, states, over: false };
+    this.savedPlan = null;
     updates.locked = true;
-    let end: Pick<PlanRun, 'failure' | 'beforeCore'> = {};
+    let end: Pick<PlanRun, 'failure' | 'beforeCore' | 'kept'> = {};
     try {
+      keep();
       for (const step of steps) {
         if (step.kind === 'core') {
-          end = { beforeCore: step.version };
+          end = { beforeCore: step.version, kept: keep(step.version) };
           break;
         }
         mark(step.key, 'running');
@@ -391,7 +416,10 @@ export class SetupState {
           break;
         }
         mark(step.key, 'done');
+        keep();
       }
+      // Every step done: nothing is left to resume.
+      if (end.failure === undefined && end.beforeCore === undefined) this.#options.keepPendingPlan?.(null);
     } finally {
       updates.locked = false;
       this.run = { steps, states, over: true, ...end };
@@ -428,8 +456,8 @@ export class SetupState {
 
   /**
    * Update Foundry VTT in place to the build the plan stopped before, which must be the one its updater would install.
-   * The rest of the plan's choices are kept first, to restore once Foundry is on that build. A failure is kept in
-   * {@link coreUpdating}, never thrown, and forgets the plan kept.
+   * The run kept the rest of the plan's choices when it stopped, to restore once Foundry is on that build. A failure is
+   * kept in {@link coreUpdating}, never thrown; the plan stays kept, as Foundry may be updated by other means still.
    * @returns Once the update has begun, or failed
    */
   async updateCoreInPlace(): Promise<void> {
@@ -438,28 +466,61 @@ export class SetupState {
     const target = this.coreTarget;
     if (core === undefined || version === undefined || typeof target !== 'object' || target === null) return;
     if (!('version' in target) || target.version !== version || target.manual) return;
-    const picks = this.updates.picks.filter(([key]) => key !== 'core');
-    const kept = this.#options.keepPendingPlan?.({ core: version, picks }) ?? false;
+    const kept = this.run?.kept === true;
     try {
       await core.update();
       this.coreUpdating = { kind: 'begun', version, kept };
     } catch (error) {
-      this.#options.keepPendingPlan?.(null);
       this.coreUpdating = { kind: 'failed', message: error instanceof Error ? error.message : String(error) };
     }
   }
 
   /**
-   * Restore the plan kept before Foundry VTT's update, once Foundry is on the build it was updated to, and forget it.
+   * Once the search has found what it offers, deal with a plan a run did not finish. One that stopped before Foundry
+   * VTT's update is restored, as expected, once Foundry is on that build or a later one; until then it stays kept. Any
+   * other is offered to resume, on a visit with no run yet, as the plan of a run in this one is still here.
    * @param overview - The installation, as read
-   * @returns Once restored
+   * @returns Once restored, or offered
    */
   async #resume(overview: Overview): Promise<void> {
     const pending = this.#options.pendingPlan?.();
-    if (pending === undefined || pending.core !== overview.core || this.updates.status !== 'found') return;
+    if (pending === undefined || this.updates.status !== 'found') return;
+    if (pending.core === undefined) {
+      if (this.run === null) this.savedPlan = pending;
+      return;
+    }
+    if (buildAtLeast(overview.core, pending.core)) await this.#restore(pending, { core: pending.core });
+  }
+
+  /**
+   * Resume the plan offered (see {@link savedPlan}).
+   * @returns Once restored
+   */
+  async resumeSaved(): Promise<void> {
+    const saved = this.savedPlan;
+    if (saved === null) return;
+    this.savedPlan = null;
+    await this.#restore(saved, {});
+  }
+
+  /** Discard the plan offered (see {@link savedPlan}), forgetting it. */
+  discardSaved(): void {
+    this.savedPlan = null;
     this.#options.keepPendingPlan?.(null);
-    for (const [key, version] of pending.picks) await this.updates.choose(key, version);
-    this.resumedOn = pending.core;
+  }
+
+  /**
+   * Restore a plan a run did not finish, and forget it, naming the choices that could not be restored.
+   * @param pending - The plan
+   * @param resumed - How it was resumed (see {@link resumed})
+   * @param resumed.core - The build Foundry VTT was updated to, if it was resumed on that
+   * @returns Once restored
+   */
+  async #restore(pending: PendingPlan, resumed: { readonly core?: string }): Promise<void> {
+    const refused = await this.updates.restore(pending.picks);
+    this.#options.keepPendingPlan?.(null);
+    this.unrestored = refused.map(key => this.updates.titleOf(key));
+    this.resumed = resumed;
   }
 
   /**
@@ -479,4 +540,20 @@ export class SetupState {
     this.bestInUseOnly = on;
     this.#options.onBestInUseOnlyChange?.(on);
   }
+}
+
+/**
+ * Whether a Foundry build is a given one or later, as `generation.build` (such as `14.370`). A build named otherwise is
+ * only itself.
+ * @param build - The build installed
+ * @param target - The build
+ * @returns `true` if it is that build or a later one
+ */
+function buildAtLeast(build: string, target: string): boolean {
+  const parts = (version: string) => version.split('.').map(Number);
+  const [have, want] = [parts(build), parts(target)];
+  if (have.length !== 2 || want.length !== 2 || [...have, ...want].some(Number.isNaN)) return build === target;
+  const [haveGeneration = 0, haveBuild = 0] = have;
+  const [wantGeneration = 0, wantBuild = 0] = want;
+  return haveGeneration !== wantGeneration ? haveGeneration > wantGeneration : haveBuild >= wantBuild;
 }

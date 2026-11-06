@@ -123,11 +123,12 @@ function unreadText(read: Exclude<ManifestRead, { ok: true }>): string {
   if (read.problem === 'not-manifest') return localize('Manifest.NotManifest');
   if (read.problem === 'other-type')
     return localize(read.type === 'system' ? 'Manifest.IsSystem' : 'Manifest.IsModule');
-  const { reason, status, host, proxied } = read;
-  if (reason === 'http' && status === 403 && proxied) return format('Manifest.Forbidden', { host });
+  if (read.problem === 'no-catalogue') return localize('Manifest.NoCatalogue');
+  const { reason, status, host } = read;
   if (reason === 'http') return format('Manifest.Status', { host, status: String(status ?? '') });
-  if (reason === 'network') return format(proxied ? 'Manifest.Unreached' : 'Manifest.NoCors', { host });
-  return localize(reason === 'budget' ? 'Manifest.Budget' : 'Manifest.NotJson');
+  if (reason === 'network') return format('Manifest.Unreached', { host });
+  if (reason === 'refused') return format('Manifest.Barred', { host });
+  return localize(reason === 'too-large' ? 'Manifest.TooLarge' : 'Manifest.NotJson');
 }
 
 /** The updates, and the versions chosen. */
@@ -147,6 +148,8 @@ export class UpdateState {
   locked = $state(false);
   /** How many times the user has changed the plan, as by choosing, taking out or clearing; a new search does not. */
   changes = $state(0);
+  /** Whether the catalogue is checking the installed packages' own manifests again, as "check live" asks. */
+  checking = $state(false);
 
   /** The versions chosen, by package key, in the order they were chosen. */
   readonly #picks = new SvelteMap<PackageKey, string>();
@@ -177,6 +180,8 @@ export class UpdateState {
   readonly #find: (overview: Overview) => Promise<UpdateSearch>;
   /** Counts the searches, so that only the latest one's answer is kept. */
   #searches = 0;
+  /** The search to come of the packages the catalogue was fetching, if one is waited for. */
+  #retry: ReturnType<typeof setTimeout> | undefined;
 
   /**
    * The changes in the plan: the versions chosen, in the order they were chosen, then what they need, then what the user
@@ -247,10 +252,16 @@ export class UpdateState {
    * Search for the updates of an installation, as it was read. A failure is kept in {@link status}, never thrown, and
    * a search that cannot be made in {@link problem} too, with what was found before dropped. A choice the new search
    * no longer offers is dropped, as is an uninstall of a package no longer installed.
+   *
+   * Packages the catalogue does not hold yet it fetches: once it says they may be found, they are searched for once
+   * more, by themselves, unless a plan is running then. A search of its own, as a refresh, cancels that one.
    * @param overview - The installation
+   * @param again - Whether this is that one more search, which is never followed by another
    * @returns Once found, or failed
    */
-  async searchFor(overview: Overview): Promise<void> {
+  async searchFor(overview: Overview, again = false): Promise<void> {
+    clearTimeout(this.#retry);
+    this.#retry = undefined;
     const search = ++this.#searches;
     this.#overview = overview;
     this.status = 'searching';
@@ -281,6 +292,13 @@ export class UpdateState {
       this.plan = plan ?? [];
       // What came in on a recommendation and is no longer chosen is no longer the recommendation's.
       for (const key of [...this.#recommendedBy.keys()]) if (!this.#picks.has(key)) this.#recommendedBy.delete(key);
+      const { retryAfter } = found.catalogue ?? {};
+      if (!again && retryAfter !== undefined) {
+        this.#retry = setTimeout(() => {
+          this.#retry = undefined;
+          if (!this.locked && search === this.#searches) void this.searchFor(overview, true);
+        }, retryAfter * 1000);
+      }
     } catch (error) {
       if (search !== this.#searches) return;
       if (error instanceof KitUnavailable) {
@@ -292,6 +310,25 @@ export class UpdateState {
       } else {
         this.status = 'failed';
       }
+    }
+  }
+
+  /**
+   * Check live: have the catalogue check the installed packages' own manifests again now, and search again, so that
+   * a version published by a manifest alone since it last checked is known. A version it does not hold yet it
+   * fetches, and is searched for once more when it may be found, as any package it is fetching.
+   * @returns Once searched again, or at once while there is nothing to check or a check is under way
+   */
+  async checkLive(): Promise<void> {
+    const catalogue = this.search?.catalogue;
+    const overview = this.#overview;
+    if (catalogue === undefined || overview === null || this.checking || this.locked) return;
+    this.checking = true;
+    try {
+      await catalogue.recheck();
+      await this.searchFor(overview);
+    } finally {
+      this.checking = false;
     }
   }
 
@@ -486,6 +523,40 @@ export class UpdateState {
     // What it recommends that the user ticked comes in with it.
     if (chosen && version !== UNINSTALL) await this.#bringRecommended(key);
     return chosen;
+  }
+
+  /**
+   * Restore choices kept from an earlier plan, as before Foundry VTT's update: all together, as one plan, as a new
+   * search keeps the choices it still offers, so a choice that needs a later one is not refused for want of it. If they
+   * cannot be planned together, each is chosen in turn instead. A package to install anew is looked up again; a choice
+   * of the version installed is done already, so needs nothing.
+   * @param choices - The versions chosen, as `[key, version]`, in the order they were chosen
+   * @returns The keys of the choices that could not be restored
+   */
+  async restore(choices: readonly (readonly [PackageKey, string])[]): Promise<PackageKey[]> {
+    const search = this.search;
+    const overview = this.#overview;
+    if (search === null || overview === null || this.locked) return choices.map(([key]) => key);
+    const waiting = choices.filter(([key, version]) => this.#installedOf(key) !== version);
+    for (const [key, version] of waiting) {
+      if (version !== UNINSTALL && this.#installedOf(key) === undefined) await search.planner.add(key);
+    }
+    const offered = (key: PackageKey, version: string) =>
+      version === UNINSTALL ? this.#installedOf(key) !== undefined : search.planner.candidates(key).includes(version);
+    let picks = keepChoices(this.#picks, () => true);
+    for (const [key, version] of waiting) if (offered(key, version)) picks = withChoice(picks, key, version);
+    const plan = this.#uninstallsAllowed(overview, picks) ? await search.planner.plan(picks) : undefined;
+    if (plan !== undefined && search === this.search) {
+      this.#picks.clear();
+      for (const [key, version] of picks) this.#picks.set(key, version);
+      this.plan = plan;
+      this.changes++;
+      return waiting.filter(([key, version]) => !offered(key, version)).map(([key]) => key);
+    }
+    // Not together, or a new search began meanwhile: each in turn, as choosing it would.
+    const refused: PackageKey[] = [];
+    for (const [key, version] of waiting) if (!(await this.choose(key, version))) refused.push(key);
+    return refused;
   }
 
   /**

@@ -72,13 +72,13 @@
           ? null
           : {
               icon: 'fa-triangle-exclamation',
-              // A proxy is advised only when none is set.
-              label: format(
-                versions.proxied === false
-                  ? 'MONDARTH-EMMA.Versions.UnreachedNoProxy'
-                  : 'MONDARTH-EMMA.Versions.Unreached',
-                { packages: formatList(versions.unreached.map(titleOf)) },
-              ),
+              // Without the catalogue nothing was reached, as the footer says: there is no list to give.
+              label:
+                versions.reached === false
+                  ? localize('MONDARTH-EMMA.Versions.CatalogueUnreachable')
+                  : format('MONDARTH-EMMA.Versions.Unreached', {
+                      packages: formatList(versions.unreached.map(titleOf)),
+                    }),
             };
       default:
         return null;

@@ -8,7 +8,8 @@ import { closeEmmaSetup, openEmmaSetup } from '../../../src/app/emma-setup-app';
 import type { SetupState } from '../../../src/app/setup-state.svelte';
 import { startEmmaSetup, waitForSetup } from '../../../src/app/start';
 import { GUARDED_CLASS } from '../../../src/foundry/guard';
-import { GUARD_KEY } from '../../../src/foundry/preferences';
+import { GUARD_KEY, readOwnedKept, writeOwnedKept } from '../../../src/foundry/preferences';
+import { revealCatalogue } from '@mondarth/emma-core/default-catalogue';
 import { SETUP_KIT_API } from '@mondarth/emma-core/setup-kit';
 
 import type * as SetupKitModule from '../../../src/foundry/setup-kit';
@@ -20,6 +21,9 @@ vi.mock('../../../src/foundry/setup-kit', async importOriginal => ({
   ...(await importOriginal<typeof SetupKitModule>()),
   loadKit: vi.fn(() => Promise.resolve(KIT)),
 }));
+
+// Tests are built without EMMA's catalogue; one may give it.
+vi.mock('@mondarth/emma-core/default-catalogue', () => ({ revealCatalogue: vi.fn(() => null) }));
 
 // The window opens as ever; the tests may read the state it shows.
 vi.mock('../../../src/app/emma-setup-app', async importOriginal => {
@@ -121,7 +125,7 @@ describe('startEmmaSetup', () => {
     await expect(startEmmaSetup()).resolves.toBe(true);
   });
 
-  test('finds updates with the kit of the installed EMMA module', async () => {
+  test('finds updates with the kit of the installed EMMA module, saying so when it has no catalogue to ask', async () => {
     installSetupMocks({
       modules: [{ id: 'mondarth-emma', flags: { setupKit: { api: SETUP_KIT_API, path: 'dist/emma-setup-kit.js' } } }],
     });
@@ -130,14 +134,33 @@ describe('startEmmaSetup', () => {
 
     menu.querySelector('button')?.click();
 
-    expect(await screen.findByText('No updates found')).toBeInTheDocument();
+    // Tests are built without EMMA's catalogue, so only what is installed is known.
+    expect(await screen.findByText(/^Catalogue unreachable/)).toBeInTheDocument();
   });
 
-  test("reads Foundry's listing of what may be installed, as its Install dialog does", async () => {
-    const { game } = installSetupMocks();
-    const getPackages = vi.fn(() =>
-      Promise.resolve(new Map([['dice', { id: 'dice', title: 'Dice', version: '1.0.0' }]])),
+  test("reads Foundry's listing of what may be installed from the catalogue, and what the user owns from Foundry", async () => {
+    const { game } = installSetupMocks({
+      modules: [{ id: 'mondarth-emma', flags: { setupKit: { api: SETUP_KIT_API, path: 'dist/emma-setup-kit.js' } } }],
+    });
+    vi.mocked(revealCatalogue).mockReturnValue({ url: 'https://catalogue.example.test/', key: 'k3y' });
+    const listed = {
+      package: { type: 'module', id: 'dice' },
+      title: 'Dice',
+      summary: null,
+      author: null,
+      url: null,
+      tags: [],
+      systems: [],
+      premium: true,
+      exclusive: false,
+      latest: null,
+      versions: [{ version: '1.0.0', minimum: null, maximum: null, verified: null, manifest: null, notes: null }],
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response(JSON.stringify({ asOf: null, packages: [listed] })))),
     );
+    const getPackages = vi.fn(() => Promise.resolve(new Map([['dice', { id: 'dice', protected: true, owned: true }]])));
     Object.assign(game, { getPackages });
     const menu = showMenu();
     await startEmmaSetup();
@@ -146,8 +169,74 @@ describe('startEmmaSetup', () => {
 
     await setup.loadListing('module');
 
-    expect(setup.listings.module).toEqual([expect.objectContaining({ id: 'dice' })]);
+    expect(setup.listings.module).toEqual([expect.objectContaining({ id: 'dice', version: '1.0.0', unowned: false })]);
     expect(setup.canInstall).toBe(true);
+    expect(getPackages).toHaveBeenCalledWith({ type: 'module' });
+    // What the user owns is kept, for Foundry not to be asked again for a week.
+    expect(readOwnedKept('module')).toEqual(new Set(['module:dice']));
+    vi.mocked(revealCatalogue).mockReturnValue(null);
+  });
+
+  test('takes what the user owns as kept, without asking Foundry', async () => {
+    const { game } = installSetupMocks({
+      modules: [{ id: 'mondarth-emma', flags: { setupKit: { api: SETUP_KIT_API, path: 'dist/emma-setup-kit.js' } } }],
+    });
+    vi.mocked(revealCatalogue).mockReturnValue({ url: 'https://catalogue.example.test/', key: 'k3y' });
+    const versions = [{ version: '1.0.0', minimum: null, maximum: null, verified: null, manifest: null, notes: null }];
+    const listed = { package: { type: 'module', id: 'dice' }, title: 'Dice', summary: null, author: null, url: null };
+    const packages = [{ ...listed, tags: [], systems: [], premium: true, exclusive: false, latest: null, versions }];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response(JSON.stringify({ asOf: null, packages })))),
+    );
+    const getPackages = vi.fn();
+    Object.assign(game, { getPackages });
+    writeOwnedKept('module', new Set(['module:dice']));
+    const menu = showMenu();
+    await startEmmaSetup();
+    menu.querySelector('button')?.click();
+    const setup = vi.mocked(openEmmaSetup).mock.lastCall?.[0] as SetupState;
+
+    await setup.loadListing('module');
+
+    expect(setup.listings.module).toEqual([expect.objectContaining({ id: 'dice', unowned: false })]);
+    expect(getPackages).not.toHaveBeenCalled();
+    vi.mocked(revealCatalogue).mockReturnValue(null);
+  });
+
+  test('offers no listing to install from where Foundry cannot say what the user owns, and keeps nothing', async () => {
+    const { game } = installSetupMocks({
+      modules: [{ id: 'mondarth-emma', flags: { setupKit: { api: SETUP_KIT_API, path: 'dist/emma-setup-kit.js' } } }],
+    });
+    vi.mocked(revealCatalogue).mockReturnValue({ url: 'https://catalogue.example.test/', key: 'k3y' });
+    const listed = {
+      package: { type: 'module', id: 'paid' },
+      title: 'Paid',
+      summary: null,
+      author: null,
+      url: null,
+      tags: [],
+      systems: [],
+      premium: true,
+      exclusive: false,
+      latest: null,
+      versions: [{ version: '1.0.0', minimum: null, maximum: null, verified: null, manifest: null, notes: null }],
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response(JSON.stringify({ asOf: null, packages: [listed] })))),
+    );
+    Object.assign(game, { getPackages: () => Promise.resolve(new Map()) });
+    const menu = showMenu();
+    await startEmmaSetup();
+    menu.querySelector('button')?.click();
+    const setup = vi.mocked(openEmmaSetup).mock.lastCall?.[0] as SetupState;
+
+    await setup.loadListing('module');
+
+    expect(setup.listings.module).toEqual([expect.objectContaining({ id: 'paid', unowned: true })]);
+    expect(readOwnedKept('module')).toBeUndefined();
+    vi.mocked(revealCatalogue).mockReturnValue(null);
   });
 
   test("asks the server for the space a snapshot needs, as Foundry's own dialog does", async () => {
@@ -201,7 +290,7 @@ describe('startEmmaSetup', () => {
     expect(ui.notifications.info).not.toHaveBeenCalled();
   });
 
-  test("drives Foundry's own updater, as its Update Software form does, keeping the rest of the plan", async () => {
+  test("drives Foundry's own updater, as its Update Software form does, the rest of the plan kept by the run", async () => {
     const { game, post } = installSetupMocks();
     Object.assign(game, { data: { coreUpdate: { canUpdate: true }, options: { updateChannel: 'stable' } } });
     post.mockImplementation((request: object) =>
@@ -213,7 +302,7 @@ describe('startEmmaSetup', () => {
     const setup = vi.mocked(openEmmaSetup).mock.lastCall?.[0] as SetupState;
     expect(setup.coreUpdate).toEqual({ canUpdate: true, channel: 'stable' });
 
-    setup.run = { steps: [], states: {}, over: true, beforeCore: '14.369' };
+    setup.run = { steps: [], states: {}, over: true, beforeCore: '14.369', kept: true };
     await setup.checkCoreTarget();
     await setup.updateCoreInPlace();
 
@@ -226,10 +315,6 @@ describe('startEmmaSetup', () => {
       { notify: false },
     );
     expect(setup.coreUpdating).toEqual({ kind: 'begun', version: '14.369', kept: true });
-    expect(JSON.parse(localStorage.getItem('mondarth-emma.setup.pending-plan') ?? 'null')).toEqual({
-      core: '14.369',
-      picks: [],
-    });
   });
 
   test("locks a package as Foundry's package menu does, through the guard", async () => {

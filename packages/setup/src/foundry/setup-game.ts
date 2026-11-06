@@ -306,7 +306,7 @@ function field(value: unknown, name: string): unknown {
     : undefined;
 }
 
-/** A package on Foundry's listing, which gives only its newest version. */
+/** A package on Foundry's listing, at the version Foundry offers for the installed build. */
 export interface ListedPackage {
   readonly type: 'module' | 'system';
   readonly id: string;
@@ -337,74 +337,26 @@ export interface ListedPackage {
 }
 
 /**
- * Read Foundry's listing of the game systems or modules that may be installed, as its Install dialog does, through
- * `game.getPackages`, which asks the server, so it needs no proxy. Checked on Foundry 14.368: it answers a `Map` of
- * each package's data by ID, keeps it for the session, and says itself if the server fails, answering an empty map.
- * The listing gives each package's newest version alone, without the modules it requires.
+ * Read which premium game systems or modules the user owns, from Foundry's listing as its Install dialog reads it,
+ * through `game.getPackages`, which asks the server: the one thing about the listing that only Foundry knows. Checked
+ * on Foundry 14.368: it answers a `Map` of each package's data by ID, with `protected` for premium content and `owned`
+ * for what the user's licence holds, keeps it for the session, and says itself if the server fails, answering an
+ * empty map.
  * @param game - The setup screen's `game`
  * @param type - Which
- * @returns The packages, sorted by title; none if Foundry offers no listing
+ * @returns The keys of the premium packages the user owns, or `undefined` if Foundry gives no listing to tell by
  */
-export async function listPackages(game: SetupGame, type: 'module' | 'system'): Promise<ListedPackage[]> {
+export async function readOwned(game: SetupGame, type: 'module' | 'system'): Promise<Set<string> | undefined> {
   const listing = await game.getPackages?.call(game, { type });
-  if (!(listing instanceof Map)) return [];
-  return sorted(Array.from(listing.values() as Iterable<unknown>, entry => toListed(entry, type)));
-}
-
-/**
- * The newest version of each game system and module Foundry's listing gives, as the index a "latest" manifest's version
- * is checked against (see `lib/latest.ts`).
- * @param game - The setup screen's `game`
- * @returns The versions, by package key
- */
-export async function readIndex(game: SetupGame): Promise<Map<string, string>> {
-  const listed = await Promise.all([listPackages(game, 'system'), listPackages(game, 'module')]);
-  return new Map(listed.flat().map(({ type, id, version }) => [`${type}:${id}`, version]));
-}
-
-/**
- * Describe a package on Foundry's listing.
- * @param entry - Its data
- * @param type - Its type
- * @returns The package, or `undefined` if it lacks an ID, title or version
- */
-function toListed(entry: unknown, type: 'module' | 'system'): ListedPackage | undefined {
-  const described = toPackage(entry);
-  if (described === undefined) return undefined;
-  const data = entry as Record<string, unknown>;
-  const compatibility = field(data, 'compatibility');
-  const version = (name: string) => {
-    const value = field(compatibility, name);
-    return typeof value === 'string' || typeof value === 'number' ? { [name]: String(value) } : {};
-  };
-  const names = field(data, 'authors');
-  const authors = (Array.isArray(names) ? names : [])
-    .map(person => field(person, 'name'))
-    .filter((name): name is string => typeof name === 'string' && name !== '');
-  const [author] = authors;
-  const description = field(data, 'description');
-  const text = typeof description === 'string' ? plainText(description) : '';
-  const url = field(data, 'url');
-  const manifest = field(data, 'manifest');
-  const tags = field(data, 'tags');
-  const tagList = (Array.isArray(tags) ? tags : []).filter((tag): tag is string => typeof tag === 'string');
-  return {
-    type,
-    id: described.id,
-    title: described.title,
-    version: described.version,
-    ...(author !== undefined && { author }),
-    compatibility: { ...version('minimum'), ...version('verified'), ...version('maximum') },
-    systems: type === 'module' ? relatedIds(field(field(data, 'relationships'), 'systems')) : [],
-    unowned: data.protected === true && data.owned !== true,
-    ...(text !== '' && { description: text }),
-    ...(authors.length > 0 && { authors }),
-    ...(typeof url === 'string' && /^https?:\/\//i.test(url) && { url }),
-    ...(typeof manifest === 'string' && /^https?:\/\//i.test(manifest) && { manifest }),
-    ...(tagList.length > 0 && { tags: tagList }),
-    ...(data.protected === true && { premium: true as const }),
-    ...(data.exclusive === true && { exclusive: true as const }),
-  };
+  if (!(listing instanceof Map) || listing.size === 0) return undefined;
+  const owned = new Set<string>();
+  for (const entry of listing.values() as Iterable<unknown>) {
+    const id = field(entry, 'id');
+    if (typeof id === 'string' && field(entry, 'protected') === true && field(entry, 'owned') === true) {
+      owned.add(`${type}:${id}`);
+    }
+  }
+  return owned;
 }
 
 /**
@@ -413,7 +365,7 @@ function toListed(entry: unknown, type: 'module' | 'system'): ListedPackage | un
  * @param html - The description
  * @returns Its text, with its runs of white space made single spaces
  */
-function plainText(html: string): string {
+export function plainText(html: string): string {
   const parsed = new DOMParser().parseFromString(html, 'text/html');
   for (const code of parsed.body.querySelectorAll('script, style')) code.remove();
   return parsed.body.textContent.replace(/\s+/g, ' ').trim();
@@ -590,7 +542,9 @@ function relatedIds(related: unknown, type?: string): string[] {
  * @param packages - The packages
  * @returns The packages sorted
  */
-function sorted<T extends { readonly id: string; readonly title: string }>(packages: readonly (T | undefined)[]): T[] {
+export function sorted<T extends { readonly id: string; readonly title: string }>(
+  packages: readonly (T | undefined)[],
+): T[] {
   const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
   return packages
     .filter(pkg => pkg !== undefined)

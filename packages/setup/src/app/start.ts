@@ -13,12 +13,14 @@ import {
   readCoreLocked,
   readIgnored,
   readGuardOn,
+  readOwnedKept,
   readPendingPlan,
   writeAlphaAcknowledged,
   writeBestInUseOnly,
   writeCoreLocked,
   writeIgnored,
   writeGuardOn,
+  writeOwnedKept,
   writePendingPlan,
 } from '../foundry/preferences';
 import { readRecords } from '../foundry/records';
@@ -27,25 +29,52 @@ import type { SetupGame } from '../foundry/setup-game';
 import {
   checkCoreUpdate,
   checkSnapshotSpace,
-  listPackages,
   lockPackage,
   readCoreUpdate,
-  readIndex,
   readInstallation,
   readManifests,
+  readOwned,
   setupGame,
   startCoreUpdate,
 } from '../foundry/setup-game';
 import { KitUnavailable, loadKit, locateKit } from '../foundry/setup-kit';
 import { revealCatalogue } from '@mondarth/emma-core/default-catalogue';
-import { revealProxy } from '@mondarth/emma-core/default-proxy';
 
+import { readListing } from '../foundry/listing';
 import { lookUpReleases } from '../foundry/releases';
 import { localize } from '../lib/i18n';
 import { buildOverview } from '../lib/overview';
 import { findUpdates } from '../lib/updates';
 import { openEmmaSetup } from './emma-setup-app';
 import { SetupState } from './setup-state.svelte';
+
+/**
+ * The setup kit of the installed EMMA module, if it fits, with the installed packages' manifests it was found in.
+ * @param game - The setup screen's `game`
+ * @returns The kit and the manifests
+ * @throws {KitUnavailable} If there is no kit to use
+ */
+async function kitIn(game: SetupGame) {
+  const installed = readManifests(game);
+  const found = locateKit(installed, path => foundry.utils.getRoute(path));
+  if (!found.ok) throw new KitUnavailable(found.problem);
+  return { installed, kit: await loadKit(found) };
+}
+
+/**
+ * The premium packages of a type the user owns: as kept, or else as Foundry gives them now, kept for next time.
+ * @param game - The setup screen's `game`
+ * @param type - Which
+ * @returns Their keys; none if Foundry cannot tell
+ */
+async function ownedIn(game: SetupGame, type: 'module' | 'system'): Promise<ReadonlySet<string>> {
+  const kept = readOwnedKept(type);
+  if (kept !== undefined) return kept;
+  const read = await readOwned(game, type);
+  if (read === undefined) return new Set();
+  writeOwnedKept(type, read);
+  return read;
+}
 
 /** Marks the page once EMMA has started on it, so that a second injection does nothing. */
 const STARTED = Symbol.for('mondarth-emma.setup');
@@ -102,19 +131,14 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
     bestInUseOnly: readBestInUseOnly(),
     onBestInUseOnlyChange: writeBestInUseOnly,
     findUpdates: async overview => {
-      const installed = readManifests(game);
       // The resolver comes from the installed EMMA module's setup kit, if it fits.
-      const found = locateKit(installed, path => foundry.utils.getRoute(path));
-      if (!found.ok) throw new KitUnavailable(found.problem);
-      const kit = await loadKit(found);
-      const { universe, load, lookUp, readManifest } = await lookUpReleases(installed, {
+      const { installed, kit } = await kitIn(game);
+      const { universe, load, lookUp, readManifest, catalogue } = await lookUpReleases(installed, {
         kit,
         catalogue: revealCatalogue(__EMMA_DEFAULT_CATALOGUE__),
-        proxy: revealProxy(__EMMA_DEFAULT_PROXY__),
         clientVersion: __EMMA_EXTENSION_VERSION__,
-        index: () => readIndex(game),
       });
-      return findUpdates({
+      const found = await findUpdates({
         resolver: kit.resolver,
         badges: kit.badges,
         overview,
@@ -123,6 +147,7 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
         lookUp,
         readManifest,
       });
+      return { ...found, catalogue };
     },
     installModule: async () => {
       if (placed.guard !== undefined) await installEmma(game, placed.guard);
@@ -133,7 +158,16 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
       check: () => checkCoreUpdate(game, readCoreUpdate(game).channel),
       update: () => startCoreUpdate(game, readCoreUpdate(game).channel),
     },
-    listPackages: type => listPackages(game, type),
+    listPackages: async type => {
+      const { installed, kit } = await kitIn(game);
+      return readListing(type, {
+        kit,
+        catalogue: revealCatalogue(__EMMA_DEFAULT_CATALOGUE__),
+        clientVersion: __EMMA_EXTENSION_VERSION__,
+        core: installed.core.version,
+        owned: () => ownedIn(game, type),
+      });
+    },
     ...(IN_ALPHA && {
       alpha: {
         acknowledged: readAlphaAcknowledged(__EMMA_EXTENSION_VERSION__),

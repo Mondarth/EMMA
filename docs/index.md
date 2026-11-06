@@ -21,6 +21,6 @@ developers/architecture.md
 developers/workflow.md
 developers/releases.md
 developers/github-setup.md
-developers/default-proxy.md
+developers/default-catalogue.md
 developers/documentation.md
 ```

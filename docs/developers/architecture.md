@@ -30,14 +30,11 @@ The module is the `packages/module` package of the repository's pnpm workspace; 
   mode. `world-record.ts` reads and writes the world record, `mondarth-emma.json` in the root of the world's folder:
   it lists the folder with `FilePicker.browse` first, so a missing record costs no failed request, fetches the file
   as the server serves it, and writes it with `FilePicker.upload`. Its format, and the comparison that ignores when
-  it was written, are in `src/module/lib/world-record.ts`. `versions.ts` looks up the versions of the system and the active modules with `@mondarth/fvtt-resolver`: the
-  installed manifests (from `toObject()`), GitHub's and GitLab's release lists, declared manifest URLs and, through
-  the proxy setting only (the resolver's `proxiedFetch`), Foundry's package listing and, with the system, Foundry's
-  core builds from its release notes (`foundryCoreReleases`). Without a proxy it never asks a host that sends no CORS
-  headers (GitHub's release downloads, foundryvtt.com), as the browser could not read the answer and would log an
-  error. With a proxy, an API key set for it goes with every request in an `X-API-Key` header.
-  Modules are looked up one by one as they are needed (`VersionJudge.lookUp`), as GitHub allows 60 requests an hour
-  without a token. It offers the installed version and the newer ones, and judges a version with the resolver's
+  it was written, are in `src/module/lib/world-record.ts`. `versions.ts` looks up the versions of the system and every installed module with `@mondarth/fvtt-resolver`'s
+  `catalogueSet`: one `POST /api/v2/lookup` to EMMA's catalogue, the first time hypothetical mode needs them
+  (`VersionJudge.lookUp`), with the installed versions, the manifest URLs and the generation in use, which also gives
+  Foundry's builds. The installed manifests (from `toObject()`) stand in for what the catalogue does not give. Without
+  the catalogue, or when it cannot be reached (`VersionJudge.reached`), only those are known. It offers the installed version and the newer ones, and judges a version with the resolver's
   `check`, in the setup of the core, the system and the other modules staged active at their chosen versions, and turns the verdict into a badge with Foundry's public `Module.getVersionBadge`, so the colours
   and tooltips are Foundry's own. The core and the system may be chosen too (`platformVersions`, `judgePlatform`):
   a version of either is badged by the worst badge the setup it makes would give the system or an active module,
@@ -86,14 +83,10 @@ The module is the `packages/module` package of the repository's pnpm workspace; 
 `src/module/app/`
 : The `ApplicationV2` windows. `EmmaApp` is EMMA itself; `DrawerFieldsConfig` is the Module details settings menu,
   registered with `game.settings.registerMenu` and open to every user, in which they choose the details drawers show;
-  `SetupReportApp` (in `setup-report.ts`) is the hypothetical-mode report, opened from the toolbar, one at a time,
+  and `SetupReportApp` (in `setup-report.ts`) is the hypothetical-mode report, opened from the toolbar, one at a time,
   showing the plan, check or resolve picked, as `src/module/lib/report-text.ts` also writes them for download through
-  Foundry's `saveDataToFile`;
-  and `VersionProxyConfig` is the Version lookup proxy menu, registered `restricted`, so Foundry shows it only to
-  users who may change configuration settings, in which a GM sets the proxy (a world setting) and its API key. The key
-  is a client setting, kept in the browser's local storage, because Foundry sends every world and user setting to
-  every user who joins. Each mounts its Svelte component on first render and unmounts it on close. All but the report ask
-  before closing with unsaved changes (staged activation in `EmmaApp`, a changed draft in the menus), through
+  Foundry's `saveDataToFile`. Each mounts its Svelte component on first render and unmounts it on close. All but the
+  report ask before closing with unsaved changes (staged activation in `EmmaApp`, a changed draft in the menu), through
   `confirmDiscard` in `confirm-discard.ts`; `close({ discard: true })` closes without asking.
   `world-record.ts` keeps the world record in step with the world (`syncWorldRecord`), one check at a time, writing
   it only when it is missing or says something else. The active GM checks it on `ready`, `saveModules` (in
@@ -117,18 +110,18 @@ module:
 `packages/core` (`@mondarth/emma-core`)
 : Code that more than one package needs, and that uses no Foundry or browser globals: so far the world record's format
   (`src/world-record.ts`), which the module writes and the setup screen reads, with `parseWorldRecord` to read a record
-  that anything may have written; EMMA's package catalogue and version lookup proxy, obscured in a build
-  (`src/obscure.ts`, `src/default-catalogue.ts`, `src/default-proxy.ts`), with what builds them in and checks a
-  release for their keys in plain text, which run under Node (`scripts/`); and the setup kit's API
+  that anything may have written; EMMA's package catalogue, obscured in a build (`src/obscure.ts`,
+  `src/default-catalogue.ts`), with what builds it in and checks a release for its key in plain text, which run under Node (`scripts/`); and the setup kit's API
   (`src/setup-kit.ts`). The setup kit is the code the EMMA extension imports from the installed module, rather than
-  carry its own copy: the resolver and its sources, and how the module badges a version
+  carry its own copy: the resolver and the catalogue's sources, and how the module badges a version
   (`src/module/adapters/badges.ts`), so the extension's version lists are coloured as the module's are. It holds no
-  catalogue or proxy: each bundle builds in its own. The module builds it as `dist/emma-setup-kit.js`
+  catalogue: each bundle builds in its own. The module builds it as `dist/emma-setup-kit.js`
   (`src/setup-kit.ts`, `vite.kit.config.ts`) and names it, with its API version `<major>.<minor>`, in its manifest's
   `flags.setupKit`; the EMMA extension checks that version against the one it was built with (`kitFit`) before it
   imports the kit, and again after. Raise the minor when the kit gives more, and the major when it gives less or
   changes what it gives, as a resolver release that changes a function the EMMA extension calls would; keep
-  `module.json`'s flag in step, which a unit test checks. Packages import core from its source, through its
+  `module.json`'s flag in step, which a unit test checks. Kit 2.0 gives only the catalogue's sources (`catalogueSet`,
+  `catalogueSource`) and the installed manifests' (`localSource`). Packages import core from its source, through its
   `exports`.
 
 `packages/setup` (`@mondarth/emma-setup`)
@@ -146,9 +139,11 @@ module:
   from the root, and the window keeps the selected row's key. Updates: `src/foundry/setup-kit.ts` finds the setup kit
   in the installed EMMA module and imports it, and `src/foundry/install-emma.ts` installs or updates the module when
   the kit is missing or does not fit, letting the install through the guard with `allowing`;
-  `src/foundry/releases.ts`, the only code that fetches, looks up the releases of the installed packages with the
-  kit's sources, the catalogue first, and the rest through EMMA's proxy, reading the installed manifests
-  `setup-game.ts` gives; `src/lib/updates.ts` resolves each recorded world's
+  `src/foundry/releases.ts` looks up the releases of the installed packages in one catalogue lookup, through the
+  kit's `catalogueSet`, from the installed manifests `setup-game.ts` gives, and reads a manifest URL the user gives
+  through the catalogue too; `src/foundry/listing.ts` reads the Install sections' listing from the catalogue, with
+  which premium packages the user owns from `game.getPackages` (`readOwned`), kept a week in local storage
+  (`preferences.ts`); these two are the only code that fetches; `src/lib/updates.ts` resolves each recorded world's
   setup with the packages free to move up, and offers each package the lowest of the bests of the worlds that use it,
   or, if none does, its newest version the installed core can run; `src/app/update-state.svelte.ts` keeps what the
   search found, whether Update mode is on, and the versions chosen. `Splitter.svelte` resizes the panels, whose shares
