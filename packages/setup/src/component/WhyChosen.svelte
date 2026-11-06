@@ -7,6 +7,7 @@
   import { untrack } from 'svelte';
 
   import type { NotTakenRun, UpdateState } from '../app/update-state.svelte';
+  import { versionIn } from '../app/update-state.svelte';
   import { format, localize } from '../lib/i18n';
   import BusyMark from './BusyMark.svelte';
 
@@ -55,6 +56,16 @@
     run.newest === run.oldest ? run.newest : `${run.newest} – ${run.oldest}`;
 
   /**
+   * The resolver's explanation of a line's versions: the newest's, naming every version of the line where it names the
+   * newest, as the others' explanations say the same of themselves.
+   * @param run - The line's versions
+   * @param lines - The newest's explanation
+   * @returns The explanation
+   */
+  const explained = (run: NotTakenRun, lines: readonly string[]): string[] =>
+    run.newest === run.oldest ? [...lines] : lines.map(line => line.replace(versionIn(run.newest), versionsOf(run)));
+
+  /**
    * Why the plan does not take a line's versions, in words.
    * @param run - The line's versions
    * @returns The words
@@ -94,7 +105,7 @@
             {reasonOf(run)}
             {#if run.why.reason === 'conflict' && run.why.explanation.length > 0}
               <ol class="emma-why-explained">
-                {#each run.why.explanation as line, index (index)}
+                {#each explained(run, run.why.explanation) as line, index (index)}
                   <li>{line}</li>
                 {/each}
               </ol>

@@ -39,13 +39,25 @@ export interface NotTakenRun {
 }
 
 /**
- * Whether two reasons for not taking a version are the same, so that the versions they are given for may share a line.
- * @param a - A reason
- * @param b - Another
- * @returns `true` if they say the same
+ * A version as it stands in an explanation: alone, not part of a longer version or name, as `2.1.0` in `monsterblock
+ * 2.1.0 depends on _mathjs`, but not in `12.1.0` nor `2.1.0-beta`.
+ * @param version - The version
+ * @returns A pattern finding it
  */
-function sameWhy(a: NotTakenRun['why'], b: NotTakenRun['why']): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
+export function versionIn(version: string): RegExp {
+  return new RegExp(`(?<![\\w.-])${version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-]|\\.\\w)`, 'g');
+}
+
+/**
+ * A reason for not taking a version, as it would be for any version: the version named in its explanation stood for, so
+ * that versions refused alike, each naming itself, share a line.
+ * @param why - The reason
+ * @param version - The version it is for
+ * @returns The reason, as JSON
+ */
+function reasonFor(why: NotTakenRun['why'], version: string): string {
+  if (why.reason !== 'conflict') return JSON.stringify(why);
+  return JSON.stringify(why.explanation.map(line => line.replace(versionIn(version), '\u0000')));
 }
 
 /** A change in the plan: a version chosen, or one a version chosen needs. */
@@ -383,8 +395,9 @@ export class UpdateState {
       await pace();
       const why = (await planner.whyNotTaken(key, version, picks)) ?? { reason: 'possible' as const };
       const last = runs.at(-1);
-      if (last !== undefined && sameWhy(last.why, why)) runs[runs.length - 1] = { ...last, oldest: version };
-      else runs.push({ newest: version, oldest: version, why });
+      if (last !== undefined && reasonFor(last.why, last.newest) === reasonFor(why, version)) {
+        runs[runs.length - 1] = { ...last, oldest: version };
+      } else runs.push({ newest: version, oldest: version, why });
     }
     return runs;
   }

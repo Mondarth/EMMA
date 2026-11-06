@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
-import { UpdateState } from '../../../src/app/update-state.svelte';
+import { UpdateState, versionIn } from '../../../src/app/update-state.svelte';
 import { KitUnavailable } from '../../../src/foundry/setup-kit';
 import { buildOverview } from '../../../src/lib/overview';
 import type { CatalogueState, ManifestRead, PackageUpdate, UpdateSearch } from '../../../src/lib/updates';
@@ -1382,5 +1382,47 @@ describe('why the plan takes the version it does', () => {
     await updates.searchFor(OVERVIEW);
     await expect(updates.notTakenOf('module:app')).resolves.toEqual([]);
     await expect(updates.notTakenOf('core')).resolves.toEqual([]);
+  });
+});
+
+describe('versions refused alike, each naming itself', () => {
+  // Regression: Monster Blocks' newer versions were each listed, as the resolver's explanation names the version it is
+  // of, so no two explanations were the same.
+  test('share a line, however their explanations name them', async () => {
+    const explanation = (version: string) => [
+      `Because monsterblock ${version} depends on _mathjs and no version of _mathjs is available, monsterblock ${version} cannot be used.`,
+      `So, because the plan has monsterblock ${version}, the plan cannot keep working. (1)`,
+    ];
+    const updates = new UpdateState(() =>
+      Promise.resolve({
+        ...finding(APP),
+        planner: {
+          ...alone(APP),
+          newerThan: () => ['3.5.1', '3.5.0', '3.0.0', '2.5.0'],
+          whyNotTaken: (_key: string, version: string) =>
+            Promise.resolve(
+              version === '2.5.0'
+                ? { reason: 'no-manifest' as const }
+                : { reason: 'conflict' as const, explanation: explanation(version) },
+            ),
+        },
+      }),
+    );
+    await updates.searchFor(OVERVIEW);
+    await updates.choose('module:app', '1.5.0');
+
+    await expect(updates.notTakenOf('module:app')).resolves.toEqual([
+      { newest: '3.5.1', oldest: '3.0.0', why: { reason: 'conflict', explanation: explanation('3.5.1') } },
+      { newest: '2.5.0', oldest: '2.5.0', why: { reason: 'no-manifest' } },
+    ]);
+  });
+
+  test.each([
+    ['monsterblock 2.1.0 cannot be used.', true],
+    ['the plan has monsterblock 2.1.0, the plan', true],
+    ['ends with 2.1.0.', true],
+    ['not 12.1.0 nor 2.1.0-beta nor 2.1.0.1 nor v2.1.0x', false],
+  ])('finds a version standing alone in %s', (line, found) => {
+    expect(versionIn('2.1.0').test(line)).toBe(found);
   });
 });

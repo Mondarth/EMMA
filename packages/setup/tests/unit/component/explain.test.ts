@@ -19,7 +19,8 @@ const LIB: PackageUpdate = { key: 'module:lib', installed: '1.0.0', newest: '2.0
  */
 const planner = (): Planner => ({
   ...alone(LIB),
-  newerThan: (_key, version) => (version === '2.0.0' ? ['3.4.0', '3.3.0', '3.2.0', '3.1.0', '3.0.0', '2.5.0'] : []),
+  newerThan: (_key, version) =>
+    version === '2.0.0' ? ['3.4.0', '3.3.0', '3.2.0', '3.1.0', '3.0.5', '3.0.0', '2.5.0'] : [],
   whyNotTaken: (_key, version) => {
     switch (version) {
       case '3.4.0':
@@ -29,7 +30,8 @@ const planner = (): Planner => ({
       case '3.2.0':
         return Promise.resolve({ reason: 'no-build' as const });
       case '3.1.0':
-        return Promise.resolve({ reason: 'conflict' as const, explanation: ['Library 3.1.0 needs Helper.'] });
+      case '3.0.5':
+        return Promise.resolve({ reason: 'conflict' as const, explanation: [`Library ${version} needs Helper.`] });
       case '3.0.0':
         return Promise.resolve({ reason: 'conflict' as const, explanation: [] });
       default:
@@ -87,10 +89,11 @@ describe('why the plan takes the version it does', () => {
       '3.4.0: no manifest URL for that version alone, which installing it needs.',
       '3.3.0: needs Foundry VTT 15 or later.',
       '3.2.0: runs on no build of Foundry VTT the plan may choose.',
+      // Folded, as each names itself alike: the explanation names them all.
       expect.stringMatching(
-        /^3\.1\.0: the plan cannot take it with the other versions chosen:\s*Library 3\.1\.0 needs Helper\.$/,
+        /^3\.1\.0 – 3\.0\.5: the plan cannot take it with the other versions chosen:\s*Library 3\.1\.0 – 3\.0\.5 needs Helper\.$/,
       ),
-      'Library 3.1.0 needs Helper.',
+      'Library 3.1.0 – 3.0.5 needs Helper.',
       '3.0.0: the plan cannot take it with the other versions chosen:',
       '2.5.0: the plan could take it now.',
     ]);
