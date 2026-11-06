@@ -1,5 +1,5 @@
 /**
- * The only place the EMMA extension fetches: the releases of the installed game systems and modules, and of any it
+ * One of the two places the EMMA extension fetches, with `listing.ts`: the releases of the installed game systems and modules, and of any it
  * means to install, from EMMA's package catalogue alone, as its version 2 gives them (see `catalogueSet` in
  * `@mondarth/fvtt-resolver/sources`): one lookup for the installed packages, with everything they need, how fresh
  * each is, and Foundry's builds. Nothing else is asked, so a browser needs no proxy: the catalogue sends CORS headers.

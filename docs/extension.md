@@ -333,8 +333,9 @@ updates.
 ### Installing
 
 The panels of the **Game systems** and **Modules** groups have an **Install** section below them, of the packages on
-Foundry's own package listing, which EMMA reads as Foundry's Install dialog does, through the server, so it needs no
-proxy. It offers those that fit the installation and the plan: not installed, not a premium package the user does not
+Foundry's own package listing, as EMMA's package catalogue keeps it, at the version Foundry offers for the installed
+build. Which premium packages you own only Foundry knows: EMMA asks it as its Install dialog does, and remembers the
+answer in your browser for a week, so a package bought since shows as not owned until then. It offers those that fit the installation and the plan: not installed, not a premium package the user does not
 own, whose newest version runs on the plan's Foundry VTT build, and, for a module, for a game system that stays
 installed, or for any. A game system's group of modules offers those for it, and the universal group those for any
 system. A search finds a package by its title, ID or author. The list shows enough packages to fill the panel, and

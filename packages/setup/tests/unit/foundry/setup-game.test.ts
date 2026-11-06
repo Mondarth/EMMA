@@ -4,11 +4,11 @@ import {
   checkCoreUpdate,
   checkSnapshotSpace,
   isSetupGame,
-  listPackages,
   lockPackage,
   readCoreUpdate,
   readInstallation,
   readManifests,
+  readOwned,
   setupGame,
   startCoreUpdate,
 } from '../../../src/foundry/setup-game';
@@ -266,102 +266,33 @@ describe("Foundry's updater", () => {
   });
 });
 
-describe('listPackages', () => {
-  test("reads Foundry's listing as its Install dialog does, sorted by title, leaving out what is incomplete", async () => {
+describe('readOwned', () => {
+  test("reads the premium packages the user owns from Foundry's listing, as its Install dialog reads it", async () => {
     const getPackages = vi.fn(() =>
       Promise.resolve(
         new Map<string, unknown>([
-          [
-            'midi',
-            {
-              id: 'midi',
-              title: 'Midi QOL',
-              version: '13.0.1',
-              authors: [{ name: 'tposney' }, { name: 'Helper' }, 'odd'],
-              compatibility: { minimum: '14', verified: 14.368, maximum: null },
-              relationships: { systems: [{ id: 'dnd5e' }] },
-              protected: false,
-              exclusive: true,
-              description:
-                '<p>Automates\n  <b>combat</b>.</p><script>alert(1)</script><img src="x" onerror="alert(2)">',
-              url: 'https://example.org/midi',
-              manifest: 'https://example.org/midi/module.json',
-              tags: ['combat', 7, 'automation'],
-            },
-          ],
-          [
-            'dice',
-            { id: 'dice', title: 'Dice', version: '1.0.0', authors: [{ name: '' }], protected: true, owned: true },
-          ],
-          [
-            'paid',
-            {
-              id: 'paid',
-              title: 'Paid',
-              version: '2.0.0',
-              protected: true,
-              url: 'javascript:alert(1)',
-              description: ' ',
-            },
-          ],
-          ['broken', { id: 'broken' }],
+          ['dice', { id: 'dice', protected: true, owned: true }],
+          ['paid', { id: 'paid', protected: true }],
+          ['free', { id: 'free', protected: false, owned: true }],
+          ['odd', { protected: true, owned: true }],
         ]),
       ),
     );
     const { game } = installSetupMocks();
     Object.assign(game, { getPackages });
 
-    await expect(listPackages(game as never, 'module')).resolves.toEqual([
-      {
-        type: 'module',
-        id: 'dice',
-        title: 'Dice',
-        version: '1.0.0',
-        compatibility: {},
-        systems: [],
-        unowned: false,
-        premium: true,
-      },
-      {
-        type: 'module',
-        id: 'midi',
-        title: 'Midi QOL',
-        version: '13.0.1',
-        author: 'tposney',
-        compatibility: { minimum: '14', verified: '14.368' },
-        systems: ['dnd5e'],
-        unowned: false,
-        // Its description's text alone: what the HTML would run or load is gone.
-        description: 'Automates combat.',
-        authors: ['tposney', 'Helper'],
-        url: 'https://example.org/midi',
-        manifest: 'https://example.org/midi/module.json',
-        tags: ['combat', 'automation'],
-        exclusive: true,
-      },
-      // A web page that is not one is left out.
-      {
-        type: 'module',
-        id: 'paid',
-        title: 'Paid',
-        version: '2.0.0',
-        compatibility: {},
-        systems: [],
-        unowned: true,
-        premium: true,
-      },
-    ]);
+    await expect(readOwned(game as never, 'module')).resolves.toEqual(new Set(['module:dice']));
     expect(getPackages).toHaveBeenCalledWith({ type: 'module' });
-    // A system names no systems.
-    const [system] = await listPackages(game as never, 'system');
-    expect(system).toMatchObject({ type: 'system', systems: [] });
+    await expect(readOwned(game as never, 'system')).resolves.toEqual(new Set(['system:dice']));
   });
 
-  test('lists nothing where Foundry offers no listing, or an odd one', async () => {
+  test('tells nothing where Foundry offers no listing, an empty one, as when the server fails, or an odd one', async () => {
     const { game } = installSetupMocks();
-    await expect(listPackages(game as never, 'module')).resolves.toEqual([]);
+    await expect(readOwned(game as never, 'module')).resolves.toBeUndefined();
+    Object.assign(game, { getPackages: () => Promise.resolve(new Map()) });
+    await expect(readOwned(game as never, 'module')).resolves.toBeUndefined();
     Object.assign(game, { getPackages: () => Promise.resolve([]) });
-    await expect(listPackages(game as never, 'module')).resolves.toEqual([]);
+    await expect(readOwned(game as never, 'module')).resolves.toBeUndefined();
   });
 });
 

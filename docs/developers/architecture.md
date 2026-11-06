@@ -147,9 +147,11 @@ module:
   from the root, and the window keeps the selected row's key. Updates: `src/foundry/setup-kit.ts` finds the setup kit
   in the installed EMMA module and imports it, and `src/foundry/install-emma.ts` installs or updates the module when
   the kit is missing or does not fit, letting the install through the guard with `allowing`;
-  `src/foundry/releases.ts`, the only code that fetches, looks up the releases of the installed packages in one
-  catalogue lookup, through the kit's `catalogueSet`, from the installed manifests `setup-game.ts` gives, and reads
-  a manifest URL the user gives through the catalogue too; `src/lib/updates.ts` resolves each recorded world's
+  `src/foundry/releases.ts` looks up the releases of the installed packages in one catalogue lookup, through the
+  kit's `catalogueSet`, from the installed manifests `setup-game.ts` gives, and reads a manifest URL the user gives
+  through the catalogue too; `src/foundry/listing.ts` reads the Install sections' listing from the catalogue, with
+  which premium packages the user owns from `game.getPackages` (`readOwned`), kept a week in local storage
+  (`preferences.ts`); these two are the only code that fetches; `src/lib/updates.ts` resolves each recorded world's
   setup with the packages free to move up, and offers each package the lowest of the bests of the worlds that use it,
   or, if none does, its newest version the installed core can run; `src/app/update-state.svelte.ts` keeps what the
   search found, whether Update mode is on, and the versions chosen. `Splitter.svelte` resizes the panels, whose shares
