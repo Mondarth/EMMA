@@ -30,7 +30,6 @@ import {
   listPackages,
   lockPackage,
   readCoreUpdate,
-  readIndex,
   readInstallation,
   readManifests,
   setupGame,
@@ -38,7 +37,6 @@ import {
 } from '../foundry/setup-game';
 import { KitUnavailable, loadKit, locateKit } from '../foundry/setup-kit';
 import { revealCatalogue } from '@mondarth/emma-core/default-catalogue';
-import { revealProxy } from '@mondarth/emma-core/default-proxy';
 
 import { lookUpReleases } from '../foundry/releases';
 import { localize } from '../lib/i18n';
@@ -110,9 +108,7 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
       const { universe, load, lookUp, readManifest } = await lookUpReleases(installed, {
         kit,
         catalogue: revealCatalogue(__EMMA_DEFAULT_CATALOGUE__),
-        proxy: revealProxy(__EMMA_DEFAULT_PROXY__),
         clientVersion: __EMMA_EXTENSION_VERSION__,
-        index: () => readIndex(game),
       });
       return findUpdates({
         resolver: kit.resolver,

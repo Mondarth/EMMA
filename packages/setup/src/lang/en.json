@@ -327,11 +327,11 @@
     "Forced": "{title} {version} is in the plan against EMMA's advice.",
     "TakeOut": "Take {title} out of the plan",
     "AgainstAdvice": "Added against EMMA's advice",
-    "Forbidden": "EMMA's proxy refused to read it from {host} (403). The proxy reads only from the sites packages are known to be on, such as GitHub, GitLab and Foundry's own; or {host} itself refused it.",
     "Status": "{host} answered {status}, not the manifest.",
     "Unreached": "{host} could not be reached.",
-    "NoCors": "{host} could not be reached, or does not let a browser read it (it sends no CORS headers), and this build of EMMA has no proxy to read it through.",
-    "Budget": "EMMA has made as many requests as it may this session. Read the installation again later.",
+    "Barred": "EMMA's catalogue does not read from {host}: it reads only public web addresses, with few redirects.",
+    "TooLarge": "What the URL gives is too large to be a manifest.",
+    "NoCatalogue": "EMMA's catalogue, which reads the manifest, could not be reached. Try again later.",
     "NotJson": "What the URL gives is not a manifest's JSON."
   },
   "Lock": {

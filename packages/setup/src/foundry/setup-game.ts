@@ -338,7 +338,7 @@ export interface ListedPackage {
 
 /**
  * Read Foundry's listing of the game systems or modules that may be installed, as its Install dialog does, through
- * `game.getPackages`, which asks the server, so it needs no proxy. Checked on Foundry 14.368: it answers a `Map` of
+ * `game.getPackages`, which asks the server. Checked on Foundry 14.368: it answers a `Map` of
  * each package's data by ID, keeps it for the session, and says itself if the server fails, answering an empty map.
  * The listing gives each package's newest version alone, without the modules it requires.
  * @param game - The setup screen's `game`
@@ -349,17 +349,6 @@ export async function listPackages(game: SetupGame, type: 'module' | 'system'): 
   const listing = await game.getPackages?.call(game, { type });
   if (!(listing instanceof Map)) return [];
   return sorted(Array.from(listing.values() as Iterable<unknown>, entry => toListed(entry, type)));
-}
-
-/**
- * The newest version of each game system and module Foundry's listing gives, as the index a "latest" manifest's version
- * is checked against (see `lib/latest.ts`).
- * @param game - The setup screen's `game`
- * @returns The versions, by package key
- */
-export async function readIndex(game: SetupGame): Promise<Map<string, string>> {
-  const listed = await Promise.all([listPackages(game, 'system'), listPackages(game, 'module')]);
-  return new Map(listed.flat().map(({ type, id, version }) => [`${type}:${id}`, version]));
 }
 
 /**

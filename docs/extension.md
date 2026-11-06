@@ -199,8 +199,8 @@ Foundry VTT itself is offered an update too, on the tree's root row: the newest 
 record can take, with its game system and modules free to move up as well. A world without a record holds Foundry VTT
 to the builds its installed game system runs on, and a world for which EMMA finds no working setup holds it where it
 is. Its versions are coloured by how well the recorded worlds' packages fit each build, naming those that will not work
-with it and those not verified with it. Foundry's builds come from its release notes, which only EMMA's proxy can read;
-without the proxy, Foundry VTT is not offered an update.
+with it and those not verified with it. Foundry's builds come from EMMA's package catalogue; without it, Foundry VTT
+is not offered an update.
 
 A version that needs other packages to change with it, or a newer Foundry VTT, is still offered if they can all change
 together and every world that uses them keeps working: dnd5e 6, say, with the newer modules a world runs that need it,
@@ -323,12 +323,12 @@ resized, and the browser remembers the sizes. The window opens where it was last
 update plan, which shows only while it has changes, opens at the height it last had. Foundry keeps the window on the
 screen, so one left off a larger screen opens on it.
 
-EMMA finds versions in EMMA's package catalogue first, which holds every release of the packages it knows, with the
-Foundry VTT versions each works with. For packages the catalogue does not hold, EMMA reads the manifest each package
-declares, Foundry's package listing, and GitHub's and GitLab's lists of releases, through EMMA's version lookup proxy.
-A browser cannot read Foundry's listing or the manifests attached to GitHub releases itself, which the proxy lets it
-do. Without the proxy, as in a development build, a version found only in a release list says nothing of the Foundry
-VTT versions it works with, and is not offered.
+EMMA finds versions in EMMA's package catalogue alone, in one request: it holds every release of Foundry's listed
+packages and of those it is asked for, with the Foundry VTT versions each works with, and checks each package's own
+manifest about every hour, so it knows a version published by the manifest alone. A package it does not hold yet,
+such as one installed from a manifest only, it fetches by the manifest URL EMMA sends, to give it next time. When the
+catalogue cannot be reached, or in a development build without one, EMMA knows only what is installed, and offers no
+updates.
 
 ### Installing
 
@@ -363,7 +363,7 @@ version fits, the section says why, in the resolver's words, and the box stays u
 the plan again, with what it brought in. A premium package you do not own has its box disabled.
 
 **Manifest URL**, at the top of the section, installs a package from a manifest you give, as Foundry's own Install
-dialog can. **+** (or Enter) reads it, through EMMA's proxy where a site sends no CORS headers, and checks that it is a
+dialog can. **+** (or Enter) has EMMA's package catalogue read it, and checks that it is a
 manifest of the section's type: by its file name, `module.json` or `system.json`, or failing that by the fields only a
 game system declares. A package installed already, or in the plan already, is refused. EMMA then looks up the modules
 it requires, and checks the version it gives against the plan, as for any other: if the plan can take it, it is added,
@@ -478,10 +478,11 @@ The extension reads the setup screen of the servers you allow it on, and the wor
 through the server's own pages. It keeps the list of servers you activated, the choice of whether EMMA opens by itself
 on each, and the sizes of EMMA's panels, in your browser.
 
-To find updates, EMMA sends the IDs of the installed game systems and modules to EMMA's package catalogue, and asks
-GitHub, GitLab, Foundry's package listing and the sites the packages' manifests are on for their releases, through
-EMMA's version lookup proxy. Each request to the catalogue or the proxy carries a key that says it comes from EMMA,
-and the extension's version. EMMA sends nothing about your worlds, your server or you.
+To find updates, EMMA sends EMMA's package catalogue the IDs and versions of the installed game systems and modules,
+the manifest URLs they were installed from, and the installed Foundry VTT generation; a manifest URL you give, to
+install from, goes to the catalogue too, which reads it. Each request to the catalogue carries a key that says it
+comes from EMMA, and the extension's version. EMMA asks nothing else, and sends nothing about your worlds, your server
+or you.
 
 ## Limitations of the alpha
 
