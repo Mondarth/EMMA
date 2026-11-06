@@ -188,7 +188,9 @@ When the plan takes a version of a package other than its newest, whether you ch
 package to install anew, the package's panel says why: **Why 2.1.0, not 3.4.0** lists each newer version and why the plan
 does not take it. It may run on no build of Foundry VTT the plan may choose, or need a newer one; there may be no
 manifest URL for that version alone, which installing it needs; or the plan may not take it with the other versions
-chosen, which EMMA explains. Versions one after another for one reason share a line.
+chosen, which EMMA explains. Versions one after another for one reason share a line. A package to install anew is
+expected at its newest version, so in the plan, one taken at another stands out in amber, with a warning sign: its
+tooltip names the newest version, and selecting the package says why.
 
 Looking for updates needs the EMMA module installed, as the extension uses the module's own code to work them out.
 Without it, the footer says so and offers **Install the EMMA module**, which installs it from its published manifest,

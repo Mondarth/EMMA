@@ -375,6 +375,17 @@ export class UpdateState {
   }
 
   /**
+   * The newest version known of a package, if it is newer than one: what a package installed anew is taken at, when it
+   * is not its newest.
+   * @param key - The package's key
+   * @param version - The version
+   * @returns The newest version, or `undefined` if none is newer, or before the search has found anything
+   */
+  newestBeyond(key: PackageKey, version: string): string | undefined {
+    return this.search?.planner.newerThan(key, version)[0];
+  }
+
+  /**
    * Why the plan takes the version of a package it does rather than a newer one: each newer version, newest first, and
    * why the plan does not take it, versions one after another for one reason sharing a line. The browser is let draw as
    * it works, as for a version list. None for a package the plan does not change, uninstalls, or takes at its newest;

@@ -4,6 +4,8 @@ import { describe, expect, test, vi } from 'vitest';
 
 import { SetupState } from '../../../src/app/setup-state.svelte';
 import SetupRoot from '../../../src/component/SetupRoot.svelte';
+import UpdatePlan from '../../../src/component/UpdatePlan.svelte';
+import { UpdateState } from '../../../src/app/update-state.svelte';
 import { buildOverview } from '../../../src/lib/overview';
 import type { Planner } from '../../../src/lib/plans';
 import type { RunStep } from '../../../src/lib/run';
@@ -211,5 +213,34 @@ describe("Foundry VTT's line in the plan", () => {
     await user.click(within(plan).getByRole('button', { name: /^Show .* in the tree$/ }));
 
     expect(screen.getByRole('treeitem', { selected: true })).toBe(screen.getAllByRole('treeitem')[0]);
+  });
+});
+
+describe("a package installed anew that is not at its newest, in the plan's Chosen cell", () => {
+  test('stands out, saying which is newest; an update of one installed, or one added against advice, does not', async () => {
+    const updates = new UpdateState(() =>
+      Promise.resolve({
+        updates: new Map([[LIB.key, LIB]]),
+        blocked: new Map(),
+        unresolved: [],
+        judge: unjudged,
+        planner: { ...alone(LIB), newerThan: () => ['3.5.1'] },
+      }),
+    );
+    await updates.searchFor(OVERVIEW);
+    updates.plan = [
+      { key: 'module:monsterblock', version: '2.1.0', manifest: 'https://example.org/monsterblock/2.1.0.json' },
+      { key: 'module:lib', installed: '1.0.0', version: '2.0.0', manifest: 'https://example.org/lib/2.0.0.json' },
+    ];
+    render(UpdatePlan, { overview: OVERVIEW, updates });
+    const rows = within(screen.getByRole('table', { name: 'Changes' })).getAllByRole('row');
+
+    const added = within(rows[1] as HTMLElement).getByText('2.1.0');
+    expect(added).toHaveClass('emma-plan-older', 'emma-plan-not-newest');
+    expect(added).toHaveAttribute('data-tooltip', 'Not the newest: 3.5.1 is. Select the package to see why.');
+    expect(rows[1]).toHaveTextContent('Not the newest: 3.5.1 is.');
+    const updated = within(rows[2] as HTMLElement).getByText('2.0.0');
+    expect(updated).not.toHaveClass('emma-plan-not-newest');
+    expect(updated).not.toHaveAttribute('data-tooltip');
   });
 });

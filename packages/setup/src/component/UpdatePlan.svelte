@@ -340,7 +340,22 @@
             {#if choice.chosen === UNINSTALL}
               <span class="emma-plan-uninstall">{localize('Update.Uninstall')}</span>
             {:else}
-              <span class={[older !== undefined && 'emma-plan-older']}>{choice.chosen}</span>
+              <!-- A package installed anew is expected at its newest: one that is not stands out, as Foundry VTT's does. -->
+              {@const newest =
+                choice.installed === undefined && choice.forced !== true
+                  ? updates.newestBeyond(choice.key, choice.chosen)
+                  : undefined}
+              {@const notNewest = newest === undefined ? undefined : format('Plan.NewNotNewest', { newest })}
+              <!-- Its icon is drawn by CSS, so that the cell's text is the version alone, as for any other. -->
+              <span
+                class={[
+                  (older !== undefined || newest !== undefined) && 'emma-plan-older',
+                  newest !== undefined && 'emma-plan-not-newest',
+                ]}
+                data-tooltip={notNewest}>{choice.chosen}</span>
+              {#if notNewest !== undefined}
+                <span class="emma-visually-hidden">{notNewest}</span>
+              {/if}
             {/if}
             {#if choice.by !== undefined}
               <span class="emma-plan-needed">
@@ -514,6 +529,22 @@
   .emma-plan-older {
     color: var(--color-level-warning, #ec3);
     font-weight: bold;
+  }
+
+  .emma-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* Font Awesome's triangle-exclamation, as an icon element would show it. */
+  .emma-plan-not-newest::before {
+    content: '\f071';
+    margin-right: 0.3em;
+    font: var(--fa-font-solid, 900 1em 'Font Awesome 6 Free');
   }
 
   .emma-plan-newer {
