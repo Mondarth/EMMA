@@ -128,6 +128,28 @@ export interface UpdateSearch {
   readonly planner: Planner;
   /** Read a manifest the user gives, to install a package from; none can be without it. */
   readonly readManifest?: ReadManifest;
+  /** What EMMA's package catalogue said of the search, beside the releases; none where nothing asked it. */
+  readonly catalogue?: CatalogueState;
+}
+
+/** What EMMA's package catalogue said of a search, beside the releases, and how to have it check again. */
+export interface CatalogueState {
+  /** Whether it could be asked, and answered: if not, only what is installed is known. */
+  readonly reached: boolean;
+  /** The packages it does not hold yet, which it is fetching: looked up again, they may be found. */
+  readonly pending: readonly PackageKey[];
+  /** The seconds after which to look the pending packages up again; none when none are pending. */
+  readonly retryAfter?: number;
+  /**
+   * When the installed packages' own manifests were last checked, the oldest of them, as an ISO 8601 time: a version
+   * published since by a manifest alone is not known yet. `null` if none was ever checked.
+   */
+  readonly checkedAt: string | null;
+  /**
+   * Have the installed packages' own manifests checked again now, as "check live" asks.
+   * @returns Whether the catalogue answered
+   */
+  readonly recheck: () => Promise<boolean>;
 }
 
 /** What reading a manifest the user gives found: the release it describes, or why it is none. */

@@ -6,6 +6,7 @@ import { SetupState } from '../../../src/app/setup-state.svelte';
 import SetupRoot from '../../../src/component/SetupRoot.svelte';
 import type { RecordState } from '../../../src/foundry/records';
 import { buildOverview } from '../../../src/lib/overview';
+import type { CatalogueState } from '../../../src/lib/updates';
 import { installation, installedModule, noInstall, noUpdates, record, recorded } from '../../mocks/fixtures';
 
 const OVERVIEW = buildOverview(
@@ -440,5 +441,72 @@ describe('the alpha', () => {
     expect(setup.alphaAcknowledged).toBe(true);
     expect(screen.queryByRole('note', { name: 'Alpha build' })).toBeNull();
     setup.acknowledgeAlpha();
+  });
+});
+
+describe("the footer's word of the catalogue", () => {
+  /**
+   * Render EMMA's window content, its search finding nothing, with what the catalogue says of it.
+   * @param catalogue - What the catalogue says
+   * @returns The state and a user to act with
+   */
+  async function withCatalogue(catalogue: CatalogueState) {
+    const findUpdates = vi.fn(async () => ({ ...(await noUpdates()), catalogue }));
+    const setup = new SetupState({
+      load: () => Promise.resolve(OVERVIEW),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates,
+      installModule: noInstall,
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    await vi.waitFor(() => {
+      expect(setup.updates.status).toBe('found');
+    });
+    return { findUpdates, user: userEvent.setup() };
+  }
+
+  test('says the catalogue cannot be reached, and offers no check', async () => {
+    await withCatalogue({ reached: false, pending: [], checkedAt: null, recheck: vi.fn() });
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Catalogue unreachable: EMMA knows only the installed versions, so offers no updates. Refresh to try again.',
+    );
+    expect(screen.queryByRole('button', { name: 'Check live' })).toBeNull();
+  });
+
+  test('says how fresh the versions are and what is fetched, and checks live', async () => {
+    const recheck = vi.fn(() => Promise.resolve(true));
+    const checkedAt = '2026-11-06T09:00:00.000Z';
+    const { findUpdates, user } = await withCatalogue({
+      reached: true,
+      pending: ['module:new', 'module:other'],
+      retryAfter: 30,
+      checkedAt,
+      recheck,
+    });
+
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent('No updates found');
+    expect(status).toHaveTextContent(
+      'The catalogue is fetching 2 packages it did not hold yet; EMMA looks again shortly.',
+    );
+    const time = new Date(checkedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+    expect(status).toHaveTextContent(`As of ${time}: a version published since`);
+
+    await user.click(screen.getByRole('button', { name: 'Check live' }));
+
+    expect(recheck).toHaveBeenCalledOnce();
+    await vi.waitFor(() => {
+      expect(findUpdates).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  test('says nothing of freshness where nothing was checked or fetched', async () => {
+    await withCatalogue({ reached: true, pending: [], checkedAt: null, recheck: vi.fn() });
+
+    expect(screen.getByRole('status')).toHaveTextContent(/^No updates found$/);
+    expect(screen.getByRole('button', { name: 'Check live' })).toBeEnabled();
   });
 });

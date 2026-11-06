@@ -327,8 +327,15 @@ EMMA finds versions in EMMA's package catalogue alone, in one request: it holds 
 packages and of those it is asked for, with the Foundry VTT versions each works with, and checks each package's own
 manifest about every hour, so it knows a version published by the manifest alone. A package it does not hold yet,
 such as one installed from a manifest only, it fetches by the manifest URL EMMA sends, to give it next time. When the
-catalogue cannot be reached, or in a development build without one, EMMA knows only what is installed, and offers no
-updates.
+catalogue cannot be reached, or in a development build without one, EMMA knows only what is installed, offers no
+updates, and its footer says **Catalogue unreachable**; **Refresh** tries again.
+
+The footer says how fresh the catalogue's versions are: as of when the installed packages' own manifests were last
+checked, the oldest of them. A version published since by a manifest alone is not known yet. **Check live** has the
+catalogue read each installed package's own manifest now, then looks again: a check takes a few seconds per package,
+and the catalogue checks a package at most once every five minutes, however often it is asked. A package the
+catalogue does not hold yet, it fetches, and the footer says how many it is fetching; EMMA looks again once, by
+itself, when the catalogue says they may be found.
 
 ### Installing
 

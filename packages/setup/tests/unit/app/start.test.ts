@@ -125,7 +125,7 @@ describe('startEmmaSetup', () => {
     await expect(startEmmaSetup()).resolves.toBe(true);
   });
 
-  test('finds updates with the kit of the installed EMMA module', async () => {
+  test('finds updates with the kit of the installed EMMA module, saying so when it has no catalogue to ask', async () => {
     installSetupMocks({
       modules: [{ id: 'mondarth-emma', flags: { setupKit: { api: SETUP_KIT_API, path: 'dist/emma-setup-kit.js' } } }],
     });
@@ -134,7 +134,8 @@ describe('startEmmaSetup', () => {
 
     menu.querySelector('button')?.click();
 
-    expect(await screen.findByText('No updates found')).toBeInTheDocument();
+    // Tests are built without EMMA's catalogue, so only what is installed is known.
+    expect(await screen.findByText(/^Catalogue unreachable/)).toBeInTheDocument();
   });
 
   test("reads Foundry's listing of what may be installed from the catalogue, and what the user owns from Foundry", async () => {
