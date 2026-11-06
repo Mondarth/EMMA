@@ -34,7 +34,7 @@ export class HypotheticalState {
   readonly #choices = new SvelteMap<string, string>();
   #core: string | undefined = $state();
   #system: string | undefined = $state();
-  #proxied: boolean | null = $state(null);
+  #reached: boolean | null = $state(null);
 
   /** The modules looked up or being looked up; only read untracked. */
   readonly #asked = new SvelteSet<string>();
@@ -85,11 +85,11 @@ export class HypotheticalState {
   }
 
   /**
-   * Whether versions are looked up through a proxy, without which fewer are found.
-   * @returns `null` until the first lookup starts
+   * Whether EMMA's catalogue answered the lookup, without which only the installed versions are known.
+   * @returns `null` until the first lookup is done
    */
-  get proxied(): boolean | null {
-    return this.#proxied;
+  get reached(): boolean | null {
+    return this.#reached;
   }
 
   /**
@@ -107,13 +107,13 @@ export class HypotheticalState {
       for (const id of needed) this.#asked.add(id);
       this.#judge ??= this.#createJudge();
       const judge = this.#judge;
-      this.#proxied = judge.proxied;
       this.#lookups += 1;
       this.#status = 'loading';
       this.#queue = this.#queue.then(async () => {
         try {
           await judge.lookUp(needed);
           this.#unreached = judge.unreached;
+          this.#reached = judge.reached;
           this.#looked = { judge };
           if (this.#status === 'loading') this.#status = this.#lookups === 1 ? 'ready' : 'loading';
         } catch (error: unknown) {

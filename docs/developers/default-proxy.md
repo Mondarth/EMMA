@@ -1,12 +1,10 @@
 # The default proxy and catalogue
 
-EMMA looks up versions through a CORS proxy. A GM can set their own; without one, a release uses a default proxy, built
-in. That proxy is a [Foundry VTT Package CORS Proxy](https://github.com/ulenarofmondarth/fvtt-package-corsproxy) that
-asks for an API key.
-
-With the default proxy, a release asks a default package catalogue first: the
-[Foundry VTT package catalogue](https://github.com/Mondarth/fvtt-package-catalogue), which also asks for an API key.
-It is built in the same way as the proxy, from its own pair of values; see [The catalogue](#the-catalogue).
+EMMA looks up versions in a default package catalogue, built in: the
+[Foundry VTT package catalogue](https://github.com/Mondarth/fvtt-package-catalogue), which asks for an API key; see
+[The catalogue](#the-catalogue). Releases are still built with a default
+[Foundry VTT Package CORS Proxy](https://github.com/ulenarofmondarth/fvtt-package-corsproxy) too, which also asks for
+an API key, but nothing uses it any more: it goes, with the proxy settings, in a coming release.
 
 ## What protects it
 
@@ -69,12 +67,12 @@ the default proxy until they update.
 ## The catalogue
 
 The catalogue keeps every release of the packages it is asked for, loaded from their manifests, with everything they
-require and run in, and gives a whole universe in one `POST /api/v1/universe`. EMMA asks it through
-`@mondarth/fvtt-resolver`'s `catalogueSource`, given to `sourceSet` as its `catalogue`: the packages it holds come from
-it alone, and the proxy finds the rest, or everything when the catalogue cannot be reached.
+require and run in. EMMA asks its version 2 alone, through `@mondarth/fvtt-resolver`'s `catalogueSet`, in one
+`POST /api/v2/lookup` for the installed packages; nothing goes through the proxy any more.
 
-- **Only with the default proxy.** `versionLookup()` (`src/module/settings.ts`) gives the catalogue in the `default`
-  mode only: a GM who chose their own proxy, or none, never contacts it, and its key goes only to it.
+- **Only in the default mode, in the module.** `versionLookup()` (`src/module/settings.ts`) gives the catalogue in the
+  `default` mode only: a GM who chose their own proxy, or none, never contacts it, and hypothetical mode then knows
+  only the installed versions (`src/module/adapters/versions.ts`). Those modes go in a coming release.
 - **Alone, in the EMMA extension.** On the setup screen, the EMMA extension asks the catalogue's version 2 for
   everything, in one `POST /api/v2/lookup` for the installed packages, through the kit's `catalogueSet`
   (`packages/setup/src/foundry/releases.ts`), and reads a manifest URL the user gives with `POST /api/v2/manifest`.

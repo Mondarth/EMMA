@@ -176,27 +176,27 @@ describe('Footer', () => {
     });
   });
 
-  describe('hypothetical mode without a proxy', () => {
-    const NO_PROXY = 'MONDARTH-EMMA.Footer.NoProxy';
+  describe('hypothetical mode without the catalogue', () => {
+    const UNREACHABLE = 'MONDARTH-EMMA.Footer.CatalogueUnreachable';
 
-    test('explains what is not looked up, for a GM or not', () => {
+    test('says the catalogue could not be reached, for a GM or not', () => {
       const { unmount } = render(Footer, {
         modules: createModules(),
         canManage: true,
         onSave: vi.fn(),
-        unproxied: true,
+        unreachable: true,
       });
-      expect(screen.getByRole('status')).toHaveTextContent(NO_PROXY);
+      expect(screen.getByRole('status')).toHaveTextContent(UNREACHABLE);
       unmount();
 
-      render(Footer, { modules: createModules(), canManage: false, onSave: vi.fn(), unproxied: true });
-      expect(screen.getByRole('status')).toHaveTextContent(NO_PROXY);
+      render(Footer, { modules: createModules(), canManage: false, onSave: vi.fn(), unreachable: true });
+      expect(screen.getByRole('status')).toHaveTextContent(UNREACHABLE);
     });
 
     test('says nothing of it otherwise', () => {
       render(Footer, { modules: createModules(), canManage: true, onSave: vi.fn() });
 
-      expect(screen.getByRole('status')).not.toHaveTextContent(NO_PROXY);
+      expect(screen.getByRole('status')).not.toHaveTextContent(UNREACHABLE);
     });
   });
 

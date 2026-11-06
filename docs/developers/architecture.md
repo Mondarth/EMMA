@@ -30,14 +30,11 @@ The module is the `packages/module` package of the repository's pnpm workspace; 
   mode. `world-record.ts` reads and writes the world record, `mondarth-emma.json` in the root of the world's folder:
   it lists the folder with `FilePicker.browse` first, so a missing record costs no failed request, fetches the file
   as the server serves it, and writes it with `FilePicker.upload`. Its format, and the comparison that ignores when
-  it was written, are in `src/module/lib/world-record.ts`. `versions.ts` looks up the versions of the system and the active modules with `@mondarth/fvtt-resolver`: the
-  installed manifests (from `toObject()`), GitHub's and GitLab's release lists, declared manifest URLs and, through
-  the proxy setting only (the resolver's `proxiedFetch`), Foundry's package listing and, with the system, Foundry's
-  core builds from its release notes (`foundryCoreReleases`). Without a proxy it never asks a host that sends no CORS
-  headers (GitHub's release downloads, foundryvtt.com), as the browser could not read the answer and would log an
-  error. With a proxy, an API key set for it goes with every request in an `X-API-Key` header.
-  Modules are looked up one by one as they are needed (`VersionJudge.lookUp`), as GitHub allows 60 requests an hour
-  without a token. It offers the installed version and the newer ones, and judges a version with the resolver's
+  it was written, are in `src/module/lib/world-record.ts`. `versions.ts` looks up the versions of the system and every installed module with `@mondarth/fvtt-resolver`'s
+  `catalogueSet`: one `POST /api/v2/lookup` to EMMA's catalogue, the first time hypothetical mode needs them
+  (`VersionJudge.lookUp`), with the installed versions, the manifest URLs and the generation in use, which also gives
+  Foundry's builds. The installed manifests (from `toObject()`) stand in for what the catalogue does not give. Without
+  the catalogue, or when it cannot be reached (`VersionJudge.reached`), only those are known. It offers the installed version and the newer ones, and judges a version with the resolver's
   `check`, in the setup of the core, the system and the other modules staged active at their chosen versions, and turns the verdict into a badge with Foundry's public `Module.getVersionBadge`, so the colours
   and tooltips are Foundry's own. The core and the system may be chosen too (`platformVersions`, `judgePlatform`):
   a version of either is badged by the worst badge the setup it makes would give the system or an active module,
