@@ -14,7 +14,9 @@
   import { UNINSTALL } from '../lib/plans';
   import { runSteps, stepText } from '../lib/run';
   import type { Safeguard } from '../lib/safeguards';
+  import type { TreeSelection } from '../lib/tree';
   import BusyMark from './BusyMark.svelte';
+  import TreeLink from './TreeLink.svelte';
 
   interface Props {
     overview: Overview;
@@ -31,6 +33,8 @@
     acknowledged?: boolean;
     /** Acknowledge it, from the confirmation. */
     onAcknowledge?: (() => void) | undefined;
+    /** Open the tree to a package's row, and select it, as its name in the plan is clicked. */
+    onOpen?: ((link: TreeSelection) => void) | undefined;
   }
 
   let {
@@ -42,7 +46,19 @@
     onRun,
     acknowledged = true,
     onAcknowledge,
+    onOpen,
   }: Props = $props();
+
+  /**
+   * The tree's row for a change's package.
+   * @param key - The package's key
+   * @returns The row's selection
+   */
+  function linkOf(key: string): TreeSelection {
+    if (key === 'core') return { kind: 'root' };
+    const id = key.slice(key.indexOf(':') + 1);
+    return key.startsWith('system:') ? { kind: 'system', system: id } : { kind: 'module', module: id };
+  }
 
   /** The newest build of Foundry VTT's generation, when the plan has an older one, and whether the plan can take it. */
   let newerCore = $state.raw<NewerCore | undefined>(undefined);
@@ -125,6 +141,9 @@
         aria-hidden="true"></i>
       {localize(`Run.State.${state}`)}
     </span>
+    {#if state === 'failed' && onOpen !== undefined}
+      <span class="emma-plan-needed">{localize('Run.SeeWhy')}</span>
+    {/if}
     {@const stopped = run?.needed?.[key]}
     {#if state === 'skipped' && stopped !== undefined}
       <span class="emma-plan-needed">{format('Run.Needs', { steps: stopped.map(stepText).join(', ') })}</span>
@@ -308,7 +327,7 @@
             {/if}
             <!-- Before the name, so that it adds no space between the name and what follows it. -->
             {@render barOf(choice.key)}
-            {name}{@render stateOf(choice.key)}
+            <TreeLink title={name} link={linkOf(choice.key)} {onOpen} />{@render stateOf(choice.key)}
           </th>
           <td>
             {#if choice.installed === undefined}

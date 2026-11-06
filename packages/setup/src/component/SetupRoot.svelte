@@ -28,6 +28,8 @@
   import CoreStep from './CoreStep.svelte';
   import AlphaNotice from './AlphaNotice.svelte';
   import BusyMark from './BusyMark.svelte';
+  import FailedStep from './FailedStep.svelte';
+  import WhyChosen from './WhyChosen.svelte';
   import SavedPlanNotice from './SavedPlanNotice.svelte';
   import BestSection from './BestSection.svelte';
   import InstallSection from './InstallSection.svelte';
@@ -137,6 +139,7 @@
         format('Run.Failed', { step: stepText(run.failure.step), message: run.failure.message }),
         ...((run.failed ?? 1) > 1 ? [format('Run.MoreFailed', { count: String((run.failed ?? 1) - 1) })] : []),
         ...(notRun > 0 ? [format('Run.NotRun', { count: String(notRun) })] : []),
+        localize('Run.FailedHint'),
       ].join(' ');
     }
     if (run.beforeCore === undefined) return localize('Run.Ran');
@@ -329,21 +332,25 @@
             </div>
           {/if}
           {#if selection.kind === 'module'}
+            <FailedStep run={setup.shownRun} key={`module:${selection.module}`} />
             <ModulePanel
               detail={moduleDetail(overview, selection.module, selection.world)}
               onOpen={openLink}
               blocked={updates.blockedOf(`module:${selection.module}`)}
               explained={updates.explainedOf(`module:${selection.module}`)} />
+            <WhyChosen {updates} key={`module:${selection.module}`} />
             <RecommendsSection key={`module:${selection.module}`} {updates} onOpen={openLink} />
             {@render lock(`module:${selection.module}`)}
             {@render ignoreInstalled(`module:${selection.module}`)}
             {@render uninstall(`module:${selection.module}`)}
           {:else if selection.kind === 'system'}
+            <FailedStep run={setup.shownRun} key={`system:${selection.system}`} />
             <SystemPanel
               detail={systemDetail(overview, selection.system, selection.world)}
               onOpen={openLink}
               blocked={updates.blockedOf(`system:${selection.system}`)}
               explained={updates.explainedOf(`system:${selection.system}`)} />
+            <WhyChosen {updates} key={`system:${selection.system}`} />
             {@render lock(`system:${selection.system}`)}
             {@render ignoreInstalled(`system:${selection.system}`)}
             {@render uninstall(`system:${selection.system}`)}
@@ -427,6 +434,7 @@
             space={setup.snapshotSpace}
             {coreBlocked}
             run={setup.shownRun}
+            onOpen={openLink}
             acknowledged={setup.alphaAcknowledged}
             onAcknowledge={() => {
               setup.acknowledgeAlpha();

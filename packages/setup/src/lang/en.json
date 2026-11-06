@@ -283,7 +283,9 @@
     "InstallingOf": "Installing {title}",
     "MoreFailed": "Steps that failed besides: {count}.",
     "NotRun": "Steps not run, as steps they need failed: {count}.",
-    "Needs": "It needs {steps}, which failed or was not run."
+    "Needs": "It needs {steps}, which failed or was not run.",
+    "FailedHint": "Select a failed step in the plan to see why.",
+    "SeeWhy": "Select it to see why."
   },
   "Core": {
     "Heading": "Updating Foundry VTT to {version}",
@@ -406,5 +408,23 @@
     "Locking": "Locking",
     "Ignoring": "Ignoring",
     "Resuming": "Resuming"
+  },
+  "Why": {
+    "Checking": "Why {chosen}",
+    "Heading": "Why {chosen}, not {newest}",
+    "Hint": "The newer versions, and why the plan does not take them:",
+    "NoBuild": "{versions}: runs on no build of Foundry VTT the plan may choose.",
+    "NeedsBuild": "{versions}: needs Foundry VTT {minimum} or later.",
+    "NoManifest": "{versions}: no manifest URL for that version alone, which installing it needs.",
+    "Conflict": "{versions}: the plan cannot take it with the other versions chosen:",
+    "Possible": "{versions}: the plan could take it now."
+  },
+  "Failure": {
+    "Install": "Installing {title} {version} failed",
+    "Uninstall": "Uninstalling {title} failed",
+    "Asked": "EMMA asked Foundry to install {version} from:",
+    "Answered": "Foundry answered:",
+    "ManifestHint": "A manifest URL can give a version other than the one it is listed for, as one that always gives the newest does: then Foundry cannot install the version the plan chose. Take it out of the plan, or choose another version.",
+    "NoAnswer": "Foundry said nothing of why."
   }
 }

@@ -1338,3 +1338,49 @@ describe('what the catalogue says of a search', () => {
     expect(catalogue.recheck).not.toHaveBeenCalled();
   });
 });
+
+describe('why the plan takes the version it does', () => {
+  /**
+   * A planner that knows newer versions of the app than those it offers, each refused for a reason.
+   * @returns The planner
+   */
+  const planner = (): Planner => ({
+    ...alone(APP),
+    newerThan: (_key, version) => ['5.0.0', '4.0.0', '3.0.0', '2.5.0', '2.0.0'].filter(newer => newer > version),
+    whyNotTaken: (_key, version) => {
+      switch (version) {
+        case '5.0.0':
+        case '4.0.0':
+          return Promise.resolve({ reason: 'no-manifest' as const });
+        case '3.0.0':
+          return Promise.resolve({ reason: 'conflict' as const, explanation: ['Lib is too old'] });
+        case '2.5.0':
+          return Promise.resolve({ reason: 'no-build' as const, minimum: '15' });
+        default:
+          return Promise.resolve(undefined);
+      }
+    },
+  });
+
+  test('gives each newer version and why, folding those one after another for one reason', async () => {
+    const updates = new UpdateState(() => Promise.resolve({ ...finding(APP), planner: planner() }));
+    await updates.searchFor(OVERVIEW);
+    await updates.choose('module:app', '1.5.0');
+
+    await expect(updates.notTakenOf('module:app')).resolves.toEqual([
+      { newest: '5.0.0', oldest: '4.0.0', why: { reason: 'no-manifest' } },
+      { newest: '3.0.0', oldest: '3.0.0', why: { reason: 'conflict', explanation: ['Lib is too old'] } },
+      { newest: '2.5.0', oldest: '2.5.0', why: { reason: 'no-build', minimum: '15' } },
+      // The plan could take it now, as the choices have changed since.
+      { newest: '2.0.0', oldest: '2.0.0', why: { reason: 'possible' } },
+    ]);
+  });
+
+  test('says nothing of a package the plan does not change, uninstalls, nor of Foundry VTT', async () => {
+    const updates = new UpdateState(() => Promise.resolve({ ...finding(APP), planner: planner() }));
+    await expect(updates.notTakenOf('module:app')).resolves.toEqual([]);
+    await updates.searchFor(OVERVIEW);
+    await expect(updates.notTakenOf('module:app')).resolves.toEqual([]);
+    await expect(updates.notTakenOf('core')).resolves.toEqual([]);
+  });
+});

@@ -153,6 +153,9 @@ export function alone(...updates: readonly PackageUpdate[]): Planner {
     titleOf: key => key,
     needsOf: () => [],
     missingManifest: () => false,
+    // Every version offered is taken; none newer is known.
+    newerThan: () => [],
+    whyNotTaken: () => Promise.resolve(undefined),
   };
 }
 
