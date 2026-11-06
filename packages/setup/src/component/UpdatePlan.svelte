@@ -130,27 +130,31 @@
 {#snippet barOf(key: string)}
   {@const state = run?.states[key]}
   {@const reached = run?.progress?.[key]}
-  {#if state === 'running' && reached !== undefined}
+  {@const measured = state === 'running' && reached !== undefined}
+  {#if measured || state === 'done' || state === 'failed'}
+    {@const installing = reached?.phase === 'install'}
+    {@const pct = reached?.pct}
+    {@const downloaded = reached === undefined || reached.phase === 'install' || state === 'done' ? 100 : reached.pct}
+    {@const installed = state === 'done' ? 100 : reached?.phase === 'install' ? reached.pct : 0}
     <!-- Only installs say how far they have got, so only a package is named. -->
-    {@const title = titles.get(key) ?? updates.titleOf(key)}
-    {@const label = format(reached.phase === 'download' ? 'Run.DownloadingOf' : 'Run.InstallingOf', { title })}
+    {@const title = measured ? (titles.get(key) ?? updates.titleOf(key)) : ''}
+    <!--
+      One bar from the first tick to the end, so that the install's green runs on to the end and stays, as the underline
+      of a step done, rather than being put in its place.
+    -->
     <span
       class="emma-plan-bar"
-      role="progressbar"
-      aria-label={label}
-      aria-valuemin="0"
-      aria-valuemax="100"
-      aria-valuenow={reached.pct}>
-      <span class="emma-plan-bar-download" style:width="{reached.phase === 'download' ? reached.pct : 100}%"></span>
-      {#if reached.phase === 'install'}
-        <span class="emma-plan-bar-install" style:width="{reached.pct}%"></span>
+      role={measured ? 'progressbar' : undefined}
+      aria-hidden={measured ? undefined : 'true'}
+      aria-label={measured ? format(installing ? 'Run.InstallingOf' : 'Run.DownloadingOf', { title }) : undefined}
+      aria-valuemin={measured ? 0 : undefined}
+      aria-valuemax={measured ? 100 : undefined}
+      aria-valuenow={measured ? pct : undefined}>
+      <span class="emma-plan-bar-download" style:width="{downloaded}%"></span>
+      <span class="emma-plan-bar-install" style:width="{installed}%"></span>
+      {#if state === 'failed'}
+        <span class="emma-plan-bar-failed" style:width="{pct ?? 100}%"></span>
       {/if}
-    </span>
-  {:else if state === 'done'}
-    <span class="emma-plan-bar" aria-hidden="true"><span class="emma-plan-bar-install" style:width="100%"></span></span>
-  {:else if state === 'failed'}
-    <span class="emma-plan-bar" aria-hidden="true">
-      <span class="emma-plan-bar-failed" style:width="{reached?.pct ?? 100}%"></span>
     </span>
   {/if}
 {/snippet}

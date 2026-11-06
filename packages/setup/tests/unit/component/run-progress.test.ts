@@ -96,7 +96,7 @@ describe("a plan's run, step by step", () => {
     const downloading = within(lib).getByRole('progressbar', { name: 'Downloading Library' });
     expect(downloading).toHaveAttribute('aria-valuenow', '42');
     expect(downloading.querySelector('.emma-plan-bar-download')).toHaveStyle({ width: '42%' });
-    expect(downloading.querySelector('.emma-plan-bar-install')).toBeNull();
+    expect(downloading.querySelector('.emma-plan-bar-install')).toHaveStyle({ width: '0%' });
     expect(lib.querySelector('.fa-spinner')).toBeNull();
 
     first?.tell({ phase: 'install', pct: 70 });
@@ -113,7 +113,10 @@ describe("a plan's run, step by step", () => {
       expect(lib).toHaveTextContent('Done');
     });
     expect(within(lib).queryByRole('progressbar')).toBeNull();
-    expect(lib.querySelector('.emma-plan-bar-install')).toHaveStyle({ width: '100%' });
+    // The install's green bar runs on to the end and stays, as the underline: the same bar, not one put in its place.
+    expect(lib.querySelector('.emma-plan-bar')).toBe(installing);
+    expect(installing.querySelector('.emma-plan-bar-install')).toHaveStyle({ width: '100%' });
+    expect(installing).toHaveAttribute('aria-hidden', 'true');
     // The next step has started, and says nothing yet of how far.
     await vi.waitFor(() => {
       expect(held).toHaveLength(2);
