@@ -6,7 +6,6 @@ import {
   isSetupGame,
   listPackages,
   lockPackage,
-  readIndex,
   readCoreUpdate,
   readInstallation,
   readManifests,
@@ -356,23 +355,6 @@ describe('listPackages', () => {
     // A system names no systems.
     const [system] = await listPackages(game as never, 'system');
     expect(system).toMatchObject({ type: 'system', systems: [] });
-  });
-
-  test("reads Foundry's index: the newest version of each game system and module listed", async () => {
-    const { game } = installSetupMocks();
-    Object.assign(game, {
-      getPackages: ({ type }: { type: string }) =>
-        Promise.resolve(
-          new Map([[type, { id: `${type}-one`, title: 'One', version: type === 'system' ? '2.0' : '1.0' }]]),
-        ),
-    });
-
-    await expect(readIndex(game as never)).resolves.toEqual(
-      new Map([
-        ['system:system-one', '2.0'],
-        ['module:module-one', '1.0'],
-      ]),
-    );
   });
 
   test('lists nothing where Foundry offers no listing, or an odd one', async () => {

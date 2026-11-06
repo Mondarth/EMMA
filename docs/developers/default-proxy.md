@@ -39,9 +39,7 @@ are new with every build. It is not encryption, as the pads ship beside the chun
 sight, and out of a search of the code. EMMA reveals it when it uses it, with `defaultProxy()`
 (`src/module/lib/default-proxy.ts`, through `packages/core/src/default-proxy.ts`).
 
-The EMMA extension is built with the proxy in the same way, in the browser extension's release step, and uses it
-always, as it has no proxy settings yet (`packages/setup/src/foundry/releases.ts`). It names itself to the proxy as
-`extension-<version>` in `X-EMMA-Version`, so the proxy's logs tell it from the module.
+The EMMA extension uses no proxy: it asks the catalogue alone (see [The catalogue](#the-catalogue)).
 
 The build stops when only one of the two is set, or when the URL is not `https` or has no `{url}`. After building, the
 release, of the module and of the browser extension, refuses to package a bundle that holds the key in plain text
@@ -77,9 +75,10 @@ it alone, and the proxy finds the rest, or everything when the catalogue cannot 
 
 - **Only with the default proxy.** `versionLookup()` (`src/module/settings.ts`) gives the catalogue in the `default`
   mode only: a GM who chose their own proxy, or none, never contacts it, and its key goes only to it.
-- **Always, in the EMMA extension.** On the setup screen there are no proxy settings yet, so the EMMA extension asks
-  the catalogue whenever it is built in (`packages/setup/src/foundry/releases.ts`), then the default proxy for the
-  rest, or the sources a browser may read directly when it is built without one. It names itself as
+- **Alone, in the EMMA extension.** On the setup screen, the EMMA extension asks the catalogue's version 2 for
+  everything, in one `POST /api/v2/lookup` for the installed packages, through the kit's `catalogueSet`
+  (`packages/setup/src/foundry/releases.ts`), and reads a manifest URL the user gives with `POST /api/v2/manifest`.
+  Built without a catalogue, or when it cannot be reached, it knows only what is installed. It names itself as
   `EMMA-extension/<version>` in `X-Catalogue-Client`.
 - **Directly, not through the proxy.** The catalogue sends CORS headers, so the browser asks it itself, with its key in
   `X-API-Key` and `EMMA/<version>` in `X-Catalogue-Client`.

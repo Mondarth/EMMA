@@ -123,11 +123,12 @@ function unreadText(read: Exclude<ManifestRead, { ok: true }>): string {
   if (read.problem === 'not-manifest') return localize('Manifest.NotManifest');
   if (read.problem === 'other-type')
     return localize(read.type === 'system' ? 'Manifest.IsSystem' : 'Manifest.IsModule');
-  const { reason, status, host, proxied } = read;
-  if (reason === 'http' && status === 403 && proxied) return format('Manifest.Forbidden', { host });
+  if (read.problem === 'no-catalogue') return localize('Manifest.NoCatalogue');
+  const { reason, status, host } = read;
   if (reason === 'http') return format('Manifest.Status', { host, status: String(status ?? '') });
-  if (reason === 'network') return format(proxied ? 'Manifest.Unreached' : 'Manifest.NoCors', { host });
-  return localize(reason === 'budget' ? 'Manifest.Budget' : 'Manifest.NotJson');
+  if (reason === 'network') return format('Manifest.Unreached', { host });
+  if (reason === 'refused') return format('Manifest.Barred', { host });
+  return localize(reason === 'too-large' ? 'Manifest.TooLarge' : 'Manifest.NotJson');
 }
 
 /** The updates, and the versions chosen. */

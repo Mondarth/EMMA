@@ -703,14 +703,13 @@ describe('installing from a manifest URL', () => {
     const reasons = await Promise.all(
       (
         [
-          { ...unread, reason: 'http', status: 403, proxied: true },
-          { ...unread, reason: 'http', status: 404, proxied: true },
-          { ...unread, reason: 'http', status: 403, proxied: false },
-          { ...unread, reason: 'http', proxied: false },
-          { ...unread, reason: 'network', proxied: true },
-          { ...unread, reason: 'network', proxied: false },
-          { ...unread, reason: 'budget', proxied: true },
-          { ...unread, reason: 'invalid', proxied: true },
+          { ...unread, reason: 'http', status: 404 },
+          { ...unread, reason: 'http' },
+          { ...unread, reason: 'network' },
+          { ...unread, reason: 'refused' },
+          { ...unread, reason: 'too-large' },
+          { ...unread, reason: 'invalid' },
+          { ok: false, problem: 'no-catalogue' },
           { ok: false, problem: 'not-manifest' },
           { ok: false, problem: 'other-type', type: 'module' },
         ] satisfies ManifestRead[]
@@ -720,14 +719,13 @@ describe('installing from a manifest URL', () => {
       }),
     );
     expect(reasons).toEqual([
-      "EMMA's proxy refused to read it from example.org (403). The proxy reads only from the sites packages are known to be on, such as GitHub, GitLab and Foundry's own; or example.org itself refused it.",
       'example.org answered 404, not the manifest.',
-      'example.org answered 403, not the manifest.',
       'example.org answered , not the manifest.',
       'example.org could not be reached.',
-      'example.org could not be reached, or does not let a browser read it (it sends no CORS headers), and this build of EMMA has no proxy to read it through.',
-      'EMMA has made as many requests as it may this session. Read the installation again later.',
+      "EMMA's catalogue does not read from example.org: it reads only public web addresses, with few redirects.",
+      'What the URL gives is too large to be a manifest.',
       "What the URL gives is not a manifest's JSON.",
+      "EMMA's catalogue, which reads the manifest, could not be reached. Try again later.",
       "That is not a game system's or module's manifest.",
       "That is a module's manifest, not a game system's.",
     ]);
