@@ -1307,7 +1307,7 @@ test.describe('Hypothetical versions', () => {
     const emma = page.locator(EMMA_WINDOW);
     const choose = (version: string) =>
       emma.getByRole('button', { name: `${system.title} version ${version}: choose another version`, exact: true });
-    const unreachable = emma.getByText(/^Catalogue unreachable/);
+    const unreachable = emma.getByText(/Catalogue unreachable: hypothetical mode/);
 
     await emma.getByRole('button', { name: 'Hypothetical mode', exact: true }).click();
     await choose(system.version).click();
@@ -1450,7 +1450,7 @@ test.describe('Version lookup proxy', () => {
     await (await moduleManagementButton(page)).click();
     await emma.getByRole('button', { name: 'Hypothetical mode', exact: true }).click();
 
-    await expect(emma.getByText(/^Catalogue unreachable/)).toBeVisible();
+    await expect(emma.getByText(/Catalogue unreachable: hypothetical mode/)).toBeVisible();
     expect(proxied).toEqual([]);
     expect(asked).toHaveLength(1);
 
