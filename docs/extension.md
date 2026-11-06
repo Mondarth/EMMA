@@ -279,7 +279,10 @@ say what a world's backup needs, so its row gives the space free alone. What is 
 3. each package to uninstall, last, once nothing installed needs it (see [Uninstalling](#uninstalling)).
 
 Each row says how far its step has got, and the footer how the run went, until the plan is changed again, as by
-starting a new one. The plan's title and its **Run the plan** and **Clear choices** buttons stay in view as its tables
+starting a new one. A package being installed or updated says how far, as Foundry tells it: **Downloading 42%**, then
+**Installing 70%**, with a thin bar along the foot of its name, blue as it downloads and then green over it as it
+installs. A step done is underlined in green, with a tick and **Done**; a step that failed in red, as far as it got.
+Foundry says nothing of how far a snapshot, a backup or an uninstall has got, so those show a spinner until done. The plan's title and its **Run the plan** and **Clear choices** buttons stay in view as its tables
 scroll. A run stops at the first step that fails,
 saying why, and before Foundry VTT's own update: updating Foundry in place restarts it, and is for the user to do with
 care. Meanwhile the choices cannot change. After a run, EMMA reads the installation again, so what was done leaves the

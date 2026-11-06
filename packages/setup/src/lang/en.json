@@ -275,7 +275,11 @@
     "NoBackups": "Foundry offers no way to back a world up here.",
     "NoInstalls": "Foundry offers no way to install packages here.",
     "BackupFailed": "Foundry could not back up {world}.",
-    "NoManifest": "EMMA has no manifest URL for {title} {version} alone, so cannot install it."
+    "NoManifest": "EMMA has no manifest URL for {title} {version} alone, so cannot install it.",
+    "Downloading": "Downloading {pct}%",
+    "Installing": "Installing {pct}%",
+    "DownloadingOf": "Downloading {title}",
+    "InstallingOf": "Installing {title}"
   },
   "Core": {
     "Heading": "Updating Foundry VTT to {version}",

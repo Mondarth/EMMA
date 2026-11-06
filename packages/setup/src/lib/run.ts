@@ -40,6 +40,16 @@ export type RunStep =
 export type StepState = 'waiting' | 'running' | 'done' | 'failed';
 
 /**
+ * How far an install has got, as Foundry tells it: downloading the package, then installing it, which is extracting its
+ * files, each from 0 to 100 per cent of that phase.
+ */
+export interface StepProgress {
+  readonly phase: 'download' | 'install';
+  /** How much of the phase is done, in whole per cent. */
+  readonly pct: number;
+}
+
+/**
  * The steps that running a plan takes, in order.
  * @param safeguards - The plan's snapshot and backups; only those checked are made
  * @param plan - The plan's changes, in the order to install them
