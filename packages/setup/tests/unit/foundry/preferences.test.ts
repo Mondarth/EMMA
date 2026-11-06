@@ -13,6 +13,10 @@ import {
   PENDING_PLAN_KEY,
   CORE_LOCK_KEY,
   IGNORED_KEY,
+  OWNED_FOR_MS,
+  OWNED_KEY,
+  readOwnedKept,
+  writeOwnedKept,
   readCoreLocked,
   readIgnored,
   readGuardOn,
@@ -239,5 +243,45 @@ describe('the plan a run has not finished', () => {
     expect(writePendingPlan(PLAN)).toBe(false);
     expect(writePendingPlan(null)).toBe(false);
     expect(readPendingPlan()).toBeUndefined();
+  });
+});
+
+describe('the premium packages the user owns', () => {
+  const NOW = 1_800_000_000_000;
+
+  test('are kept for each type, and read for a week', () => {
+    expect(readOwnedKept('module', NOW)).toBeUndefined();
+
+    writeOwnedKept('module', new Set(['module:dice']), NOW);
+
+    expect(readOwnedKept('module', NOW)).toEqual(new Set(['module:dice']));
+    expect(readOwnedKept('module', NOW + OWNED_FOR_MS - 1)).toEqual(new Set(['module:dice']));
+    expect(readOwnedKept('module', NOW + OWNED_FOR_MS)).toBeUndefined();
+    // Kept in the future, as by a clock set wrong, they are read again.
+    expect(readOwnedKept('module', NOW - 1)).toBeUndefined();
+    expect(readOwnedKept('system', NOW)).toBeUndefined();
+  });
+
+  test.each([
+    '{not json',
+    '"owned"',
+    JSON.stringify({ at: 'now', keys: [] }),
+    JSON.stringify({ at: NOW, keys: 'module:dice' }),
+    JSON.stringify({ at: NOW, keys: [7] }),
+  ])('are not read from %s', kept => {
+    localStorage.setItem(`${OWNED_KEY}.module`, kept);
+    expect(readOwnedKept('module', NOW)).toBeUndefined();
+  });
+
+  test('are not kept, nor read, where the storage is refused', () => {
+    const blocked = () => {
+      throw new Error('blocked');
+    };
+    vi.stubGlobal('localStorage', { getItem: blocked, setItem: blocked, removeItem: blocked });
+
+    expect(() => {
+      writeOwnedKept('module', new Set(['module:dice']));
+    }).not.toThrow();
+    expect(readOwnedKept('module')).toBeUndefined();
   });
 });

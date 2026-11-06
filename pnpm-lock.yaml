@@ -293,6 +293,9 @@ importers:
         specifier: workspace:*
         version: link:../core
     devDependencies:
+      '@mondarth/fvtt-package-catalogue-contract':
+        specifier: 0.4.0
+        version: 0.4.0
       '@mondarth/fvtt-resolver':
         specifier: 0.10.0
         version: 0.10.0
