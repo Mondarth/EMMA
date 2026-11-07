@@ -264,7 +264,7 @@ needed by it, locked in. A shift-click takes out what it brought in
 too, but for what another change still needs. So does a click on a change in a ring of changes that need each other,
 such as a module, a module it requires and the game system they run in, each newer: alone, it would only come back.
 
-**Plan the best versions**, in the root's panel, replaces the plan with the newest versions there are: those of Foundry
+**Plan the best versions**, under **Plan Updates** just below the actions in the root's panel, replaces the plan with the newest versions there are: those of Foundry
 VTT, then of each game system, then of each module installed, each the newest the plan can take with those before it,
 so that every recorded world keeps working, as choosing each by hand would. Packages locked in Foundry, and Foundry VTT
 locked in EMMA, stay as they are. What was chosen before goes, uninstalls and packages added against advice among it.
@@ -459,12 +459,16 @@ A game system or module locked in Foundry has a lock beside it in the tree. EMMA
 Foundry refuses to update or uninstall it: none of its other versions is offered, an update of another package that
 needs it changed is not either, and it cannot be uninstalled.
 
-The panel of each installed game system and module has a **Lock** section: **Lock <title> at <version>**, or **Unlock
+**The actions** on what a panel shows, **Lock**, **Ignore** and **Uninstall**, sit side by side just below its title,
+wrapping only where the panel is too narrow. Each button names what it does; the **ⓘ** beside it shows, or hides again,
+what that is, hidden at first. Only why an uninstall is refused shows always, below its button.
+
+The panel of each installed game system and module has a **Lock** action: **Lock <title> at <version>**, or **Unlock
 <title>**, which locks or unlocks it in Foundry at once, as Foundry's own package menu does, and reads the installation
 again. A choice of the package in the plan goes once it is locked.
 
 Foundry VTT itself can be locked too, in EMMA alone, as Foundry has no lock for itself: the root's panel has the same
-**Lock** section, **Lock Foundry VTT at <build>**. Locked, the plan never updates Foundry VTT, nor offers a newer
+**Lock** action, **Lock Foundry VTT at <build>**. Locked, the plan never updates Foundry VTT, nor offers a newer
 build, but still updates the game systems and modules that run on the build installed, so that a server can be kept on
 its build and still have its packages brought up to date. The tree's root shows the lock, **Locked in EMMA**. The
 browser remembers the lock for that server. It does not stop Foundry's own **Update Software**.
@@ -482,19 +486,19 @@ to whole worlds and to game systems, outside any one world.
 - **An ignored world** holds nothing back: what it runs is not taken into account, so a plan may leave it unable to
   run. Use it for a world no longer played.
 
-Each world's panel, and each installed game system's and module's, has an **Ignore** section: **Ignore <title>** or
+Each world's panel, and each installed game system's and module's, has an **Ignore** action: **Ignore <title>** or
 **Stop ignoring <title>**. It takes effect at once, reading the installation again, not in the plan. An ignored row is
 greyed out and struck through in the tree, and can still be selected: its panel has an **Ignored** block in its top
 right corner, which stays in view as the panel scrolls. The browser remembers what is ignored for that server.
 
 ### Uninstalling
 
-The panel of a game system or module has an **Uninstall** section below it. **Uninstall <title>** puts the package in
+The panel of a game system or module has an **Uninstall** action. **Uninstall <title>** puts the package in
 the plan: its row says **Uninstall**, with nothing to install, and the tree shows **Uninstall** in place of its version.
 **Keep <title> installed** takes it out again. Uninstalling deletes the package from the server, with any data it keeps
 there, and cannot be undone; a snapshot keeps a copy.
 
-EMMA refuses an uninstall that would break something it knows of, saying what:
+EMMA refuses an uninstall that would break something it knows of, saying what below the button:
 
 - a game system a world uses;
 - a module a recorded world runs, or will need when next run;

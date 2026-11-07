@@ -322,7 +322,7 @@ describe('ignoring', () => {
     await setup.refresh();
     render(SetupRoot, { setup });
     const user = userEvent.setup();
-    const section = () => screen.getByRole('region', { name: 'Ignore' });
+    const section = () => screen.getByRole('group', { name: 'Ignore' });
 
     await toggle(user, /^D&D 5e/);
     await user.click(row(/^Alpha/));
@@ -360,10 +360,10 @@ describe('ignoring', () => {
 
   test('is not offered where it cannot be kept', async () => {
     const { user } = await setUp();
-    expect(screen.queryByRole('region', { name: 'Ignore' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Ignore' })).toBeNull();
     await toggle(user, /^D&D 5e/);
     await user.click(row(/^Alpha/));
-    expect(screen.queryByRole('region', { name: 'Ignore' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Ignore' })).toBeNull();
   });
 });
 
