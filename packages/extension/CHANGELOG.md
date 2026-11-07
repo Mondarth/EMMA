@@ -1,3 +1,20 @@
+## [0.5.0](https://github.com/Mondarth/EMMA/compare/extension-v0.4.0...extension-v0.5.0) (2026-11-07)
+
+### Features
+
+* **setup:** ignore a phantom module a world records ([75e2dc3](https://github.com/Mondarth/EMMA/commit/75e2dc3bdfb26bd8d0d340d75e55ef01acac0b10))
+* **setup:** plan updates just below the root's actions, with more space ([1f2a75f](https://github.com/Mondarth/EMMA/commit/1f2a75fdfb782c06da45a9b9f3d48a8a82246569))
+* **setup:** put a panel's actions together, just below its title ([9e97bd7](https://github.com/Mondarth/EMMA/commit/9e97bd7c471cc8aab429a519752cc79e59e38b07))
+* **setup:** say in its panel what holds back a package's update ([4da5edc](https://github.com/Mondarth/EMMA/commit/4da5edc1fb4470740b93168fb2598c03b6c89f50))
+* **setup:** show EMMA analyzing, large, while its window opens ([51dbb90](https://github.com/Mondarth/EMMA/commit/51dbb90a83950cc20e025317549c3635a284421e))
+* **setup:** show the worlds on a branch of their own in the tree ([4841e58](https://github.com/Mondarth/EMMA/commit/4841e58d1e70ac1877aba72d4b86071a8f9bd826))
+* **setup:** strike through an update the plan cannot take as it stands ([7323d93](https://github.com/Mondarth/EMMA/commit/7323d9382c4d7eed6a3a1eca9198db2ac77b3691))
+
+### Bug Fixes
+
+* **setup:** draw what shows EMMA busy before its work starts ([0466598](https://github.com/Mondarth/EMMA/commit/046659862037e8453c608523fc450afb72f2fafe))
+* **setup:** space the panel's sections apart, not their headings ([718d305](https://github.com/Mondarth/EMMA/commit/718d305318133197558cd3e447b85c395441658f))
+
 ## [0.4.0](https://github.com/Mondarth/EMMA/compare/extension-v0.3.0...extension-v0.4.0) (2026-11-07)
 
 ### Features
