@@ -431,5 +431,9 @@
     "Answered": "Foundry answered:",
     "ManifestHint": "A manifest URL can give a version other than the one it is listed for, as one that always gives the newest does: then Foundry cannot install the version the plan chose. Take it out of the plan, or choose another version.",
     "NoAnswer": "Foundry said nothing of why."
+  },
+  "Action": {
+    "About": "What {action} does",
+    "Label": "Actions"
   }
 }

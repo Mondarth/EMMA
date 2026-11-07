@@ -1,7 +1,7 @@
 <!--
-  Uninstalling a game system or module, below its panel: what it would break, then a button to put it in the plan, or
-  take it out again. In standard mode, an uninstall that would break something known is refused, saying why; what EMMA
-  cannot know, it warns of.
+  Uninstalling a game system or module, among the actions at the top of its panel: a button to put it in the plan, or
+  take it out again, and what it would break. In standard mode, an uninstall that would break something known is
+  refused, saying why below the button, always; what EMMA cannot know, it warns of where it says what uninstalling does.
 -->
 <script lang="ts">
   import type { Activity } from '../app/busy.svelte';
@@ -9,6 +9,7 @@
   import { format, localize } from '../lib/i18n';
   import { blockText, warningText } from '../lib/uninstall';
 
+  import ActionItem from './ActionItem.svelte';
   import BusyMark from './BusyMark.svelte';
 
   interface Props {
@@ -25,35 +26,10 @@
 
   let { title, offer, locked, onChoose, busy }: Props = $props();
 
-  const uid = $props.id();
   const refused = $derived(offer.effects.blocks.length > 0 && !offer.planned);
 </script>
 
-<section class="emma-uninstall" aria-labelledby="{uid}-heading">
-  <h3 id="{uid}-heading">{localize('Uninstall.Heading')}</h3>
-  {#if offer.planned}
-    <p>{format('Uninstall.Planned', { title })}</p>
-  {:else if refused}
-    <p class="emma-uninstall-refused">{format('Uninstall.Refused', { title })}</p>
-    <ul>
-      {#each offer.effects.blocks as block, index (index)}
-        <li>{blockText(block)}</li>
-      {/each}
-    </ul>
-  {:else}
-    <p>{localize('Uninstall.NoUndo')}</p>
-  {/if}
-  {#if !refused && offer.effects.warnings.length > 0}
-    <p class="emma-uninstall-warning">
-      <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-      {localize('Uninstall.Warnings')}
-    </p>
-    <ul>
-      {#each offer.effects.warnings as warning, index (index)}
-        <li>{warningText(warning)}</li>
-      {/each}
-    </ul>
-  {/if}
+{#snippet button()}
   {#if offer.planned}
     <button
       type="button"
@@ -81,22 +57,45 @@
       <BusyMark activity={busy} />
     </button>
   {/if}
-</section>
+{/snippet}
+
+{#snippet why()}
+  <p class="emma-uninstall-refused">{format('Uninstall.Refused', { title })}</p>
+  <ul>
+    {#each offer.effects.blocks as block, index (index)}
+      <li>{blockText(block)}</li>
+    {/each}
+  </ul>
+{/snippet}
+
+{#snippet about()}
+  <p>{offer.planned ? format('Uninstall.Planned', { title }) : localize('Uninstall.NoUndo')}</p>
+  {#if !refused && offer.effects.warnings.length > 0}
+    <p class="emma-uninstall-warning">
+      <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+      {localize('Uninstall.Warnings')}
+    </p>
+    <ul>
+      {#each offer.effects.warnings as warning, index (index)}
+        <li>{warningText(warning)}</li>
+      {/each}
+    </ul>
+  {/if}
+{/snippet}
+
+<ActionItem
+  label={localize('Uninstall.Heading')}
+  {button}
+  {about}
+  shown={refused ? why : undefined}
+  warning={!refused && offer.effects.warnings.length > 0} />
 
 <style>
-  .emma-uninstall {
-    margin-top: 1rem;
-  }
-
   .emma-uninstall-refused {
     color: var(--color-level-error, #c00);
   }
 
   .emma-uninstall-warning i {
     color: var(--color-level-warning, #ec3);
-  }
-
-  .emma-uninstall button {
-    width: auto;
   }
 </style>

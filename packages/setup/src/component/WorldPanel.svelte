@@ -3,6 +3,8 @@
   it will need when next run that it did not run then.
 -->
 <script lang="ts">
+  import type { Snippet } from 'svelte';
+
   import { format, localize } from '../lib/i18n';
   import type { Difference, WorldOverview } from '../lib/overview';
   import type { TreeSelection } from '../lib/tree';
@@ -13,9 +15,11 @@
     world: WorldOverview;
     /** Open the tree to a row a name links to, and select it; without it, names do not link. */
     onOpen?: ((link: TreeSelection) => void) | undefined;
+    /** The actions on what it shows, such as Lock, Ignore and Uninstall, just below its title; none by default. */
+    actions?: Snippet | undefined;
   }
 
-  let { world, onOpen }: Props = $props();
+  let { world, onOpen, actions }: Props = $props();
 
   const recorded = $derived(
     world.record === undefined
@@ -40,6 +44,7 @@
 </script>
 
 <h2>{world.world.title}</h2>
+{@render actions?.()}
 <p class={['emma-status', `emma-status-${world.status}`]}>{localize(`Status.${world.status}`)}</p>
 
 <dl>

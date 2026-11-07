@@ -3,6 +3,8 @@
   EMMA guards Foundry's own package buttons.
 -->
 <script lang="ts">
+  import type { Snippet } from 'svelte';
+
   import type { ExplainedVersion } from '../app/update-state.svelte';
   import { format, localize } from '../lib/i18n';
   import type { Overview, WorldStatus } from '../lib/overview';
@@ -24,9 +26,11 @@
     explained?: ExplainedVersion | undefined;
     /** Open the tree to a row a name links to, and select it; without it, names do not link. */
     onOpen?: ((link: TreeSelection) => void) | undefined;
+    /** The actions on what it shows, such as Lock, Ignore and Uninstall, just below its title; none by default. */
+    actions?: Snippet | undefined;
   }
 
-  let { overview, guardOn, onGuardChange, blocked, explained, onOpen }: Props = $props();
+  let { overview, guardOn, onGuardChange, blocked, explained, onOpen, actions }: Props = $props();
 
   const STATUSES: readonly WorldStatus[] = ['matches', 'differs', 'unrecorded', 'unreadable'];
   const worlds = $derived(overview.summary.worlds);
@@ -34,6 +38,7 @@
 </script>
 
 <h2>{format('Root.Heading', { version: overview.core })}</h2>
+{@render actions?.()}
 
 {#if explained !== undefined}
   <VersionExplanation {explained} />
