@@ -375,6 +375,16 @@ and the catalogue checks a package at most once every five minutes, however ofte
 catalogue does not hold yet, it fetches, and the footer says how many it is fetching; EMMA looks again once, by
 itself, when the catalogue says they may be found.
 
+### How versions are compared
+
+EMMA compares versions as Foundry VTT does, so that what it plans Foundry accepts. That includes one anomaly: a version
+with more parts is newer than the same version with fewer, so Foundry reads `6.1.0` as newer than `6.1`. A module
+whose manifest allows a game system up to `"maximum": "6.1"` therefore does not run, in Foundry's eyes, on that system
+at 6.1.0, though its author likely meant it to; Foundry's Setup screen says the system needs a downgrade, and EMMA
+says the module cannot take that version. EMMA keeps to Foundry's reading rather than guess what was meant. A
+manifest that means "any 6.1" can say so with a maximum such as `6.1.99`. Only Foundry VTT's own `maximum`, as a whole
+number like `14`, is read as a whole generation, by Foundry and EMMA alike.
+
 ### Installing
 
 The panels of the **Game systems** and **Modules** groups have an **Install** section below them, of the packages on
