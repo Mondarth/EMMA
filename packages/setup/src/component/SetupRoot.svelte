@@ -28,6 +28,7 @@
   import CoreStep from './CoreStep.svelte';
   import AlphaNotice from './AlphaNotice.svelte';
   import BusyMark from './BusyMark.svelte';
+  import OpeningMark from './OpeningMark.svelte';
   import FailedStep from './FailedStep.svelte';
   import WhyChosen from './WhyChosen.svelte';
   import SavedPlanNotice from './SavedPlanNotice.svelte';
@@ -297,6 +298,9 @@
 {/snippet}
 
 <div class="emma-setup">
+  {#if setup.opening}
+    <OpeningMark />
+  {/if}
   {#if overview === null}
     <p class="emma-setup-message" role="status">
       {setup.failed ? localize('App.LoadFailed') : localize('App.Loading')}
@@ -534,6 +538,7 @@
 
 <style>
   .emma-setup {
+    position: relative;
     display: flex;
     flex-direction: column;
     height: 100%;

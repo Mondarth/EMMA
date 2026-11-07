@@ -408,7 +408,8 @@
     "Refreshing": "Refreshing",
     "Locking": "Locking",
     "Ignoring": "Ignoring",
-    "Resuming": "Resuming"
+    "Resuming": "Resuming",
+    "Analyzing": "Analyzing"
   },
   "Why": {
     "Checking": "Why {chosen}",
