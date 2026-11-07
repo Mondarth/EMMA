@@ -27,6 +27,9 @@
   import SystemPanel from './SystemPanel.svelte';
   import CoreStep from './CoreStep.svelte';
   import AlphaNotice from './AlphaNotice.svelte';
+  import BusyMark from './BusyMark.svelte';
+  import FailedStep from './FailedStep.svelte';
+  import WhyChosen from './WhyChosen.svelte';
   import SavedPlanNotice from './SavedPlanNotice.svelte';
   import BestSection from './BestSection.svelte';
   import InstallSection from './InstallSection.svelte';
@@ -131,7 +134,13 @@
     if (run === null) return undefined;
     if (!run.over) return localize('Run.Running');
     if (run.failure !== undefined) {
-      return format('Run.Failed', { step: stepText(run.failure.step), message: run.failure.message });
+      const notRun = Object.keys(run.needed ?? {}).length;
+      return [
+        format('Run.Failed', { step: stepText(run.failure.step), message: run.failure.message }),
+        ...((run.failed ?? 1) > 1 ? [format('Run.MoreFailed', { count: String((run.failed ?? 1) - 1) })] : []),
+        ...(notRun > 0 ? [format('Run.NotRun', { count: String(notRun) })] : []),
+        localize('Run.FailedHint'),
+      ].join(' ');
     }
     if (run.beforeCore === undefined) return localize('Run.Ran');
     const stopped = format('Run.BeforeCore', { version: run.beforeCore });
@@ -240,8 +249,9 @@
       version={pkg.version}
       locked={pkg.locked === true}
       disabled={updates.locked || setup.running}
+      busy={updates.busy.activityOf(`lock:${key}`)}
       onLock={(locking: boolean) => {
-        void setup.setLocked(key, locking);
+        void updates.busy.run(`lock:${key}`, 'locking', () => setup.setLocked(key, locking));
       }} />
   {/if}
 {/snippet}
@@ -253,8 +263,9 @@
       world={key.startsWith('world:')}
       ignored={isIgnored(overview, key)}
       disabled={updates.locked || setup.running}
+      busy={updates.busy.activityOf(`ignore:${key}`)}
       onIgnore={(ignoring: boolean) => {
-        void setup.setIgnored(key, ignoring);
+        void updates.busy.run(`ignore:${key}`, 'ignoring', () => setup.setIgnored(key, ignoring));
       }} />
   {/if}
 {/snippet}
@@ -276,8 +287,11 @@
       title={updates.titleOf(key)}
       {offer}
       locked={updates.locked}
+      busy={updates.busy.activityOf(`uninstall:${key}`)}
       onChoose={(remove: boolean) => {
-        void updates.choose(key, remove ? UNINSTALL : offer.installed);
+        void updates.busy.run(`uninstall:${key}`, 'planning', () =>
+          updates.choose(key, remove ? UNINSTALL : offer.installed),
+        );
       }} />
   {/if}
 {/snippet}
@@ -318,21 +332,25 @@
             </div>
           {/if}
           {#if selection.kind === 'module'}
+            <FailedStep run={setup.shownRun} key={`module:${selection.module}`} />
             <ModulePanel
               detail={moduleDetail(overview, selection.module, selection.world)}
               onOpen={openLink}
               blocked={updates.blockedOf(`module:${selection.module}`)}
               explained={updates.explainedOf(`module:${selection.module}`)} />
+            <WhyChosen {updates} key={`module:${selection.module}`} />
             <RecommendsSection key={`module:${selection.module}`} {updates} onOpen={openLink} />
             {@render lock(`module:${selection.module}`)}
             {@render ignoreInstalled(`module:${selection.module}`)}
             {@render uninstall(`module:${selection.module}`)}
           {:else if selection.kind === 'system'}
+            <FailedStep run={setup.shownRun} key={`system:${selection.system}`} />
             <SystemPanel
               detail={systemDetail(overview, selection.system, selection.world)}
               onOpen={openLink}
               blocked={updates.blockedOf(`system:${selection.system}`)}
               explained={updates.explainedOf(`system:${selection.system}`)} />
+            <WhyChosen {updates} key={`system:${selection.system}`} />
             {@render lock(`system:${selection.system}`)}
             {@render ignoreInstalled(`system:${selection.system}`)}
             {@render uninstall(`system:${selection.system}`)}
@@ -380,8 +398,9 @@
                 version={overview.core}
                 locked={overview.coreLocked === true}
                 disabled={updates.locked || setup.running}
+                busy={updates.busy.activityOf('lock:core')}
                 onLock={(locking: boolean) => {
-                  void setup.setCoreLocked(locking);
+                  void updates.busy.run('lock:core', 'locking', () => setup.setCoreLocked(locking));
                 }} />
             {/if}
           {/if}
@@ -415,6 +434,7 @@
             space={setup.snapshotSpace}
             {coreBlocked}
             run={setup.shownRun}
+            onOpen={openLink}
             acknowledged={setup.alphaAcknowledged}
             onAcknowledge={() => {
               setup.acknowledgeAlpha();
@@ -440,8 +460,9 @@
     {#if setup.savedPlan !== null}
       <SavedPlanNotice
         count={setup.savedPlan.picks.length}
+        busy={updates.busy.activityOf('resume')}
         onResume={() => {
-          void setup.resumeSaved();
+          void updates.busy.run('resume', 'resuming', () => setup.resumeSaved());
         }}
         onDiscard={() => {
           setup.discardSaved();
@@ -481,25 +502,32 @@
     {#if catalogue?.reached === true}
       <button
         type="button"
-        class="emma-setup-check"
+        class="emma-setup-check emma-busy-host"
+        aria-busy={updates.busy.activityOf('check-live') !== undefined}
         data-tooltip={localize('Update.CheckLiveHint')}
-        disabled={updates.checking || updates.locked || updates.status !== 'found'}
+        disabled={updates.checking ||
+          updates.locked ||
+          updates.status !== 'found' ||
+          updates.busy.activityOf('check-live') !== undefined}
         onclick={() => {
-          void updates.checkLive();
+          void updates.busy.run('check-live', 'checking', () => updates.checkLive());
         }}>
         <i class="fa-solid fa-satellite-dish" aria-hidden="true"></i>
         {localize('Update.CheckLive')}
+        <BusyMark activity={updates.busy.activityOf('check-live')} />
       </button>
     {/if}
     <button
       type="button"
-      class="emma-setup-refresh"
-      disabled={setup.loading}
+      class="emma-setup-refresh emma-busy-host"
+      aria-busy={updates.busy.activityOf('refresh') !== undefined}
+      disabled={setup.loading || updates.busy.activityOf('refresh') !== undefined}
       onclick={() => {
-        void setup.refresh();
+        void updates.busy.run('refresh', 'refreshing', () => setup.refresh());
       }}>
       <i class="fa-solid fa-rotate" aria-hidden="true"></i>
       {localize('App.Refresh')}
+      <BusyMark activity={updates.busy.activityOf('refresh')} />
     </button>
   </footer>
 </div>

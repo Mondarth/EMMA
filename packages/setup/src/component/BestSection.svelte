@@ -6,6 +6,8 @@
   import type { UpdateState } from '../app/update-state.svelte';
   import { localize } from '../lib/i18n';
 
+  import BusyMark from './BusyMark.svelte';
+
   interface Props {
     updates: UpdateState;
     /** Whether the plan cannot change now, as while it runs. */
@@ -33,7 +35,7 @@
     outcome = null;
     const limited = inUseOnly;
     try {
-      const replaced = await updates.planBest({ inUseOnly: limited });
+      const replaced = await updates.busy.run('best', 'planning', () => updates.planBest({ inUseOnly: limited }));
       let key: string | undefined;
       if (!replaced) key = 'Best.Failed';
       else if (updates.choices.length === 0) key = limited ? 'Best.AlreadyBestInUse' : 'Best.AlreadyBest';
@@ -49,12 +51,15 @@
   <p>{localize('Best.Hint')}</p>
   <button
     type="button"
-    disabled={disabled || working || updates.status !== 'found'}
+    class="emma-busy-host"
+    aria-busy={updates.busy.activityOf('best') !== undefined}
+    disabled={disabled || working || updates.status !== 'found' || updates.busy.activityOf('best') !== undefined}
     onclick={() => {
       void planBest();
     }}>
     <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
     {localize(updates.choices.length > 0 ? 'Best.Replace' : 'Best.Plan')}
+    <BusyMark activity={updates.busy.activityOf('best')} />
   </button>
   <label class="emma-best-in-use">
     <input

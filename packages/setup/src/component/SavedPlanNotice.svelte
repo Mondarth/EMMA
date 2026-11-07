@@ -3,7 +3,10 @@
   to resume, or to discard (see `SetupState.savedPlan`).
 -->
 <script lang="ts">
+  import type { Activity } from '../app/busy.svelte';
   import { format, localize } from '../lib/i18n';
+
+  import BusyMark from './BusyMark.svelte';
 
   interface Props {
     /** How many changes it has still to make. */
@@ -12,17 +15,25 @@
     onResume: () => void;
     /** Discard it. */
     onDiscard: () => void;
+    /** What EMMA is busy with because of Resume, shown over it; nothing by default. */
+    busy?: Activity | undefined;
   }
 
-  let { count, onResume, onDiscard }: Props = $props();
+  let { count, onResume, onDiscard, busy }: Props = $props();
 </script>
 
 <div class="emma-saved-plan" role="region" aria-label={localize('Saved.Label')}>
   <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
   <p>{format('Saved.Offer', { count: String(count) })}</p>
-  <button type="button" onclick={onResume}>
+  <button
+    type="button"
+    class="emma-busy-host"
+    aria-busy={busy !== undefined}
+    disabled={busy !== undefined}
+    onclick={onResume}>
     <i class="fa-solid fa-play" aria-hidden="true"></i>
     {localize('Saved.Resume')}
+    <BusyMark activity={busy} />
   </button>
   <button type="button" onclick={onDiscard}>
     <i class="fa-solid fa-trash" aria-hidden="true"></i>

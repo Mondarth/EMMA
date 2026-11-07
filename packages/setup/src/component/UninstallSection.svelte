@@ -4,9 +4,12 @@
   cannot know, it warns of.
 -->
 <script lang="ts">
+  import type { Activity } from '../app/busy.svelte';
   import type { UninstallOffer } from '../app/update-state.svelte';
   import { format, localize } from '../lib/i18n';
   import { blockText, warningText } from '../lib/uninstall';
+
+  import BusyMark from './BusyMark.svelte';
 
   interface Props {
     /** The package's title. */
@@ -16,9 +19,11 @@
     locked: boolean;
     /** Put the uninstall in the plan, or take it out. */
     onChoose: (uninstall: boolean) => void;
+    /** What EMMA is busy with because of this section's button, shown over it; nothing by default. */
+    busy?: Activity | undefined;
   }
 
-  let { title, offer, locked, onChoose }: Props = $props();
+  let { title, offer, locked, onChoose, busy }: Props = $props();
 
   const uid = $props.id();
   const refused = $derived(offer.effects.blocks.length > 0 && !offer.planned);
@@ -52,22 +57,28 @@
   {#if offer.planned}
     <button
       type="button"
-      disabled={locked}
+      class="emma-busy-host"
+      aria-busy={busy !== undefined}
+      disabled={locked || busy !== undefined}
       onclick={() => {
         onChoose(false);
       }}>
       <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
       {format('Uninstall.Keep', { title })}
+      <BusyMark activity={busy} />
     </button>
   {:else}
     <button
       type="button"
-      disabled={locked || refused}
+      class="emma-busy-host"
+      aria-busy={busy !== undefined}
+      disabled={locked || refused || busy !== undefined}
       onclick={() => {
         onChoose(true);
       }}>
       <i class="fa-solid fa-trash" aria-hidden="true"></i>
       {format('Uninstall.Button', { title })}
+      <BusyMark activity={busy} />
     </button>
   {/if}
 </section>

@@ -94,6 +94,14 @@ affected: uninstalling, locking, creating and launching them. To let Foundry ins
 the root of EMMA's tree and check **Let Foundry install and update packages here**. The browser remembers the choice
 for that server.
 
+**While EMMA works on something you did**, the item you did it to is covered by a spinner and a word for what EMMA is
+doing, until it is done: a tree row while EMMA plans the version you chose there (**Planning**), a row of the plan
+while EMMA plans without it, a package in an **Install** section while EMMA looks it up and plans it, the manifest URL
+while EMMA reads it (**Reading**), and the buttons that lock (**Locking**), ignore (**Ignoring**), uninstall, plan the
+best versions, resume a saved plan (**Resuming**), **Check live** (**Checking**) and **Refresh** (**Refreshing**). A
+button is disabled meanwhile, so that what it does is not asked for twice. A version list opens at once, with a spinner
+while EMMA checks which versions work with what is chosen, which can take a second or two for a package with many.
+
 ### The installation tree
 
 EMMA's window shows the installation as a tree, and beside it what is selected in it. The tree is in two halves, the
@@ -175,6 +183,14 @@ footer says how many it found. Each package with an update has a blue upward arr
 in the tree. A package with a newer version that EMMA cannot offer has a red one beside it, and its panel says which
 version, and which worlds hold it back and why: EMMA cannot make every world that uses the package consistent with it. A
 closed row with either kind of package anywhere under it has the same arrow, fainter, so nothing is hidden.
+
+When the plan takes a version of a package other than its newest, whether you chose it, the plan needs it, or it is a
+package to install anew, the package's panel says why: **Why 2.1.0, not 3.4.0** lists each newer version and why the plan
+does not take it. It may run on no build of Foundry VTT the plan may choose, or need a newer one; there may be no
+manifest URL for that version alone, which installing it needs; or the plan may not take it with the other versions
+chosen, which EMMA explains. Versions one after another for one reason share a line. A package to install anew is
+expected at its newest version, so in the plan, one taken at another stands out in amber, with a warning sign: its
+tooltip names the newest version, and selecting the package says why.
 
 Looking for updates needs the EMMA module installed, as the extension uses the module's own code to work them out.
 Without it, the footer says so and offers **Install the EMMA module**, which installs it from its published manifest,
@@ -262,18 +278,30 @@ Each has a note, which Foundry keeps with it, written for it at first and free t
 space it needs and the space free, as Foundry's own dialog does, and says when there is too little; Foundry does not
 say what a world's backup needs, so its row gives the space free alone. What is checked is made before anything changes.
 
-**Run plan** lists the steps and asks to confirm them, then runs them in order:
+**Run plan** lists the steps and asks to confirm them, then runs them:
 
-1. the snapshot and backups checked, as Foundry's **Manage Backups** makes them;
-2. each package change, a package installed anew among them, installed from the manifest URL of the version chosen,
-   as Foundry's Install button installs one; the guard lets EMMA's installs through. Foundry's dependency dialog is
-   not shown, as the plan already has what each change needs;
-3. each package to uninstall, last, once nothing installed needs it (see [Uninstalling](#uninstalling)).
+1. the snapshot and backups checked, one at a time, as Foundry's **Manage Backups** makes them;
+2. the package changes, a package installed anew among them, each installed from the manifest URL of the version
+   chosen, as Foundry's Install button installs one; the guard lets EMMA's installs through. Up to five run at once,
+   as Foundry's own **Update All** runs them, each as soon as the changes it needs are done: the game systems it runs
+   in and the modules it requires, that the plan changes. Foundry's dependency dialog is not shown, as the plan
+   already has what each change needs. What you added against EMMA's advice is installed once the rest are over;
+3. each package to uninstall, last, one at a time, once the changes of the packages that needed it are done (see
+   [Uninstalling](#uninstalling)).
+
+A step that fails stops only the steps that need it, and those that need them in turn: they are **Not run**, each
+saying which step it needed. Every other step goes on. Every change needs the snapshot and backups, so if one of
+those fails, nothing changes.
 
 Each row says how far its step has got, and the footer how the run went, until the plan is changed again, as by
-starting a new one. The plan's title and its **Run the plan** and **Clear choices** buttons stay in view as its tables
-scroll. A run stops at the first step that fails,
-saying why, and before Foundry VTT's own update: updating Foundry in place restarts it, and is for the user to do with
+starting a new one. A package being installed or updated says how far, as Foundry tells it: **Downloading 42%**, then
+**Installing 70%**, with a thin bar along the foot of its name, blue as it downloads and then green over it as it
+installs. A step done is underlined in green, with a tick and **Done**; a step that failed in red, as far as it got.
+Foundry says nothing of how far a snapshot, a backup or an uninstall has got, so those show a spinner until done. The plan's title and its **Run the plan** and **Clear choices** buttons stay in view as its tables
+scroll. The footer names the first step that failed, and why, and counts any others that failed or were not run. Each
+package's name in the plan opens its row in the tree, and its panel: a step that failed leads it with what EMMA asked
+Foundry to do (the version, and the manifest URL it was installed from) and what Foundry answered. A
+run stops before Foundry VTT's own update: updating Foundry in place restarts it, and is for the user to do with
 care. Meanwhile the choices cannot change. After a run, EMMA reads the installation again, so what was done leaves the
 plan and the rest stays in it, to run again.
 

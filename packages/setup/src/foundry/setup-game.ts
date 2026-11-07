@@ -380,6 +380,11 @@ export interface PackageInstall {
   readonly dependencies?: boolean;
   /** Whether Foundry says itself that the package was installed, or why not. */
   readonly notify?: boolean;
+  /**
+   * Called on each tick of the install's progress, with Foundry's packet as the event's `data`: its `step`, such as
+   * `download` or `install`, and its `pct`, how much of that step is done (see `run-step.ts`).
+   */
+  readonly onProgress?: (event: Event & { readonly data?: unknown }) => void;
 }
 
 /**

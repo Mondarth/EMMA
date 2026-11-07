@@ -8,6 +8,7 @@
   import { format, localize } from '../lib/i18n';
   import type { TreeSelection } from '../lib/tree';
 
+  import BusyMark from './BusyMark.svelte';
   import TreeLink from './TreeLink.svelte';
 
   interface Props {
@@ -43,7 +44,8 @@
     <p class="emma-recommends-hint">{localize('Recommends.Hint')}</p>
     <ul>
       {#each recommended as recommendation (recommendation.key)}
-        <li>
+        {@const item = `recommends:${key}>${recommendation.key}`}
+        <li class="emma-busy-host" aria-busy={updates.busy.activityOf(item) !== undefined}>
           <!-- The checkbox has its own name, so that the module's name beside it can link to it in the tree. -->
           <input
             type="checkbox"
@@ -51,7 +53,8 @@
             disabled={updates.locked || recommendation.installed}
             aria-label={format('Recommends.Want', { title: recommendation.title, by: updates.titleOf(key) })}
             onchange={event => {
-              void updates.setRecommended(key, recommendation.key, event.currentTarget.checked);
+              const wanted = event.currentTarget.checked;
+              void updates.busy.run(item, 'planning', () => updates.setRecommended(key, recommendation.key, wanted));
             }} />
           <TreeLink
             title={recommendation.title}
@@ -62,6 +65,7 @@
           {#if recommendation.rejected !== undefined}
             {@render rejected(recommendation.rejected)}
           {/if}
+          <BusyMark activity={updates.busy.activityOf(item)} />
         </li>
       {/each}
     </ul>

@@ -7,10 +7,11 @@ import type { PackageKey, Release } from '@mondarth/fvtt-resolver';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
 import type { KitProblem } from '../foundry/setup-kit';
+import { BusyState, afterPaint, paced } from './busy.svelte';
 import { KitUnavailable } from '../foundry/setup-kit';
 import { format, localize, today } from '../lib/i18n';
 import type { Overview } from '../lib/overview';
-import type { PlanEntry, Planner } from '../lib/plans';
+import type { NotTaken, PlanEntry, Planner } from '../lib/plans';
 import { UNINSTALL, keepChoices, withChoice } from '../lib/plans';
 import type { Safeguard, SafeguardEdit } from '../lib/safeguards';
 import { safeguardsFor } from '../lib/safeguards';
@@ -24,6 +25,40 @@ import type { BlockedUpdate, ManifestRead, PackageUpdate, UpdateSearch, VersionO
  * fits (see {@link UpdateState.problem}).
  */
 export type UpdateStatus = 'idle' | 'searching' | 'found' | 'failed' | 'unavailable';
+
+/**
+ * Newer versions of a package the plan does not take, one after another, for one reason: `possible` if the plan could
+ * take them now, as after the choices changed.
+ */
+export interface NotTakenRun {
+  /** The newest of them. */
+  readonly newest: string;
+  /** The oldest of them; the newest, if there is one. */
+  readonly oldest: string;
+  readonly why: NotTaken | { readonly reason: 'possible' };
+}
+
+/**
+ * A version as it stands in an explanation: alone, not part of a longer version or name, as `2.1.0` in `monsterblock
+ * 2.1.0 depends on _mathjs`, but not in `12.1.0` nor `2.1.0-beta`.
+ * @param version - The version
+ * @returns A pattern finding it
+ */
+export function versionIn(version: string): RegExp {
+  return new RegExp(`(?<![\\w.-])${version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-]|\\.\\w)`, 'g');
+}
+
+/**
+ * A reason for not taking a version, as it would be for any version: the version named in its explanation stood for, so
+ * that versions refused alike, each naming itself, share a line.
+ * @param why - The reason
+ * @param version - The version it is for
+ * @returns The reason, as JSON
+ */
+function reasonFor(why: NotTakenRun['why'], version: string): string {
+  if (why.reason !== 'conflict') return JSON.stringify(why);
+  return JSON.stringify(why.explanation.map(line => line.replace(versionIn(version), '\u0000')));
+}
 
 /** A change in the plan: a version chosen, or one a version chosen needs. */
 export interface UpdateChoice {
@@ -150,6 +185,8 @@ export class UpdateState {
   changes = $state(0);
   /** Whether the catalogue is checking the installed packages' own manifests again, as "check live" asks. */
   checking = $state(false);
+  /** What EMMA is busy with, by the item the user acted on, for that item to show it. */
+  readonly busy = new BusyState();
 
   /** The versions chosen, by package key, in the order they were chosen. */
   readonly #picks = new SvelteMap<PackageKey, string>();
@@ -217,7 +254,12 @@ export class UpdateState {
    */
   readonly runPlan: readonly PlanEntry[] = $derived.by(() => {
     const kept = this.plan.filter(({ key }) => !this.#forced.has(key));
-    const forced = [...this.#forced.values()].map(({ key, version, manifest }) => ({ key, version, manifest }));
+    const forced = [...this.#forced.values()].map(({ key, version, manifest }) => ({
+      key,
+      version,
+      manifest,
+      forced: true as const,
+    }));
     const uninstalls = kept.filter(({ version }) => version === UNINSTALL);
     return [...kept.filter(({ version }) => version !== UNINSTALL), ...forced, ...uninstalls];
   });
@@ -333,6 +375,45 @@ export class UpdateState {
   }
 
   /**
+   * The newest version known of a package, if it is newer than one: what a package installed anew is taken at, when it
+   * is not its newest.
+   * @param key - The package's key
+   * @param version - The version
+   * @returns The newest version, or `undefined` if none is newer, or before the search has found anything
+   */
+  newestBeyond(key: PackageKey, version: string): string | undefined {
+    return this.search?.planner.newerThan(key, version)[0];
+  }
+
+  /**
+   * Why the plan takes the version of a package it does rather than a newer one: each newer version, newest first, and
+   * why the plan does not take it, versions one after another for one reason sharing a line. The browser is let draw as
+   * it works, as for a version list. None for a package the plan does not change, uninstalls, or takes at its newest;
+   * nor for Foundry VTT, whose builds the plan's panels say of.
+   * @param key - The package's key
+   * @returns The newer versions, by reason
+   */
+  async notTakenOf(key: PackageKey): Promise<readonly NotTakenRun[]> {
+    const search = this.search;
+    const chosen = this.plan.find(entry => entry.key === key)?.version;
+    if (search === null || chosen === undefined || chosen === UNINSTALL || key === 'core') return [];
+    const { planner } = search;
+    const picks = new SvelteMap(this.#picks);
+    const runs: NotTakenRun[] = [];
+    await afterPaint();
+    const pace = paced();
+    for (const version of planner.newerThan(key, chosen)) {
+      await pace();
+      const why = (await planner.whyNotTaken(key, version, picks)) ?? { reason: 'possible' as const };
+      const last = runs.at(-1);
+      if (last !== undefined && reasonFor(last.why, last.newest) === reasonFor(why, version)) {
+        runs[runs.length - 1] = { ...last, oldest: version };
+      } else runs.push({ newest: version, oldest: version, why });
+    }
+    return runs;
+  }
+
+  /**
    * The update on offer for a package.
    * @param key - The package's key, such as `module:<id>`
    * @returns The update, or `undefined` if there is none
@@ -442,7 +523,12 @@ export class UpdateState {
     const { planner } = search;
     const chosen = (other: PackageKey) => this.chosenOf(other);
     const options: VersionOption[] = [];
+    // The list that asked is drawn first, saying it is checking, and again as the work goes on, which would otherwise
+    // keep the browser from drawing anything until every version was judged.
+    await afterPaint();
+    const pace = paced();
     for (const version of [...planner.candidates(key), installed]) {
+      await pace();
       if (planner.missingManifest(key, version)) {
         const judged = search.judge(key, version, chosen);
         options.push({ ...this.#withNeeds(key, judged), missingManifest: true });

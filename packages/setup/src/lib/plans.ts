@@ -89,7 +89,27 @@ export interface PlanEntry {
   readonly through?: readonly PackageVersion[];
   /** The manifest URL to install the version from, one for that version alone; none for Foundry VTT, or if none is found. */
   readonly manifest?: string;
+  /**
+   * The plan's other changes this one waits for when the plan runs, and does not run without, as the order to install
+   * them gives them (see {@link installOrder}): for a version installed, the game systems and modules it requires or
+   * runs in that the plan changes; for an uninstall, the changes of the packages whose installed versions require it or
+   * run in it, as those might still if their changes failed. None if it waits for none.
+   */
+  readonly after?: readonly PackageKey[];
+  /** Added against EMMA's advice: installed as given, after the plan's other installs, and never resolved. */
+  readonly forced?: true;
 }
+
+/**
+ * Why the plan does not take a version:
+ * - `no-build`: it runs on no build of Foundry VTT the plan may choose, needing `minimum` or later, where it says;
+ * - `no-manifest`: there is no manifest URL for that version alone, which installing it needs;
+ * - `conflict`: the plan cannot take it with the other versions chosen, as the resolver explains.
+ */
+export type NotTaken =
+  | { readonly reason: 'no-build'; readonly minimum?: string }
+  | { readonly reason: 'no-manifest' }
+  | { readonly reason: 'conflict'; readonly explanation: readonly string[] };
 
 /** Plans updates of an installation. */
 export interface Planner {
@@ -152,6 +172,22 @@ export interface Planner {
    * @returns `true` for such a version; `false` for one installed, one not found, or Foundry VTT
    */
   missingManifest(key: PackageKey, version: string): boolean;
+  /**
+   * The versions of a package newer than one, newest first: those known, whether or not the plan could take them.
+   * @param key - The package
+   * @param version - The version
+   * @returns The newer versions
+   */
+  newerThan(key: PackageKey, version: string): readonly string[];
+  /**
+   * Why the plan does not take a version of a package with the versions chosen: it runs on no build of Foundry VTT the
+   * plan may choose, there is no manifest URL for that version alone, or the plan cannot take it with the rest.
+   * @param key - The package
+   * @param version - The version
+   * @param picks - The versions chosen
+   * @returns Why, or `undefined` if the plan could take it
+   */
+  whyNotTaken(key: PackageKey, version: string, picks: ReadonlyMap<PackageKey, string>): Promise<NotTaken | undefined>;
   /**
    * A package's title.
    * @param key - The package, or `core`
@@ -655,7 +691,7 @@ export function createPlanner(inputs: PlannerInputs): Planner {
           ...(manifest !== undefined && { manifest }),
         };
       };
-      return installOrder(
+      const ordered = installOrder(
         [
           ...order.filter(([key]) => versions.has(key)).map(([key, version]) => entry(key, version)),
           ...[...versions].filter(([key]) => !picks.has(key)).map(([key, version]) => entry(key, version)),
@@ -663,6 +699,26 @@ export function createPlanner(inputs: PlannerInputs): Planner {
         ({ key, version }) =>
           releaseOf(key, version)?.relationships.requires.map(required => packageKey(required.package)) ?? [],
       );
+      // What each change waits for, of the plan's other changes, as it runs.
+      const changing = new Set(
+        ordered.filter(({ key, version }) => key !== CORE && version !== UNINSTALL).map(e => e.key),
+      );
+      // What a version requires or runs in; nothing for one not installed, or whose release is not known.
+      const namedBy = (key: PackageKey, version: string | undefined): PackageKey[] => {
+        const relationships = version === undefined ? undefined : releaseOf(key, version)?.relationships;
+        return [...(relationships?.requires ?? []), ...(relationships?.systems ?? [])].map(related =>
+          packageKey(related.package),
+        );
+      };
+      return ordered.map(planned => {
+        const { key, version } = planned;
+        if (key === CORE) return planned;
+        const after =
+          version === UNINSTALL
+            ? [...changing].filter(other => namedBy(other, installed.get(other)).includes(key))
+            : [...new Set(namedBy(key, version))].filter(other => other !== key && changing.has(other));
+        return after.length === 0 ? planned : { ...planned, after };
+      });
     },
 
     candidates(key) {
@@ -678,6 +734,25 @@ export function createPlanner(inputs: PlannerInputs): Planner {
           .filter(release => runnable.some(build => runsOn(resolver, release, build, universe)))
           .map(({ version }) => version),
       );
+    },
+
+    newerThan(key, version) {
+      return newestFirst(
+        resolver,
+        universe.releases
+          .filter(release => packageKey(release.package) === key && newer(release.version, version))
+          .map(release => release.version),
+      );
+    },
+
+    async whyNotTaken(key, version, picks) {
+      if (!this.candidates(key).includes(version)) {
+        const minimum = releaseOf(key, version)?.compatibility.minimum;
+        return { reason: 'no-build', ...(minimum !== undefined && { minimum }) };
+      }
+      if (this.missingManifest(key, version)) return { reason: 'no-manifest' };
+      const completion = await this.complete(withChoice(picks, key, version));
+      return completion.ok ? undefined : { reason: 'conflict', explanation: completion.explanation ?? [] };
     },
 
     include(read) {

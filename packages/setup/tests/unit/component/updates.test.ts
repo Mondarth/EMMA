@@ -254,7 +254,7 @@ describe('updates in the window', () => {
     await user.click(system);
     const list = screen.getByRole('listbox', { name: 'Versions of D&D 5e' });
     // The installed version, shown on the button, is left out.
-    const options = within(list).getAllByRole('option');
+    const options = await within(list).findAllByRole('option');
     expect(options.map(option => option.textContent.trim().split(/\s+/)[0])).toEqual(['5.4.0']);
     expect(options[0]?.querySelector('.emma-badge')).toHaveClass('warning');
     // Opening the list selected its row, for its panel to explain the versions; choosing one keeps it so.
@@ -1422,13 +1422,10 @@ describe('uninstalling', () => {
     expect(within(plan).getByRole('alertdialog')).toHaveTextContent('uninstall Spare');
     await user.click(within(plan).getByRole('button', { name: 'Run' }));
     await vi.waitFor(() => {
-      expect(runStep).toHaveBeenCalledWith({
-        kind: 'uninstall',
-        key: 'module:spare',
-        type: 'module',
-        id: 'spare',
-        title: 'Spare',
-      });
+      expect(runStep).toHaveBeenCalledWith(
+        { kind: 'uninstall', key: 'module:spare', type: 'module', id: 'spare', title: 'Spare' },
+        expect.any(Function),
+      );
     });
     await vi.waitFor(() => {
       expect(setup.run?.over).toBe(true);
@@ -1620,9 +1617,7 @@ describe("the plan's snapshot and backups", () => {
     fail(new Error('The download failed'));
 
     await vi.waitFor(() => {
-      expect(screen.getByRole('status')).toHaveTextContent(
-        'The plan stopped at “install Library 1.5.0”: The download failed',
-      );
+      expect(screen.getByRole('status')).toHaveTextContent('“install Library 1.5.0” failed: The download failed');
     });
     expect(setup.run?.over).toBe(true);
   });

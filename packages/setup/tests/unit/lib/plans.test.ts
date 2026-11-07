@@ -242,6 +242,8 @@ describe('createPlanner', () => {
         version: '2.0.0',
         by: { package: 'system:dnd5e', version: '6.0.6' },
         manifest: 'https://example.org/midi/2.0.0/module.json',
+        // It runs in the game system, which changes first.
+        after: ['system:dnd5e'],
       },
     ]);
     // The same choices are not worked out again.
@@ -283,6 +285,37 @@ describe('createPlanner', () => {
   });
 });
 
+describe('why a version is not taken', () => {
+  const RELEASES = [
+    ...DND,
+    ...MIDI,
+    release('module:midi', '3.0.0', { core: { minimum: '15', verified: '15' } }),
+    release('module:midi', '2.5.0', { versionManifest: null }),
+  ];
+
+  test('lists the versions newer than one, newest first, whether or not the plan could take them', () => {
+    const plans = planner([['midi', '1.0.0']], { a: [['midi', '1.0.0']] }, RELEASES);
+
+    expect(plans.newerThan('module:midi', '1.0.0')).toEqual(['3.0.0', '2.5.0', '2.0.0']);
+    expect(plans.newerThan('module:midi', '3.0.0')).toEqual([]);
+  });
+
+  test('says one needs a newer Foundry VTT, one has no manifest of its own, and one the plan cannot take', async () => {
+    const plans = planner([['midi', '1.0.0']], { a: [['midi', '1.0.0']] }, RELEASES);
+    // D&D 5e kept at 5.3.3, which Midi 2.0.0 does not run in.
+    const kept = picks(['system:dnd5e', '5.3.3']);
+
+    await expect(plans.whyNotTaken('module:midi', '3.0.0', kept)).resolves.toEqual({
+      reason: 'no-build',
+      minimum: '15',
+    });
+    await expect(plans.whyNotTaken('module:midi', '2.5.0', kept)).resolves.toEqual({ reason: 'no-manifest' });
+    await expect(plans.whyNotTaken('module:midi', '2.0.0', kept)).resolves.toMatchObject({ reason: 'conflict' });
+    // Free to change D&D 5e too, the plan could take it.
+    await expect(plans.whyNotTaken('module:midi', '2.0.0', picks())).resolves.toBeUndefined();
+  });
+});
+
 describe('installing anew', () => {
   /** Dice: 2.0.0 needs Foundry 15, 1.5.0 runs on 14, and 1.0.0 too. */
   const DICE = [
@@ -312,7 +345,13 @@ describe('installing anew', () => {
         by: { package: 'module:dice', version: '1.5.0' },
         manifest: 'https://example.org/lib/1.0.0/module.json',
       },
-      { key: 'module:dice', version: '1.5.0', manifest: 'https://example.org/dice/1.5.0/module.json' },
+      {
+        key: 'module:dice',
+        version: '1.5.0',
+        manifest: 'https://example.org/dice/1.5.0/module.json',
+        // It requires the library, installed first.
+        after: ['module:lib'],
+      },
     ]);
   });
 
@@ -601,6 +640,28 @@ describe('uninstalling', () => {
       ok: false,
       explanation: ['the plan needs LIB, which the plan uninstalls'],
     });
+  });
+
+  test('uninstalls a package only after the changes of those whose installed versions need it', async () => {
+    // The app installed needs the library; the version chosen does not, so the library may go once it is installed.
+    const plans = planner(
+      [
+        ['lib', '1.0.0'],
+        ['app', '1.0.0'],
+      ],
+      { a: [['app', '1.0.0']] },
+      [
+        ...DND,
+        release('module:lib', '1.0.0'),
+        release('module:app', '1.0.0', { requires: { lib: {} } }),
+        release('module:app', '2.0.0'),
+      ],
+    );
+
+    await expect(plans.plan(picks(['module:app', '2.0.0'], ['module:lib', UNINSTALL]))).resolves.toEqual([
+      expect.objectContaining({ key: 'module:app', version: '2.0.0' }),
+      { key: 'module:lib', installed: '1.0.0', version: UNINSTALL, after: ['module:app'] },
+    ]);
   });
 
   test('cannot uninstall the game system of a world without a record', async () => {

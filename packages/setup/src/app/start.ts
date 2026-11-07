@@ -181,8 +181,8 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
     },
     keepPendingPlan: writePendingPlan,
     pendingPlan: readPendingPlan,
-    runStep: async step => {
-      if (placed.guard !== undefined) await runStep(game, placed.guard, step);
+    runStep: async (step, onProgress) => {
+      if (placed.guard !== undefined) await runStep(game, placed.guard, step, onProgress);
     },
     guardOn: readGuardOn(),
     onGuardChange: on => {
