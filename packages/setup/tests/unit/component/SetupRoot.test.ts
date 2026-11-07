@@ -652,7 +652,9 @@ describe('what is locked and ignored, under Plan Updates', () => {
     // Just below the heading of Plan Updates.
     const block = () => screen.getByRole('group', { name: 'Locked and ignored' });
     const held = block();
-    expect(screen.getByRole('heading', { level: 3, name: 'Plan Updates' }).nextElementSibling).toBe(held);
+    expect(screen.getByRole('heading', { level: 3, name: 'Plan Updates' }).nextElementSibling?.firstElementChild).toBe(
+      held,
+    );
     const lockedList = within(held).getByRole('list', { name: 'Locked' });
     expect(
       within(lockedList)

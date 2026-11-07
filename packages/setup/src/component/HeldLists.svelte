@@ -69,23 +69,35 @@
 {/snippet}
 
 {#if locked.length > 0 || ignored.length > 0}
-  <div class="emma-held" role="group" aria-label={localize('Held.Label')}>
-    {@render list('locked', localize('Held.Locked'), locked, true)}
-    {@render list('ignored', localize('Held.Ignored'), ignored, false)}
+  <!-- Its width, which the lists' columns follow, rather than the window's. -->
+  <div class="emma-held-box">
+    <div class="emma-held" role="group" aria-label={localize('Held.Label')}>
+      {@render list('locked', localize('Held.Locked'), locked, true)}
+      {@render list('ignored', localize('Held.Ignored'), ignored, false)}
+    </div>
   </div>
 {/if}
 
 <style>
-  /* Side by side, each list taking half, wrapping one under the other only where the panel is too narrow. */
-  .emma-held {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem 1rem;
+  .emma-held-box {
+    container-type: inline-size;
     margin: 0.5rem 0 0.75rem;
   }
 
+  /* Side by side, each list half the width, even alone; one under the other, each the full width, where too narrow. */
+  .emma-held {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem 1rem;
+  }
+
+  @container (width < 24rem) {
+    .emma-held {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
   .emma-held-list {
-    flex: 1 1 12rem;
     min-width: 0;
   }
 
