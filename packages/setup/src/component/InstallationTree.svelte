@@ -111,6 +111,14 @@
       });
   });
 
+  // Check again which updates the plan holds back whenever the plan, or the search, changes.
+  $effect(() => {
+    if (updates === undefined || updates.heldBackFor === '') return;
+    untrack(() => {
+      void updates.checkHeldBack();
+    });
+  });
+
   /** Forget what the finder was typing; what it opened stays open. */
   function endFinding(): void {
     clearTimeout(finderTimer);
@@ -207,8 +215,11 @@
   }
 </script>
 
-{#snippet arrow(text: string, faint: boolean)}
-  <i class={['fa-solid', 'fa-circle-up', { 'emma-tree-hidden': faint }]} title={localize(text)} aria-hidden="true"></i>
+{#snippet arrow(text: string, faint: boolean, held = false)}
+  <i
+    class={['fa-solid', 'fa-circle-up', { 'emma-tree-hidden': faint, 'emma-tree-held': held }]}
+    title={localize(text)}
+    aria-hidden="true"></i>
   <span class="emma-visually-hidden">{localize(text)}</span>
 {/snippet}
 
@@ -225,7 +236,10 @@
       {@const update = key === undefined ? undefined : updates?.updateOf(key)}
       {@const blocked = key !== undefined && updates?.blockedOf(key) !== undefined}
       {@const removing = key !== undefined && row.installed === true && updates?.chosenOf(key) === UNINSTALL}
-      {@const hidden = updates !== undefined && anyOf(row.hides, under => updates.updateOf(under) !== undefined)}
+      {@const hidden =
+        updates !== undefined &&
+        anyOf(row.hides, under => updates.updateOf(under) !== undefined && !updates.heldBack(under))}
+      {@const hiddenHeld = !hidden && updates !== undefined && anyOf(row.hides, under => updates.heldBack(under))}
       {@const hiddenBlocked =
         updates !== undefined && anyOf(row.hides, under => updates.blockedOf(under) !== undefined)}
       <li
@@ -247,10 +261,14 @@
         }}
         onkeydown={onKeydown}>
         <span class="emma-tree-update">
-          {#if update !== undefined}
+          {#if update !== undefined && key !== undefined && updates?.heldBack(key) === true}
+            {@render arrow('Update.HeldBack', false, true)}
+          {:else if update !== undefined}
             {@render arrow('Update.Available', false)}
           {:else if hidden}
             {@render arrow('Update.Hidden', true)}
+          {:else if hiddenHeld}
+            {@render arrow('Update.HiddenHeldBack', true, true)}
           {/if}
         </span>
         {#if anyBlocked}
@@ -461,6 +479,23 @@
 
   .emma-tree-hidden {
     opacity: 0.6;
+  }
+
+  /* Struck through: an update the plan as it stands cannot take. */
+  .emma-tree-held {
+    position: relative;
+  }
+
+  .emma-tree-held::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: -10%;
+    width: 120%;
+    height: 2px;
+    background: currentcolor;
+    box-shadow: 0 0 0 1px var(--color-cool-5, #0b0a13);
+    transform: rotate(-45deg);
   }
 
   .emma-visually-hidden {
