@@ -16,6 +16,7 @@
   import { groupDetail, moduleDetail, systemDetail } from '../lib/details';
   import { EMMA_VERSION } from '../lib/alpha';
   import { format, localize } from '../lib/i18n';
+  import { ignoredItems, lockedItems } from '../lib/held';
   import { isIgnored } from '../lib/overview';
   import type { TreeRow, TreeSelection } from '../lib/tree';
   import { ROOT, allRows, ignoreKeyOf, rowFor } from '../lib/tree';
@@ -33,6 +34,7 @@
   import WhyChosen from './WhyChosen.svelte';
   import SavedPlanNotice from './SavedPlanNotice.svelte';
   import BestSection from './BestSection.svelte';
+  import HeldLists from './HeldLists.svelte';
   import InstallSection from './InstallSection.svelte';
   import IgnoreSection from './IgnoreSection.svelte';
   import LockSection from './LockSection.svelte';
@@ -233,6 +235,21 @@
   function filterInstall(type: 'module' | 'system', change: Partial<InstallFilters>): void {
     setup.setInstallFilters(type, change);
   }
+  /**
+   * The latest version known of an installed game system or module, for its panel: none before the search, for one not
+   * installed, or for one ignored, whose other releases EMMA never looks up.
+   * @param key - The package's key
+   * @returns The version, if known
+   */
+  function latestOf(key: string): string | undefined {
+    if (overview === null || isIgnored(overview, key)) return undefined;
+    const id = key.slice(key.indexOf(':') + 1);
+    const version = key.startsWith('system:')
+      ? overview.systems.find(system => system.id === id)?.version
+      : overview.modules.find(({ module: installed }) => installed.id === id)?.module.version;
+    return version === undefined ? undefined : updates.latestKnown(key, version);
+  }
+
   // What is selected, if it is still there: after reading again, a world may have gone.
   const world = $derived(
     selection.kind === 'world' ? overview?.worlds.find(({ world: { id } }) => id === selection.world) : undefined,
@@ -335,7 +352,31 @@
     inUseOnly={setup.bestInUseOnly}
     onInUseOnlyChange={(on: boolean) => {
       setup.setBestInUseOnly(on);
-    }} />
+    }}
+    {held} />
+{/snippet}
+
+<!--
+  What is locked and what is ignored, under Plan Updates, each with a shortcut to unlock it or stop ignoring it: only
+  what can be unlocked or unignored here, as through its own panel.
+-->
+{#snippet held()}
+  {#if overview !== null}
+    <HeldLists
+      locked={lockedItems(overview).filter(({ key }) => (key === 'core' ? setup.canLockCore : setup.canLock))}
+      ignored={setup.canIgnore ? ignoredItems(overview) : []}
+      disabled={updates.locked || setup.running}
+      busy={(key: string, locking: boolean) => updates.busy.activityOf(`${locking ? 'lock' : 'ignore'}:${key}`)}
+      onUnlock={(key: string) => {
+        void updates.busy.run(`lock:${key}`, 'locking', () =>
+          key === 'core' ? setup.setCoreLocked(false) : setup.setLocked(key, false),
+        );
+      }}
+      onUnignore={(key: string) => {
+        void updates.busy.run(`ignore:${key}`, 'ignoring', () => setup.setIgnored(key, false));
+      }}
+      onOpen={openLink} />
+  {/if}
 {/snippet}
 
 {#snippet uninstall(key: string)}
@@ -399,7 +440,8 @@
               detail={moduleDetail(overview, selection.module, selection.world)}
               onOpen={openLink}
               blocked={updates.blockedOf(`module:${selection.module}`)}
-              explained={updates.explainedOf(`module:${selection.module}`)} />
+              explained={updates.explainedOf(`module:${selection.module}`)}
+              latest={latestOf(`module:${selection.module}`)} />
             <WhyChosen {updates} key={`module:${selection.module}`} />
             <RecommendsSection key={`module:${selection.module}`} {updates} onOpen={openLink} />
           {:else if selection.kind === 'system'}
@@ -409,7 +451,8 @@
               detail={systemDetail(overview, selection.system, selection.world)}
               onOpen={openLink}
               blocked={updates.blockedOf(`system:${selection.system}`)}
-              explained={updates.explainedOf(`system:${selection.system}`)} />
+              explained={updates.explainedOf(`system:${selection.system}`)}
+              latest={latestOf(`system:${selection.system}`)} />
             <WhyChosen {updates} key={`system:${selection.system}`} />
           {:else if selection.kind === 'worlds' || selection.kind === 'systems' || selection.kind === 'modules' || selection.kind === 'group'}
             <GroupPanel detail={groupDetail(overview, selection)} onOpen={openLink} />

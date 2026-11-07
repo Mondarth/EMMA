@@ -278,6 +278,36 @@ describe('updates in the window', () => {
     expect(universal).toHaveTextContent(/^Updates in the rows under it Universal/);
   });
 
+  test("gives each package's latest version known under its installed one, the installed one where none is newer", async () => {
+    const planner = alone(...UPDATES);
+    await setUp(() =>
+      findingBlocked()().then(found => ({
+        ...found,
+        planner: {
+          ...planner,
+          // Newer than the plan can take, the library's newest is known still.
+          newerThan: (key, version) => (key === 'module:lib' && version === '1.0.0' ? ['3.0.0', '2.0.0'] : []),
+        },
+      })),
+    );
+    const user = userEvent.setup();
+    const shown = () =>
+      Object.fromEntries(
+        Array.from(document.querySelectorAll('.emma-setup-panel dt'), term => [
+          term.textContent.trim(),
+          term.nextElementSibling?.textContent.trim(),
+        ]),
+      );
+
+    await user.click(within(row(/D&D 5e 5\.3\.3/)).getByText('D&D 5e'));
+    expect(shown()).toMatchObject({ Installed: '5.3.3', 'Latest known': '5.3.3' });
+
+    await user.click(within(row(/Universal/)).getByText('Universal'));
+    await user.keyboard('{ArrowRight}');
+    await user.click(within(row(/Library 1\.0\.0/)).getByText('Library'));
+    expect(shown()).toMatchObject({ Installed: '1.0.0', 'Latest known': '3.0.0' });
+  });
+
   test('gives no column to red arrows while nothing is blocked', async () => {
     await setUp();
 

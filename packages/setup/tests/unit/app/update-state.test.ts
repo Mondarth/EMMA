@@ -1533,3 +1533,19 @@ describe('updates the plan holds back', () => {
     expect(updates.heldBack('module:app')).toBe(true);
   });
 });
+
+describe("a package's latest version known", () => {
+  test('is the newest the search found, or the installed one where none is newer, and none before the search', async () => {
+    const planner = alone(APP);
+    const updates = new UpdateState(() =>
+      Promise.resolve({
+        ...finding(APP),
+        planner: { ...planner, newerThan: (key: string) => (key === 'module:app' ? ['3.0.0', '2.0.0'] : []) },
+      }),
+    );
+    expect(updates.latestKnown('module:app', '1.0.0')).toBeUndefined();
+    await updates.searchFor(OVERVIEW);
+    expect(updates.latestKnown('module:app', '1.0.0')).toBe('3.0.0');
+    expect(updates.latestKnown('module:other', '1.0.0')).toBe('1.0.0');
+  });
+});

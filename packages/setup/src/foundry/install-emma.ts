@@ -13,7 +13,7 @@ import { EMMA_MANIFEST, EMMA_MODULE_ID } from './setup-kit';
  * @param game - The setup screen's `game`
  * @param guard - The guard, to let the installs through
  * @returns Once installed, and its dependencies seen to
- * @throws Error if Foundry cannot install packages here, or the install fails; Foundry tells the user why
+ * @throws {Error} if Foundry cannot install packages here, or the install fails; Foundry tells the user why
  */
 export async function installEmma(game: SetupGame, guard: Guard): Promise<void> {
   const { installPackage, installDependencies } = game;

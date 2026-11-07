@@ -1,9 +1,9 @@
 /**
- * Dependabot writes long "bump x from y to z" messages; their format is not ours to police.
+ * Dependabot writes long "Bump x from y to z" messages, capitalised or not; their format is not ours to police.
  * @param message - A commit message
  * @returns Whether Dependabot wrote it to update a dependency
  */
-const isDependabot = message => /^(?:build|ci)\([\w-]+\): bump /.test(message);
+const isDependabot = message => /^(?:build|ci)\([\w-]+\): [Bb]ump /.test(message);
 
 export default {
   extends: ['@commitlint/config-conventional'],

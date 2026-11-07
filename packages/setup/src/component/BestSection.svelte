@@ -3,6 +3,8 @@
   module installed that the plan can take together, in place of what was chosen before (see `UpdateState.planBest`).
 -->
 <script lang="ts">
+  import type { Snippet } from 'svelte';
+
   import type { UpdateState } from '../app/update-state.svelte';
   import { localize } from '../lib/i18n';
 
@@ -16,9 +18,11 @@
     inUseOnly?: boolean;
     /** Limit them, or not. */
     onInUseOnlyChange?: (on: boolean) => void;
+    /** What is held as it is, shown just below the heading, as what the best versions keep as it is. */
+    held?: Snippet | undefined;
   }
 
-  let { updates, disabled, inUseOnly = false, onInUseOnlyChange }: Props = $props();
+  let { updates, disabled, inUseOnly = false, onInUseOnlyChange, held }: Props = $props();
 
   const uid = $props.id();
   /** Whether the best versions are being worked out. */
@@ -48,6 +52,7 @@
 
 <section class="emma-best" aria-labelledby="{uid}-heading">
   <h3 id="{uid}-heading">{localize('Best.Heading')}</h3>
+  {@render held?.()}
   <p>{localize('Best.Hint')}</p>
   <button
     type="button"

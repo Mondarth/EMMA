@@ -380,6 +380,18 @@ export class UpdateState {
   }
 
   /**
+   * The latest version known of a package installed at a version: the newest the search found, whether or not the plan
+   * can take it, or the installed one where none is newer.
+   * @param key - The package's key
+   * @param installed - Its installed version
+   * @returns The version, or `undefined` before the search has found anything
+   */
+  latestKnown(key: PackageKey, installed: string): string | undefined {
+    if (this.search === null) return undefined;
+    return this.search.planner.newerThan(key, installed)[0] ?? installed;
+  }
+
+  /**
    * The newest version known of a package, if it is newer than one: what a package installed anew is taken at, when it
    * is not its newest.
    * @param key - The package's key

@@ -264,6 +264,11 @@ needed by it, locked in. A shift-click takes out what it brought in
 too, but for what another change still needs. So does a click on a change in a ring of changes that need each other,
 such as a module, a module it requires and the game system they run in, each newer: alone, it would only come back.
 
+Just under **Plan Updates**, what is held as it is shows in two lists side by side: **Locked**, Foundry VTT if EMMA locks
+it and the game systems and modules locked in Foundry, and **Ignored**, the worlds, game systems and modules EMMA
+ignores. Each list is five entries high and scrolls past that, and one with nothing in it is not shown. Each entry opens
+its row in the tree, and the padlock or the eye beside it unlocks it or stops ignoring it at once.
+
 **Plan the best versions**, under **Plan Updates** just below the actions in the root's panel, replaces the plan with the newest versions there are: those of Foundry
 VTT, then of each game system, then of each module installed, each the newest the plan can take with those before it,
 so that every recorded world keeps working, as choosing each by hand would. Packages locked in Foundry, and Foundry VTT
@@ -374,6 +379,16 @@ catalogue read each installed package's own manifest now, then looks again: a ch
 and the catalogue checks a package at most once every five minutes, however often it is asked. A package the
 catalogue does not hold yet, it fetches, and the footer says how many it is fetching; EMMA looks again once, by
 itself, when the catalogue says they may be found.
+
+### How versions are compared
+
+EMMA compares versions as Foundry VTT does, so that what it plans Foundry accepts. That includes one anomaly: a version
+with more parts is newer than the same version with fewer, so Foundry reads `6.1.0` as newer than `6.1`. A module
+whose manifest allows a game system up to `"maximum": "6.1"` therefore does not run, in Foundry's eyes, on that system
+at 6.1.0, though its author likely meant it to; Foundry's Setup screen says the system needs a downgrade, and EMMA
+says the module cannot take that version. EMMA keeps to Foundry's reading rather than guess what was meant. A
+manifest that means "any 6.1" can say so with a maximum such as `6.1.99`. Only Foundry VTT's own `maximum`, as a whole
+number like `14`, is read as a whole generation, by Foundry and EMMA alike.
 
 ### Installing
 

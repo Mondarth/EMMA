@@ -75,6 +75,7 @@
     "InWorld": "In {world}",
     "LastRan": "Last ran with",
     "Installed": "Installed",
+    "Latest": "Latest known",
     "NotInstalled": "Not installed",
     "ActiveIn": "Active in",
     "Systems": "Game systems",
@@ -435,5 +436,12 @@
   "Action": {
     "About": "What {action} does",
     "Label": "Actions"
+  },
+  "Held": {
+    "Label": "Locked and ignored",
+    "Locked": "Locked",
+    "Ignored": "Ignored",
+    "Unlock": "Unlock {title}",
+    "Unignore": "Stop ignoring {title}"
   }
 }
