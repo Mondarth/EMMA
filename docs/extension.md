@@ -187,6 +187,12 @@ in the tree. A package with a newer version that EMMA cannot offer has a red one
 version, and which worlds hold it back and why: EMMA cannot make every world that uses the package consistent with it. A
 closed row with either kind of package anywhere under it has the same arrow, fainter, so nothing is hidden.
 
+A blue arrow **struck through** marks an update the plan cannot take as it stands: a newer version is offered, but none
+of them goes with the plan's choices and locks, as when Foundry VTT is locked and every newer version needs a newer
+build. Its version list says why. A package the plan already changes keeps its plain arrow. A closed row whose updates
+under it are all held back so has the struck arrow, fainter. EMMA checks again each time the plan changes, so the
+arrows may take a moment to catch up after a change.
+
 When the plan takes a version of a package other than its newest, whether you chose it, the plan needs it, or it is a
 package to install anew, the package's panel says why: **Why 2.1.0, not 3.4.0** lists each newer version and why the plan
 does not take it. It may run on no build of Foundry VTT the plan may choose, or need a newer one; there may be no

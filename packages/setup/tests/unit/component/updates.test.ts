@@ -217,6 +217,45 @@ describe('updates in the window', () => {
     );
   });
 
+  test('strikes through an update the plan as it stands cannot take, and a collapsed row hiding only those', async () => {
+    const planner = alone(...UPDATES);
+    // The library's newer versions need D&D 5e 5.4.0, as a lock might keep them from the plan.
+    const { setup, user } = await setUp(() =>
+      findingBlocked()().then(found => ({
+        ...found,
+        planner: {
+          ...planner,
+          complete: picks =>
+            (picks.get('module:lib') ?? '1.0.0') !== '1.0.0' && picks.get('system:dnd5e') !== '5.4.0'
+              ? Promise.resolve({ ok: false as const, explanation: ['Library needs D&D 5e 5.4.0.'] })
+              : planner.complete(picks),
+        },
+      })),
+    );
+    const universal = row(/Universal/);
+    await vi.waitFor(() => {
+      expect(universal).toHaveTextContent(/^Updates in the rows under it, but none with the plan as it stands/);
+    });
+    expect(universal.querySelector('.emma-tree-held')).toHaveClass('emma-tree-hidden');
+    await user.click(within(universal).getByText('Universal'));
+    await user.keyboard('{ArrowRight}');
+    const library = row(/Library/);
+    expect(library).toHaveTextContent(/^Update available, but not with the plan as it stands/);
+    expect(library.querySelector('.emma-tree-held')).not.toHaveClass('emma-tree-hidden');
+    // D&D 5e's update the plan can take.
+    expect(row(/D&D 5e/)).toHaveTextContent(/^Update available D&D 5e/);
+
+    await setup.updates.choose('system:dnd5e', '5.4.0');
+
+    await vi.waitFor(() => {
+      expect(row(/Library/)).toHaveTextContent(/^Update available Library/);
+    });
+    expect(document.querySelector('.emma-tree-held')).toBeNull();
+    await user.click(within(universal).getByText('Universal'));
+    await user.keyboard('{ArrowLeft}');
+    expect(universal).toHaveTextContent(/^Updates in the rows under it Universal/);
+  });
+
   test('gives no column to red arrows while nothing is blocked', async () => {
     await setUp();
 

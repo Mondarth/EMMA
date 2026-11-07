@@ -217,6 +217,11 @@ export class UpdateState {
   readonly #find: (overview: Overview) => Promise<UpdateSearch>;
   /** Counts the searches, so that only the latest one's answer is kept. */
   #searches = 0;
+  /** The packages whose update the plan as it stands holds back (see {@link heldBack}). */
+  readonly #heldBack = new SvelteSet<PackageKey>();
+  /** The plan and search {@link checkHeldBack} last checked, and how many checks were begun. */
+  #heldBackFor = '';
+  #heldBackRuns = 0;
   /** The search to come of the packages the catalogue was fetching, if one is waited for. */
   #retry: ReturnType<typeof setTimeout> | undefined;
 
@@ -420,6 +425,67 @@ export class UpdateState {
    */
   updateOf(key: PackageKey): PackageUpdate | undefined {
     return this.search?.updates.get(key);
+  }
+
+  /**
+   * Whether a package's update is held back by the plan as it stands: a newer version is offered, but the plan, with its
+   * choices and locks, can take none of them, so that its version list offers nothing newer. As last checked (see
+   * {@link checkHeldBack}); not, before it is checked.
+   * @param key - The package's key
+   * @returns `true` if it is held back
+   */
+  heldBack(key: PackageKey): boolean {
+    return this.#heldBack.has(key);
+  }
+
+  /**
+   * What {@link checkHeldBack} checks for: the search, and the versions chosen. Read where it should be checked again
+   * whenever it changes.
+   * @returns It, in words
+   */
+  get heldBackFor(): string {
+    // A search still going has the number of the one it will find, so that whether it has found anything tells them apart.
+    return [
+      this.search === null ? 'none' : this.#searches,
+      ...[...this.#picks].map(([key, version]) => `${key}@${version}`),
+    ].join(' ');
+  }
+
+  /**
+   * Check, for each package with an update, whether the plan as it stands can take a newer version of it (see
+   * {@link heldBack}), as the plan changes. A package the plan changes already is not held back. Each tries its newer
+   * versions, newest first, until the plan can take one, letting the browser draw as it goes; a check of the same plan
+   * and search is not made again, and one begun is given up once another is.
+   */
+  async checkHeldBack(): Promise<void> {
+    const search = this.search;
+    const signature = this.heldBackFor;
+    if (signature === this.#heldBackFor) return;
+    this.#heldBackFor = signature;
+    const run = ++this.#heldBackRuns;
+    if (search === null) {
+      this.#heldBack.clear();
+      return;
+    }
+    const { planner } = search;
+    const picks = this.#picks;
+    await afterPaint();
+    const pace = paced();
+    for (const [key, update] of search.updates) {
+      let held = this.chosenOf(key) === update.installed;
+      for (const version of held ? update.versions : []) {
+        if (version === update.installed || planner.missingManifest(key, version)) continue;
+        await pace();
+        if ((await planner.complete(withChoice(picks, key, version))).ok) {
+          held = false;
+          break;
+        }
+      }
+      // Given up once another check has begun, as the plan has changed since.
+      if (run !== this.#heldBackRuns) return;
+      if (held) this.#heldBack.add(key);
+      else this.#heldBack.delete(key);
+    }
   }
 
   /**
