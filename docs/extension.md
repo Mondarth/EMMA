@@ -190,7 +190,7 @@ closed row with either kind of package anywhere under it has the same arrow, fai
 
 A blue arrow **struck through** marks an update the plan cannot take as it stands: a newer version is offered, but none
 of them goes with the plan's choices and locks, as when Foundry VTT is locked and every newer version needs a newer
-build. Its version list says why. A package the plan already changes keeps its plain arrow. A closed row whose updates
+build. Its panel says what holds back each newer version, under **Why <installed>, not <newest>**, as for a version the plan takes below its newest. A package the plan already changes keeps its plain arrow. A closed row whose updates
 under it are all held back so has the struck arrow, fainter. EMMA checks again each time the plan changes, so the
 arrows may take a moment to catch up after a change.
 

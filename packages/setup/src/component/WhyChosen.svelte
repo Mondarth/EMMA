@@ -1,7 +1,9 @@
 <!--
   Why the plan takes the version of a package it does, rather than a newer one, in the panel for the package: each newer
-  version, newest first, and why the plan does not take it (see `UpdateState.notTakenOf`). Worked out when the panel
-  shows it, and again when the plan changes; nothing for a package the plan does not change or takes at its newest.
+  version, newest first, and why the plan does not take it (see `UpdateState.notTakenOf`). For a package whose update
+  the plan holds back, its arrow struck through, that is what holds back each newer version. Worked out when the panel
+  shows it, and again when the plan changes; nothing for a package the plan neither changes nor holds back, or takes at
+  its newest.
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
@@ -20,8 +22,8 @@
   let { updates, key }: Props = $props();
 
   const uid = $props.id();
-  /** The version the plan takes. */
-  const chosen = $derived(updates.plan.find(entry => entry.key === key)?.version);
+  /** The version the plan takes, or the one installed where it holds the package's update back. */
+  const chosen = $derived(updates.explainedAt(key));
   /** The newer versions not taken, once worked out. */
   let runs = $state.raw<readonly NotTakenRun[] | null>(null);
   /** Counts the times they are asked for, so that only the latest answer is kept. */
@@ -32,7 +34,11 @@
   $effect(() => {
     // Asked again whenever the plan changes, or the package shown does.
     const shown = key;
-    const signature = [shown, ...updates.plan.map(({ key: planned, version }) => `${planned}@${version}`)].join(' ');
+    const signature = [
+      shown,
+      updates.explainedAt(shown) ?? '',
+      ...updates.plan.map(({ key: planned, version }) => `${planned}@${version}`),
+    ].join(' ');
     if (signature === askedFor) return;
     askedFor = signature;
     // Untracked: working it out reads and writes what EMMA is busy with, and the state it reads, which would ask again.

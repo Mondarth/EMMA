@@ -393,14 +393,15 @@ export class UpdateState {
   /**
    * Why the plan takes the version of a package it does rather than a newer one: each newer version, newest first, and
    * why the plan does not take it, versions one after another for one reason sharing a line. The browser is let draw as
-   * it works, as for a version list. None for a package the plan does not change, uninstalls, or takes at its newest;
-   * nor for Foundry VTT, whose builds the plan's panels say of.
+   * it works, as for a version list. A package whose update the plan holds back (see {@link heldBack}) is taken at its
+   * installed version, so that it says what holds back each newer one. None for a package the plan does not change and
+   * does not hold back, uninstalls, or takes at its newest; nor for Foundry VTT, whose builds the plan's panels say of.
    * @param key - The package's key
    * @returns The newer versions, by reason
    */
   async notTakenOf(key: PackageKey): Promise<readonly NotTakenRun[]> {
     const search = this.search;
-    const chosen = this.plan.find(entry => entry.key === key)?.version;
+    const chosen = this.plan.find(entry => entry.key === key)?.version ?? this.#heldBackAt(key);
     if (search === null || chosen === undefined || chosen === UNINSTALL || key === 'core') return [];
     const { planner } = search;
     const picks = new SvelteMap(this.#picks);
@@ -416,6 +417,25 @@ export class UpdateState {
       } else runs.push({ newest: version, oldest: version, why });
     }
     return runs;
+  }
+
+  /**
+   * The version a package's update is held back at, by the plan as it stands: the installed one.
+   * @param key - The package's key
+   * @returns The version, or `undefined` if its update is not held back
+   */
+  #heldBackAt(key: PackageKey): string | undefined {
+    return this.heldBack(key) ? this.updateOf(key)?.installed : undefined;
+  }
+
+  /**
+   * The version the plan has of a package, as the panel says why not a newer one: the one it takes, or the installed one
+   * where its update is held back (see {@link notTakenOf}).
+   * @param key - The package's key
+   * @returns The version, or `undefined` for none to explain
+   */
+  explainedAt(key: PackageKey): string | undefined {
+    return this.plan.find(entry => entry.key === key)?.version ?? this.#heldBackAt(key);
   }
 
   /**
