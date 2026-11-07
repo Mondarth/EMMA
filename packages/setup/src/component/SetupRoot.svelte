@@ -16,6 +16,7 @@
   import { groupDetail, moduleDetail, systemDetail } from '../lib/details';
   import { EMMA_VERSION } from '../lib/alpha';
   import { format, localize } from '../lib/i18n';
+  import { ignoredItems, lockedItems } from '../lib/held';
   import { isIgnored } from '../lib/overview';
   import type { TreeRow, TreeSelection } from '../lib/tree';
   import { ROOT, allRows, ignoreKeyOf, rowFor } from '../lib/tree';
@@ -33,6 +34,7 @@
   import WhyChosen from './WhyChosen.svelte';
   import SavedPlanNotice from './SavedPlanNotice.svelte';
   import BestSection from './BestSection.svelte';
+  import HeldLists from './HeldLists.svelte';
   import InstallSection from './InstallSection.svelte';
   import IgnoreSection from './IgnoreSection.svelte';
   import LockSection from './LockSection.svelte';
@@ -335,7 +337,31 @@
     inUseOnly={setup.bestInUseOnly}
     onInUseOnlyChange={(on: boolean) => {
       setup.setBestInUseOnly(on);
-    }} />
+    }}
+    {held} />
+{/snippet}
+
+<!--
+  What is locked and what is ignored, under Plan Updates, each with a shortcut to unlock it or stop ignoring it: only
+  what can be unlocked or unignored here, as through its own panel.
+-->
+{#snippet held()}
+  {#if overview !== null}
+    <HeldLists
+      locked={lockedItems(overview).filter(({ key }) => (key === 'core' ? setup.canLockCore : setup.canLock))}
+      ignored={setup.canIgnore ? ignoredItems(overview) : []}
+      disabled={updates.locked || setup.running}
+      busy={(key: string, locking: boolean) => updates.busy.activityOf(`${locking ? 'lock' : 'ignore'}:${key}`)}
+      onUnlock={(key: string) => {
+        void updates.busy.run(`lock:${key}`, 'locking', () =>
+          key === 'core' ? setup.setCoreLocked(false) : setup.setLocked(key, false),
+        );
+      }}
+      onUnignore={(key: string) => {
+        void updates.busy.run(`ignore:${key}`, 'ignoring', () => setup.setIgnored(key, false));
+      }}
+      onOpen={openLink} />
+  {/if}
 {/snippet}
 
 {#snippet uninstall(key: string)}
