@@ -1,3 +1,15 @@
+## [0.6.0](https://github.com/Mondarth/EMMA/compare/extension-v0.5.0...extension-v0.6.0) (2026-11-07)
+
+### Features
+
+* **setup:** list what is locked and ignored under Plan Updates ([3b09549](https://github.com/Mondarth/EMMA/commit/3b095491f00c3ff3aa7af094cb385be8e7239724))
+* **setup:** show each package's latest version known in its panel ([b3efd33](https://github.com/Mondarth/EMMA/commit/b3efd33eab53ac6a4c3e4e909f343973f6144ec2))
+
+### Bug Fixes
+
+* **setup:** give the locked and ignored lists half the width each ([5533352](https://github.com/Mondarth/EMMA/commit/553335234088aa6e95fd7384e36f16c4bfe87a87))
+* **setup:** put more space between the two lists under Plan Updates ([be4bc12](https://github.com/Mondarth/EMMA/commit/be4bc12bcb4e693e050679add320fc23cfcb0215))
+
 ## [0.5.0](https://github.com/Mondarth/EMMA/compare/extension-v0.4.0...extension-v0.5.0) (2026-11-07)
 
 ### Features
