@@ -483,6 +483,9 @@ to whole worlds and to game systems, outside any one world.
   releases, so it is never updated or offered as an update. What it asks of the setup holds nothing back, and whatever
   version of it another package asks for is taken to be the one installed. Use it for a package whose releases EMMA
   cannot read or judge correctly.
+- **An ignored phantom module**: a world's record may name a module that is not a real one, such as a synthetic
+  module another module adds, so that it never installs. Its row, under the world, offers **Ignore** too; ignored, it is
+  no longer counted as a change since the world last ran.
 - **An ignored world** holds nothing back: what it runs is not taken into account, so a plan may leave it unable to
   run. Use it for a world no longer played.
 

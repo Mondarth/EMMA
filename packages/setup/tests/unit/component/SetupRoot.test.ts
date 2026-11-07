@@ -358,6 +358,52 @@ describe('ignoring', () => {
     expect(row(/^Alpha/)).not.toHaveClass('emma-tree-ignored');
   });
 
+  // A world's record may name a phantom module, one that is not a real module, as Midi-QOL's synthetic module.
+  test('ignores a phantom module a world records, so that the world no longer differs for it', async () => {
+    const ignored = new Set<string>();
+    const ignore = vi.fn((key: string, on: boolean) => {
+      if (on) ignored.add(key);
+      else ignored.delete(key);
+    });
+    const setup = new SetupState({
+      load: () =>
+        Promise.resolve(
+          buildOverview(
+            { ...installation({ worlds: [{ id: 'a', title: 'Alpha', system: 'dnd5e' }] }), ignored: [...ignored] },
+            new Map([
+              ['a', recorded(record('a', { modules: [{ id: 'zSynthetic', title: 'zSynthetic', version: '1.0.0' }] }))],
+            ]),
+          ),
+        ),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: noUpdates,
+      installModule: noInstall,
+      ignore,
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    const user = userEvent.setup();
+    expect(row(/^Alpha/)).toHaveTextContent('Changed since it last ran');
+
+    await toggle(user, /^Alpha/);
+    await user.click(row(/^zSynthetic/));
+    const section = screen.getByRole('group', { name: 'Ignore' });
+    await user.click(within(section).getByRole('button', { name: 'Ignore zSynthetic' }));
+
+    expect(ignore).toHaveBeenCalledWith('module:zSynthetic', true);
+    await vi.waitFor(() => {
+      expect(row(/^zSynthetic/)).toHaveClass('emma-tree-ignored');
+    });
+    expect(row(/^Alpha/)).toHaveTextContent('Matches its record');
+    await user.click(
+      within(screen.getByRole('group', { name: 'Ignore' })).getByRole('button', { name: 'Stop ignoring zSynthetic' }),
+    );
+    await vi.waitFor(() => {
+      expect(row(/^Alpha/)).toHaveTextContent('Changed since it last ran');
+    });
+  });
+
   test('is not offered where it cannot be kept', async () => {
     const { user } = await setUp();
     expect(screen.queryByRole('group', { name: 'Ignore' })).toBeNull();
