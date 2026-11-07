@@ -88,7 +88,8 @@
   .emma-held {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.5rem 1rem;
+    /* A wide gutter, so that a list's toggles read as its own, not the next list's entries. */
+    gap: 0.5rem 2.5rem;
   }
 
   @container (width < 24rem) {
