@@ -1,3 +1,9 @@
+## [0.6.1](https://github.com/Mondarth/EMMA/compare/extension-v0.6.0...extension-v0.6.1) (2026-11-07)
+
+### Bug Fixes
+
+* **setup:** name a package not installed as the catalogue does ([387be99](https://github.com/Mondarth/EMMA/commit/387be9927232b32f80adc8203b549a5ddfd3d030))
+
 ## [0.6.0](https://github.com/Mondarth/EMMA/compare/extension-v0.5.0...extension-v0.6.0) (2026-11-07)
 
 ### Features
