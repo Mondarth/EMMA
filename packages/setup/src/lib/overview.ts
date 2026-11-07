@@ -122,14 +122,17 @@ export interface Overview {
 export function buildOverview(installation: Installation, records: ReadonlyMap<string, RecordState>): Overview {
   const modules = new Map(installation.modules.map(pkg => [pkg.id, pkg]));
   const systems = new Map(installation.systems.map(pkg => [pkg.id, pkg]));
+  const asked = new Set(installation.ignored ?? []);
   const worlds = installation.worlds.map(world =>
-    worldOverview(world, records.get(world.id) ?? { kind: 'none' }, installation.core, modules, systems),
+    worldOverview(world, records.get(world.id) ?? { kind: 'none' }, installation.core, modules, systems, asked),
   );
-  // What is ignored and still there: a key kept for something uninstalled since is no more.
+  // What is ignored and still there: a key kept for something uninstalled since is no more. A module a world's record
+  // names is there, installed or not, as a phantom module a world records may be ignored though no such module exists.
   const there = new Set([
     ...installation.worlds.map(({ id }) => `world:${id}`),
     ...installation.systems.map(({ id }) => `system:${id}`),
     ...installation.modules.map(({ id }) => `module:${id}`),
+    ...worlds.flatMap(({ modules: run }) => run.map(({ id }) => `module:${id}`)),
   ]);
   const ignored = (installation.ignored ?? []).filter(key => there.has(key));
   const uses = installation.modules.map((installed): ModuleUse => {
@@ -159,6 +162,8 @@ export function buildOverview(installation: Installation, records: ReadonlyMap<s
  * @param core - The Foundry version installed
  * @param modules - The installed modules, by ID
  * @param systems - The installed systems, by ID
+ * @param ignored - The keys EMMA is asked to ignore: a module the record names that is ignored and not installed, such
+ *   as a phantom module, is no difference
  * @returns The world's overview
  */
 function worldOverview(
@@ -167,6 +172,7 @@ function worldOverview(
   core: string,
   modules: ReadonlyMap<string, InstalledModule>,
   systems: ReadonlyMap<string, InstalledPackage>,
+  ignored: ReadonlySet<string>,
 ): WorldOverview {
   const installedSystem = systems.get(world.system);
   const base = { world, ...(installedSystem !== undefined && { system: installedSystem }) };
@@ -195,6 +201,7 @@ function worldOverview(
   }
   for (const entry of run) {
     if (entry.status === 'same') continue;
+    if (entry.status === 'missing' && ignored.has(`module:${entry.id}`)) continue;
     differences.push({
       kind: 'module',
       title: entry.title,

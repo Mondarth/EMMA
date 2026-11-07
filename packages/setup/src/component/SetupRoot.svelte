@@ -271,11 +271,16 @@
   {/if}
 {/snippet}
 
+<!--
+  Ignoring an installed game system or module, or a module a world's record names that is not installed, as a phantom
+  module a world records may be, though no such module exists.
+-->
 {#snippet ignoreInstalled(key: string)}
   {@const id = key.slice(key.indexOf(':') + 1)}
   {@const pkg = key.startsWith('system:')
     ? overview?.systems.find(system => system.id === id)
-    : overview?.modules.find(({ module: installed }) => installed.id === id)?.module}
+    : (overview?.modules.find(({ module: installed }) => installed.id === id)?.module ??
+      overview?.worlds.flatMap(({ modules: run }) => run).find(recorded => recorded.id === id))}
   {#if pkg !== undefined}
     {@render ignore(key, pkg.title)}
   {/if}
