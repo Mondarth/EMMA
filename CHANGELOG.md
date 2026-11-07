@@ -1,3 +1,9 @@
+## [0.12.0](https://github.com/Mondarth/EMMA/compare/v0.11.0...v0.12.0) (2026-11-07)
+
+### Features
+
+* **setup:** show the worlds on a branch of their own in the tree ([4841e58](https://github.com/Mondarth/EMMA/commit/4841e58d1e70ac1877aba72d4b86071a8f9bd826))
+
 ## [0.11.0](https://github.com/Mondarth/EMMA/compare/v0.10.0...v0.11.0) (2026-11-06)
 
 ### Features
