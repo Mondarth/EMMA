@@ -107,19 +107,19 @@ while EMMA checks which versions work with what is chosen, which can take a seco
 
 ### The installation tree
 
-EMMA's window shows the installation as a tree, and beside it what is selected in it. The tree is in two halves, the
-game systems with the worlds that use them, and the modules:
+EMMA's window shows the installation as a tree, and beside it what is selected in it. The tree has three branches, in
+the order Foundry's Setup screen gives them: the worlds, the game systems, and the modules:
 
 ```text
 Foundry VTT
+  Worlds
+    World 1
+      the game system and the modules World 1 last ran with
+    World 2
+      the game system and the modules World 2 last ran with
   Game systems
     D&D 5e
-      World 1
-        the game system and the modules World 1 last ran with
-      World 2
-        the game system and the modules World 2 last ran with
     Pathfinder 2e
-      World 3 …
   Modules
     Universal
       the modules for any game system
@@ -129,9 +129,7 @@ Foundry VTT
 
 - **The root**, Foundry VTT and its version: a summary of the worlds (how many, by game system, and how their records
   compare with what is installed) and of the modules (how many, and how many are active in a recorded world).
-- **Game systems**: each installed system, with its version, marked **In use** if a world uses it, and the worlds that use it; then any
-  system a world uses that is not installed, marked **Not installed**. Only one version of a system is installed at a
-  time. Each world shows how its record compares with what is installed now:
+- **Worlds**: every world, each showing how its record compares with what is installed now:
   - **Matches its record**: Foundry, the game system and every module are installed at the versions the world last ran
     with.
   - **Changed since it last ran**: something has been updated or uninstalled since. The world's panel lists what.
@@ -140,6 +138,9 @@ Foundry VTT
   and whether that version is **In use**, as it is installed, **Another version installed**, or **Not installed**. So a world that last
   ran with an older version of its system, or with a system since uninstalled, says so. A world without a record shows
   nothing under it, as EMMA cannot tell what it last ran with.
+- **Game systems**: each installed system, with its version, marked **In use** if a world uses it; then any system a
+  world uses that is not installed, marked **Not installed**. Only one version of a system is installed at a time. A
+  system's panel lists the worlds that use it, each linked to its row.
 
 Each of these badges says what it reports in its tooltip: **Current state**, or, where the plan changes it, **Planned
 update**. A badge of something the plan changes, a package it updates or uninstalls, or a world whose game system, a

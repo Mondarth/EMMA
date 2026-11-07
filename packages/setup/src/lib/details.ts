@@ -155,7 +155,7 @@ export interface GroupDetail {
 }
 
 /** The rows that only group others. */
-export type GroupSelection = Extract<TreeSelection, { kind: 'systems' | 'modules' | 'group' }>;
+export type GroupSelection = Extract<TreeSelection, { kind: 'worlds' | 'systems' | 'modules' | 'group' }>;
 
 /**
  * What a grouping row holds, as the tree shows it.
@@ -165,6 +165,17 @@ export type GroupSelection = Extract<TreeSelection, { kind: 'systems' | 'modules
  */
 export function groupDetail(overview: Overview, selection: GroupSelection): GroupDetail {
   switch (selection.kind) {
+    case 'worlds': {
+      const titles = new Map(overview.systems.map(({ id, title }) => [id, title]));
+      return {
+        title: localize('Tree.Worlds'),
+        items: overview.worlds.map(({ world }) => ({
+          title: world.title,
+          detail: titles.get(world.system) ?? world.system,
+          link: { kind: 'world', world: world.id } as const,
+        })),
+      };
+    }
     case 'systems': {
       const installed = new Set(overview.systems.map(({ id }) => id));
       const ids = [

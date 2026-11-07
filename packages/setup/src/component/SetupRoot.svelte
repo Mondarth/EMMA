@@ -358,7 +358,7 @@
             {@render lock(`system:${selection.system}`)}
             {@render ignoreInstalled(`system:${selection.system}`)}
             {@render uninstall(`system:${selection.system}`)}
-          {:else if selection.kind === 'systems' || selection.kind === 'modules' || selection.kind === 'group'}
+          {:else if selection.kind === 'worlds' || selection.kind === 'systems' || selection.kind === 'modules' || selection.kind === 'group'}
             <GroupPanel detail={groupDetail(overview, selection)} onOpen={openLink} />
             {#if installType !== undefined && setup.canInstall}
               <InstallSection

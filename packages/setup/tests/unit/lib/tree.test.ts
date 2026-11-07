@@ -7,6 +7,7 @@ import {
   MODULES,
   ROOT,
   SYSTEMS,
+  WORLDS,
   allRows,
   ancestorsOf,
   findRow,
@@ -67,7 +68,8 @@ const keys = (rows: readonly TreeRow[]) => rows.map(({ key }) => key);
 const rowOf = (rows: readonly TreeRow[], key: string) => rows.find(row => row.key === key);
 
 const DND = `${SYSTEMS}/system:dnd5e`;
-const WORLD_A = `${DND}/world:a`;
+const WORLD_A = `${WORLDS}/world:a`;
+const WORLD_B = `${WORLDS}/world:b`;
 
 describe('visibleRows', () => {
   test('shows only the root while it is collapsed', () => {
@@ -96,25 +98,29 @@ describe('visibleRows', () => {
   });
 
   test('says which packages a collapsed row hides, at any depth, and an expanded row none', () => {
-    const rows = visibleRows(OVERVIEW, new Set([ROOT, SYSTEMS, DND, MODULES]));
+    const rows = visibleRows(OVERVIEW, new Set([ROOT, WORLDS, SYSTEMS, MODULES]));
 
     expect(rowOf(rows, ROOT)).not.toHaveProperty('hides');
     // Under the world, its system and the modules it ran with, and the module those require.
     expect(rowOf(rows, WORLD_A)?.hides).toEqual(new Set(['system:dnd5e', 'module:app', 'module:old', 'module:lib']));
-    expect(rowOf(rows, `${SYSTEMS}/system:pf2e`)?.hides).toEqual(new Set());
     // Requirements that loop, and one that is not installed.
     expect(rowOf(rows, `${MODULES}/universal`)?.hides).toEqual(
       new Set(['module:lib', 'module:loop', 'module:back', 'module:gone']),
     );
     // A row with nothing under it hides nothing.
-    expect(rowOf(rows, `${DND}/world:b`)).not.toHaveProperty('hides');
+    expect(rowOf(rows, WORLD_B)).not.toHaveProperty('hides');
+    expect(rowOf(rows, DND)).not.toHaveProperty('hides');
   });
 
-  test('shows the game systems and the modules under the root at first, each in groups', () => {
+  test('shows the worlds, the game systems and the modules under the root at first, the modules in groups', () => {
     const rows = visibleRows(OVERVIEW, new Set(INITIALLY_EXPANDED));
 
     expect(keys(rows)).toEqual([
       ROOT,
+      WORLDS,
+      WORLD_A,
+      WORLD_B,
+      `${WORLDS}/world:p`,
       SYSTEMS,
       DND,
       `${SYSTEMS}/system:pf2e`,
@@ -124,6 +130,14 @@ describe('visibleRows', () => {
       `${MODULES}/system:pf2e`,
     ]);
     expect(rows[1]).toEqual({
+      key: WORLDS,
+      level: 2,
+      selection: { kind: 'worlds' },
+      title: 'Worlds',
+      expandable: true,
+      parent: ROOT,
+    });
+    expect(rows[5]).toEqual({
       key: SYSTEMS,
       level: 2,
       selection: { kind: 'systems' },
@@ -131,29 +145,30 @@ describe('visibleRows', () => {
       expandable: true,
       parent: ROOT,
     });
-    expect(rows[2]).toMatchObject({ level: 3, title: 'D&D 5e', version: '5.3.3', expandable: true });
-    expect(rows[3]).toMatchObject({ title: 'pf2e', status: { kind: 'package', value: 'missing' } });
-    expect(rows[5]).toMatchObject({ selection: { kind: 'group' }, title: 'Universal', expandable: true });
-    expect(rows[6]).toMatchObject({ selection: { kind: 'group', system: 'dnd5e' }, title: 'D&D 5e' });
-    expect(rows[6]).not.toHaveProperty('status');
+    // The worlds that use a game system are under the worlds' row, not under it.
+    expect(rows[6]).toMatchObject({ level: 3, title: 'D&D 5e', version: '5.3.3', expandable: false });
     expect(rows[7]).toMatchObject({ title: 'pf2e', status: { kind: 'package', value: 'missing' } });
+    expect(rows[9]).toMatchObject({ selection: { kind: 'group' }, title: 'Universal', expandable: true });
+    expect(rows[10]).toMatchObject({ selection: { kind: 'group', system: 'dnd5e' }, title: 'D&D 5e' });
+    expect(rows[10]).not.toHaveProperty('status');
+    expect(rows[11]).toMatchObject({ title: 'pf2e', status: { kind: 'package', value: 'missing' } });
   });
 
-  test('shows the worlds under their game system, and under each world what its record says it last ran with', () => {
-    const rows = visibleRows(OVERVIEW, new Set([ROOT, SYSTEMS, DND, WORLD_A]));
+  test('shows the worlds under their own row, and under each world what its record says it last ran with', () => {
+    const rows = visibleRows(OVERVIEW, new Set([ROOT, WORLDS, SYSTEMS, WORLD_A]));
 
-    expect(keys(rows).slice(2, 8)).toEqual([
-      DND,
+    expect(keys(rows).slice(1, 7)).toEqual([
+      WORLDS,
       WORLD_A,
       `${WORLD_A}/system:dnd5e`,
       `${WORLD_A}/module:app`,
       `${WORLD_A}/module:old`,
-      `${DND}/world:b`,
+      WORLD_B,
     ]);
     expect(rowOf(rows, DND)).toMatchObject({ version: '5.3.3', status: { kind: 'package', value: 'same' } });
     expect(rowOf(rows, `${WORLD_A}/system:dnd5e`)).toEqual({
       key: `${WORLD_A}/system:dnd5e`,
-      level: 5,
+      level: 4,
       selection: { kind: 'system', system: 'dnd5e', world: 'a' },
       title: 'D&D 5e',
       version: '5.3.3',
@@ -162,13 +177,13 @@ describe('visibleRows', () => {
       parent: WORLD_A,
     });
     expect(rowOf(rows, WORLD_A)).toMatchObject({ status: { kind: 'world', value: 'differs' }, expandable: true });
-    expect(rowOf(rows, `${DND}/world:b`)).toMatchObject({
+    expect(rowOf(rows, WORLD_B)).toMatchObject({
       status: { kind: 'world', value: 'unrecorded' },
       expandable: false,
     });
     expect(rowOf(rows, `${WORLD_A}/module:app`)).toEqual({
       key: `${WORLD_A}/module:app`,
-      level: 5,
+      level: 4,
       selection: { kind: 'module', module: 'app', world: 'a' },
       title: 'App',
       version: '2.0.0',
@@ -186,11 +201,11 @@ describe('visibleRows', () => {
 
   test("shows a module's requirements under it, in the world it is under", () => {
     const app = `${WORLD_A}/module:app`;
-    const rows = visibleRows(OVERVIEW, new Set([ROOT, SYSTEMS, DND, WORLD_A, app]));
+    const rows = visibleRows(OVERVIEW, new Set([ROOT, WORLDS, WORLD_A, app]));
 
     expect(rowOf(rows, `${app}/module:lib`)).toEqual({
       key: `${app}/module:lib`,
-      level: 6,
+      level: 5,
       selection: { kind: 'module', module: 'lib', world: 'a' },
       title: 'Library',
       version: '1.0.0',
@@ -393,7 +408,7 @@ describe('finding rows', () => {
     expect(rows.length).toBeGreaterThan(visibleRows(OVERVIEW, new Set(INITIALLY_EXPANDED)).length);
     expect(keys(rows)).toContain(`${WORLD_A}/module:app/module:lib`);
     expect(rows.every(({ hides }) => hides === undefined)).toBe(true);
-    expect(ancestorsOf(`${WORLD_A}/module:app`)).toEqual([ROOT, SYSTEMS, DND, WORLD_A]);
+    expect(ancestorsOf(`${WORLD_A}/module:app`)).toEqual([ROOT, WORLDS, WORLD_A]);
     expect(ancestorsOf(ROOT)).toEqual([]);
   });
 
@@ -416,19 +431,19 @@ describe('finding rows', () => {
 });
 
 describe('moveFor', () => {
-  const expanded = new Set([ROOT, SYSTEMS]);
+  const expanded = new Set([ROOT, WORLDS, SYSTEMS]);
   const rows = visibleRows(OVERVIEW, expanded);
   const PF2E = `${SYSTEMS}/system:pf2e`;
 
   test.each([
-    ['ArrowDown', ROOT, { kind: 'focus', key: SYSTEMS }],
+    ['ArrowDown', ROOT, { kind: 'focus', key: WORLDS }],
     ['ArrowDown', MODULES, undefined],
-    ['ArrowUp', SYSTEMS, { kind: 'focus', key: ROOT }],
+    ['ArrowUp', WORLDS, { kind: 'focus', key: ROOT }],
     ['ArrowUp', ROOT, undefined],
     ['Home', MODULES, { kind: 'focus', key: ROOT }],
     ['End', ROOT, { kind: 'focus', key: MODULES }],
     ['ArrowRight', SYSTEMS, { kind: 'focus', key: DND }],
-    ['ArrowRight', DND, { kind: 'expand', key: DND }],
+    ['ArrowRight', WORLD_A, { kind: 'expand', key: WORLD_A }],
     ['ArrowLeft', SYSTEMS, { kind: 'collapse', key: SYSTEMS }],
     ['ArrowLeft', PF2E, { kind: 'focus', key: SYSTEMS }],
     ['ArrowLeft', MODULES, { kind: 'focus', key: ROOT }],

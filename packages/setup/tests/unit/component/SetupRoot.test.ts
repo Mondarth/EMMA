@@ -289,7 +289,7 @@ describe("the panels' links", () => {
     await user.click(screen.getByRole('button', { name: 'Show Library in the tree' }));
     // On to a world it is active in, and from a module to the game system it is for.
     await user.click(screen.getByRole('button', { name: 'Show Delta in the tree' }));
-    expect(selected().getAttribute('data-key')).toBe('root/systems/system:dnd5e/world:d');
+    expect(selected().getAttribute('data-key')).toBe('root/worlds/world:d');
     await user.click(row(/^Modules/));
     await user.click(screen.getByRole('button', { name: 'Show D&D 5e in the tree' }));
     await user.click(screen.getByRole('button', { name: 'Show Idle in the tree' }));

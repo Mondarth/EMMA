@@ -306,9 +306,9 @@ describe('updates in the window', () => {
     expect(chosen).not.toHaveTextContent('Installed');
 
     // Only a row that shows the installed version offers them: under a world, the version it last ran with shows.
-    await user.click(within(row(/^Update available D&D 5e/)).getByText('D&D 5e'));
-    await user.keyboard('{ArrowRight}{ArrowRight}{ArrowRight}');
-    expect(row(/^Alpha/)).toHaveAttribute('aria-expanded', 'true');
+    await user.click(within(row(/Alpha/)).getByText('Alpha'));
+    await user.keyboard('{ArrowRight}');
+    expect(row(/Alpha/)).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getAllByRole('treeitem', { name: /^Update available D&D 5e/ })).toHaveLength(2);
     expect(screen.getAllByRole('button', { name: /^Version of/ })).toHaveLength(1);
 
