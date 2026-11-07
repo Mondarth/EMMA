@@ -3,6 +3,8 @@
   if it shows under one; the worlds that use it, each with the version it last ran with; and how many modules are for it.
 -->
 <script lang="ts">
+  import type { Snippet } from 'svelte';
+
   import type { ExplainedVersion } from '../app/update-state.svelte';
   import type { SystemDetail } from '../lib/details';
   import type { BlockedUpdate as Blocked } from '../lib/updates';
@@ -22,12 +24,15 @@
     explained?: ExplainedVersion | undefined;
     /** Open the tree to a row a name links to, and select it; without it, names do not link. */
     onOpen?: ((link: TreeSelection) => void) | undefined;
+    /** The actions on what it shows, such as Lock, Ignore and Uninstall, just below its title; none by default. */
+    actions?: Snippet | undefined;
   }
 
-  let { detail, blocked, explained, onOpen }: Props = $props();
+  let { detail, blocked, explained, onOpen, actions }: Props = $props();
 </script>
 
 <h2>{detail.title}</h2>
+{@render actions?.()}
 {#if detail.world !== undefined}
   <p>{format('ModuleInfo.InWorld', { world: detail.world.world.title })}</p>
 {/if}

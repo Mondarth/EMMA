@@ -148,6 +148,17 @@ describe('moduleDetail', () => {
 });
 
 describe('groupDetail', () => {
+  test('gives the worlds, with the game system each runs, by its title where it is installed', () => {
+    expect(groupDetail(OVERVIEW, { kind: 'worlds' })).toEqual({
+      title: 'Worlds',
+      items: [
+        { title: 'Alpha', detail: 'D&D 5e', link: { kind: 'world', world: 'a' } },
+        { title: 'Beta', detail: 'D&D 5e', link: { kind: 'world', world: 'b' } },
+        { title: 'Savage', detail: 'swade', link: { kind: 'world', world: 's' } },
+      ],
+    });
+  });
+
   test('gives the game systems, installed then not, with how many worlds use each', () => {
     expect(groupDetail(OVERVIEW, { kind: 'systems' })).toEqual({
       title: 'Game systems',

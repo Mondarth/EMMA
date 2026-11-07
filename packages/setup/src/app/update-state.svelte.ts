@@ -217,6 +217,11 @@ export class UpdateState {
   readonly #find: (overview: Overview) => Promise<UpdateSearch>;
   /** Counts the searches, so that only the latest one's answer is kept. */
   #searches = 0;
+  /** The packages whose update the plan as it stands holds back (see {@link heldBack}). */
+  readonly #heldBack = new SvelteSet<PackageKey>();
+  /** The plan and search {@link checkHeldBack} last checked, and how many checks were begun. */
+  #heldBackFor = '';
+  #heldBackRuns = 0;
   /** The search to come of the packages the catalogue was fetching, if one is waited for. */
   #retry: ReturnType<typeof setTimeout> | undefined;
 
@@ -388,14 +393,15 @@ export class UpdateState {
   /**
    * Why the plan takes the version of a package it does rather than a newer one: each newer version, newest first, and
    * why the plan does not take it, versions one after another for one reason sharing a line. The browser is let draw as
-   * it works, as for a version list. None for a package the plan does not change, uninstalls, or takes at its newest;
-   * nor for Foundry VTT, whose builds the plan's panels say of.
+   * it works, as for a version list. A package whose update the plan holds back (see {@link heldBack}) is taken at its
+   * installed version, so that it says what holds back each newer one. None for a package the plan does not change and
+   * does not hold back, uninstalls, or takes at its newest; nor for Foundry VTT, whose builds the plan's panels say of.
    * @param key - The package's key
    * @returns The newer versions, by reason
    */
   async notTakenOf(key: PackageKey): Promise<readonly NotTakenRun[]> {
     const search = this.search;
-    const chosen = this.plan.find(entry => entry.key === key)?.version;
+    const chosen = this.plan.find(entry => entry.key === key)?.version ?? this.#heldBackAt(key);
     if (search === null || chosen === undefined || chosen === UNINSTALL || key === 'core') return [];
     const { planner } = search;
     const picks = new SvelteMap(this.#picks);
@@ -414,12 +420,92 @@ export class UpdateState {
   }
 
   /**
+   * The version a package's update is held back at, by the plan as it stands: the installed one.
+   * @param key - The package's key
+   * @returns The version, or `undefined` if its update is not held back
+   */
+  #heldBackAt(key: PackageKey): string | undefined {
+    return this.heldBack(key) ? this.updateOf(key)?.installed : undefined;
+  }
+
+  /**
+   * The version the plan has of a package, as the panel says why not a newer one: the one it takes, or the installed one
+   * where its update is held back (see {@link notTakenOf}).
+   * @param key - The package's key
+   * @returns The version, or `undefined` for none to explain
+   */
+  explainedAt(key: PackageKey): string | undefined {
+    return this.plan.find(entry => entry.key === key)?.version ?? this.#heldBackAt(key);
+  }
+
+  /**
    * The update on offer for a package.
    * @param key - The package's key, such as `module:<id>`
    * @returns The update, or `undefined` if there is none
    */
   updateOf(key: PackageKey): PackageUpdate | undefined {
     return this.search?.updates.get(key);
+  }
+
+  /**
+   * Whether a package's update is held back by the plan as it stands: a newer version is offered, but the plan, with its
+   * choices and locks, can take none of them, so that its version list offers nothing newer. As last checked (see
+   * {@link checkHeldBack}); not, before it is checked.
+   * @param key - The package's key
+   * @returns `true` if it is held back
+   */
+  heldBack(key: PackageKey): boolean {
+    return this.#heldBack.has(key);
+  }
+
+  /**
+   * What {@link checkHeldBack} checks for: the search, and the versions chosen. Read where it should be checked again
+   * whenever it changes.
+   * @returns It, in words
+   */
+  get heldBackFor(): string {
+    // A search still going has the number of the one it will find, so that whether it has found anything tells them apart.
+    return [
+      this.search === null ? 'none' : this.#searches,
+      ...[...this.#picks].map(([key, version]) => `${key}@${version}`),
+    ].join(' ');
+  }
+
+  /**
+   * Check, for each package with an update, whether the plan as it stands can take a newer version of it (see
+   * {@link heldBack}), as the plan changes. A package the plan changes already is not held back. Each tries its newer
+   * versions, newest first, until the plan can take one, letting the browser draw as it goes; a check of the same plan
+   * and search is not made again, and one begun is given up once another is.
+   */
+  async checkHeldBack(): Promise<void> {
+    const search = this.search;
+    const signature = this.heldBackFor;
+    if (signature === this.#heldBackFor) return;
+    this.#heldBackFor = signature;
+    const run = ++this.#heldBackRuns;
+    if (search === null) {
+      this.#heldBack.clear();
+      return;
+    }
+    const { planner } = search;
+    const picks = this.#picks;
+    await afterPaint();
+    const pace = paced();
+    for (const [key, update] of search.updates) {
+      let held = this.chosenOf(key) === update.installed;
+      for (const version of held ? update.versions : []) {
+        if (version === update.installed || planner.missingManifest(key, version)) continue;
+        await pace();
+        if ((await planner.complete(withChoice(picks, key, version))).ok) {
+          held = false;
+          break;
+        }
+      }
+      // Given up once another check has begun, as the plan has changed since.
+      if (run !== this.#heldBackRuns) return;
+      if (held) this.#heldBack.add(key);
+      else this.#heldBack.delete(key);
+    }
   }
 
   /**
@@ -996,9 +1082,14 @@ export class UpdateState {
     ].filter(key => key === 'core' || used === undefined || used.has(key));
     this.planning = true;
     try {
+      // The planner's answers settle at once, in a chain that would keep the browser from drawing anything, the busy
+      // mark on what was clicked among it, until every package was planned.
+      await afterPaint();
+      const pace = paced();
       let picks: ReadonlyMap<PackageKey, string> = new SvelteMap();
       for (const key of keys) {
         for (const version of planner.candidates(key)) {
+          await pace();
           if (planner.missingManifest(key, version)) continue;
           const tried = withChoice(picks, key, version);
           if ((await planner.complete(tried)).ok) {

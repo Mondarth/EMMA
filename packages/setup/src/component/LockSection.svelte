@@ -1,5 +1,6 @@
 <!--
-  Locking a game system or module in Foundry, below its panel, as Foundry's own package menu does: a locked package is
+  Locking a game system or module in Foundry, among the actions at the top of its panel, as Foundry's own package menu
+  does: a locked package is
   kept as it is installed, as Foundry refuses to update or uninstall it, so EMMA's plan never changes it either. Or
   locking Foundry VTT itself, in EMMA alone, as Foundry has no lock for itself, so that the plan keeps its build but
   updates what runs on it. It takes effect at once, not in the plan.
@@ -8,6 +9,7 @@
   import type { Activity } from '../app/busy.svelte';
   import { format, localize } from '../lib/i18n';
 
+  import ActionItem from './ActionItem.svelte';
   import BusyMark from './BusyMark.svelte';
 
   interface Props {
@@ -31,13 +33,9 @@
   const said = $derived(
     core ? (locked ? 'Lock.CoreLocked' : 'Lock.CoreUnlocked') : locked ? 'Lock.Locked' : 'Lock.Unlocked',
   );
-
-  const uid = $props.id();
 </script>
 
-<section class="emma-lock" aria-labelledby="{uid}-heading">
-  <h3 id="{uid}-heading">{localize('Lock.Heading')}</h3>
-  <p>{format(said, { title, version })}</p>
+{#snippet button()}
   <button
     type="button"
     class="emma-busy-host"
@@ -50,14 +48,10 @@
     {format(locked ? 'Lock.Unlock' : 'Lock.Lock', { title, version })}
     <BusyMark activity={busy} />
   </button>
-</section>
+{/snippet}
 
-<style>
-  .emma-lock {
-    margin-top: 1rem;
-  }
+{#snippet about()}
+  <p>{format(said, { title, version })}</p>
+{/snippet}
 
-  .emma-lock button {
-    width: auto;
-  }
-</style>
+<ActionItem label={localize('Lock.Heading')} {button} {about} />

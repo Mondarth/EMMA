@@ -110,9 +110,9 @@ test.describe('EMMA on the setup screen', () => {
 
     await expect(tree.getByRole('treeitem', { name: /^Foundry VTT 14\./ })).toHaveAttribute('aria-selected', 'true');
     await expect(emma.getByRole('heading', { name: /^Foundry VTT 14\./ })).toBeVisible();
-    // Worlds are shown under the game system they run.
-    await tree.getByRole('treeitem', { name: new RegExp(`^${SYSTEM_TITLE} `) }).click();
-    await page.keyboard.press('ArrowRight');
+    // Worlds are shown under their own row, open at first, and the game system under it.
+    await expect(tree.getByRole('treeitem', { name: /^Worlds/ })).toHaveAttribute('aria-expanded', 'true');
+    await expect(tree.getByRole('treeitem', { name: new RegExp(`^${SYSTEM_TITLE} `) })).toBeVisible();
     const world = tree.getByRole('treeitem', { name: new RegExp(WORLD.title) });
     await expect(world).toContainText('Matches its record');
 

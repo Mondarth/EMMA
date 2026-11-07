@@ -148,3 +148,27 @@ describe('letting the browser draw', () => {
     await pace();
   });
 });
+
+describe('marking an item busy', () => {
+  afterEach(() => {
+    busyTiming.paint = false;
+    vi.useRealTimers();
+  });
+
+  // Regression: the mark on Plan the best versions never showed, as the planner's answers, settling at once, kept the
+  // browser from drawing it until the work was done. Every item's work now starts once its mark is drawn.
+  test('starts the work only once the browser has drawn the mark', async () => {
+    busyTiming.paint = true;
+    vi.useFakeTimers();
+    const busy = new BusyState(0);
+    const work = vi.fn(() => Promise.resolve('planned'));
+
+    const running = busy.run('best', 'planning', work);
+    expect(busy.activityOf('best')).toBe('planning');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(work).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(20);
+    await expect(running).resolves.toBe('planned');
+    expect(work).toHaveBeenCalledOnce();
+  });
+});
