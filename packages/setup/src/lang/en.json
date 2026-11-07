@@ -435,5 +435,12 @@
   "Action": {
     "About": "What {action} does",
     "Label": "Actions"
+  },
+  "Held": {
+    "Label": "Locked and ignored",
+    "Locked": "Locked",
+    "Ignored": "Ignored",
+    "Unlock": "Unlock {title}",
+    "Unignore": "Stop ignoring {title}"
   }
 }

@@ -605,3 +605,89 @@ describe('opening the window', () => {
     });
   });
 });
+
+describe('what is locked and ignored, under Plan Updates', () => {
+  test('lists each, linked to its row, with a shortcut to unlock it or stop ignoring it, and nothing once none is', async () => {
+    let locked = true;
+    let coreLocked = true;
+    const ignored = new Set(['world:a']);
+    const lockPackage = vi.fn((_type: 'module' | 'system', _id: string, lock: boolean) => {
+      locked = lock;
+      return Promise.resolve();
+    });
+    const lockCore = vi.fn((lock: boolean) => {
+      coreLocked = lock;
+    });
+    const ignore = vi.fn((key: string, on: boolean) => {
+      if (on) ignored.add(key);
+      else ignored.delete(key);
+    });
+    const setup = new SetupState({
+      load: () =>
+        Promise.resolve(
+          buildOverview(
+            {
+              ...installation({
+                worlds: [{ id: 'a', title: 'Alpha', system: 'dnd5e' }],
+                modules: [{ ...installedModule('lib', 'Library', '1.0.0'), ...(locked && { locked: true as const }) }],
+              }),
+              ...(coreLocked && { coreLocked: true as const }),
+              ignored: [...ignored],
+            },
+            new Map(),
+          ),
+        ),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: noUpdates,
+      installModule: noInstall,
+      lockPackage,
+      lockCore,
+      ignore,
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    const user = userEvent.setup();
+
+    // Just below the heading of Plan Updates.
+    const block = () => screen.getByRole('group', { name: 'Locked and ignored' });
+    const held = block();
+    expect(screen.getByRole('heading', { level: 3, name: 'Plan Updates' }).nextElementSibling).toBe(held);
+    const lockedList = within(held).getByRole('list', { name: 'Locked' });
+    expect(
+      within(lockedList)
+        .getAllByRole('listitem')
+        .map(item => item.textContent.trim()),
+    ).toEqual(['Foundry VTT', 'Library']);
+    const ignoredList = within(held).getByRole('list', { name: 'Ignored' });
+    expect(
+      within(ignoredList)
+        .getAllByRole('listitem')
+        .map(item => item.textContent.trim()),
+    ).toEqual(['Alpha']);
+
+    // Each opens its row in the tree.
+    await user.click(within(lockedList).getByRole('button', { name: 'Show Library in the tree' }));
+    expect(screen.getByRole('treeitem', { selected: true })).toHaveTextContent('Library');
+    await user.click(row(/^Foundry VTT/));
+
+    await user.click(within(block()).getByRole('button', { name: 'Unlock Library' }));
+    expect(lockPackage).toHaveBeenCalledWith('module', 'lib', false);
+    await vi.waitFor(() => {
+      expect(within(within(block()).getByRole('list', { name: 'Locked' })).getAllByRole('listitem')).toHaveLength(1);
+    });
+    await user.click(within(block()).getByRole('button', { name: 'Unlock Foundry VTT' }));
+    expect(lockCore).toHaveBeenCalledWith(false);
+    // A list with nothing in it is not shown.
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('list', { name: 'Locked' })).toBeNull();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Stop ignoring Alpha' }));
+    expect(ignore).toHaveBeenCalledWith('world:a', false);
+    // Nor is the block with nothing in either.
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('group', { name: 'Locked and ignored' })).toBeNull();
+    });
+  });
+});
