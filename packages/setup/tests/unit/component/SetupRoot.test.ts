@@ -510,3 +510,52 @@ describe("the footer's word of the catalogue", () => {
     expect(screen.getByRole('button', { name: 'Check live' })).toBeEnabled();
   });
 });
+
+describe('opening the window', () => {
+  test('shows it is analyzing, large over the window, until the installation is read and its updates looked for', async () => {
+    let found: (() => void) | undefined;
+    const setup = new SetupState({
+      load: () => Promise.resolve(OVERVIEW),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: () =>
+        new Promise(resolve => {
+          found = () => {
+            void noUpdates().then(resolve);
+          };
+        }),
+      installModule: noInstall,
+    });
+    render(SetupRoot, { setup });
+    const opening = screen.getByTestId('emma-opening');
+    expect(opening).toHaveTextContent('Analyzing');
+    expect(opening).toHaveAttribute('aria-hidden', 'true');
+
+    await setup.refresh();
+    // Read, but its updates not yet looked for.
+    expect(screen.getByTestId('emma-opening')).toBeInTheDocument();
+    found?.();
+    await vi.waitFor(() => {
+      expect(screen.queryByTestId('emma-opening')).not.toBeInTheDocument();
+    });
+
+    // Not again when the installation is read afresh.
+    await setup.refresh();
+    expect(screen.queryByTestId('emma-opening')).not.toBeInTheDocument();
+  });
+
+  test('stops showing it once the installation could not be read', async () => {
+    const setup = new SetupState({
+      load: () => Promise.reject(new Error('offline')),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: noUpdates,
+      installModule: noInstall,
+    });
+    render(SetupRoot, { setup });
+    await setup.refresh();
+    await vi.waitFor(() => {
+      expect(screen.queryByTestId('emma-opening')).not.toBeInTheDocument();
+    });
+  });
+});

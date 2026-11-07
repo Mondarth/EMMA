@@ -86,6 +86,9 @@ gives EMMA's version, such as **EMMA - installation (0.1.1)**. While EMMA is an 
 with a link to [EMMA's alpha](alpha.md), and asks once for each new version that you acknowledge it with **I
 understand**: until you do, the plan cannot be run.
 
+**While the window opens**, a large spinner and **Analyzing** sit in its middle, until EMMA has read the installation
+and first looked for updates; reading it again later shows only the **Read again** button busy.
+
 **Foundry's own installs, updates, uninstalls and locks are disabled**: the **Install** button, **Update All**, and the
 update button on each package are greyed out, and say that EMMA manages packages on this screen if chosen. So do
 **Uninstall**, **Lock** and **Unlock** in the package menu of a game system or module, before Foundry asks anything.
