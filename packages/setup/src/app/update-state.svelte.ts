@@ -996,9 +996,14 @@ export class UpdateState {
     ].filter(key => key === 'core' || used === undefined || used.has(key));
     this.planning = true;
     try {
+      // The planner's answers settle at once, in a chain that would keep the browser from drawing anything, the busy
+      // mark on what was clicked among it, until every package was planned.
+      await afterPaint();
+      const pace = paced();
       let picks: ReadonlyMap<PackageKey, string> = new SvelteMap();
       for (const key of keys) {
         for (const version of planner.candidates(key)) {
+          await pace();
           if (planner.missingManifest(key, version)) continue;
           const tried = withChoice(picks, key, version);
           if ((await planner.complete(tried)).ok) {
