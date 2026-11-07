@@ -9,7 +9,7 @@ export const RELEASE_DEFAULTS = ['EMMA_DEFAULT_CATALOGUE_URL', 'EMMA_DEFAULT_CAT
 /**
  * Refuse to release without the catalogue.
  * @param env - The environment the release runs in
- * @throws Error naming each variable not set
+ * @throws {Error} naming each variable not set
  */
 export function requireReleaseDefaults(env: Readonly<Record<string, string | undefined>>): void {
   const missing = RELEASE_DEFAULTS.filter(name => !env[name]);

@@ -8,7 +8,7 @@ import { obscure } from '../src/obscure.ts';
  * The value of `__EMMA_DEFAULT_CATALOGUE__` for a build.
  * @param env - The environment the build runs in
  * @returns JSON: the catalogue's URL and key, obscured, or `null` without them
- * @throws Error for only one of them, or a URL that is not https, rather than build a broken release
+ * @throws {Error} for only one of them, or a URL that is not https, rather than build a broken release
  */
 export function defaultCatalogueDefine(env: Readonly<Record<string, string | undefined>>): string {
   const url = env['EMMA_DEFAULT_CATALOGUE_URL'] || undefined;
