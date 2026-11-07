@@ -17,6 +17,6 @@
   },
   "devDependencies": {
     "@mondarth/fvtt-package-catalogue-contract": "0.4.0",
-    "@mondarth/fvtt-resolver": "0.10.0"
+    "@mondarth/fvtt-resolver": "0.11.0"
   }
 }
