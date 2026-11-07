@@ -212,6 +212,11 @@ export interface PlannerInputs {
   readonly policy: Partial<Policy>;
   /** Foundry VTT's title. */
   readonly coreTitle: string;
+  /**
+   * A package's title as the catalogue gives it, from Foundry VTT's listing or else its own manifest, for one found
+   * that is not installed, as one a plan installs to meet another's needs; none if the catalogue gave none.
+   */
+  readonly titleOf?: (key: PackageKey) => string | undefined;
 }
 
 /**
@@ -459,7 +464,7 @@ export function createPlanner(inputs: PlannerInputs): Planner {
   // The resolver's words, naming the installed packages by their titles.
   const messages: ExplanationMessages = {
     ...resolver.englishMessages,
-    name: key => titles.get(key) ?? resolver.englishMessages.name(key),
+    name: key => titles.get(key) ?? inputs.titleOf?.(key) ?? resolver.englishMessages.name(key),
   };
 
   /**
@@ -798,7 +803,7 @@ export function createPlanner(inputs: PlannerInputs): Planner {
     },
 
     titleOf(key) {
-      return titles.get(key) ?? key;
+      return titles.get(key) ?? inputs.titleOf?.(key) ?? key;
     },
 
     recommendsOf(key, version) {

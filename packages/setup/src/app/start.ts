@@ -133,7 +133,7 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
     findUpdates: async overview => {
       // The resolver comes from the installed EMMA module's setup kit, if it fits.
       const { installed, kit } = await kitIn(game);
-      const { universe, load, lookUp, readManifest, catalogue } = await lookUpReleases(installed, {
+      const { universe, load, lookUp, readManifest, titleOf, catalogue } = await lookUpReleases(installed, {
         kit,
         catalogue: revealCatalogue(__EMMA_DEFAULT_CATALOGUE__),
         clientVersion: __EMMA_EXTENSION_VERSION__,
@@ -146,6 +146,7 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
         load,
         lookUp,
         readManifest,
+        titleOf,
       });
       return { ...found, catalogue };
     },

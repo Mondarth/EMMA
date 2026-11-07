@@ -995,7 +995,9 @@ export class UpdateState {
   titleOf(key: PackageKey): string {
     if (key === 'core') return localize('Tree.Root');
     const title = this.#overview === null ? key : titleIn(this.#overview, key);
-    return title === key ? (this.#named.get(key) ?? this.#listingTitles.get(key) ?? key) : title;
+    if (title !== key) return title;
+    const found = this.search?.planner.titleOf(key);
+    return this.#named.get(key) ?? this.#listingTitles.get(key) ?? (found === undefined || found === key ? key : found);
   }
 
   /**

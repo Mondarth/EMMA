@@ -23,6 +23,7 @@ const CORES = [build('14.368'), build('14.369'), build('14.370')];
  * @param releases - Every release found, the installed ones among them
  * @param unrecorded - The IDs of worlds without a record
  * @param lookUp - How the releases of packages not installed are looked up, if they can be
+ * @param titleOf - The titles the catalogue gives, for packages not installed
  * @returns The planner
  */
 function planner(
@@ -31,6 +32,7 @@ function planner(
   releases: readonly Release[],
   unrecorded: readonly string[] = [],
   lookUp?: (packages: readonly PackageRef[]) => Promise<readonly Release[]>,
+  titleOf?: (key: string) => string | undefined,
 ) {
   const overview = buildOverview(
     installation({
@@ -52,6 +54,7 @@ function planner(
     policy: { verified: 'ignore', systemCompatibility: 'require', missingCompatibility: 'reject' },
     coreTitle: 'Foundry VTT',
     ...(lookUp !== undefined && { lookUp }),
+    ...(titleOf !== undefined && { titleOf }),
   });
 }
 
@@ -834,5 +837,18 @@ describe('a version chosen of a package no recorded world runs', () => {
     // The module chosen is installed after the one it requires.
     const plan = await plans.plan(picks(['module:cat', '0.1.6']));
     expect(plan?.map(({ key }) => key)).toEqual(['core', 'system:dnd5e', 'module:midi', 'module:cat']);
+  });
+});
+
+describe("a package's title", () => {
+  // Regression: Math.js, which Monster Blocks requires, was named by its ID in the plan and its explanations, as only
+  // installed packages' titles were known.
+  test("is the installed one's, or else the catalogue's, or else its key", () => {
+    const plans = planner([['midi', '1.0.0']], {}, [...DND, ...MIDI], [], undefined, key =>
+      key === 'module:_mathjs' ? 'Math.js' : undefined,
+    );
+    expect(plans.titleOf('module:midi')).toBe('MIDI');
+    expect(plans.titleOf('module:_mathjs')).toBe('Math.js');
+    expect(plans.titleOf('module:unknown')).toBe('module:unknown');
   });
 });

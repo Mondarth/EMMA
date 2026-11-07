@@ -38,6 +38,11 @@ export interface ReleaseLookup {
   /** Read a manifest the user gives, to install a package from, through the catalogue. */
   readonly readManifest: ReadManifest;
   /**
+   * A package's title as the catalogue gives it, from Foundry VTT's listing or else its own manifest, for one found
+   * that is not installed, as one a plan installs to meet another's needs; none if the catalogue gave none.
+   */
+  readonly titleOf: (key: PackageKey) => string | undefined;
+  /**
    * The packages the catalogue says cannot be had, archived or gone: only their installed releases are in the
    * universe, so they stay as they are.
    */
@@ -218,6 +223,7 @@ export async function lookUpReleases(installed: InstalledManifests, options: Loo
       );
       return latest(asked.universe.releases);
     },
+    titleOf: key => set?.packageOf(key)?.title ?? undefined,
     readManifest: async (url, type) => {
       const read = await source?.manifest(url, type);
       if (read === undefined || !read.ok) return { ok: false, problem: 'no-catalogue' };
