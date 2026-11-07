@@ -229,6 +229,18 @@ describe('updates in the window', () => {
             (picks.get('module:lib') ?? '1.0.0') !== '1.0.0' && picks.get('system:dnd5e') !== '5.4.0'
               ? Promise.resolve({ ok: false as const, explanation: ['Library needs D&D 5e 5.4.0.'] })
               : planner.complete(picks),
+          newerThan: (key, version) => (key === 'module:lib' && version === '1.0.0' ? ['2.0.0', '1.5.0'] : []),
+          whyNotTaken: (_key, version, picks) =>
+            Promise.resolve(
+              picks.get('system:dnd5e') === '5.4.0'
+                ? undefined
+                : {
+                    reason: 'conflict' as const,
+                    explanation: [
+                      `Because Library ${version} depends on D&D 5e 5.4.0, Library ${version} cannot be used.`,
+                    ],
+                  },
+            ),
         },
       })),
     );
@@ -242,6 +254,12 @@ describe('updates in the window', () => {
     const library = row(/Library/);
     expect(library).toHaveTextContent(/^Update available, but not with the plan as it stands/);
     expect(library.querySelector('.emma-tree-held')).not.toHaveClass('emma-tree-hidden');
+    // Its panel says what holds each newer version back, those held back alike on one line.
+    await user.click(within(library).getByText('Library'));
+    const why = await screen.findByRole('region', { name: 'Why 1.0.0, not 2.0.0' });
+    expect(why).toHaveTextContent(
+      '2.0.0 – 1.5.0: the plan cannot take it with the other versions chosen: Because Library 2.0.0 – 1.5.0 depends on D&D 5e 5.4.0, Library 2.0.0 – 1.5.0 cannot be used.',
+    );
     // D&D 5e's update the plan can take.
     expect(row(/D&D 5e/)).toHaveTextContent(/^Update available D&D 5e/);
 
@@ -251,6 +269,10 @@ describe('updates in the window', () => {
       expect(row(/Library/)).toHaveTextContent(/^Update available Library/);
     });
     expect(document.querySelector('.emma-tree-held')).toBeNull();
+    // Nothing holds it back now, so its panel no longer says why.
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('region', { name: /^Why 1\.0\.0/ })).toBeNull();
+    });
     await user.click(within(universal).getByText('Universal'));
     await user.keyboard('{ArrowLeft}');
     expect(universal).toHaveTextContent(/^Updates in the rows under it Universal/);

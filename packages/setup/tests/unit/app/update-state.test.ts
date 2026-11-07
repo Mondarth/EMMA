@@ -1488,10 +1488,16 @@ describe('updates the plan holds back', () => {
     expect(updates.heldBack('module:app')).toBe(true);
     expect(updates.heldBack('module:lib')).toBe(false);
 
+    // Its panel explains it at the version installed, what holds back each newer one.
+    expect(updates.explainedAt('module:app')).toBe('1.0.0');
+    expect(updates.explainedAt('module:lib')).toBeUndefined();
+
     await updates.choose('module:lib', '2.0.0');
     await updates.checkHeldBack();
     expect(updates.heldBack('module:app')).toBe(false);
     expect(updates.heldBack('module:lib')).toBe(false);
+    expect(updates.explainedAt('module:app')).toBeUndefined();
+    expect(updates.explainedAt('module:lib')).toBe('2.0.0');
   });
 
   test('are not checked again for the same plan, and a check begun is given up once another is', async () => {
