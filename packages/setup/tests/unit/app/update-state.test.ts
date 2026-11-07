@@ -1426,3 +1426,28 @@ describe('versions refused alike, each naming itself', () => {
     expect(versionIn('2.1.0').test(line)).toBe(found);
   });
 });
+
+describe('planning the best versions', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // Regression: the busy mark on Plan the best versions never showed, as the planner's answers, settling at once, kept
+  // the browser from drawing until every package was planned.
+  test('lets the browser draw before it plans, so that what shows it busy is drawn', async () => {
+    const planner = alone(APP);
+    const complete = vi.fn(planner.complete);
+    const updates = new UpdateState(() => Promise.resolve({ ...finding(APP), planner: { ...planner, complete } }));
+    await updates.searchFor(
+      buildOverview(installation({ modules: [installedModule('app', 'App', '1.0.0')] }), new Map()),
+    );
+    vi.useFakeTimers();
+
+    const planning = updates.planBest();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(complete).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(20);
+    await expect(planning).resolves.toBe(true);
+    expect(complete).toHaveBeenCalled();
+  });
+});

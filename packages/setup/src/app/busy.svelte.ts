@@ -11,8 +11,11 @@ import { SvelteMap } from 'svelte/reactivity';
  */
 export const MINIMUM_BUSY_MS = 400;
 
-/** How long items stay marked, at least, unless a state is given its own: the unit tests set none. */
-export const busyTiming = { minimumMs: MINIMUM_BUSY_MS };
+/**
+ * How long items stay marked, at least, unless a state is given its own, and whether work waits for the mark to be
+ * drawn: the unit tests set neither, so that what they do happens at once.
+ */
+export const busyTiming = { minimumMs: MINIMUM_BUSY_MS, paint: true };
 
 /** What EMMA may be busy with, each said in one word. */
 export type Activity = 'planning' | 'reading' | 'checking' | 'refreshing' | 'locking' | 'ignoring' | 'resuming';
@@ -41,7 +44,8 @@ export class BusyState {
 
   /**
    * Do some work for an item, marking it busy until the work is done, or has failed, and for the least time an item is
-   * marked. What the work gives is given as soon as it is done; only the mark stays.
+   * marked. The work starts once the browser has drawn the mark. What the work gives is given as soon as it is done;
+   * only the mark stays.
    * @param item - The item the user acted on
    * @param activity - What the work is
    * @param work - The work
@@ -52,6 +56,9 @@ export class BusyState {
     this.#items.set(item, { activity, runs: (held?.runs ?? 0) + 1 });
     const started = Date.now();
     try {
+      // Drawn before the work starts: work whose answers settle at once, as the planner's do, keeps the browser from
+      // drawing until it ends, so that the mark would never be seen.
+      if (busyTiming.paint) await afterPaint();
       return await work();
     } finally {
       const left = (this.#minimumMs ?? busyTiming.minimumMs) - (Date.now() - started);

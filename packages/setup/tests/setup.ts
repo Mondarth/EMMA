@@ -4,9 +4,11 @@ import '@testing-library/jest-dom/vitest';
 import { busyTiming } from '../src/app/busy.svelte';
 import { ApplicationV2Mock } from './mocks/foundry';
 
-// What EMMA is busy with is marked only while it works, so that a test may act on an item again at once; the tests of
-// the least time an item is marked give their states their own.
+// What EMMA is busy with is marked only while it works, and its work starts at once, not once the mark is drawn, so
+// that a test may act on an item again at once; the tests of the least time an item is marked give their states their
+// own, and those of the mark being drawn first set it so again.
 busyTiming.minimumMs = 0;
+busyTiming.paint = false;
 
 // EMMA's window extends Foundry's ApplicationV2 as soon as its module loads, before any test installs its mocks.
 Object.assign(globalThis, { foundry: { applications: { api: { ApplicationV2: ApplicationV2Mock } } } });
