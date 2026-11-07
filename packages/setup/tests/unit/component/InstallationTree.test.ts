@@ -46,12 +46,15 @@ const rows = () => screen.getAllByRole('treeitem').map(item => item.textContent.
 const row = (name: RegExp) => screen.getByRole('treeitem', { name });
 
 describe('InstallationTree', () => {
-  test('shows the root, the game systems and the modules expanded, with the groups under them', () => {
+  test('shows the root, the worlds, the game systems and the modules expanded, with the groups under them', () => {
     setUp();
 
     expect(screen.getByRole('tree', { name: 'Installation' })).toBeInTheDocument();
     expect(rows()).toEqual([
       'Foundry VTT 14.368',
+      'Worlds',
+      'Alpha Matches its record, Current state',
+      'Beta No record, Current state',
       'Game systems',
       'D&D 5e 5.3.3 In use, Current state',
       'Modules',
@@ -59,7 +62,10 @@ describe('InstallationTree', () => {
     ]);
     expect(row(/Foundry/)).toHaveAttribute('aria-expanded', 'true');
     expect(row(/Foundry/)).toHaveAttribute('aria-level', '1');
-    expect(row(/D&D 5e/)).toHaveAttribute('aria-expanded', 'false');
+    expect(row(/Alpha/)).toHaveAttribute('aria-expanded', 'false');
+    expect(row(/Alpha/)).toHaveAttribute('aria-level', '3');
+    // The worlds that use it are under the worlds' row.
+    expect(row(/D&D 5e/)).not.toHaveAttribute('aria-expanded');
     expect(row(/D&D 5e/)).toHaveAttribute('aria-level', '3');
   });
 
@@ -68,15 +74,10 @@ describe('InstallationTree', () => {
     row(/Foundry/).focus();
 
     await user.keyboard('{ArrowDown}{ArrowDown}');
-    expect(onSelect).toHaveBeenLastCalledWith(
-      expect.objectContaining({ selection: { kind: 'system', system: 'dnd5e' } }),
-    );
-    expect(row(/D&D 5e/)).toHaveFocus();
+    expect(onSelect).toHaveBeenLastCalledWith(expect.objectContaining({ selection: { kind: 'world', world: 'a' } }));
+    expect(row(/Alpha/)).toHaveFocus();
 
     await user.keyboard('{ArrowRight}');
-    expect(rows()).toContain('Alpha Matches its record, Current state');
-
-    await user.keyboard('{ArrowRight}{ArrowRight}');
     expect(rows()).toContain('Library 1.0.0 In use, Current state');
     // The world's game system comes first, then its modules.
     await user.keyboard('{ArrowRight}');
@@ -122,7 +123,7 @@ describe('InstallationTree', () => {
     expect(row(/Foundry/)).toHaveAttribute('aria-selected', 'false');
     row(/Foundry/).focus();
     await user.keyboard('{ArrowDown}');
-    expect(row(/Game systems/)).toHaveFocus();
+    expect(row(/Worlds/)).toHaveFocus();
   });
 });
 
@@ -158,9 +159,6 @@ describe("the tree's status badges", () => {
     await updates.searchFor(OVERVIEW);
     render(InstallationTree, { overview: OVERVIEW, selected: ROOT, onSelect: vi.fn(), updates });
     const user = userEvent.setup();
-    await user.click(
-      screen.getAllByRole('treeitem', { name: /D&D 5e 5\.3\.3/ })[0]?.querySelector('.emma-tree-toggle') as Element,
-    );
     await user.click(row(/Alpha/).querySelector('.emma-tree-toggle') as Element);
     const badge = (name: RegExp) =>
       within(row(name)).getByText(/Matches|In use|No record/, { selector: '.emma-status' });
@@ -217,7 +215,7 @@ describe('the finder', () => {
       expect(selected()).toHaveTextContent('Dungeons and Dragons Fifth Edition');
       expect(screen.getByRole('status')).toHaveTextContent('Finding “eon”');
 
-      // Library, under Alpha, which the finder opens; then Gamma, under Pathfinder, so it closes them again.
+      // Library, under Alpha, which the finder opens; then Gamma, beside Alpha, so it closes Alpha again.
       await user.keyboard('{Escape}');
       expect(screen.queryByRole('status')).toBeNull();
       await user.keyboard('libr');
@@ -225,8 +223,7 @@ describe('the finder', () => {
       expect(row(/^Alpha/)).toHaveAttribute('aria-expanded', 'true');
       await user.keyboard('{Backspace}{Backspace}{Backspace}{Backspace}gamm');
       expect(selected()).toHaveTextContent('Gamma');
-      expect(screen.queryByRole('treeitem', { name: /^Alpha/ })).toBeNull();
-      expect(row(/Pathfinder/)).toHaveAttribute('aria-expanded', 'true');
+      expect(row(/^Alpha/)).toHaveAttribute('aria-expanded', 'false');
 
       await user.keyboard('x');
       expect(screen.getByRole('status')).toHaveTextContent('Nothing has “gammx”');
@@ -240,7 +237,12 @@ describe('the finder', () => {
       await user.keyboard(' ');
       expect(screen.queryByRole('status')).toBeNull();
       // What it opened stays open once it is done.
-      expect(row(/Pathfinder/)).toHaveAttribute('aria-expanded', 'true');
+      await user.keyboard('libr');
+      vi.advanceTimersByTime(2000);
+      await vi.waitFor(() => {
+        expect(screen.queryByRole('status')).toBeNull();
+      });
+      expect(row(/^Alpha/)).toHaveAttribute('aria-expanded', 'true');
     } finally {
       vi.useRealTimers();
     }

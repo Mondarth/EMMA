@@ -1426,3 +1426,110 @@ describe('versions refused alike, each naming itself', () => {
     expect(versionIn('2.1.0').test(line)).toBe(found);
   });
 });
+
+describe('planning the best versions', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // Regression: the busy mark on Plan the best versions never showed, as the planner's answers, settling at once, kept
+  // the browser from drawing until every package was planned.
+  test('lets the browser draw before it plans, so that what shows it busy is drawn', async () => {
+    const planner = alone(APP);
+    const complete = vi.fn(planner.complete);
+    const updates = new UpdateState(() => Promise.resolve({ ...finding(APP), planner: { ...planner, complete } }));
+    await updates.searchFor(
+      buildOverview(installation({ modules: [installedModule('app', 'App', '1.0.0')] }), new Map()),
+    );
+    vi.useFakeTimers();
+
+    const planning = updates.planBest();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(complete).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(20);
+    await expect(planning).resolves.toBe(true);
+    expect(complete).toHaveBeenCalled();
+  });
+});
+
+describe('updates the plan holds back', () => {
+  const LIBRARY: PackageUpdate = {
+    key: 'module:lib',
+    installed: '1.0.0',
+    newest: '2.0.0',
+    versions: ['2.0.0', '1.0.0'],
+  };
+  const INSTALLED = buildOverview(
+    installation({ modules: [installedModule('app', 'App', '1.0.0'), installedModule('lib', 'Library', '1.0.0')] }),
+    new Map(),
+  );
+
+  /**
+   * A search whose planner cannot take the app's newer versions unless the library is at 2.0.0.
+   * @returns The state, searched, and the planner's completion, to count its calls
+   */
+  async function searched() {
+    const planner = alone(APP, LIBRARY);
+    const complete = vi.fn((picks: ReadonlyMap<string, string>) =>
+      (picks.get('module:app') ?? '1.0.0') !== '1.0.0' && picks.get('module:lib') !== '2.0.0'
+        ? Promise.resolve({ ok: false as const })
+        : planner.complete(picks),
+    );
+    const updates = new UpdateState(() =>
+      Promise.resolve({ ...finding(APP, LIBRARY), planner: { ...planner, complete } }),
+    );
+    await updates.searchFor(INSTALLED);
+    return { updates, complete };
+  }
+
+  test('are those with an update none of whose newer versions the plan can take, not one it changes already', async () => {
+    const { updates } = await searched();
+    await updates.checkHeldBack();
+    expect(updates.heldBack('module:app')).toBe(true);
+    expect(updates.heldBack('module:lib')).toBe(false);
+
+    // Its panel explains it at the version installed, what holds back each newer one.
+    expect(updates.explainedAt('module:app')).toBe('1.0.0');
+    expect(updates.explainedAt('module:lib')).toBeUndefined();
+
+    await updates.choose('module:lib', '2.0.0');
+    await updates.checkHeldBack();
+    expect(updates.heldBack('module:app')).toBe(false);
+    expect(updates.heldBack('module:lib')).toBe(false);
+    expect(updates.explainedAt('module:app')).toBeUndefined();
+    expect(updates.explainedAt('module:lib')).toBe('2.0.0');
+  });
+
+  test('are not checked again for the same plan, and a check begun is given up once another is', async () => {
+    const { updates, complete } = await searched();
+    await updates.checkHeldBack();
+    const calls = complete.mock.calls.length;
+    await updates.checkHeldBack();
+    expect(complete.mock.calls.length).toBe(calls);
+
+    await updates.choose('module:lib', '2.0.0');
+    const first = updates.checkHeldBack();
+    updates.clear();
+    await Promise.all([first, updates.checkHeldBack()]);
+    // As the last check found, with nothing chosen.
+    expect(updates.heldBack('module:app')).toBe(true);
+  });
+
+  test('are none before the search has found anything, and checked once it has', async () => {
+    const planner = alone(APP);
+    const updates = new UpdateState(() =>
+      Promise.resolve({
+        ...finding(APP),
+        planner: { ...planner, complete: () => Promise.resolve({ ok: false as const }) },
+      }),
+    );
+    await updates.checkHeldBack();
+    expect(updates.heldBack('module:app')).toBe(false);
+
+    await updates.searchFor(
+      buildOverview(installation({ modules: [installedModule('app', 'App', '1.0.0')] }), new Map()),
+    );
+    await updates.checkHeldBack();
+    expect(updates.heldBack('module:app')).toBe(true);
+  });
+});

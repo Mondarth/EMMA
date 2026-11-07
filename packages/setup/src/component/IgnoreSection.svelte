@@ -1,11 +1,12 @@
 <!--
-  Ignoring a world, game system or module, below its panel: ignored, no plan takes it into account, as the EMMA
+  Ignoring a world, game system or module, among the actions at the top of its panel: ignored, no plan takes it into account, as the EMMA
   module's hypothetical mode ignores a module (see `considered`). It takes effect at once, not in the plan.
 -->
 <script lang="ts">
   import type { Activity } from '../app/busy.svelte';
   import { format, localize } from '../lib/i18n';
 
+  import ActionItem from './ActionItem.svelte';
   import BusyMark from './BusyMark.svelte';
 
   interface Props {
@@ -27,13 +28,9 @@
   const said = $derived(
     ignored ? (world ? 'Ignore.IgnoredWorld' : 'Ignore.Ignored') : world ? 'Ignore.UnignoredWorld' : 'Ignore.Unignored',
   );
-
-  const uid = $props.id();
 </script>
 
-<section class="emma-ignore" aria-labelledby="{uid}-heading">
-  <h3 id="{uid}-heading">{localize('Ignore.Heading')}</h3>
-  <p>{format(said, { title })}</p>
+{#snippet button()}
   <button
     type="button"
     class="emma-busy-host"
@@ -46,14 +43,10 @@
     {format(ignored ? 'Ignore.Unignore' : 'Ignore.Ignore', { title })}
     <BusyMark activity={busy} />
   </button>
-</section>
+{/snippet}
 
-<style>
-  .emma-ignore {
-    margin-top: 1rem;
-  }
+{#snippet about()}
+  <p>{format(said, { title })}</p>
+{/snippet}
 
-  .emma-ignore button {
-    width: auto;
-  }
-</style>
+<ActionItem label={localize('Ignore.Heading')} {button} {about} />

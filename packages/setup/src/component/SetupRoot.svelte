@@ -28,6 +28,7 @@
   import CoreStep from './CoreStep.svelte';
   import AlphaNotice from './AlphaNotice.svelte';
   import BusyMark from './BusyMark.svelte';
+  import OpeningMark from './OpeningMark.svelte';
   import FailedStep from './FailedStep.svelte';
   import WhyChosen from './WhyChosen.svelte';
   import SavedPlanNotice from './SavedPlanNotice.svelte';
@@ -270,14 +271,71 @@
   {/if}
 {/snippet}
 
+<!--
+  Ignoring an installed game system or module, or a module a world's record names that is not installed, as a phantom
+  module a world records may be, though no such module exists.
+-->
 {#snippet ignoreInstalled(key: string)}
   {@const id = key.slice(key.indexOf(':') + 1)}
   {@const pkg = key.startsWith('system:')
     ? overview?.systems.find(system => system.id === id)
-    : overview?.modules.find(({ module: installed }) => installed.id === id)?.module}
+    : (overview?.modules.find(({ module: installed }) => installed.id === id)?.module ??
+      overview?.worlds.flatMap(({ modules: run }) => run).find(recorded => recorded.id === id))}
   {#if pkg !== undefined}
     {@render ignore(key, pkg.title)}
   {/if}
+{/snippet}
+
+<!--
+  The actions on what the panel shows, just below its title, side by side, each its own title: none it cannot take.
+-->
+{#snippet packageActions()}
+  {@const key =
+    selection.kind === 'module'
+      ? `module:${selection.module}`
+      : selection.kind === 'system'
+        ? `system:${selection.system}`
+        : undefined}
+  {#if key !== undefined}
+    <div class="emma-actions" role="group" aria-label={localize('Action.Label')}>
+      {@render lock(key)}
+      {@render ignoreInstalled(key)}
+      {@render uninstall(key)}
+    </div>
+  {/if}
+{/snippet}
+
+{#snippet worldActions()}
+  {#if world !== undefined}
+    <div class="emma-actions" role="group" aria-label={localize('Action.Label')}>
+      {@render ignore(`world:${world.world.id}`, world.world.title)}
+    </div>
+  {/if}
+{/snippet}
+
+<!-- Foundry VTT's, with planning the best versions just below them, as what is most often done from the root. -->
+{#snippet rootActions()}
+  {#if setup.canLockCore && overview !== null}
+    <div class="emma-actions" role="group" aria-label={localize('Action.Label')}>
+      <LockSection
+        core
+        title={localize('Tree.Root')}
+        version={overview.core}
+        locked={overview.coreLocked === true}
+        disabled={updates.locked || setup.running}
+        busy={updates.busy.activityOf('lock:core')}
+        onLock={(locking: boolean) => {
+          void updates.busy.run('lock:core', 'locking', () => setup.setCoreLocked(locking));
+        }} />
+    </div>
+  {/if}
+  <BestSection
+    {updates}
+    disabled={updates.locked || setup.running}
+    inUseOnly={setup.bestInUseOnly}
+    onInUseOnlyChange={(on: boolean) => {
+      setup.setBestInUseOnly(on);
+    }} />
 {/snippet}
 
 {#snippet uninstall(key: string)}
@@ -297,6 +355,9 @@
 {/snippet}
 
 <div class="emma-setup">
+  {#if setup.opening}
+    <OpeningMark />
+  {/if}
   {#if overview === null}
     <p class="emma-setup-message" role="status">
       {setup.failed ? localize('App.LoadFailed') : localize('App.Loading')}
@@ -334,27 +395,23 @@
           {#if selection.kind === 'module'}
             <FailedStep run={setup.shownRun} key={`module:${selection.module}`} />
             <ModulePanel
+              actions={packageActions}
               detail={moduleDetail(overview, selection.module, selection.world)}
               onOpen={openLink}
               blocked={updates.blockedOf(`module:${selection.module}`)}
               explained={updates.explainedOf(`module:${selection.module}`)} />
             <WhyChosen {updates} key={`module:${selection.module}`} />
             <RecommendsSection key={`module:${selection.module}`} {updates} onOpen={openLink} />
-            {@render lock(`module:${selection.module}`)}
-            {@render ignoreInstalled(`module:${selection.module}`)}
-            {@render uninstall(`module:${selection.module}`)}
           {:else if selection.kind === 'system'}
             <FailedStep run={setup.shownRun} key={`system:${selection.system}`} />
             <SystemPanel
+              actions={packageActions}
               detail={systemDetail(overview, selection.system, selection.world)}
               onOpen={openLink}
               blocked={updates.blockedOf(`system:${selection.system}`)}
               explained={updates.explainedOf(`system:${selection.system}`)} />
             <WhyChosen {updates} key={`system:${selection.system}`} />
-            {@render lock(`system:${selection.system}`)}
-            {@render ignoreInstalled(`system:${selection.system}`)}
-            {@render uninstall(`system:${selection.system}`)}
-          {:else if selection.kind === 'systems' || selection.kind === 'modules' || selection.kind === 'group'}
+          {:else if selection.kind === 'worlds' || selection.kind === 'systems' || selection.kind === 'modules' || selection.kind === 'group'}
             <GroupPanel detail={groupDetail(overview, selection)} onOpen={openLink} />
             {#if installType !== undefined && setup.canInstall}
               <InstallSection
@@ -372,10 +429,10 @@
                 }} />
             {/if}
           {:else if world !== undefined}
-            <WorldPanel {world} onOpen={openLink} />
-            {@render ignore(`world:${world.world.id}`, world.world.title)}
+            <WorldPanel {world} onOpen={openLink} actions={worldActions} />
           {:else}
             <RootPanel
+              actions={rootActions}
               {overview}
               onOpen={openLink}
               guardOn={setup.guardOn}
@@ -384,25 +441,6 @@
               onGuardChange={(on: boolean) => {
                 setup.setGuardOn(on);
               }} />
-            <BestSection
-              {updates}
-              disabled={updates.locked || setup.running}
-              inUseOnly={setup.bestInUseOnly}
-              onInUseOnlyChange={(on: boolean) => {
-                setup.setBestInUseOnly(on);
-              }} />
-            {#if setup.canLockCore}
-              <LockSection
-                core
-                title={localize('Tree.Root')}
-                version={overview.core}
-                locked={overview.coreLocked === true}
-                disabled={updates.locked || setup.running}
-                busy={updates.busy.activityOf('lock:core')}
-                onLock={(locking: boolean) => {
-                  void updates.busy.run('lock:core', 'locking', () => setup.setCoreLocked(locking));
-                }} />
-            {/if}
           {/if}
         </section>
       </div>
@@ -533,7 +571,20 @@
 </div>
 
 <style>
+  /* The actions side by side, wrapping only where the panel is too narrow for them. */
+  .emma-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.5rem 1rem;
+  }
+
+  .emma-actions:has(:global(.emma-action)) {
+    margin-bottom: 0.75rem;
+  }
+
   .emma-setup {
+    position: relative;
     display: flex;
     flex-direction: column;
     height: 100%;
@@ -568,6 +619,11 @@
   .emma-setup-panel {
     overflow: auto;
     padding: 0 1rem;
+  }
+
+  /* Space above each section with a heading, to set the sections apart. */
+  .emma-setup-panel :global(section:has(> h3)) {
+    margin-top: 2rem;
   }
 
   /* At least three lines high, in the panel's top right corner, to catch the eye wherever the panel is scrolled. */

@@ -86,6 +86,9 @@ gives EMMA's version, such as **EMMA - installation (0.1.1)**. While EMMA is an 
 with a link to [EMMA's alpha](alpha.md), and asks once for each new version that you acknowledge it with **I
 understand**: until you do, the plan cannot be run.
 
+**While the window opens**, a large spinner and **Analyzing** sit in its middle, until EMMA has read the installation
+and first looked for updates; reading it again later shows only the **Read again** button busy.
+
 **Foundry's own installs, updates, uninstalls and locks are disabled**: the **Install** button, **Update All**, and the
 update button on each package are greyed out, and say that EMMA manages packages on this screen if chosen. So do
 **Uninstall**, **Lock** and **Unlock** in the package menu of a game system or module, before Foundry asks anything.
@@ -104,19 +107,19 @@ while EMMA checks which versions work with what is chosen, which can take a seco
 
 ### The installation tree
 
-EMMA's window shows the installation as a tree, and beside it what is selected in it. The tree is in two halves, the
-game systems with the worlds that use them, and the modules:
+EMMA's window shows the installation as a tree, and beside it what is selected in it. The tree has three branches, in
+the order Foundry's Setup screen gives them: the worlds, the game systems, and the modules:
 
 ```text
 Foundry VTT
+  Worlds
+    World 1
+      the game system and the modules World 1 last ran with
+    World 2
+      the game system and the modules World 2 last ran with
   Game systems
     D&D 5e
-      World 1
-        the game system and the modules World 1 last ran with
-      World 2
-        the game system and the modules World 2 last ran with
     Pathfinder 2e
-      World 3 …
   Modules
     Universal
       the modules for any game system
@@ -126,9 +129,7 @@ Foundry VTT
 
 - **The root**, Foundry VTT and its version: a summary of the worlds (how many, by game system, and how their records
   compare with what is installed) and of the modules (how many, and how many are active in a recorded world).
-- **Game systems**: each installed system, with its version, marked **In use** if a world uses it, and the worlds that use it; then any
-  system a world uses that is not installed, marked **Not installed**. Only one version of a system is installed at a
-  time. Each world shows how its record compares with what is installed now:
+- **Worlds**: every world, each showing how its record compares with what is installed now:
   - **Matches its record**: Foundry, the game system and every module are installed at the versions the world last ran
     with.
   - **Changed since it last ran**: something has been updated or uninstalled since. The world's panel lists what.
@@ -137,6 +138,9 @@ Foundry VTT
   and whether that version is **In use**, as it is installed, **Another version installed**, or **Not installed**. So a world that last
   ran with an older version of its system, or with a system since uninstalled, says so. A world without a record shows
   nothing under it, as EMMA cannot tell what it last ran with.
+- **Game systems**: each installed system, with its version, marked **In use** if a world uses it; then any system a
+  world uses that is not installed, marked **Not installed**. Only one version of a system is installed at a time. A
+  system's panel lists the worlds that use it, each linked to its row.
 
 Each of these badges says what it reports in its tooltip: **Current state**, or, where the plan changes it, **Planned
 update**. A badge of something the plan changes, a package it updates or uninstalls, or a world whose game system, a
@@ -183,6 +187,12 @@ footer says how many it found. Each package with an update has a blue upward arr
 in the tree. A package with a newer version that EMMA cannot offer has a red one beside it, and its panel says which
 version, and which worlds hold it back and why: EMMA cannot make every world that uses the package consistent with it. A
 closed row with either kind of package anywhere under it has the same arrow, fainter, so nothing is hidden.
+
+A blue arrow **struck through** marks an update the plan cannot take as it stands: a newer version is offered, but none
+of them goes with the plan's choices and locks, as when Foundry VTT is locked and every newer version needs a newer
+build. Its panel says what holds back each newer version, under **Why <installed>, not <newest>**, as for a version the plan takes below its newest. A package the plan already changes keeps its plain arrow. A closed row whose updates
+under it are all held back so has the struck arrow, fainter. EMMA checks again each time the plan changes, so the
+arrows may take a moment to catch up after a change.
 
 When the plan takes a version of a package other than its newest, whether you chose it, the plan needs it, or it is a
 package to install anew, the package's panel says why: **Why 2.1.0, not 3.4.0** lists each newer version and why the plan
@@ -254,7 +264,7 @@ needed by it, locked in. A shift-click takes out what it brought in
 too, but for what another change still needs. So does a click on a change in a ring of changes that need each other,
 such as a module, a module it requires and the game system they run in, each newer: alone, it would only come back.
 
-**Plan the best versions**, in the root's panel, replaces the plan with the newest versions there are: those of Foundry
+**Plan the best versions**, under **Plan Updates** just below the actions in the root's panel, replaces the plan with the newest versions there are: those of Foundry
 VTT, then of each game system, then of each module installed, each the newest the plan can take with those before it,
 so that every recorded world keeps working, as choosing each by hand would. Packages locked in Foundry, and Foundry VTT
 locked in EMMA, stay as they are. What was chosen before goes, uninstalls and packages added against advice among it.
@@ -449,12 +459,16 @@ A game system or module locked in Foundry has a lock beside it in the tree. EMMA
 Foundry refuses to update or uninstall it: none of its other versions is offered, an update of another package that
 needs it changed is not either, and it cannot be uninstalled.
 
-The panel of each installed game system and module has a **Lock** section: **Lock <title> at <version>**, or **Unlock
+**The actions** on what a panel shows, **Lock**, **Ignore** and **Uninstall**, sit side by side just below its title,
+wrapping only where the panel is too narrow. Each button names what it does; the **ⓘ** beside it shows, or hides again,
+what that is, hidden at first. Only why an uninstall is refused shows always, below its button.
+
+The panel of each installed game system and module has a **Lock** action: **Lock <title> at <version>**, or **Unlock
 <title>**, which locks or unlocks it in Foundry at once, as Foundry's own package menu does, and reads the installation
 again. A choice of the package in the plan goes once it is locked.
 
 Foundry VTT itself can be locked too, in EMMA alone, as Foundry has no lock for itself: the root's panel has the same
-**Lock** section, **Lock Foundry VTT at <build>**. Locked, the plan never updates Foundry VTT, nor offers a newer
+**Lock** action, **Lock Foundry VTT at <build>**. Locked, the plan never updates Foundry VTT, nor offers a newer
 build, but still updates the game systems and modules that run on the build installed, so that a server can be kept on
 its build and still have its packages brought up to date. The tree's root shows the lock, **Locked in EMMA**. The
 browser remembers the lock for that server. It does not stop Foundry's own **Update Software**.
@@ -469,22 +483,25 @@ to whole worlds and to game systems, outside any one world.
   releases, so it is never updated or offered as an update. What it asks of the setup holds nothing back, and whatever
   version of it another package asks for is taken to be the one installed. Use it for a package whose releases EMMA
   cannot read or judge correctly.
+- **An ignored phantom module**: a world's record may name a module that is not a real one, such as a synthetic
+  module another module adds, so that it never installs. Its row, under the world, offers **Ignore** too; ignored, it is
+  no longer counted as a change since the world last ran.
 - **An ignored world** holds nothing back: what it runs is not taken into account, so a plan may leave it unable to
   run. Use it for a world no longer played.
 
-Each world's panel, and each installed game system's and module's, has an **Ignore** section: **Ignore <title>** or
+Each world's panel, and each installed game system's and module's, has an **Ignore** action: **Ignore <title>** or
 **Stop ignoring <title>**. It takes effect at once, reading the installation again, not in the plan. An ignored row is
 greyed out and struck through in the tree, and can still be selected: its panel has an **Ignored** block in its top
 right corner, which stays in view as the panel scrolls. The browser remembers what is ignored for that server.
 
 ### Uninstalling
 
-The panel of a game system or module has an **Uninstall** section below it. **Uninstall <title>** puts the package in
+The panel of a game system or module has an **Uninstall** action. **Uninstall <title>** puts the package in
 the plan: its row says **Uninstall**, with nothing to install, and the tree shows **Uninstall** in place of its version.
 **Keep <title> installed** takes it out again. Uninstalling deletes the package from the server, with any data it keeps
 there, and cannot be undone; a snapshot keeps a copy.
 
-EMMA refuses an uninstall that would break something it knows of, saying what:
+EMMA refuses an uninstall that would break something it knows of, saying what below the button:
 
 - a game system a world uses;
 - a module a recorded world runs, or will need when next run;

@@ -217,6 +217,67 @@ describe('updates in the window', () => {
     );
   });
 
+  test('strikes through an update the plan as it stands cannot take, and a collapsed row hiding only those', async () => {
+    const planner = alone(...UPDATES);
+    // The library's newer versions need D&D 5e 5.4.0, as a lock might keep them from the plan.
+    const { setup, user } = await setUp(() =>
+      findingBlocked()().then(found => ({
+        ...found,
+        planner: {
+          ...planner,
+          complete: picks =>
+            (picks.get('module:lib') ?? '1.0.0') !== '1.0.0' && picks.get('system:dnd5e') !== '5.4.0'
+              ? Promise.resolve({ ok: false as const, explanation: ['Library needs D&D 5e 5.4.0.'] })
+              : planner.complete(picks),
+          newerThan: (key, version) => (key === 'module:lib' && version === '1.0.0' ? ['2.0.0', '1.5.0'] : []),
+          whyNotTaken: (_key, version, picks) =>
+            Promise.resolve(
+              picks.get('system:dnd5e') === '5.4.0'
+                ? undefined
+                : {
+                    reason: 'conflict' as const,
+                    explanation: [
+                      `Because Library ${version} depends on D&D 5e 5.4.0, Library ${version} cannot be used.`,
+                    ],
+                  },
+            ),
+        },
+      })),
+    );
+    const universal = row(/Universal/);
+    await vi.waitFor(() => {
+      expect(universal).toHaveTextContent(/^Updates in the rows under it, but none with the plan as it stands/);
+    });
+    expect(universal.querySelector('.emma-tree-held')).toHaveClass('emma-tree-hidden');
+    await user.click(within(universal).getByText('Universal'));
+    await user.keyboard('{ArrowRight}');
+    const library = row(/Library/);
+    expect(library).toHaveTextContent(/^Update available, but not with the plan as it stands/);
+    expect(library.querySelector('.emma-tree-held')).not.toHaveClass('emma-tree-hidden');
+    // Its panel says what holds each newer version back, those held back alike on one line.
+    await user.click(within(library).getByText('Library'));
+    const why = await screen.findByRole('region', { name: 'Why 1.0.0, not 2.0.0' });
+    expect(why).toHaveTextContent(
+      '2.0.0 – 1.5.0: the plan cannot take it with the other versions chosen: Because Library 2.0.0 – 1.5.0 depends on D&D 5e 5.4.0, Library 2.0.0 – 1.5.0 cannot be used.',
+    );
+    // D&D 5e's update the plan can take.
+    expect(row(/D&D 5e/)).toHaveTextContent(/^Update available D&D 5e/);
+
+    await setup.updates.choose('system:dnd5e', '5.4.0');
+
+    await vi.waitFor(() => {
+      expect(row(/Library/)).toHaveTextContent(/^Update available Library/);
+    });
+    expect(document.querySelector('.emma-tree-held')).toBeNull();
+    // Nothing holds it back now, so its panel no longer says why.
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('region', { name: /^Why 1\.0\.0/ })).toBeNull();
+    });
+    await user.click(within(universal).getByText('Universal'));
+    await user.keyboard('{ArrowLeft}');
+    expect(universal).toHaveTextContent(/^Updates in the rows under it Universal/);
+  });
+
   test('gives no column to red arrows while nothing is blocked', async () => {
     await setUp();
 
@@ -267,9 +328,9 @@ describe('updates in the window', () => {
     expect(chosen).not.toHaveTextContent('Installed');
 
     // Only a row that shows the installed version offers them: under a world, the version it last ran with shows.
-    await user.click(within(row(/^Update available D&D 5e/)).getByText('D&D 5e'));
-    await user.keyboard('{ArrowRight}{ArrowRight}{ArrowRight}');
-    expect(row(/^Alpha/)).toHaveAttribute('aria-expanded', 'true');
+    await user.click(within(row(/Alpha/)).getByText('Alpha'));
+    await user.keyboard('{ArrowRight}');
+    expect(row(/Alpha/)).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getAllByRole('treeitem', { name: /^Update available D&D 5e/ })).toHaveLength(2);
     expect(screen.getAllByRole('button', { name: /^Version of/ })).toHaveLength(1);
 
@@ -1407,8 +1468,26 @@ describe('uninstalling', () => {
     await user.click(within(row(/Universal/)).getByText('Universal'));
     await user.keyboard('{ArrowRight}');
     await user.click(within(row(/^Spare/)).getByText('Spare'));
-    const section = screen.getByRole('region', { name: 'Uninstall' });
-    expect(section).toHaveTextContent('cannot be undone');
+    const section = screen.getByRole('group', { name: 'Uninstall' });
+    // What it does is hidden until asked for, from the information button beside it.
+    const about = within(section).getByRole('button', { name: 'What Uninstall does' });
+    expect(about).toHaveAttribute('aria-expanded', 'false');
+    expect(within(section).getByText(/cannot be undone/)).not.toBeVisible();
+    await user.click(about);
+    expect(about).toHaveAttribute('aria-expanded', 'true');
+    expect(within(section).getByText(/cannot be undone/)).toBeVisible();
+    await user.click(about);
+    expect(within(section).getByText(/cannot be undone/)).not.toBeVisible();
+    // The actions are just below the panel's title, side by side.
+    expect(section.parentElement).toHaveAttribute('aria-label', 'Actions');
+    expect(section.parentElement?.previousElementSibling).toEqual(
+      screen.getByRole('heading', { level: 2, name: 'Spare' }),
+    );
+    expect(
+      within(section.parentElement as HTMLElement)
+        .getAllByRole('group')
+        .map(group => group.getAttribute('aria-label')),
+    ).toEqual(['Uninstall']);
     await user.click(within(section).getByRole('button', { name: 'Uninstall Spare' }));
 
     const plan = await screen.findByRole('region', { name: 'Update plan' });
@@ -1433,13 +1512,15 @@ describe('uninstalling', () => {
 
     // Run, the plan is read again: here nothing was uninstalled, so it is kept, and can be taken back.
     await user.click(
-      within(screen.getByRole('region', { name: 'Uninstall' })).getByRole('button', { name: 'Keep Spare installed' }),
+      within(screen.getByRole('group', { name: 'Uninstall' })).getByRole('button', { name: 'Keep Spare installed' }),
     );
     expect(screen.queryByRole('region', { name: 'Update plan' })).toBeNull();
 
     await user.click(within(row(/^Update available Library/)).getByText('Library'));
-    const refused = screen.getByRole('region', { name: 'Uninstall' });
+    const refused = screen.getByRole('group', { name: 'Uninstall' });
     expect(refused).toHaveTextContent('EMMA cannot uninstall Library, as it would break what uses it: Alpha runs it.');
+    // Why it cannot be uninstalled shows always, below the button.
+    expect(within(refused).getByText('Alpha runs it.')).toBeVisible();
     expect(within(refused).getByRole('button', { name: 'Uninstall Library' })).toBeDisabled();
   });
 });
@@ -2013,14 +2094,14 @@ describe('locking a package', () => {
     if (toggle === null) throw new Error('No universal group to open');
     await user.click(toggle);
     await user.click(within(row(/Library 1\.0\.0/)).getByText('Library'));
-    const section = screen.getByRole('region', { name: 'Lock' });
+    const section = screen.getByRole('group', { name: 'Lock' });
     expect(section).toHaveTextContent('Locking Library keeps it at 1.0.0');
 
     await user.click(within(section).getByRole('button', { name: 'Lock Library at 1.0.0' }));
 
     expect(lockPackage).toHaveBeenCalledWith('module', 'lib', true);
     await vi.waitFor(() => {
-      expect(screen.getByRole('region', { name: 'Lock' })).toHaveTextContent('Library is locked in Foundry at 1.0.0.');
+      expect(screen.getByRole('group', { name: 'Lock' })).toHaveTextContent('Library is locked in Foundry at 1.0.0.');
     });
     expect(screen.getAllByRole('img', { name: 'Locked in Foundry' }).length).toBeGreaterThan(0);
 
@@ -2050,7 +2131,7 @@ describe('locking Foundry VTT in EMMA', () => {
     await setup.refresh();
     render(SetupRoot, { setup });
     const user = userEvent.setup();
-    const section = () => screen.getByRole('region', { name: 'Lock' });
+    const section = () => screen.getByRole('group', { name: 'Lock' });
     expect(section()).toHaveTextContent('Locking Foundry VTT in EMMA keeps it at 14.368');
 
     await user.click(within(section()).getByRole('button', { name: 'Lock Foundry VTT at 14.368' }));
@@ -2084,7 +2165,11 @@ describe('planning the best versions', () => {
       expect(setup.updates.status).toBe('found');
     });
     const user = userEvent.setup();
-    const section = screen.getByRole('region', { name: 'Best versions' });
+    // Just below the root's title, and its actions where it has them.
+    let below = screen.getByRole('heading', { level: 2, name: /^Foundry VTT/ }).nextElementSibling;
+    if (below?.classList.contains('emma-actions') === true) below = below.nextElementSibling;
+    expect(below).toBe(screen.getByRole('region', { name: 'Plan Updates' }));
+    const section = screen.getByRole('region', { name: 'Plan Updates' });
 
     await user.click(within(section).getByRole('button', { name: 'Plan the best versions' }));
 
@@ -2115,7 +2200,7 @@ describe('planning the best versions', () => {
     // As when everything is at its best version already: the plan is replaced, with nothing in it.
     const planBest = vi.spyOn(setup.updates, 'planBest').mockResolvedValue(true);
     const user = userEvent.setup();
-    const section = screen.getByRole('region', { name: 'Best versions' });
+    const section = screen.getByRole('region', { name: 'Plan Updates' });
     const button = within(section).getByRole('button', { name: 'Plan the best versions' });
 
     await user.click(button);
@@ -2159,7 +2244,7 @@ describe('planning the best versions', () => {
     });
     const planBest = vi.spyOn(setup.updates, 'planBest');
     const user = userEvent.setup();
-    const section = screen.getByRole('region', { name: 'Best versions' });
+    const section = screen.getByRole('region', { name: 'Plan Updates' });
     const limit = within(section).getByRole('checkbox', { name: 'Only what worlds use' });
     expect(limit).not.toBeChecked();
 

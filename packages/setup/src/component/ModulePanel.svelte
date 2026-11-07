@@ -4,6 +4,8 @@
   worlds it is active in, or that will need it when next run as what they run now requires it.
 -->
 <script lang="ts">
+  import type { Snippet } from 'svelte';
+
   import type { ExplainedVersion } from '../app/update-state.svelte';
   import type { ModuleDetail, RelatedPackage } from '../lib/details';
   import type { BlockedUpdate as Blocked } from '../lib/updates';
@@ -23,9 +25,11 @@
     explained?: ExplainedVersion | undefined;
     /** Open the tree to a row a name links to, and select it; without it, names do not link. */
     onOpen?: ((link: TreeSelection) => void) | undefined;
+    /** The actions on what it shows, such as Lock, Ignore and Uninstall, just below its title; none by default. */
+    actions?: Snippet | undefined;
   }
 
-  let { detail, blocked, explained, onOpen }: Props = $props();
+  let { detail, blocked, explained, onOpen, actions }: Props = $props();
 
   /**
    * The row a related package's name links to.
@@ -59,6 +63,7 @@
 {/snippet}
 
 <h2>{detail.title}</h2>
+{@render actions?.()}
 {#if detail.world !== undefined}
   <p>{format('ModuleInfo.InWorld', { world: detail.world.world.title })}</p>
 {/if}

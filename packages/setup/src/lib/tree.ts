@@ -20,7 +20,9 @@ import { byTitle, isIgnored } from './overview';
 /** What is selected in the tree, and so shown in the panel beside it. */
 export type TreeSelection =
   | { readonly kind: 'root' }
-  /** The game systems, and the worlds under them. */
+  /** The worlds, each with what it last ran with under it. */
+  | { readonly kind: 'worlds' }
+  /** The game systems. */
   | { readonly kind: 'systems' }
   /** A game system, shown under a world if `world` is given. */
   | { readonly kind: 'system'; readonly system: string; readonly world?: string }
@@ -78,13 +80,15 @@ export interface TreeRow {
 
 /** The root row's key. */
 export const ROOT = 'root';
+/** The worlds' row's key. */
+export const WORLDS = `${ROOT}/worlds`;
 /** The game systems' row's key. */
 export const SYSTEMS = `${ROOT}/systems`;
 /** The modules' row's key. */
 export const MODULES = `${ROOT}/modules`;
 
-/** The rows expanded when the tree first shows: the root, and the game systems and the modules under it. */
-export const INITIALLY_EXPANDED: readonly string[] = [ROOT, SYSTEMS, MODULES];
+/** The rows expanded when the tree first shows: the root, and the worlds, the game systems and the modules under it. */
+export const INITIALLY_EXPANDED: readonly string[] = [ROOT, WORLDS, SYSTEMS, MODULES];
 
 /** A row, and how to find the rows under it, which are only worked out while it shows. */
 interface TreeNode {
@@ -189,18 +193,25 @@ function packagesUnder(nodes: readonly TreeNode[]): Set<string> {
 }
 
 /**
- * The root: Foundry VTT, with the game systems and the modules under it.
+ * The root: Foundry VTT, with the worlds, the game systems and the modules under it, in the order Foundry's Setup screen
+ * gives them.
  * @param overview - The installation
  * @param pending - The packages the plan installs anew
  * @returns The root's node
  */
 function rootNode(overview: Overview, pending: Pending): TreeNode {
   const modules = new Map(overview.modules.map(use => [use.module.id, use]));
+  const worlds: TreeNode = {
+    segment: 'worlds',
+    selection: { kind: 'worlds' },
+    title: localize('Tree.Worlds'),
+    children: () => overview.worlds.map(world => worldNode(world, modules, pending)),
+  };
   const systems: TreeNode = {
     segment: 'systems',
     selection: { kind: 'systems' },
     title: localize('Tree.Systems'),
-    children: () => systemNodes(overview, modules, pending),
+    children: () => systemNodes(overview, pending),
   };
   const grouped: TreeNode = {
     segment: 'modules',
@@ -215,7 +226,7 @@ function rootNode(overview: Overview, pending: Pending): TreeNode {
     version: overview.core,
     installed: true,
     ...(overview.coreLocked && { locked: true }),
-    children: () => [systems, grouped],
+    children: () => [worlds, systems, grouped],
   };
 }
 
@@ -241,11 +252,10 @@ function pendingOf(pending: Pending, type: 'system' | 'module'): (PendingPackage
  * The game systems: those installed, then those the plan installs anew, then any that a world uses but is not
  * installed.
  * @param overview - The installation
- * @param modules - The installed modules, by ID
  * @param pending - The packages the plan installs anew
  * @returns Their nodes
  */
-function systemNodes(overview: Overview, modules: ReadonlyMap<string, ModuleUse>, pending: Pending): TreeNode[] {
+function systemNodes(overview: Overview, pending: Pending): TreeNode[] {
   const installed = new Set(overview.systems.map(({ id }) => id));
   const planned = pendingOf(pending, 'system').filter(({ id }) => !installed.has(id));
   const missing = [...new Set(overview.worlds.map(({ world }) => world.system))]
@@ -261,8 +271,8 @@ function systemNodes(overview: Overview, modules: ReadonlyMap<string, ModuleUse>
     selection: { kind: 'system', system: id },
     title,
     ...shown,
-    children: () =>
-      overview.worlds.filter(({ world }) => world.system === id).map(world => worldNode(world, modules, pending)),
+    // The worlds that use it are under the worlds' row; its panel names them.
+    children: () => [],
   });
   return [
     ...overview.systems.map(({ id, title, version, locked }) =>

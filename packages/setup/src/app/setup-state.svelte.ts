@@ -116,6 +116,11 @@ export class SetupState {
   overview = $state<Overview | null>(null);
   /** Whether the installation is being read. */
   loading = $state(false);
+  /**
+   * Whether the window is still opening: until the installation is first read and its updates first looked for, or the
+   * reading failed. Not again when it is read afresh.
+   */
+  opening = $state(true);
   /** Whether the last reading failed. */
   failed = $state(false);
   /** Whether the EMMA module is being installed or updated. */
@@ -234,9 +239,13 @@ export class SetupState {
       this.snapshotSpace = null;
       this.coreTarget = null;
       this.failed = false;
-      void this.updates.searchFor(overview).then(() => this.#resume(overview));
+      void this.updates.searchFor(overview).then(() => {
+        this.opening = false;
+        return this.#resume(overview);
+      });
     } catch {
       this.failed = true;
+      this.opening = false;
     } finally {
       this.loading = false;
     }
