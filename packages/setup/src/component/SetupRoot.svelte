@@ -308,6 +308,7 @@
   {/if}
 {/snippet}
 
+<!-- Foundry VTT's, with planning the best versions just below them, as what is most often done from the root. -->
 {#snippet rootActions()}
   {#if setup.canLockCore && overview !== null}
     <div class="emma-actions" role="group" aria-label={localize('Action.Label')}>
@@ -323,6 +324,13 @@
         }} />
     </div>
   {/if}
+  <BestSection
+    {updates}
+    disabled={updates.locked || setup.running}
+    inUseOnly={setup.bestInUseOnly}
+    onInUseOnlyChange={(on: boolean) => {
+      setup.setBestInUseOnly(on);
+    }} />
 {/snippet}
 
 {#snippet uninstall(key: string)}
@@ -427,13 +435,6 @@
               explained={updates.explainedOf('core')}
               onGuardChange={(on: boolean) => {
                 setup.setGuardOn(on);
-              }} />
-            <BestSection
-              {updates}
-              disabled={updates.locked || setup.running}
-              inUseOnly={setup.bestInUseOnly}
-              onInUseOnlyChange={(on: boolean) => {
-                setup.setBestInUseOnly(on);
               }} />
           {/if}
         </section>
@@ -613,6 +614,11 @@
   .emma-setup-panel {
     overflow: auto;
     padding: 0 1rem;
+  }
+
+  /* Space above each section's heading, to set the sections apart. */
+  .emma-setup-panel :global(h3) {
+    margin-top: 1.25rem;
   }
 
   /* At least three lines high, in the panel's top right corner, to catch the eye wherever the panel is scrolled. */

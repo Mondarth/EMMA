@@ -2143,7 +2143,11 @@ describe('planning the best versions', () => {
       expect(setup.updates.status).toBe('found');
     });
     const user = userEvent.setup();
-    const section = screen.getByRole('region', { name: 'Best versions' });
+    // Just below the root's title, and its actions where it has them.
+    let below = screen.getByRole('heading', { level: 2, name: /^Foundry VTT/ }).nextElementSibling;
+    if (below?.classList.contains('emma-actions') === true) below = below.nextElementSibling;
+    expect(below).toBe(screen.getByRole('region', { name: 'Plan Updates' }));
+    const section = screen.getByRole('region', { name: 'Plan Updates' });
 
     await user.click(within(section).getByRole('button', { name: 'Plan the best versions' }));
 
@@ -2174,7 +2178,7 @@ describe('planning the best versions', () => {
     // As when everything is at its best version already: the plan is replaced, with nothing in it.
     const planBest = vi.spyOn(setup.updates, 'planBest').mockResolvedValue(true);
     const user = userEvent.setup();
-    const section = screen.getByRole('region', { name: 'Best versions' });
+    const section = screen.getByRole('region', { name: 'Plan Updates' });
     const button = within(section).getByRole('button', { name: 'Plan the best versions' });
 
     await user.click(button);
@@ -2218,7 +2222,7 @@ describe('planning the best versions', () => {
     });
     const planBest = vi.spyOn(setup.updates, 'planBest');
     const user = userEvent.setup();
-    const section = screen.getByRole('region', { name: 'Best versions' });
+    const section = screen.getByRole('region', { name: 'Plan Updates' });
     const limit = within(section).getByRole('checkbox', { name: 'Only what worlds use' });
     expect(limit).not.toBeChecked();
 

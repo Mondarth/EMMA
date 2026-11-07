@@ -377,7 +377,7 @@
     "Tree": "ignored"
   },
   "Best": {
-    "Heading": "Best versions",
+    "Heading": "Plan Updates",
     "Hint": "Plans the newest versions of Foundry VTT and of every game system and module installed that work together, and keep every recorded world working, in place of what is chosen now. Locked packages stay as they are.",
     "Plan": "Plan the best versions",
     "Replace": "Replace the plan with the best versions",

@@ -264,7 +264,7 @@ needed by it, locked in. A shift-click takes out what it brought in
 too, but for what another change still needs. So does a click on a change in a ring of changes that need each other,
 such as a module, a module it requires and the game system they run in, each newer: alone, it would only come back.
 
-**Plan the best versions**, in the root's panel, replaces the plan with the newest versions there are: those of Foundry
+**Plan the best versions**, under **Plan Updates** just below the actions in the root's panel, replaces the plan with the newest versions there are: those of Foundry
 VTT, then of each game system, then of each module installed, each the newest the plan can take with those before it,
 so that every recorded world keeps working, as choosing each by hand would. Packages locked in Foundry, and Foundry VTT
 locked in EMMA, stay as they are. What was chosen before goes, uninstalls and packages added against advice among it.
