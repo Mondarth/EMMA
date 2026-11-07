@@ -235,6 +235,21 @@
   function filterInstall(type: 'module' | 'system', change: Partial<InstallFilters>): void {
     setup.setInstallFilters(type, change);
   }
+  /**
+   * The latest version known of an installed game system or module, for its panel: none before the search, for one not
+   * installed, or for one ignored, whose other releases EMMA never looks up.
+   * @param key - The package's key
+   * @returns The version, if known
+   */
+  function latestOf(key: string): string | undefined {
+    if (overview === null || isIgnored(overview, key)) return undefined;
+    const id = key.slice(key.indexOf(':') + 1);
+    const version = key.startsWith('system:')
+      ? overview.systems.find(system => system.id === id)?.version
+      : overview.modules.find(({ module: installed }) => installed.id === id)?.module.version;
+    return version === undefined ? undefined : updates.latestKnown(key, version);
+  }
+
   // What is selected, if it is still there: after reading again, a world may have gone.
   const world = $derived(
     selection.kind === 'world' ? overview?.worlds.find(({ world: { id } }) => id === selection.world) : undefined,
@@ -425,7 +440,8 @@
               detail={moduleDetail(overview, selection.module, selection.world)}
               onOpen={openLink}
               blocked={updates.blockedOf(`module:${selection.module}`)}
-              explained={updates.explainedOf(`module:${selection.module}`)} />
+              explained={updates.explainedOf(`module:${selection.module}`)}
+              latest={latestOf(`module:${selection.module}`)} />
             <WhyChosen {updates} key={`module:${selection.module}`} />
             <RecommendsSection key={`module:${selection.module}`} {updates} onOpen={openLink} />
           {:else if selection.kind === 'system'}
@@ -435,7 +451,8 @@
               detail={systemDetail(overview, selection.system, selection.world)}
               onOpen={openLink}
               blocked={updates.blockedOf(`system:${selection.system}`)}
-              explained={updates.explainedOf(`system:${selection.system}`)} />
+              explained={updates.explainedOf(`system:${selection.system}`)}
+              latest={latestOf(`system:${selection.system}`)} />
             <WhyChosen {updates} key={`system:${selection.system}`} />
           {:else if selection.kind === 'worlds' || selection.kind === 'systems' || selection.kind === 'modules' || selection.kind === 'group'}
             <GroupPanel detail={groupDetail(overview, selection)} onOpen={openLink} />

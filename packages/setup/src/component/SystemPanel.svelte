@@ -26,9 +26,11 @@
     onOpen?: ((link: TreeSelection) => void) | undefined;
     /** The actions on what it shows, such as Lock, Ignore and Uninstall, just below its title; none by default. */
     actions?: Snippet | undefined;
+    /** The latest version known of it, if known: none before the search, for one not installed, or one ignored. */
+    latest?: string | undefined;
   }
 
-  let { detail, blocked, explained, onOpen, actions }: Props = $props();
+  let { detail, blocked, explained, onOpen, actions, latest }: Props = $props();
 </script>
 
 <h2>{detail.title}</h2>
@@ -46,6 +48,10 @@
   <dd class={['emma-status', `emma-status-${detail.status}`]}>
     {detail.installed?.version ?? localize('ModuleInfo.NotInstalled')}
   </dd>
+  {#if latest !== undefined && detail.installed !== undefined}
+    <dt>{localize('ModuleInfo.Latest')}</dt>
+    <dd>{latest}</dd>
+  {/if}
   <dt>{localize('System.Modules')}</dt>
   <dd>{detail.modules}</dd>
 </dl>
