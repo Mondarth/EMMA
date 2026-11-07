@@ -1,3 +1,20 @@
+## [0.4.0](https://github.com/Mondarth/EMMA/compare/extension-v0.3.0...extension-v0.4.0) (2026-11-07)
+
+### Features
+
+* **setup:** install several packages at once, each after what it needs ([8d73a21](https://github.com/Mondarth/EMMA/commit/8d73a211247b221be5a78d79f04eea4a4c3467b2))
+* **setup:** mark a package installed anew below its newest in the plan ([6330100](https://github.com/Mondarth/EMMA/commit/63301003f8f4b8add355224b8b7103c80c55a134))
+* **setup:** say why a version is taken, and why a step failed ([2fa8c8c](https://github.com/Mondarth/EMMA/commit/2fa8c8c1fa7ea967acb96adeb939ea464adca3c7))
+* **setup:** show how far each install has got as the plan runs ([f002eff](https://github.com/Mondarth/EMMA/commit/f002eff07fe2b460a72b344b36c6d1d1fa7c5bab))
+* **setup:** show what EMMA is doing over the item it works on ([5b59c45](https://github.com/Mondarth/EMMA/commit/5b59c456cb9041a435bc74376a0b9b8a650859ee))
+
+### Bug Fixes
+
+* **setup:** end a step's run with its own green bar, not another ([01d336d](https://github.com/Mondarth/EMMA/commit/01d336d2f399901af9f5259b20ccff421f60d27e))
+* **setup:** fold versions refused alike though each names itself ([ea5d32a](https://github.com/Mondarth/EMMA/commit/ea5d32a5334c7c1e29fd48e9b2202ca2a4316bdb))
+* **setup:** keep what EMMA is busy with in sight long enough to see ([005caee](https://github.com/Mondarth/EMMA/commit/005caeec6028b03bb633817eeef48def8b2c351f))
+* **setup:** open a version list at once, checking, not after the check ([34a91c3](https://github.com/Mondarth/EMMA/commit/34a91c333cda6d5b141b3a6d8ad6126c1997587f))
+
 ## [0.3.0](https://github.com/Mondarth/EMMA/compare/extension-v0.2.1...extension-v0.3.0) (2026-11-06)
 
 ### Features
