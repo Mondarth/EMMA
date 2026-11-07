@@ -1549,3 +1549,18 @@ describe("a package's latest version known", () => {
     expect(updates.latestKnown('module:other', '1.0.0')).toBe('1.0.0');
   });
 });
+
+describe("a package's title in the window", () => {
+  test("is the catalogue's for a package not installed that the planner knows, before its key", async () => {
+    const planner = alone(APP);
+    const updates = new UpdateState(() =>
+      Promise.resolve({
+        ...finding(APP),
+        planner: { ...planner, titleOf: (key: string) => (key === 'module:_mathjs' ? 'Math.js' : key) },
+      }),
+    );
+    await updates.searchFor(OVERVIEW);
+    expect(updates.titleOf('module:_mathjs')).toBe('Math.js');
+    expect(updates.titleOf('module:unknown')).toBe('module:unknown');
+  });
+});

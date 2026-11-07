@@ -133,6 +133,7 @@ describe('lookUpReleases', () => {
     expect(found.unreached).toEqual(['module:lib', 'core']);
     await expect(found.load([])).resolves.toEqual([]);
     await expect(found.lookUp([{ type: 'module', id: 'dice' }])).resolves.toEqual([]);
+    expect(found.titleOf('module:dice')).toBeUndefined();
     await expect(found.readManifest('https://example.org/dice/module.json', 'module')).resolves.toEqual({
       ok: false,
       problem: 'no-catalogue',
@@ -144,7 +145,12 @@ describe('lookUpReleases', () => {
       [LOOKUP]: () =>
         answer({
           core: [CORE, { version: '14.370', generation: 14, channel: 'testing' }],
-          packages: [looked('lib', [held('1.0.0'), held('2.0.0')])],
+          packages: [
+            looked('lib', [held('1.0.0'), held('2.0.0')]),
+            // Needed, not installed: the catalogue gives its title, from its listing or its own manifest.
+            { ...looked('needed', []), title: 'Math.js' },
+            { ...looked('untitled', []), title: null },
+          ],
           unavailable: [{ package: { type: 'module', id: 'gone' }, reason: 'archived' }],
           // A package needed but not installed is not among the unreached here.
           unreached: [
@@ -190,6 +196,9 @@ describe('lookUpReleases', () => {
     expect(versions(found.universe.releases)).toEqual(['gone@1.0.0', 'lib@1.0.0', 'lib@2.0.0', 'local@0.1.0']);
     expect([...found.unavailable]).toEqual(['module:gone']);
     expect(found.unreached).toEqual(['module:lib']);
+    expect(found.titleOf('module:needed')).toBe('Math.js');
+    expect(found.titleOf('module:untitled')).toBeUndefined();
+    expect(found.titleOf('module:unknown')).toBeUndefined();
     await expect(found.load([])).resolves.toEqual([]);
   });
 

@@ -194,6 +194,11 @@ export interface UpdateInputs {
   ) => Promise<readonly Release[]>;
   /** Read a manifest the user gives; none can be without it. */
   readonly readManifest?: ReadManifest;
+  /**
+   * A package's title as the catalogue gives it, from Foundry VTT's listing or else its own manifest, for one found
+   * that is not installed, as one a plan installs to meet another's needs; none if the catalogue gave none.
+   */
+  readonly titleOf?: (key: PackageKey) => string | undefined;
 }
 
 /**
@@ -384,6 +389,7 @@ export async function findUpdates(given: UpdateInputs): Promise<UpdateSearch> {
     policy,
     coreTitle: localize('Tree.Root'),
     ...(inputs.lookUp !== undefined && { lookUp: inputs.lookUp }),
+    ...(inputs.titleOf !== undefined && { titleOf: inputs.titleOf }),
   });
   for (const [key, block] of [...blocked]) {
     const completion = await planner.complete(new Map([[key, block.newest]]));
