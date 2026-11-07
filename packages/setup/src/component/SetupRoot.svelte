@@ -616,9 +616,9 @@
     padding: 0 1rem;
   }
 
-  /* Space above each section's heading, to set the sections apart. */
-  .emma-setup-panel :global(h3) {
-    margin-top: 1.25rem;
+  /* Space above each section with a heading, to set the sections apart. */
+  .emma-setup-panel :global(section:has(> h3)) {
+    margin-top: 2rem;
   }
 
   /* At least three lines high, in the panel's top right corner, to catch the eye wherever the panel is scrolled. */
