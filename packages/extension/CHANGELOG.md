@@ -1,3 +1,10 @@
+## [0.7.0](https://github.com/Mondarth/EMMA/compare/extension-v0.6.1...extension-v0.7.0) (2026-11-08)
+
+### Features
+
+* **setup:** name a pin in the way of a choice as pinned ([7925eae](https://github.com/Mondarth/EMMA/commit/7925eae34da43ec0c8cc242a34d2d59ec15a7129))
+* **setup:** pin versions in every plan, a softer lock ([6c091e7](https://github.com/Mondarth/EMMA/commit/6c091e7574405b554771cffc29d696d05f0eab3c))
+
 ## [0.6.1](https://github.com/Mondarth/EMMA/compare/extension-v0.6.0...extension-v0.6.1) (2026-11-07)
 
 ### Bug Fixes
