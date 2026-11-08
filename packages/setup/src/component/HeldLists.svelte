@@ -6,7 +6,7 @@
 -->
 <script lang="ts">
   import type { Activity } from '../app/busy.svelte';
-  import type { HeldItem } from '../lib/held';
+  import type { HeldItem, PinnedItem } from '../lib/held';
   import { format, localize } from '../lib/i18n';
   import type { TreeSelection } from '../lib/tree';
 
@@ -14,6 +14,12 @@
   import TreeLink from './TreeLink.svelte';
 
   interface Props {
+    /** What is pinned, each at its version. */
+    pinned: readonly PinnedItem[];
+    /** Unpin an item. */
+    onUnpin?: (key: string) => void;
+    /** What EMMA is busy with for an item's pin. */
+    pinBusy?: (key: string) => Activity | undefined;
     /** What is locked; none where nothing can be unlocked here. */
     locked: readonly HeldItem[];
     /** What is ignored; none where nothing can be unignored here. */
@@ -30,7 +36,7 @@
     onOpen?: ((link: TreeSelection) => void) | undefined;
   }
 
-  let { locked, ignored, disabled, busy, onUnlock, onUnignore, onOpen }: Props = $props();
+  let { pinned, onUnpin, pinBusy, locked, ignored, disabled, busy, onUnlock, onUnignore, onOpen }: Props = $props();
 
   const uid = $props.id();
 </script>
@@ -68,10 +74,49 @@
   {/if}
 {/snippet}
 
-{#if locked.length > 0 || ignored.length > 0}
+<!-- What is pinned, each with its version, and in red, saying why, where the plan leaves it out. -->
+{#snippet pinnedList()}
+  {#if pinned.length > 0}
+    <div class="emma-held-list">
+      <h4 id="{uid}-pinned">{localize('Pin.Pinned')}</h4>
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+      <ul tabindex="0" aria-labelledby="{uid}-pinned">
+        {#each pinned as item (item.key)}
+          {@const activity = pinBusy?.(item.key)}
+          {@const label = format('Pin.Unpin', { title: item.title, version: item.version })}
+          <li class={{ 'emma-held-unmet': item.problem !== undefined }} data-tooltip={item.problem}>
+            <span class="emma-held-title">
+              <TreeLink title={item.title} link={item.link} {onOpen} />
+              <span class="emma-held-version">{item.version}</span>
+              {#if item.problem !== undefined}
+                <span class="emma-visually-hidden">{item.problem}</span>
+              {/if}
+            </span>
+            <button
+              type="button"
+              class="emma-held-toggle emma-busy-host"
+              aria-label={label}
+              data-tooltip={label}
+              aria-busy={activity !== undefined}
+              disabled={disabled || activity !== undefined}
+              onclick={() => {
+                onUnpin?.(item.key);
+              }}>
+              <i class="fa-solid fa-thumbtack" aria-hidden="true"></i>
+              <BusyMark {activity} />
+            </button>
+          </li>
+        {/each}
+      </ul>
+    </div>
+  {/if}
+{/snippet}
+
+{#if pinned.length > 0 || locked.length > 0 || ignored.length > 0}
   <!-- Its width, which the lists' columns follow, rather than the window's. -->
   <div class="emma-held-box">
     <div class="emma-held" role="group" aria-label={localize('Held.Label')}>
+      {@render pinnedList()}
       {@render list('locked', localize('Held.Locked'), locked, true)}
       {@render list('ignored', localize('Held.Ignored'), ignored, false)}
     </div>
@@ -84,15 +129,15 @@
     margin: 0.5rem 0 0.75rem;
   }
 
-  /* Side by side, each list half the width, even alone; one under the other, each the full width, where too narrow. */
+  /* Side by side, each list a third of the width, even alone; one under the other, each the full width, where too narrow. */
   .emma-held {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     /* A wide gutter, so that a list's toggles read as its own, not the next list's entries. */
     gap: 0.5rem 2.5rem;
   }
 
-  @container (width < 24rem) {
+  @container (width < 36rem) {
     .emma-held {
       grid-template-columns: minmax(0, 1fr);
     }
@@ -100,6 +145,28 @@
 
   .emma-held-list {
     min-width: 0;
+  }
+
+  .emma-held-version {
+    margin-left: 0.35em;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.85em;
+    opacity: 0.8;
+  }
+
+  /* A pin the plan leaves out, its tooltip saying why. */
+  .emma-held-unmet,
+  .emma-held-unmet :global(.emma-tree-link) {
+    color: var(--color-level-error, #e55);
+  }
+
+  .emma-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .emma-held-list h4 {

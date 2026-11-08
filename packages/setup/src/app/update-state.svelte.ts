@@ -11,6 +11,7 @@ import { BusyState, afterPaint, paced } from './busy.svelte';
 import { KitUnavailable } from '../foundry/setup-kit';
 import { format, localize, today } from '../lib/i18n';
 import type { Overview } from '../lib/overview';
+import { isIgnored } from '../lib/overview';
 import type { NotTaken, PlanEntry, Planner } from '../lib/plans';
 import { UNINSTALL, keepChoices, withChoice } from '../lib/plans';
 import type { Safeguard, SafeguardEdit } from '../lib/safeguards';
@@ -25,6 +26,26 @@ import type { BlockedUpdate, ManifestRead, PackageUpdate, UpdateSearch, VersionO
  * fits (see {@link UpdateState.problem}).
  */
 export type UpdateStatus = 'idle' | 'searching' | 'found' | 'failed' | 'unavailable';
+
+/**
+ * Why a version pinned is not in the plan: it is no longer found (`unknown`), or the plan cannot take it with the other
+ * pins (`conflict`), as the resolver explains.
+ */
+export type PinProblem =
+  { readonly reason: 'unknown' } | { readonly reason: 'conflict'; readonly explanation: readonly string[] };
+
+/**
+ * Why a package cannot be pinned: it is locked in Foundry, ignored, Foundry VTT locked in EMMA, or the plan runs.
+ */
+export type PinBlock = 'locked' | 'ignored' | 'core-locked' | 'running';
+
+/** Where pins are kept between sessions, and what was kept. */
+export interface PinStore {
+  /** The pins kept, as `{ key: version }`. */
+  readonly initial: Readonly<Record<PackageKey, string>>;
+  /** Keep the pins as they are now. */
+  readonly keep: (pins: Readonly<Record<PackageKey, string>>) => void;
+}
 
 /**
  * Newer versions of a package the plan does not take, one after another, for one reason: `possible` if the plan could
@@ -190,6 +211,15 @@ export class UpdateState {
 
   /** The versions chosen, by package key, in the order they were chosen. */
   readonly #picks = new SvelteMap<PackageKey, string>();
+  /**
+   * The versions pinned, by package: one each, chosen in every plan, as a pin to the resolver, until unpinned. Each is
+   * among {@link #picks} too while the plan can take it.
+   */
+  readonly #pins = new SvelteMap<PackageKey, string>();
+  /** Why a pin is not in the plan, by package, as the last search found. */
+  readonly #pinProblems = new SvelteMap<PackageKey, PinProblem>();
+  /** Where the pins are kept. */
+  readonly #pinStore: PinStore | undefined;
   /** The titles of the packages installed anew, as Foundry's listing gives them, by package key. */
   readonly #named = new SvelteMap<PackageKey, string>();
   /** The titles of every package on Foundry's listing, once read, by package key, to name any not installed by. */
@@ -291,8 +321,135 @@ export class UpdateState {
   /**
    * @param search - Search for the updates of an installation
    */
-  constructor(search: (overview: Overview) => Promise<UpdateSearch>) {
+  /**
+   * @param search - How updates are searched for
+   * @param pins - Where pins are kept between sessions, and those kept; none are kept without
+   */
+  constructor(search: (overview: Overview) => Promise<UpdateSearch>, pins?: PinStore) {
     this.#find = search;
+    this.#pinStore = pins;
+    for (const [key, version] of Object.entries(pins?.initial ?? {})) this.#pins.set(key, version);
+  }
+
+  /** Keep the pins as they are now. */
+  #keepPins(): void {
+    this.#pinStore?.keep(Object.fromEntries(this.#pins));
+  }
+
+  /**
+   * The version of a package pinned, if one is.
+   * @param key - The package's key
+   * @returns The version, or `undefined`
+   */
+  pinnedOf(key: PackageKey): string | undefined {
+    return this.#pins.get(key);
+  }
+
+  /**
+   * The versions pinned, in the order they were pinned.
+   * @returns Each, as `[key, version]`
+   */
+  get pins(): readonly (readonly [PackageKey, string])[] {
+    return [...this.#pins];
+  }
+
+  /**
+   * Why a version pinned is not in the plan, if it is not.
+   * @param key - The package's key
+   * @returns Why, or `undefined` for a pin the plan takes, or none
+   */
+  pinProblemOf(key: PackageKey): PinProblem | undefined {
+    return this.#pinProblems.get(key);
+  }
+
+  /**
+   * Why a package cannot be pinned now, if it cannot: locked in Foundry, which keeps it as it is already; ignored, as
+   * no plan takes it into account; Foundry VTT locked in EMMA; or the plan runs.
+   * @param key - The package's key
+   * @returns Why, or `undefined` if it can be
+   */
+  pinBlockOf(key: PackageKey): PinBlock | undefined {
+    const overview = this.#overview;
+    if (this.locked) return 'running';
+    if (overview === null) return undefined;
+    if (key === 'core') return overview.coreLocked === true ? 'core-locked' : undefined;
+    if (isIgnored(overview, key)) return 'ignored';
+    const id = key.slice(key.indexOf(':') + 1);
+    const locked = key.startsWith('system:')
+      ? overview.systems.find(system => system.id === id)?.locked
+      : overview.modules.find(({ module: installed }) => installed.id === id)?.module.locked;
+    return locked === true ? 'locked' : undefined;
+  }
+
+  /**
+   * Pin a version of a package: it is chosen in this plan and every one after, as a pin to the resolver, until it is
+   * unpinned, or another version of it is chosen. The installed version may be pinned, to keep the package as it is,
+   * as Foundry's lock would, though Foundry does not know of it. Another pin of the package goes.
+   * @param key - The package's key
+   * @param version - The version: the installed one, or one {@link optionsFor} gives
+   * @returns Whether the plan could take it, and so it is pinned
+   */
+  async pin(key: PackageKey, version: string): Promise<boolean> {
+    const search = this.search;
+    if (search === null || this.pinBlockOf(key) !== undefined) return false;
+    const installed = this.#installedOf(key);
+    if (installed === undefined && !(await search.planner.add(key))) return false;
+    if (version !== installed && !search.planner.candidates(key).includes(version)) return false;
+    const picks = withChoice(this.#picks, key, version);
+    this.planning = true;
+    try {
+      const plan = await search.planner.plan(picks);
+      if (plan === undefined || search !== this.search) return false;
+      this.#picks.clear();
+      for (const [picked, to] of picks) this.#picks.set(picked, to);
+      this.plan = plan;
+      this.#pins.set(key, version);
+      this.#pinProblems.delete(key);
+      this.#keepPins();
+      this.changes++;
+      return true;
+    } finally {
+      this.planning = false;
+    }
+  }
+
+  /**
+   * Unpin a package. A version pinned other than the installed one stays chosen, as any choice; the installed one,
+   * chosen only as pinned, is no longer.
+   * @param key - The package's key
+   * @returns Whether it was pinned, and is no longer
+   */
+  async unpin(key: PackageKey): Promise<boolean> {
+    const version = this.#pins.get(key);
+    if (version === undefined || this.locked) return false;
+    this.#pins.delete(key);
+    this.#pinProblems.delete(key);
+    this.#keepPins();
+    this.changes++;
+    const search = this.search;
+    if (search === null || version !== this.#installedOf(key) || this.#picks.get(key) !== version) return true;
+    const picks = withChoice(this.#picks, key, null);
+    const plan = picks.size === 0 ? [] : await search.planner.plan(picks);
+    if (plan !== undefined && search === this.search) {
+      this.#picks.delete(key);
+      this.plan = plan;
+      this.changes++;
+    }
+    return true;
+  }
+
+  /**
+   * Forget the pins of packages no longer chosen, as when a choice is taken out, or another version chosen.
+   * @param keep - The pins to keep regardless, as of a package whose choice was not touched
+   */
+  #unpinUnchosen(keep: ReadonlySet<PackageKey> = new SvelteSet()): void {
+    let changed = false;
+    for (const [key, version] of [...this.#pins]) {
+      if (keep.has(key) || this.#pinProblems.has(key) || this.#picks.get(key) === version) continue;
+      this.#pins.delete(key);
+      changed = true;
+    }
+    if (changed) this.#keepPins();
   }
 
   /**
@@ -324,19 +481,39 @@ export class UpdateState {
       for (const key of [...this.#forced.keys()]) if (this.#installedOf(key) !== undefined) this.#forced.delete(key);
       // The choices are kept that the new search still offers, and planned again: an uninstall, while the package is
       // installed still, and every uninstall may still be made. A package to install anew is looked up again.
+      // The pins are chosen too, as they are in every plan.
+      for (const [key, version] of this.#pins) this.#picks.set(key, version);
       for (const [key, version] of this.#picks) {
         if (version !== UNINSTALL && this.#installedOf(key) === undefined) await found.planner.add(key);
       }
-      let picks = keepChoices(this.#picks, (key, version) =>
-        version === UNINSTALL ? this.#installedOf(key) !== undefined : found.planner.candidates(key).includes(version),
-      );
+      const offered = (key: PackageKey, version: string) =>
+        version === UNINSTALL
+          ? this.#installedOf(key) !== undefined
+          : version === this.#installedOf(key) || found.planner.candidates(key).includes(version);
+      this.#pinProblems.clear();
+      for (const [key, version] of this.#pins) {
+        if (!offered(key, version)) this.#pinProblems.set(key, { reason: 'unknown' });
+      }
+      let picks = keepChoices(this.#picks, offered);
       if (!this.#uninstallsAllowed(overview, picks))
         picks = keepChoices(picks, (_key, version) => version !== UNINSTALL);
-      const plan = picks.size === 0 ? [] : await found.planner.plan(picks);
+      let plan = picks.size === 0 ? [] : await found.planner.plan(picks);
+      // Choices the pins cannot be planned with go first; pins the plan cannot take together are left out of it.
+      if (plan === undefined) {
+        picks = keepChoices(picks, key => this.#pins.has(key));
+        plan = picks.size === 0 ? [] : await found.planner.plan(picks);
+      }
+      if (plan === undefined) {
+        const completion = await found.planner.complete(picks);
+        const explanation = completion.ok ? [] : (completion.explanation ?? []);
+        for (const key of picks.keys()) this.#pinProblems.set(key, { reason: 'conflict', explanation });
+        picks = new SvelteMap();
+        plan = [];
+      }
       if (search !== this.#searches) return;
       this.#picks.clear();
-      for (const [key, version] of plan === undefined ? [] : picks) this.#picks.set(key, version);
-      this.plan = plan ?? [];
+      for (const [key, version] of picks) this.#picks.set(key, version);
+      this.plan = plan;
       // What came in on a recommendation and is no longer chosen is no longer the recommendation's.
       for (const key of [...this.#recommendedBy.keys()]) if (!this.#picks.has(key)) this.#recommendedBy.delete(key);
       const { retryAfter } = found.catalogue ?? {};
@@ -672,7 +849,9 @@ export class UpdateState {
     for (const [other, to] of picks) {
       if (other === key) continue;
       if ((await planner.complete(withChoice(picks, other, null))).ok) {
-        remove.push({ title: planner.titleOf(other), version: to });
+        // A pin says so, as it is unpinned to take it out.
+        const title = planner.titleOf(other);
+        remove.push({ title: this.#pins.get(other) === to ? format('Pin.InTheWay', { title }) : title, version: to });
       }
     }
     return remove;
@@ -759,6 +938,8 @@ export class UpdateState {
     if (installed === undefined && (version === UNINSTALL || !(await search.planner.add(key)))) return false;
     const offered = version === installed || version === UNINSTALL || search.planner.candidates(key).includes(version);
     if (!offered || (version === UNINSTALL && key === 'core') || search !== this.search) return false;
+    // The version pinned is chosen already.
+    if (this.#pins.get(key) === version && this.#picks.get(key) === version) return true;
     const picks = this.#picksWith(key, version);
     if (!this.#uninstallsAllowed(overview, picks)) return false;
     this.planning = true;
@@ -768,6 +949,8 @@ export class UpdateState {
       this.#picks.clear();
       for (const [picked, to] of picks) this.#picks.set(picked, to);
       this.plan = plan;
+      // Choosing another version of a package pinned, or uninstalling it, unpins it.
+      this.#unpinUnchosen(new SvelteSet([...this.#pins.keys()].filter(other => other !== key)));
       this.changes++;
       return true;
     } finally {
@@ -900,6 +1083,8 @@ export class UpdateState {
     this.#picks.clear();
     for (const [picked, to] of picks) this.#picks.set(picked, to);
     this.plan = plan;
+    // A pin taken out is unpinned, as is one in the way of what is chosen instead.
+    this.#unpinUnchosen();
     this.changes++;
     return true;
   }
@@ -949,6 +1134,7 @@ export class UpdateState {
     const update = this.updateOf(key)?.installed;
     if (update !== undefined) return update;
     const overview = this.#overview;
+    if (key === 'core') return overview?.core;
     const id = key.slice(key.indexOf(':') + 1);
     return key.startsWith('system:')
       ? overview?.systems.find(system => system.id === id)?.version
@@ -1093,14 +1279,20 @@ export class UpdateState {
       'core',
       ...overview.systems.map(({ id }) => `system:${id}`),
       ...overview.modules.map(({ module: { id } }) => `module:${id}`),
-    ].filter(key => key === 'core' || used === undefined || used.has(key));
+    ]
+      .filter(key => key === 'core' || used === undefined || used.has(key))
+      // What is pinned stays as it is pinned.
+      .filter(key => !this.#pins.has(key));
     this.planning = true;
     try {
       // The planner's answers settle at once, in a chain that would keep the browser from drawing anything, the busy
       // mark on what was clicked among it, until every package was planned.
       await afterPaint();
       const pace = paced();
-      let picks: ReadonlyMap<PackageKey, string> = new SvelteMap();
+      let picks: ReadonlyMap<PackageKey, string> = keepChoices(
+        this.#picks,
+        (key, version) => this.#pins.get(key) === version,
+      );
       for (const key of keys) {
         for (const version of planner.candidates(key)) {
           await pace();
@@ -1301,12 +1493,24 @@ export class UpdateState {
   /** Take back every choice, and what was changed of the plan's snapshot and backups. */
   clear(): void {
     if (this.locked) return;
+    // The pins stay chosen, as in every plan.
+    const pinned = keepChoices(this.#picks, (key, version) => this.#pins.get(key) === version);
     this.#picks.clear();
+    for (const [key, version] of pinned) this.#picks.set(key, version);
     this.#forced.clear();
     this.#recommendedBy.clear();
     this.#safeguardEdits.clear();
     this.plan = [];
     this.changes++;
+    // The pins alone are planned again, as they were before the other choices.
+    const search = this.search;
+    if (pinned.size === 0 || search === null) return;
+    void search.planner.plan(pinned).then(plan => {
+      if (plan !== undefined && search === this.search) {
+        this.plan = plan;
+        this.changes++;
+      }
+    });
   }
 
   /**

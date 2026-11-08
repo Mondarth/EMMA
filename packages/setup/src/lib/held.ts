@@ -15,6 +15,24 @@ import type { TreeSelection } from './tree';
 const inOrder = (a: HeldItem, b: HeldItem): number =>
   byTitle({ id: a.key, title: a.title }, { id: b.key, title: b.title });
 
+/**
+ * The row of the tree a package, or Foundry VTT, shows as, by its key.
+ * @param key - Its key: `core`, `system:<id>` or `module:<id>`
+ * @returns The row
+ */
+export function linkOf(key: string): TreeSelection {
+  if (key === 'core') return { kind: 'root' };
+  const id = key.slice(key.indexOf(':') + 1);
+  return key.startsWith('system:') ? { kind: 'system', system: id } : { kind: 'module', module: id };
+}
+
+/** Something pinned, at its version, and why the plan leaves it out, if it does. */
+export interface PinnedItem extends HeldItem {
+  readonly version: string;
+  /** Why the plan leaves it out, in words, if it does. */
+  readonly problem?: string;
+}
+
 /** Something locked or ignored. */
 export interface HeldItem {
   /** Its key, as locking and ignoring name it: `core`, `world:<id>`, `system:<id>` or `module:<id>`. */

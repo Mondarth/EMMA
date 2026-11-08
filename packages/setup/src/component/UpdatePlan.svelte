@@ -16,6 +16,7 @@
   import type { Safeguard } from '../lib/safeguards';
   import type { TreeSelection } from '../lib/tree';
   import BusyMark from './BusyMark.svelte';
+  import PinToggle from './PinToggle.svelte';
   import TreeLink from './TreeLink.svelte';
 
   interface Props {
@@ -347,15 +348,19 @@
                   : undefined}
               {@const notNewest = newest === undefined ? undefined : format('Plan.NewNotNewest', { newest })}
               <!-- Its icon is drawn by CSS, so that the cell's text is the version alone, as for any other. -->
-              <span
-                class={[
-                  (older !== undefined || newest !== undefined) && 'emma-plan-older',
-                  newest !== undefined && 'emma-plan-not-newest',
-                ]}
-                data-tooltip={notNewest}>{choice.chosen}</span>
-              {#if notNewest !== undefined}
-                <span class="emma-visually-hidden">{notNewest}</span>
-              {/if}
+              <!-- The version and its pin together, on one line, whatever explains it below. -->
+              <span class="emma-plan-chosen">
+                <span
+                  class={[
+                    (older !== undefined || newest !== undefined) && 'emma-plan-older',
+                    newest !== undefined && 'emma-plan-not-newest',
+                  ]}
+                  data-tooltip={notNewest}>{choice.chosen}</span>
+                {#if notNewest !== undefined}
+                  <span class="emma-visually-hidden">{notNewest}</span>
+                {/if}
+                <PinToggle {updates} key={choice.key} title={updates.titleOf(choice.key)} version={choice.chosen} />
+              </span>
             {/if}
             {#if choice.by !== undefined}
               <span class="emma-plan-needed">
@@ -626,10 +631,26 @@
     border-collapse: collapse;
   }
 
+  /*
+   * Each row's cells on the baseline of their first line, so that the name, the versions and the link line up, whatever
+   * explains a change on the lines below.
+   */
   th,
   td {
     text-align: left;
+    vertical-align: baseline;
     padding: 0.15rem 0.5rem;
+  }
+
+  .emma-plan-chosen {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    white-space: nowrap;
+  }
+
+  .emma-plan-chosen :global(.emma-pin) {
+    display: inline-flex;
   }
 
   tbody th {

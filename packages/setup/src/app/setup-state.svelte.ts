@@ -10,6 +10,7 @@ import type { Overview } from '../lib/overview';
 import type { RunStep, StepProgress, StepState } from '../lib/run';
 import { runScheduled, runSteps } from '../lib/run';
 import type { UpdateSearch } from '../lib/updates';
+import type { PinStore } from './update-state.svelte';
 import { UpdateState } from './update-state.svelte';
 
 /** How the state reads the installation and keeps the guard's setting. */
@@ -44,6 +45,8 @@ export interface SetupStateOptions {
   readonly lockCore?: (locked: boolean) => void;
   /** Keep whether EMMA ignores a world, a game system or a module, which reading the installation then reads; none can be without. */
   readonly ignore?: (key: string, ignored: boolean) => void;
+  /** Where the versions pinned are kept between visits, and those kept; none are kept without. */
+  readonly pins?: PinStore;
   /** Lock a game system or module in Foundry, or unlock it, as Foundry's own package menu does; none can be without. */
   readonly lockPackage?: (type: 'module' | 'system', id: string, lock: boolean) => Promise<void>;
   /** Read Foundry's listing of the packages of a type that may be installed; none where it cannot be read. */
@@ -208,7 +211,7 @@ export class SetupState {
     this.guardOn = options.guardOn;
     this.alphaAcknowledged = options.alpha?.acknowledged ?? true;
     this.bestInUseOnly = options.bestInUseOnly ?? false;
-    this.updates = new UpdateState(options.findUpdates);
+    this.updates = new UpdateState(options.findUpdates, options.pins);
   }
 
   /**
