@@ -1693,3 +1693,28 @@ describe('pins', () => {
     await expect(updates.unpin('module:app')).resolves.toBe(false);
   });
 });
+
+describe('a pin in the way of a choice', () => {
+  test('is named as pinned among the choices to take out', async () => {
+    const planner = alone(APP, LIB);
+    const clash = (picks: ReadonlyMap<string, string>) =>
+      picks.get('module:app') === '2.0.0' && picks.get('module:lib') === '1.1.0';
+    const updates = new UpdateState(
+      () =>
+        Promise.resolve({
+          ...finding(APP, LIB),
+          planner: {
+            ...planner,
+            complete: picks => (clash(picks) ? Promise.resolve({ ok: false as const }) : planner.complete(picks)),
+          },
+        }),
+      { initial: {}, keep: vi.fn() },
+    );
+    await updates.searchFor(OVERVIEW);
+    await updates.pin('module:lib', '1.1.0');
+    const options = await updates.optionsFor('module:app');
+    expect(options.find(({ version }) => version === '2.0.0')?.conflict?.remove).toEqual([
+      { title: 'module:lib (pinned)', version: '1.1.0' },
+    ]);
+  });
+});

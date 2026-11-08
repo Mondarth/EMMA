@@ -478,8 +478,8 @@ it is.
 Pin a version from the **Pin** action in the item's panel, for the version the plan has or else the installed one;
 from the pin beside a version in the plan's **Chosen** column; or from the pin beside a version list in the tree.
 Pinning another version of the same item unpins the first, and so does choosing another version of it, uninstalling it,
-or taking it out of the plan. When a choice cannot be made with a pin, the version list names the pin among the
-choices in the way, and taking it out unpins it. **Clear choices** keeps the pins, and **Plan the best versions** plans
+or taking it out of the plan. When a choice cannot be made with a pin, the version list names the pin among the choices in the way, marked
+**(pinned)**: unpinning it, or taking it out of the plan, which unpins it, lets the choice be made. **Clear choices** keeps the pins, and **Plan the best versions** plans
 around them. The browser remembers the pins for that server.
 
 A pin cannot be made of a package locked in Foundry, which stays as it is already, nor of one ignored, which no plan

@@ -457,6 +457,7 @@
       "Ignored": "Ignored: no plan takes it into account, so it cannot be pinned.",
       "CoreLocked": "Foundry VTT is locked in EMMA at its build, so it cannot be pinned.",
       "Running": "The plan is running: pins cannot change until it is done."
-    }
+    },
+    "InTheWay": "{title} (pinned)"
   }
 }

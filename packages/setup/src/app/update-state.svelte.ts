@@ -849,7 +849,9 @@ export class UpdateState {
     for (const [other, to] of picks) {
       if (other === key) continue;
       if ((await planner.complete(withChoice(picks, other, null))).ok) {
-        remove.push({ title: planner.titleOf(other), version: to });
+        // A pin says so, as it is unpinned to take it out.
+        const title = planner.titleOf(other);
+        remove.push({ title: this.#pins.get(other) === to ? format('Pin.InTheWay', { title }) : title, version: to });
       }
     }
     return remove;
