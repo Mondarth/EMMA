@@ -20,6 +20,7 @@
   import { INITIALLY_EXPANDED, allRows, ancestorsOf, findRow, moveFor, packageOf, visibleRows } from '../lib/tree';
 
   import BusyMark from './BusyMark.svelte';
+  import PinToggle from './PinToggle.svelte';
   import VersionPicker from './VersionPicker.svelte';
 
   interface Props {
@@ -323,6 +324,7 @@
         {#if removing}
           <span class="emma-tree-uninstall">{localize('Update.Uninstall')}</span>
         {:else if updates !== undefined && update !== undefined && key !== undefined && row.installed === true}
+          <PinToggle {updates} {key} title={row.title} version={updates.chosenOf(key) ?? update.installed} />
           <VersionPicker
             title={row.title}
             chosen={updates.optionOf(key, updates.chosenOf(key) ?? update.installed)}

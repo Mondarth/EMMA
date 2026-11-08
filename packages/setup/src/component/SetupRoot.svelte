@@ -16,7 +16,7 @@
   import { groupDetail, moduleDetail, systemDetail } from '../lib/details';
   import { EMMA_VERSION } from '../lib/alpha';
   import { format, localize } from '../lib/i18n';
-  import { ignoredItems, lockedItems } from '../lib/held';
+  import { ignoredItems, linkOf, lockedItems } from '../lib/held';
   import { isIgnored } from '../lib/overview';
   import type { TreeRow, TreeSelection } from '../lib/tree';
   import { ROOT, allRows, ignoreKeyOf, rowFor } from '../lib/tree';
@@ -38,6 +38,7 @@
   import InstallSection from './InstallSection.svelte';
   import IgnoreSection from './IgnoreSection.svelte';
   import LockSection from './LockSection.svelte';
+  import PinSection from './PinSection.svelte';
   import RecommendsSection from './RecommendsSection.svelte';
   import UninstallSection from './UninstallSection.svelte';
   import UpdatePlan from './UpdatePlan.svelte';
@@ -236,6 +237,23 @@
     setup.setInstallFilters(type, change);
   }
   /**
+   * The version a panel's Pin pins: the plan's, or else the one installed; none for a package not installed and not
+   * in the plan, or one the plan uninstalls.
+   * @param key - The package's key, or `core`
+   * @returns The version, if any
+   */
+  function pinVersionOf(key: string): string | undefined {
+    if (overview === null) return undefined;
+    const planned = updates.plan.find(entry => entry.key === key)?.version;
+    if (planned !== undefined && planned !== UNINSTALL) return planned;
+    if (key === 'core') return overview.core;
+    const id = key.slice(key.indexOf(':') + 1);
+    return key.startsWith('system:')
+      ? overview.systems.find(system => system.id === id)?.version
+      : overview.modules.find(({ module: installed }) => installed.id === id)?.module.version;
+  }
+
+  /**
    * The latest version known of an installed game system or module, for its panel: none before the search, for one not
    * installed, or for one ignored, whose other releases EMMA never looks up.
    * @param key - The package's key
@@ -315,6 +333,7 @@
         : undefined}
   {#if key !== undefined}
     <div class="emma-actions" role="group" aria-label={localize('Action.Label')}>
+      {@render pin(key)}
       {@render lock(key)}
       {@render ignoreInstalled(key)}
       {@render uninstall(key)}
@@ -332,18 +351,21 @@
 
 <!-- Foundry VTT's, with planning the best versions just below them, as what is most often done from the root. -->
 {#snippet rootActions()}
-  {#if setup.canLockCore && overview !== null}
+  {#if overview !== null && (setup.canLockCore || updates.status === 'found')}
     <div class="emma-actions" role="group" aria-label={localize('Action.Label')}>
-      <LockSection
-        core
-        title={localize('Tree.Root')}
-        version={overview.core}
-        locked={overview.coreLocked === true}
-        disabled={updates.locked || setup.running}
-        busy={updates.busy.activityOf('lock:core')}
-        onLock={(locking: boolean) => {
-          void updates.busy.run('lock:core', 'locking', () => setup.setCoreLocked(locking));
-        }} />
+      {@render pin('core')}
+      {#if setup.canLockCore}
+        <LockSection
+          core
+          title={localize('Tree.Root')}
+          version={overview.core}
+          locked={overview.coreLocked === true}
+          disabled={updates.locked || setup.running}
+          busy={updates.busy.activityOf('lock:core')}
+          onLock={(locking: boolean) => {
+            void updates.busy.run('lock:core', 'locking', () => setup.setCoreLocked(locking));
+          }} />
+      {/if}
     </div>
   {/if}
   <BestSection
@@ -363,6 +385,26 @@
 {#snippet held()}
   {#if overview !== null}
     <HeldLists
+      pinned={updates.pins.map(([key, version]) => {
+        const unmet = updates.pinProblemOf(key);
+        return {
+          key,
+          title: updates.titleOf(key),
+          version,
+          link: linkOf(key),
+          // Why the plan leaves it out, with the resolver's explanation of a conflict.
+          ...(unmet !== undefined && {
+            problem:
+              unmet.reason === 'unknown'
+                ? localize('Pin.Unknown')
+                : [localize('Pin.Conflict'), ...unmet.explanation].join(' '),
+          }),
+        };
+      })}
+      onUnpin={(key: string) => {
+        void updates.busy.run(`pin:${key}`, 'planning', () => updates.unpin(key));
+      }}
+      pinBusy={(key: string) => updates.busy.activityOf(`pin:${key}`)}
       locked={lockedItems(overview).filter(({ key }) => (key === 'core' ? setup.canLockCore : setup.canLock))}
       ignored={setup.canIgnore ? ignoredItems(overview) : []}
       disabled={updates.locked || setup.running}
@@ -376,6 +418,17 @@
         void updates.busy.run(`ignore:${key}`, 'ignoring', () => setup.setIgnored(key, false));
       }}
       onOpen={openLink} />
+  {/if}
+{/snippet}
+
+<!--
+  Pinning what a panel shows, at the version the plan has of it, or else the one installed: once the updates are
+  found, as a pin is a choice in the plan.
+-->
+{#snippet pin(key: string)}
+  {@const version = pinVersionOf(key)}
+  {#if version !== undefined && updates.status === 'found'}
+    <PinSection {updates} {key} title={updates.titleOf(key)} {version} />
   {/if}
 {/snippet}
 

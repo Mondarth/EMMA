@@ -443,5 +443,20 @@
     "Ignored": "Ignored",
     "Unlock": "Unlock {title}",
     "Unignore": "Stop ignoring {title}"
+  },
+  "Pin": {
+    "Heading": "Pin",
+    "Pin": "Pin {title} at {version}",
+    "Unpin": "Unpin {title} (pinned at {version})",
+    "About": "A pin keeps a version in every plan, the version installed among them, until it is unpinned or another version is chosen: a softer lock, which Foundry does not know of. Pinning another version of it unpins this one.",
+    "Pinned": "Pinned",
+    "Unknown": "No longer found: the plan leaves it out until it is found again, or unpinned.",
+    "Conflict": "The plan cannot take it with the other pins.",
+    "Blocked": {
+      "Locked": "Locked in Foundry: it stays as it is installed, so it cannot be pinned.",
+      "Ignored": "Ignored: no plan takes it into account, so it cannot be pinned.",
+      "CoreLocked": "Foundry VTT is locked in EMMA at its build, so it cannot be pinned.",
+      "Running": "The plan is running: pins cannot change until it is done."
+    }
   }
 }
