@@ -1517,7 +1517,7 @@ describe('uninstalling', () => {
       within(section.parentElement as HTMLElement)
         .getAllByRole('group')
         .map(group => group.getAttribute('aria-label')),
-    ).toEqual(['Uninstall']);
+    ).toEqual(['Pin', 'Uninstall']);
     await user.click(within(section).getByRole('button', { name: 'Uninstall Spare' }));
 
     const plan = await screen.findByRole('region', { name: 'Update plan' });
@@ -2458,5 +2458,138 @@ describe('what a module recommends, installed or not to be had', () => {
     const inTree = screen.getAllByRole('checkbox', { name: 'Install dice with App' }).find(box => box !== dice);
     expect(inTree).toHaveAttribute('data-tooltip', 'No version of it fits the installation and the plan.');
     expect(inTree).not.toBeChecked();
+  });
+});
+
+describe('pins in the window', () => {
+  test('pin from the tree, the plan and the panel, list them under Plan Updates, and keep them as the plan is cleared', async () => {
+    const keep = vi.fn();
+    const setup = new SetupState({
+      load: () => Promise.resolve(OVERVIEW),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: findingBlocked(),
+      installModule: noInstall,
+      pins: { initial: {}, keep },
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    await vi.waitFor(() => {
+      expect(setup.updates.status).toBe('found');
+    });
+    const user = userEvent.setup();
+    const pinned = () => screen.queryByRole('list', { name: 'Pinned' });
+
+    // From the tree, the version it shows: here the installed one.
+    await user.click(within(row(/D&D 5e 5\.3\.3/)).getByRole('button', { name: 'Pin D&D 5e at 5.3.3' }));
+    await vi.waitFor(() => {
+      expect(
+        within(row(/D&D 5e 5\.3\.3/)).getByRole('button', { name: 'Unpin D&D 5e (pinned at 5.3.3)' }),
+      ).toHaveAttribute('aria-pressed', 'true');
+    });
+    expect(keep).toHaveBeenLastCalledWith({ 'system:dnd5e': '5.3.3' });
+    expect(
+      within(pinned() as HTMLElement)
+        .getAllByRole('listitem')
+        .map(item => item.textContent.trim()),
+    ).toEqual(['D&D 5e 5.3.3']);
+
+    // Choosing another version unpins it; pinning the plan's version, from its row, keeps it through a clear.
+    await setup.updates.choose('system:dnd5e', '5.4.0');
+    await vi.waitFor(() => {
+      expect(pinned()).toBeNull();
+    });
+    const plan = await screen.findByRole('region', { name: 'Update plan' });
+    await user.click(within(plan).getByRole('button', { name: 'Pin D&D 5e at 5.4.0' }));
+    await vi.waitFor(() => {
+      expect(setup.updates.pinnedOf('system:dnd5e')).toBe('5.4.0');
+    });
+    await user.click(within(plan).getByRole('button', { name: 'Clear choices' }));
+    await vi.waitFor(() => {
+      expect(setup.updates.plan.map(({ key, version }) => [key, version])).toEqual([['system:dnd5e', '5.4.0']]);
+    });
+
+    // From its panel, the Pin action unpins it.
+    await user.click(within(row(/D&D 5e/)).getByText('D&D 5e'));
+    const action = screen.getByRole('group', { name: 'Pin' });
+    await user.click(within(action).getByRole('button', { name: /^Unpin D&D 5e/ }));
+    await vi.waitFor(() => {
+      expect(setup.updates.pinnedOf('system:dnd5e')).toBeUndefined();
+    });
+  });
+
+  test('cannot pin a package locked in Foundry, saying why', async () => {
+    const setup = new SetupState({
+      load: () =>
+        Promise.resolve(
+          buildOverview(
+            installation({ modules: [{ ...installedModule('lib', 'Library', '1.0.0'), locked: true }] }),
+            new Map(),
+          ),
+        ),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: findingBlocked(),
+      installModule: noInstall,
+      lockPackage: () => Promise.resolve(),
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    await vi.waitFor(() => {
+      expect(setup.updates.status).toBe('found');
+    });
+    const user = userEvent.setup();
+    await user.click(within(row(/Universal/)).getByText('Universal'));
+    await user.keyboard('{ArrowRight}');
+    await user.click(within(row(/Library/)).getByText('Library'));
+
+    const toggle = within(screen.getByRole('group', { name: 'Pin' })).getByRole('button', { name: /cannot be pinned/ });
+    expect(toggle).toBeDisabled();
+    expect(toggle).toHaveAttribute(
+      'data-tooltip',
+      'Locked in Foundry: it stays as it is installed, so it cannot be pinned.',
+    );
+  });
+
+  test('list a pin the plan leaves out in red, saying why, and pin Foundry VTT, unpinning either from the list', async () => {
+    const setup = new SetupState({
+      load: () => Promise.resolve(OVERVIEW),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: findingBlocked(),
+      installModule: noInstall,
+      pins: { initial: { 'module:lib': '9.0.0' }, keep: vi.fn() },
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    await vi.waitFor(() => {
+      expect(setup.updates.status).toBe('found');
+    });
+    const user = userEvent.setup();
+    const list = () => within(screen.getByRole('list', { name: 'Pinned' }));
+
+    const unmet = list().getByRole('listitem');
+    expect(unmet).toHaveClass('emma-held-unmet');
+    expect(unmet).toHaveAttribute('data-tooltip', expect.stringMatching(/^No longer found/) as string);
+
+    // Foundry VTT, pinned from the root's own actions, at the build installed.
+    await user.click(
+      within(screen.getByRole('group', { name: 'Pin' })).getByRole('button', { name: /^Pin Foundry VTT/ }),
+    );
+    await vi.waitFor(() => {
+      expect(
+        list()
+          .getAllByRole('listitem')
+          .map(item => item.textContent.trim()),
+      ).toEqual([expect.stringMatching(/^Library 9\.0\.0/) as string, 'Foundry VTT 14.368']);
+    });
+    await user.click(list().getByRole('button', { name: 'Show Foundry VTT in the tree' }));
+    expect(screen.getByRole('treeitem', { selected: true })).toBe(screen.getAllByRole('treeitem')[0]);
+
+    await user.click(list().getByRole('button', { name: 'Unpin Library (pinned at 9.0.0)' }));
+    await user.click(list().getByRole('button', { name: 'Unpin Foundry VTT (pinned at 14.368)' }));
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('list', { name: 'Pinned' })).toBeNull();
+    });
   });
 });

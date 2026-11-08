@@ -18,6 +18,9 @@ import {
   readOwnedKept,
   writeOwnedKept,
   readCoreLocked,
+  PINS_KEY,
+  readPins,
+  writePins,
   readIgnored,
   readGuardOn,
   readLayout,
@@ -283,5 +286,34 @@ describe('the premium packages the user owns', () => {
       writeOwnedKept('module', new Set(['module:dice']));
     }).not.toThrow();
     expect(readOwnedKept('module')).toBeUndefined();
+  });
+});
+
+describe('pins', () => {
+  test('are none until kept, then as kept, and none again once all are cleared', () => {
+    expect(readPins()).toEqual({});
+    writePins({ 'module:app': '1.5.0', core: '14.368' });
+    expect(readPins()).toEqual({ 'module:app': '1.5.0', core: '14.368' });
+    writePins({});
+    expect(localStorage.getItem(PINS_KEY)).toBeNull();
+  });
+
+  test('are none where what is kept is not pins, and a version that is not text is left out', () => {
+    for (const kept of ['not json', '[]', 'null', '"text"']) {
+      localStorage.setItem(PINS_KEY, kept);
+      expect(readPins()).toEqual({});
+    }
+    localStorage.setItem(PINS_KEY, JSON.stringify({ 'module:app': '1.0.0', 'module:odd': 2 }));
+    expect(readPins()).toEqual({ 'module:app': '1.0.0' });
+  });
+
+  test('are kept for the visit alone where the storage cannot be written', () => {
+    const set = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('full');
+    });
+    expect(() => {
+      writePins({ 'module:app': '1.0.0' });
+    }).not.toThrow();
+    set.mockRestore();
   });
 });

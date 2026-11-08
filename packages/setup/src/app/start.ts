@@ -11,6 +11,7 @@ import {
   readAlphaAcknowledged,
   readBestInUseOnly,
   readCoreLocked,
+  readPins,
   readIgnored,
   readGuardOn,
   readOwnedKept,
@@ -18,6 +19,7 @@ import {
   writeAlphaAcknowledged,
   writeBestInUseOnly,
   writeCoreLocked,
+  writePins,
   writeIgnored,
   writeGuardOn,
   writeOwnedKept,
@@ -127,6 +129,7 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
       return buildOverview(installation, await readRecords(installation.worlds.map(({ id }) => id)));
     },
     lockCore: writeCoreLocked,
+    pins: { initial: readPins(), keep: writePins },
     ignore: writeIgnored,
     bestInUseOnly: readBestInUseOnly(),
     onBestInUseOnlyChange: writeBestInUseOnly,

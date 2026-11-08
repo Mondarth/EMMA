@@ -1564,3 +1564,157 @@ describe("a package's title in the window", () => {
     expect(updates.titleOf('module:unknown')).toBe('module:unknown');
   });
 });
+
+describe('pins', () => {
+  /**
+   * A search of the app and the library, its pins kept in a store.
+   * @param initial - The pins kept from before
+   * @param planner - The planner, alone of the app and the library by default
+   * @returns The state, searched, and the store's keep
+   */
+  async function pinning(initial: Record<string, string> = {}, planner: Planner = alone(APP, LIB)) {
+    const keep = vi.fn();
+    const updates = new UpdateState(() => Promise.resolve({ ...finding(APP, LIB), planner }), { initial, keep });
+    await updates.searchFor(OVERVIEW);
+    return { updates, keep };
+  }
+
+  test('pin a version in every plan, the cleared one and the best too, until unpinned, kept as they change', async () => {
+    const { updates, keep } = await pinning();
+    await expect(updates.pin('module:app', '1.5.0')).resolves.toBe(true);
+    expect(updates.pinnedOf('module:app')).toBe('1.5.0');
+    expect(updates.plan.map(({ key, version }) => [key, version])).toEqual([['module:app', '1.5.0']]);
+    expect(keep).toHaveBeenLastCalledWith({ 'module:app': '1.5.0' });
+
+    await updates.choose('module:lib', '1.1.0');
+    updates.clear();
+    await vi.waitFor(() => {
+      expect(updates.plan.map(({ key, version }) => [key, version])).toEqual([['module:app', '1.5.0']]);
+    });
+    // The best versions plan around it.
+    await updates.planBest();
+    expect(updates.picks).toContainEqual(['module:app', '1.5.0']);
+
+    await expect(updates.unpin('module:app')).resolves.toBe(true);
+    expect(updates.pinnedOf('module:app')).toBeUndefined();
+    // A version pinned beyond the installed one stays chosen.
+    expect(updates.picks).toContainEqual(['module:app', '1.5.0']);
+    expect(keep).toHaveBeenLastCalledWith({});
+    await expect(updates.unpin('module:app')).resolves.toBe(false);
+  });
+
+  test('pin the installed version, holding it as it is, with no change in the plan, and take it back unpinned', async () => {
+    const { updates } = await pinning();
+    await expect(updates.pin('module:app', '1.0.0')).resolves.toBe(true);
+    expect(updates.plan).toEqual([]);
+    expect(updates.picks).toEqual([['module:app', '1.0.0']]);
+    // The best versions leave it as it is pinned.
+    await updates.planBest();
+    expect(updates.picks).toContainEqual(['module:app', '1.0.0']);
+    await updates.unpin('module:app');
+    expect(updates.picks).not.toContainEqual(['module:app', '1.0.0']);
+  });
+
+  test('are cleared by choosing another version, taking the choice out, or a version not offered', async () => {
+    const { updates } = await pinning();
+    await updates.pin('module:app', '1.5.0');
+    // Choosing the version pinned changes nothing.
+    await expect(updates.choose('module:app', '1.5.0')).resolves.toBe(true);
+    expect(updates.pinnedOf('module:app')).toBe('1.5.0');
+    await updates.choose('module:app', '2.0.0');
+    expect(updates.pinnedOf('module:app')).toBeUndefined();
+
+    await updates.pin('module:app', '2.0.0');
+    await updates.takeOut('module:app', true);
+    expect(updates.pinnedOf('module:app')).toBeUndefined();
+    await expect(updates.pin('module:app', '9.9.9')).resolves.toBe(false);
+    // Nor one not found, nor one the plan cannot take.
+    await expect(updates.pin('module:nowhere', '1.0.0')).resolves.toBe(false);
+    const refusing = await pinning({}, { ...alone(APP, LIB), plan: () => Promise.resolve(undefined) });
+    await expect(refusing.updates.pin('module:app', '1.5.0')).resolves.toBe(false);
+    expect(refusing.updates.pinnedOf('module:app')).toBeUndefined();
+  });
+
+  test('kept from before are planned when searched, or said to be unmet: not found, or not together', async () => {
+    const { updates } = await pinning({ 'module:app': '1.5.0', 'module:lib': '9.0.0' });
+    expect(updates.plan.map(({ key, version }) => [key, version])).toEqual([['module:app', '1.5.0']]);
+    expect(updates.pinProblemOf('module:lib')).toEqual({ reason: 'unknown' });
+    expect(updates.pinProblemOf('module:app')).toBeUndefined();
+
+    const planner = alone(APP, LIB);
+    const together = (picks: ReadonlyMap<string, string>) => picks.has('module:app') && picks.has('module:lib');
+    const apart = await pinning(
+      { 'module:app': '1.5.0', 'module:lib': '1.1.0' },
+      {
+        ...planner,
+        complete: picks =>
+          together(picks)
+            ? Promise.resolve({ ok: false as const, explanation: ['App 1.5.0 conflicts with Library 1.1.0.'] })
+            : planner.complete(picks),
+        plan: picks => (together(picks) ? Promise.resolve(undefined) : planner.plan(picks)),
+      },
+    );
+    expect(apart.updates.plan).toEqual([]);
+    expect(apart.updates.pinProblemOf('module:app')).toEqual({
+      reason: 'conflict',
+      explanation: ['App 1.5.0 conflicts with Library 1.1.0.'],
+    });
+    expect(apart.updates.pinnedOf('module:lib')).toBe('1.1.0');
+  });
+
+  test('cannot be made of what is locked in Foundry or ignored, Foundry VTT locked in EMMA, or while the plan runs', async () => {
+    const keep = vi.fn();
+    const updates = new UpdateState(() => Promise.resolve(finding(APP)), { initial: {}, keep });
+    expect(updates.pinBlockOf('module:app')).toBeUndefined();
+    await updates.searchFor(
+      buildOverview(
+        {
+          ...installation({
+            modules: [
+              { ...installedModule('held', 'Held', '1.0.0'), locked: true },
+              installedModule('skipped', 'Skipped', '1.0.0'),
+            ],
+            systems: [{ id: 'dnd5e', title: 'D&D 5e', version: '5.3.3', locked: true }],
+          }),
+          coreLocked: true,
+          ignored: ['module:skipped'],
+        },
+        new Map(),
+      ),
+    );
+    expect(updates.pinBlockOf('module:held')).toBe('locked');
+    expect(updates.pinBlockOf('system:dnd5e')).toBe('locked');
+    expect(updates.pinBlockOf('module:skipped')).toBe('ignored');
+    expect(updates.pinBlockOf('core')).toBe('core-locked');
+    expect(updates.pinBlockOf('module:app')).toBeUndefined();
+    await expect(updates.pin('module:held', '1.0.0')).resolves.toBe(false);
+    updates.locked = true;
+    expect(updates.pinBlockOf('module:app')).toBe('running');
+    await expect(updates.unpin('module:app')).resolves.toBe(false);
+  });
+});
+
+describe('a pin in the way of a choice', () => {
+  test('is named as pinned among the choices to take out', async () => {
+    const planner = alone(APP, LIB);
+    const clash = (picks: ReadonlyMap<string, string>) =>
+      picks.get('module:app') === '2.0.0' && picks.get('module:lib') === '1.1.0';
+    const updates = new UpdateState(
+      () =>
+        Promise.resolve({
+          ...finding(APP, LIB),
+          planner: {
+            ...planner,
+            complete: picks => (clash(picks) ? Promise.resolve({ ok: false as const }) : planner.complete(picks)),
+          },
+        }),
+      { initial: {}, keep: vi.fn() },
+    );
+    await updates.searchFor(OVERVIEW);
+    await updates.pin('module:lib', '1.1.0');
+    const options = await updates.optionsFor('module:app');
+    expect(options.find(({ version }) => version === '2.0.0')?.conflict?.remove).toEqual([
+      { title: 'module:lib (pinned)', version: '1.1.0' },
+    ]);
+  });
+});

@@ -264,9 +264,9 @@ needed by it, locked in. A shift-click takes out what it brought in
 too, but for what another change still needs. So does a click on a change in a ring of changes that need each other,
 such as a module, a module it requires and the game system they run in, each newer: alone, it would only come back.
 
-Just under **Plan Updates**, what is held as it is shows in two lists side by side: **Locked**, Foundry VTT if EMMA locks
-it and the game systems and modules locked in Foundry, and **Ignored**, the worlds, game systems and modules EMMA
-ignores. Each list is five entries high and scrolls past that, and one with nothing in it is not shown. Each entry opens
+Just under **Plan Updates**, what is held shows in up to three lists side by side: **Pinned**, each item pinned and
+its version (see [Pinning](#pinning)); **Locked**, Foundry VTT if EMMA locks it and the game systems and modules locked
+in Foundry; and **Ignored**, the worlds, game systems and modules EMMA ignores. Each list is five entries high and scrolls past that, and one with nothing in it is not shown. Each entry opens
 its row in the tree, and the padlock or the eye beside it unlocks it or stops ignoring it at once.
 
 **Plan the best versions**, under **Plan Updates** just below the actions in the root's panel, replaces the plan with the newest versions there are: those of Foundry
@@ -467,6 +467,25 @@ it **Recommends**, each with its checkbox. **Always install recommendations**, w
 recommendation at first, so that a module added brings them all in; untick one in the drawer before adding the module
 to leave it out. A module whose wanted recommendation cannot be added is not added either: the section says which, so
 that it can be unticked.
+
+### Pinning
+
+A pin is a softer lock: it keeps one version of Foundry VTT, a game system or a module in every plan until it is
+unpinned, without Foundry knowing of it. The resolver takes it as fixed, so the plan is made around it. A version newer
+than the installed one is installed by the plan; the installed version itself may be pinned too, to keep the package as
+it is.
+
+Pin a version from the **Pin** action in the item's panel, for the version the plan has or else the installed one;
+from the pin beside a version in the plan's **Chosen** column; or from the pin beside a version list in the tree.
+Pinning another version of the same item unpins the first, and so does choosing another version of it, uninstalling it,
+or taking it out of the plan. When a choice cannot be made with a pin, the version list names the pin among the choices in the way, marked
+**(pinned)**: unpinning it, or taking it out of the plan, which unpins it, lets the choice be made. **Clear choices** keeps the pins, and **Plan the best versions** plans
+around them. The browser remembers the pins for that server.
+
+A pin cannot be made of a package locked in Foundry, which stays as it is already, nor of one ignored, which no plan
+takes into account, nor of Foundry VTT while EMMA locks it: the pin is disabled, saying why in its tooltip. A pin whose
+version is no longer found, or that the plan cannot take with the other pins, is left out of the plan and shows in red
+in the **Pinned** list, its tooltip saying why, until it is unpinned.
 
 ### Locking
 

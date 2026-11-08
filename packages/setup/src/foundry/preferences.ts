@@ -30,6 +30,39 @@ export function writeGuardOn(on: boolean): void {
   }
 }
 
+/** The key the versions pinned are kept under. */
+export const PINS_KEY = 'mondarth-emma.setup.pins';
+
+/**
+ * The versions pinned, by package key, as kept for this server; none when none are, or the storage cannot be read or
+ * holds something else.
+ * @returns The pins, as `{ key: version }`
+ */
+export function readPins(): Record<string, string> {
+  try {
+    const kept: unknown = JSON.parse(localStorage.getItem(PINS_KEY) ?? '{}');
+    if (typeof kept !== 'object' || kept === null || Array.isArray(kept)) return {};
+    return Object.fromEntries(
+      Object.entries(kept).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+    );
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Keep the versions pinned, for this server. Kept for this visit only if the storage cannot be written.
+ * @param pins - The pins, as `{ key: version }`
+ */
+export function writePins(pins: Readonly<Record<string, string>>): void {
+  try {
+    if (Object.keys(pins).length === 0) localStorage.removeItem(PINS_KEY);
+    else localStorage.setItem(PINS_KEY, JSON.stringify(pins));
+  } catch {
+    // As for the guard's setting.
+  }
+}
+
 /** The key whether EMMA keeps Foundry VTT at the build installed is kept under. */
 export const CORE_LOCK_KEY = 'mondarth-emma.setup.core-lock';
 
