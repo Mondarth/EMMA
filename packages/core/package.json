@@ -19,6 +19,6 @@
     "test:coverage": "vitest --run --coverage"
   },
   "dependencies": {
-    "@mondarth/fvtt-resolver": "0.11.2"
+    "@mondarth/fvtt-resolver": "0.11.3"
   }
 }
