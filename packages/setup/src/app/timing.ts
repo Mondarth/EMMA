@@ -32,13 +32,23 @@ let burst: Burst | undefined;
 let quiet: ReturnType<typeof setTimeout> | undefined;
 const summaries: object[] = [];
 let kept: { overview: Overview; universe: unknown } | undefined;
+// The name given to the next burst, before it begins.
+let nextLabel: string | undefined;
 
 /**
  * Start a burst, or keep the one going.
  * @returns The burst
  */
 function inBurst(): Burst {
-  burst ??= { startedAt: performance.now(), calls: new Map(), blocks: [] };
+  if (burst === undefined) {
+    burst = {
+      startedAt: performance.now(),
+      calls: new Map(),
+      blocks: [],
+      ...(nextLabel !== undefined && { label: nextLabel }),
+    };
+    nextLabel = undefined;
+  }
   clearTimeout(quiet);
   quiet = setTimeout(flush, QUIET_MS);
   return burst;
@@ -149,7 +159,7 @@ export function timedPlanner(planner: Planner): Planner {
  * @returns Once it is done
  */
 export async function timedSearch<T>(search: () => Promise<T>): Promise<T> {
-  inBurst().label = 'search';
+  inBurst().label ??= 'search';
   const start = performance.now();
   try {
     return await search();
@@ -180,11 +190,12 @@ export function offerConsoleHelpers(): void {
       console.info('[EMMA timing] Saved', link.download, `(${Math.round(text.length / 1024)} KB)`);
     },
     /**
-     * Name the burst under way, or the next, such as "best versions".
+     * Name the next burst of work, such as "best versions", or the one under way, if any.
      * @param text - The name
      */
     __emmaLabel: (text: string) => {
-      inBurst().label = text;
+      if (burst === undefined) nextLabel = text;
+      else burst.label = text;
     },
   });
 }
