@@ -483,7 +483,9 @@ or taking it out of the plan. When a choice cannot be made with a pin, the versi
 around them. The browser remembers the pins for that server.
 
 A pin cannot be made of a package locked in Foundry, which stays as it is already, nor of one ignored, which no plan
-takes into account, nor of Foundry VTT while EMMA locks it: the pin is disabled, saying why in its tooltip. A pin whose
+takes into account, nor of Foundry VTT while EMMA locks it: the pin is disabled, saying why in its tooltip. A lock comes
+before a pin: locking what is pinned, in Foundry or, for Foundry VTT, in EMMA, unpins it, and its note goes with the
+pin. A pin whose
 version is no longer found, or that the plan cannot take with the other pins, is left out of the plan and shows in red
 in the **Pinned** list, its tooltip saying why, until it is unpinned.
 
@@ -496,6 +498,14 @@ needs it changed is not either, and it cannot be uninstalled.
 **The actions** on what a panel shows, **Lock**, **Ignore** and **Uninstall**, sit side by side just below its title,
 wrapping only where the panel is too narrow. Each button names what it does; the **ⓘ** beside it shows, or hides again,
 what that is, hidden at first. Only why an uninstall is refused shows always, below its button.
+
+**Notes:** what you pin, lock or ignore can carry a note, such as why: once it is pinned, locked or ignored, a
+**Note (optional)** field shows under its button. A note is kept when you leave the field or press Enter, Escape puts
+back what was kept, and emptying it removes it; it is up to 200 characters. It shows in `[]` after the item's title in the
+tree, in the root's **Pinned**, **Locked** and **Ignored** lists, and, for a pin, beside the pin on its line in the
+update plan, its whole text in its tooltip. An item both locked
+and ignored has a note for each. A note goes with what it is on: unpinning, unlocking or no longer ignoring the item
+removes it, even when it is unlocked in Foundry rather than in EMMA. The browser keeps the notes for that server.
 
 The panel of each installed game system and module has a **Lock** action: **Lock <title> at <version>**, or **Unlock
 <title>**, which locks or unlocks it in Foundry at once, as Foundry's own package menu does, and reads the installation

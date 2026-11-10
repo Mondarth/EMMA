@@ -11,6 +11,7 @@ import { moduleEntry } from '../mocks/entries';
 import { installFoundryMocks } from '../mocks/foundry';
 import { loadedVersions } from '../mocks/versions';
 import { createModules } from './fixtures';
+import { setIgnoredNotes } from '@module/state/hypothetical-ignored.svelte';
 
 /**
  * Build a module entry with relationships to other modules.
@@ -555,6 +556,34 @@ describe('ListView', () => {
       expect(ignored).toHaveClass('ignored');
       expect(container.querySelector('[data-tooltip="MONDARTH-EMMA.Ignore.Tooltip"]')).not.toBeNull();
       expect(container.querySelector('[data-module-id="dice"]')).not.toHaveClass('ignored');
+    });
+
+    test("shows the GMs' note on it after its title, and in its tooltip", async () => {
+      setIgnoredNotes({ 'lib-wrapper': 'No manifest to read' });
+      try {
+        const { state } = await loadedVersions(
+          { 'lib-wrapper': ['1.13.2'], dice: ['4.0.0'] },
+          undefined,
+          undefined,
+          new Set(['lib-wrapper']),
+        );
+        const { container } = render(ListView, {
+          fields: new DrawerFields(),
+          modules: createModules(),
+          canManage: true,
+          versions: state,
+        });
+
+        const ignored = container.querySelector('[data-module-id="lib-wrapper"]');
+        expect(ignored?.querySelector('.emma-note')).toHaveTextContent('[No manifest to read]');
+        const tooltips = [...container.querySelectorAll('[data-tooltip]')].map(tip => tip.getAttribute('data-tooltip'));
+        expect(tooltips).toContain(
+          'MONDARTH-EMMA.Ignore.Tooltip MONDARTH-EMMA.Ignore.Noted {"note":"No manifest to read"}',
+        );
+        expect(container.querySelector('[data-module-id="dice"] .emma-note')).toBeNull();
+      } finally {
+        setIgnoredNotes({});
+      }
     });
 
     test('shows it as usual while hypothetical mode is off', () => {

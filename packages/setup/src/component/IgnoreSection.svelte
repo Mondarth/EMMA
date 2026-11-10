@@ -8,6 +8,7 @@
 
   import ActionItem from './ActionItem.svelte';
   import BusyMark from './BusyMark.svelte';
+  import NoteField from './NoteField.svelte';
 
   interface Props {
     /** Its title. */
@@ -22,9 +23,11 @@
     onIgnore: (ignore: boolean) => void;
     /** What EMMA is busy with because of this section's button, shown over it; nothing by default. */
     busy?: Activity | undefined;
+    /** The user's note on it, while it is held, if notes can be kept: the note, and how to keep it. */
+    note?: { readonly text: string | undefined; readonly onSave: (text: string) => void } | undefined;
   }
 
-  let { title, world = false, ignored, disabled, onIgnore, busy }: Props = $props();
+  let { title, world = false, ignored, disabled, onIgnore, busy, note }: Props = $props();
   const said = $derived(
     ignored ? (world ? 'Ignore.IgnoredWorld' : 'Ignore.Ignored') : world ? 'Ignore.UnignoredWorld' : 'Ignore.Unignored',
   );
@@ -45,8 +48,14 @@
   </button>
 {/snippet}
 
+{#snippet noted()}
+  {#if note !== undefined && ignored}
+    <NoteField note={note.text} label={format('Note.Ignore', { title })} {disabled} onSave={note.onSave} />
+  {/if}
+{/snippet}
+
 {#snippet about()}
   <p>{format(said, { title })}</p>
 {/snippet}
 
-<ActionItem label={localize('Ignore.Heading')} {button} {about} />
+<ActionItem label={localize('Ignore.Heading')} {button} {about} note={noted} />

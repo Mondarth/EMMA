@@ -459,5 +459,12 @@
       "Running": "The plan is running: pins cannot change until it is done."
     },
     "InTheWay": "{title} (pinned)"
+  },
+  "Note": {
+    "Placeholder": "Note (optional)",
+    "Ignore": "Note on ignoring {title}",
+    "Lock": "Note on locking {title}",
+    "Pin": "Note on pinning {title}",
+    "Tree": "Note: {note}"
   }
 }

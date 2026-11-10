@@ -36,6 +36,7 @@ import { catalogueSet, catalogueSource, localSource } from '@mondarth/fvtt-resol
 
 import { format, formatList, localize } from '@module/lib/i18n';
 import { isIncompatible } from '@module/lib/incompatible';
+import { ignoredNoteOf } from '@module/state/hypothetical-ignored.svelte';
 
 import { explanationMessages } from './explanation';
 import type { VersionBadge } from './modules';
@@ -576,7 +577,12 @@ export function createVersionJudge(options: FindOptions): VersionJudge {
     reportIgnored: (active, choices) =>
       [...active]
         .filter(id => choices.ignored?.has(id) === true)
-        .map(id => catalogue.titles.get(packageKey({ type: 'module', id })) ?? id),
+        .map(id => {
+          const title = catalogue.titles.get(packageKey({ type: 'module', id })) ?? id;
+          // With the GMs' note on why, as the views show it.
+          const note = ignoredNoteOf(id);
+          return note === undefined ? title : `${title} [${note}]`;
+        }),
     reportUnavailable: (active, choices) =>
       [...active].flatMap(id => {
         const unavailable = catalogue.unavailable.get(id);

@@ -1,5 +1,6 @@
 import type { ModuleEntry } from '@module/adapters/modules';
-import { format, formatList } from '@module/lib/i18n';
+import { format, formatList, localize } from '@module/lib/i18n';
+import { ignoredNoteOf } from '@module/state/hypothetical-ignored.svelte';
 import type { ModuleState } from '@module/state/module-state.svelte';
 
 /**
@@ -30,4 +31,16 @@ export function lockedTooltip(modules: ModuleState, entry: ModuleEntry): string 
     module: entry.title,
     parents: formatList([parent, ...others].map(({ title }) => title)),
   });
+}
+
+/**
+ * Explain why hypothetical mode leaves a module out, for a tooltip on its entry in either view, with the GMs' note on
+ * it, if any.
+ * @param id - The module's ID
+ * @returns The explanation
+ */
+export function ignoredTooltip(id: string): string {
+  const note = ignoredNoteOf(id);
+  const why = localize('MONDARTH-EMMA.Ignore.Tooltip');
+  return note === undefined ? why : `${why} ${format('MONDARTH-EMMA.Ignore.Noted', { note })}`;
 }

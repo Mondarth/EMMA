@@ -1,6 +1,7 @@
 <script lang="ts">
   import { localize } from '@module/lib/i18n';
-  import { lockedTooltip } from '@module/lib/locked';
+  import { ignoredTooltip, lockedTooltip } from '@module/lib/locked';
+  import { ignoredNoteOf } from '@module/state/hypothetical-ignored.svelte';
   import type { DrawerFields } from '@module/state/drawer-fields.svelte';
   import type { ModuleRow } from '@module/state/grouping';
   import type { VersionBadge } from '@module/adapters/modules';
@@ -190,7 +191,7 @@
       aria-expanded={expanded}
       aria-selected={modules.isSelected(side, entry.id)}
       aria-disabled={locked === undefined ? undefined : 'true'}
-      data-tooltip={locked ?? (ignored ? localize('MONDARTH-EMMA.Ignore.Tooltip') : undefined)}
+      data-tooltip={locked ?? (ignored ? ignoredTooltip(entry.id) : undefined)}
       aria-labelledby={`${optionId(key)}-title`}
       onclick={event => {
         onClick(event, row);
@@ -224,7 +225,9 @@
             aria-label={label}
             data-tooltip={label}></i>
         {/if}
-        <span id={`${optionId(key)}-title`} class="emma-option-title">{entry.title}</span>
+        <span id={`${optionId(key)}-title`} class="emma-option-title"
+          >{entry.title}{#if ignored && ignoredNoteOf(entry.id) !== undefined}
+            <span class="emma-note">[{ignoredNoteOf(entry.id)}]</span>{/if}</span>
       </div>
       <div class="emma-option-version" role="gridcell">
         <ModuleVersion {entry} {versions} {badges} focusable={false} />
@@ -251,6 +254,12 @@
 </div>
 
 <style>
+  /* The GMs' note on a module hypothetical mode ignores, after its title. */
+  .emma-note {
+    font-size: 0.85em;
+    opacity: 0.75;
+  }
+
   .emma-listbox {
     flex: 1;
     min-height: 0;

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { format, localize } from '@module/lib/i18n';
-  import { lockedTooltip } from '@module/lib/locked';
+  import { ignoredTooltip, lockedTooltip } from '@module/lib/locked';
+  import { ignoredNoteOf } from '@module/state/hypothetical-ignored.svelte';
   import type { DrawerFields } from '@module/state/drawer-fields.svelte';
   import type { ModuleRow } from '@module/state/grouping';
   import type { VersionBadge } from '@module/adapters/modules';
@@ -103,9 +104,7 @@
         ]}
         style:--emma-depth={depth}
         data-module-id={entry.id}>
-        <div
-          class="emma-module-row"
-          data-tooltip={locked ?? (ignored ? localize('MONDARTH-EMMA.Ignore.Tooltip') : undefined)}>
+        <div class="emma-module-row" data-tooltip={locked ?? (ignored ? ignoredTooltip(entry.id) : undefined)}>
           <label>
             {#if relation !== null}
               {@const label = localize(`MONDARTH-EMMA.Relation.${relation}`)}
@@ -130,7 +129,9 @@
                 aria-label={label}
                 data-tooltip={label}></i>
             {/if}
-            <span class="emma-module-title">{entry.title}</span>
+            <span class="emma-module-title"
+              >{entry.title}{#if ignored && ignoredNoteOf(entry.id) !== undefined}
+                <span class="emma-note">[{ignoredNoteOf(entry.id)}]</span>{/if}</span>
           </label>
           <span class="emma-module-version"><ModuleVersion {entry} {versions} {badges} /></span>
           <DisclosureButton
@@ -153,6 +154,12 @@
 {/if}
 
 <style>
+  /* The GMs' note on a module hypothetical mode ignores, after its title. */
+  .emma-note {
+    font-size: 0.85em;
+    opacity: 0.75;
+  }
+
   .emma-list-heading {
     display: flex;
     align-items: center;

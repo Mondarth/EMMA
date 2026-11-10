@@ -152,6 +152,41 @@ export function writeBestInUseOnly(on: boolean): void {
   }
 }
 
+/** The key the notes on what is ignored, locked or pinned are kept under. */
+export const NOTES_KEY = 'mondarth-emma.setup.notes';
+
+/**
+ * The user's notes on what they ignore, lock or pin, by `<kind>:<key>`: none if the storage cannot be read, or holds
+ * something else.
+ * @returns The notes
+ */
+export function readNotes(): Record<string, string> {
+  try {
+    const kept: unknown = JSON.parse(localStorage.getItem(NOTES_KEY) ?? '{}');
+    if (typeof kept !== 'object' || kept === null || Array.isArray(kept)) return {};
+    return Object.fromEntries(
+      Object.entries(kept).filter(
+        (entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1] !== '',
+      ),
+    );
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Keep the user's notes. Kept for this visit only if the storage cannot be written.
+ * @param notes - The notes, by `<kind>:<key>`
+ */
+export function writeNotes(notes: Readonly<Record<string, string>>): void {
+  try {
+    if (Object.keys(notes).length === 0) localStorage.removeItem(NOTES_KEY);
+    else localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
+  } catch {
+    // As for the guard's setting.
+  }
+}
+
 /** The key what EMMA ignores is kept under. */
 export const IGNORED_KEY = 'mondarth-emma.setup.ignored';
 

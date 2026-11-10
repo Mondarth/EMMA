@@ -40,6 +40,8 @@ export interface HeldItem {
   readonly title: string;
   /** Its row in the tree. */
   readonly link: TreeSelection;
+  /** The user's note on why it is held, if any. */
+  readonly note?: string;
 }
 
 /**
