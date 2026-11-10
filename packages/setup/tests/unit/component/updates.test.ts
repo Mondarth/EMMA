@@ -2143,6 +2143,70 @@ describe('locking a package', () => {
   });
 });
 
+describe('notes on what is held', () => {
+  test('are written under a lock, shown in the tree and the root lists, and go when it is unlocked', async () => {
+    let locked = false;
+    let kept: Record<string, string> = {};
+    const overviewOf = () =>
+      buildOverview(
+        installation({
+          worlds: [{ id: 'a', title: 'Alpha', system: 'dnd5e' }],
+          modules: [{ ...installedModule('lib', 'Library', '1.0.0'), ...(locked && { locked: true as const }) }],
+        }),
+        new Map([['a', recorded(record('a', { modules: [{ id: 'lib', title: 'Library', version: '1.0.0' }] }))]]),
+      );
+    const setup = new SetupState({
+      load: () => Promise.resolve(overviewOf()),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: findingBlocked(),
+      installModule: noInstall,
+      lockPackage: (_type, _id, lock) => {
+        locked = lock;
+        return Promise.resolve();
+      },
+      notes: {
+        read: () => kept,
+        write: notes => {
+          kept = { ...notes };
+        },
+      },
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    const user = userEvent.setup();
+    const toggle = row(/Universal/).querySelector('.emma-tree-toggle');
+    if (toggle === null) throw new Error('No universal group to open');
+    await user.click(toggle);
+    await user.click(within(row(/Library 1\.0\.0/)).getByText('Library'));
+    // No note until it is locked.
+    expect(screen.queryByRole('textbox', { name: 'Note on locking Library' })).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Lock Library at 1.0.0' }));
+    const field = await screen.findByRole('textbox', { name: 'Note on locking Library' });
+    await user.type(field, '  Breaks at 2.0  {Enter}');
+
+    expect(kept).toEqual({ 'lock:module:lib': 'Breaks at 2.0' });
+    // Beside its title in the tree, as everywhere the locked module shows.
+    const selected = screen.getByRole('treeitem', { selected: true });
+    expect(selected).toHaveTextContent(/Library \[Breaks at 2\.0\]/);
+    expect(selected).toHaveAccessibleName(/Note: Breaks at 2\.0/);
+    // Escape puts back what was kept.
+    await user.type(field, ' or later{Escape}');
+    expect(field).toHaveValue('Breaks at 2.0');
+    expect(kept).toEqual({ 'lock:module:lib': 'Breaks at 2.0' });
+
+    await user.click(within(row(/^Foundry VTT/)).getByText(/Foundry VTT/));
+    expect(screen.getByRole('group', { name: 'Locked and ignored' })).toHaveTextContent('Library [Breaks at 2.0]');
+
+    await user.click(screen.getByRole('button', { name: 'Unlock Library' }));
+    await vi.waitFor(() => {
+      expect(kept).toEqual({});
+    });
+    expect(screen.queryByText('[Breaks at 2.0]')).toBeNull();
+  });
+});
+
 describe('locking Foundry VTT in EMMA', () => {
   test('locks and unlocks it from the root panel, reading the installation again, and marks it in the tree', async () => {
     let locked = false;
@@ -2462,6 +2526,39 @@ describe('what a module recommends, installed or not to be had', () => {
 });
 
 describe('pins in the window', () => {
+  test("show the pin's note beside it on the plan's line, and in the tree", async () => {
+    const setup = new SetupState({
+      load: () => Promise.resolve(OVERVIEW),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: findingBlocked(),
+      installModule: noInstall,
+      pins: { initial: {}, keep: vi.fn() },
+      notes: { read: () => ({}), write: vi.fn() },
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    await vi.waitFor(() => {
+      expect(setup.updates.status).toBe('found');
+    });
+    const user = userEvent.setup();
+    await setup.updates.choose('system:dnd5e', '5.4.0');
+    const plan = await screen.findByRole('region', { name: 'Update plan' });
+    const line = () => changesIn(plan).getAllByRole('row')[1] as HTMLElement;
+
+    await user.click(within(plan).getByRole('button', { name: 'Pin D&D 5e at 5.4.0' }));
+
+    // Its note, as its action's field takes it.
+    await vi.waitFor(() => {
+      expect(setup.updates.pinnedOf('system:dnd5e')).toBe('5.4.0');
+    });
+    setup.notes.set('pin', 'system:dnd5e', 'Wait for Midi');
+    await vi.waitFor(() => {
+      expect(within(line()).getByText('[Wait for Midi]')).toHaveAttribute('data-tooltip', 'Wait for Midi');
+    });
+    expect(row(/D&D 5e/)).toHaveTextContent('[Wait for Midi]');
+  });
+
   test('pin from the tree, the plan and the panel, list them under Plan Updates, and keep them as the plan is cleared', async () => {
     const keep = vi.fn();
     const setup = new SetupState({

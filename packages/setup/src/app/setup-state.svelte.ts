@@ -7,9 +7,12 @@ import type { CoreTarget, CoreUpdateState, ListedPackage, SnapshotSpace } from '
 import type { InstallFilters } from '../lib/install';
 import { DEFAULT_FILTERS } from '../lib/install';
 import type { Overview } from '../lib/overview';
+import { isIgnored } from '../lib/overview';
 import type { RunStep, StepProgress, StepState } from '../lib/run';
 import { runScheduled, runSteps } from '../lib/run';
 import type { UpdateSearch } from '../lib/updates';
+import type { NoteStore } from './notes.svelte';
+import { NoteState } from './notes.svelte';
 import type { PinStore } from './update-state.svelte';
 import { UpdateState } from './update-state.svelte';
 
@@ -47,6 +50,8 @@ export interface SetupStateOptions {
   readonly ignore?: (key: string, ignored: boolean) => void;
   /** Where the versions pinned are kept between visits, and those kept; none are kept without. */
   readonly pins?: PinStore;
+  /** Where the notes on what is ignored, locked or pinned are kept; none can be written without. */
+  readonly notes?: NoteStore;
   /** Lock a game system or module in Foundry, or unlock it, as Foundry's own package menu does; none can be without. */
   readonly lockPackage?: (type: 'module' | 'system', id: string, lock: boolean) => Promise<void>;
   /** Read Foundry's listing of the packages of a type that may be installed; none where it cannot be read. */
@@ -139,6 +144,8 @@ export class SetupState {
   bestInUseOnly = $state(false);
   /** The installation's updates, searched for each time it is read. */
   readonly updates: UpdateState;
+  /** The user's notes on what they ignore, lock or pin. */
+  readonly notes: NoteState;
   /** The space a snapshot needs and the space free, once asked, until the installation is read again. */
   snapshotSpace = $state.raw<SnapshotSpaceState>(null);
   /** The last run of the update plan, until the next. */
@@ -212,6 +219,31 @@ export class SetupState {
     this.alphaAcknowledged = options.alpha?.acknowledged ?? true;
     this.bestInUseOnly = options.bestInUseOnly ?? false;
     this.updates = new UpdateState(options.findUpdates, options.pins);
+    this.notes = new NoteState(options.notes);
+    // A note on a pin goes with it.
+    this.updates.onUnpinned = key => {
+      this.notes.set('pin', key, '');
+    };
+  }
+
+  /**
+   * Keep only the notes on what the installation still ignores or locks, and what is still pinned: what was unignored
+   * or unlocked, here or in Foundry, takes its note with it.
+   * @param overview - The installation, as just read
+   */
+  #keepHeldNotes(overview: Overview): void {
+    const locked = [
+      ...(overview.coreLocked === true ? ['core'] : []),
+      ...overview.systems.filter(({ locked: held }) => held === true).map(({ id }) => `system:${id}`),
+      ...overview.modules
+        .filter(({ module: { locked: held } }) => held === true)
+        .map(({ module: { id } }) => `module:${id}`),
+    ];
+    this.notes.keepOnly((kind, key) => {
+      if (kind === 'ignore') return isIgnored(overview, key);
+      if (kind === 'lock') return locked.includes(key);
+      return this.updates.pinnedOf(key) !== undefined;
+    });
   }
 
   /**
@@ -238,6 +270,7 @@ export class SetupState {
     try {
       const overview = await this.#options.load();
       this.overview = overview;
+      this.#keepHeldNotes(overview);
       // What a snapshot needs changes with what is installed, as does what Foundry's updater offers.
       this.snapshotSpace = null;
       this.coreTarget = null;
@@ -279,6 +312,8 @@ export class SetupState {
     } catch {
       return false;
     }
+    // A lock comes before a pin: the package is kept as it is installed, so its pin goes, with the pin's note.
+    if (lock) await this.updates.unpin(key);
     await this.refresh();
     return true;
   }
@@ -302,6 +337,8 @@ export class SetupState {
     const lockCore = this.#options.lockCore;
     if (lockCore === undefined || this.running || this.updates.locked) return false;
     lockCore(lock);
+    // As for a package locked.
+    if (lock) await this.updates.unpin('core');
     await this.refresh();
     return true;
   }

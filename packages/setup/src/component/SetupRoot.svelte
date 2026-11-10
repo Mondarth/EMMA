@@ -5,6 +5,7 @@
 -->
 <script lang="ts">
   import { coreRefusal } from '../app/core-refusal';
+  import type { NoteKind } from '../app/notes.svelte';
   import type { SetupState } from '../app/setup-state.svelte';
   import type { Layout } from '../foundry/preferences';
   import { readLayout, writeLayout } from '../foundry/preferences';
@@ -19,7 +20,7 @@
   import { ignoredItems, linkOf, lockedItems } from '../lib/held';
   import { isIgnored } from '../lib/overview';
   import type { TreeRow, TreeSelection } from '../lib/tree';
-  import { ROOT, allRows, ignoreKeyOf, rowFor } from '../lib/tree';
+  import { ROOT, allRows, ignoreKeyOf, packageOf, rowFor } from '../lib/tree';
   import GroupPanel from './GroupPanel.svelte';
   import InstallationTree from './InstallationTree.svelte';
   import ModulePanel from './ModulePanel.svelte';
@@ -268,6 +269,50 @@
     return version === undefined ? undefined : updates.latestKnown(key, version);
   }
 
+  /**
+   * The note field's note and keeping, for an item held: none where notes cannot be kept.
+   * @param kind - What the note is on: the item ignored, locked or pinned
+   * @param key - The item's key
+   * @returns The note, and how to keep it
+   */
+  function noteFor(kind: NoteKind, key: string) {
+    if (!setup.notes.canKeep) return undefined;
+    return {
+      text: setup.notes.of(kind, key),
+      onSave: (text: string) => {
+        setup.notes.set(kind, key, text);
+      },
+    };
+  }
+
+  /**
+   * An item's note, as the root's lists take it.
+   * @param kind - What the note is on
+   * @param key - The item's key
+   * @returns The note, if there is one
+   */
+  function withNote(kind: NoteKind, key: string): { note?: string } {
+    const note = setup.notes.of(kind, key);
+    return note === undefined ? {} : { note };
+  }
+
+  /**
+   * The notes on what a row of the tree shows, as it is held: why it is ignored, locked or pinned, in that order.
+   * @param row - The row
+   * @returns The notes
+   */
+  function notesOf(row: TreeRow): string[] {
+    const ignoreKey = ignoreKeyOf(row.selection);
+    const key = packageOf(row.selection);
+    return [
+      row.ignored === true && ignoreKey !== undefined ? setup.notes.of('ignore', ignoreKey) : undefined,
+      row.locked === true && key !== undefined ? setup.notes.of('lock', key) : undefined,
+      key !== undefined && row.installed === true && updates.pinnedOf(key) !== undefined
+        ? setup.notes.of('pin', key)
+        : undefined,
+    ].filter(note => note !== undefined);
+  }
+
   // What is selected, if it is still there: after reading again, a world may have gone.
   const world = $derived(
     selection.kind === 'world' ? overview?.worlds.find(({ world: { id } }) => id === selection.world) : undefined,
@@ -286,6 +331,7 @@
       locked={pkg.locked === true}
       disabled={updates.locked || setup.running}
       busy={updates.busy.activityOf(`lock:${key}`)}
+      note={noteFor('lock', key)}
       onLock={(locking: boolean) => {
         void updates.busy.run(`lock:${key}`, 'locking', () => setup.setLocked(key, locking));
       }} />
@@ -298,6 +344,7 @@
       {title}
       world={key.startsWith('world:')}
       ignored={isIgnored(overview, key)}
+      note={noteFor('ignore', key)}
       disabled={updates.locked || setup.running}
       busy={updates.busy.activityOf(`ignore:${key}`)}
       onIgnore={(ignoring: boolean) => {
@@ -362,6 +409,7 @@
           locked={overview.coreLocked === true}
           disabled={updates.locked || setup.running}
           busy={updates.busy.activityOf('lock:core')}
+          note={noteFor('lock', 'core')}
           onLock={(locking: boolean) => {
             void updates.busy.run('lock:core', 'locking', () => setup.setCoreLocked(locking));
           }} />
@@ -392,6 +440,7 @@
           title: updates.titleOf(key),
           version,
           link: linkOf(key),
+          ...withNote('pin', key),
           // Why the plan leaves it out, with the resolver's explanation of a conflict.
           ...(unmet !== undefined && {
             problem:
@@ -405,8 +454,12 @@
         void updates.busy.run(`pin:${key}`, 'planning', () => updates.unpin(key));
       }}
       pinBusy={(key: string) => updates.busy.activityOf(`pin:${key}`)}
-      locked={lockedItems(overview).filter(({ key }) => (key === 'core' ? setup.canLockCore : setup.canLock))}
-      ignored={setup.canIgnore ? ignoredItems(overview) : []}
+      locked={lockedItems(overview)
+        .filter(({ key }) => (key === 'core' ? setup.canLockCore : setup.canLock))
+        .map(item => ({ ...item, ...withNote('lock', item.key) }))}
+      ignored={setup.canIgnore
+        ? ignoredItems(overview).map(item => ({ ...item, ...withNote('ignore', item.key) }))
+        : []}
       disabled={updates.locked || setup.running}
       busy={(key: string, locking: boolean) => updates.busy.activityOf(`${locking ? 'lock' : 'ignore'}:${key}`)}
       onUnlock={(key: string) => {
@@ -428,7 +481,7 @@
 {#snippet pin(key: string)}
   {@const version = pinVersionOf(key)}
   {#if version !== undefined && updates.status === 'found'}
-    <PinSection {updates} {key} title={updates.titleOf(key)} {version} />
+    <PinSection {updates} {key} title={updates.titleOf(key)} {version} note={noteFor('pin', key)} />
   {/if}
 {/snippet}
 
@@ -464,6 +517,7 @@
           {overview}
           {updates}
           pending={pendingNow()}
+          {notesOf}
           selected={selected.key}
           onSelect={(row: TreeRow) => {
             selected = { key: row.key, selection: row.selection };
@@ -569,6 +623,7 @@
             {coreBlocked}
             run={setup.shownRun}
             onOpen={openLink}
+            pinNoteOf={(key: string) => setup.notes.of('pin', key)}
             acknowledged={setup.alphaAcknowledged}
             onAcknowledge={() => {
               setup.acknowledgeAlpha();

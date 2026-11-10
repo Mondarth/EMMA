@@ -11,6 +11,7 @@
 
   import ActionItem from './ActionItem.svelte';
   import BusyMark from './BusyMark.svelte';
+  import NoteField from './NoteField.svelte';
 
   interface Props {
     /** The package's title. */
@@ -27,9 +28,11 @@
     core?: boolean;
     /** What EMMA is busy with because of this section's button, shown over it; nothing by default. */
     busy?: Activity | undefined;
+    /** The user's note on it, while it is held, if notes can be kept: the note, and how to keep it. */
+    note?: { readonly text: string | undefined; readonly onSave: (text: string) => void } | undefined;
   }
 
-  let { title, version, locked, disabled, onLock, core = false, busy }: Props = $props();
+  let { title, version, locked, disabled, onLock, core = false, busy, note }: Props = $props();
   const said = $derived(
     core ? (locked ? 'Lock.CoreLocked' : 'Lock.CoreUnlocked') : locked ? 'Lock.Locked' : 'Lock.Unlocked',
   );
@@ -50,8 +53,14 @@
   </button>
 {/snippet}
 
+{#snippet noted()}
+  {#if note !== undefined && locked}
+    <NoteField note={note.text} label={format('Note.Lock', { title })} {disabled} onSave={note.onSave} />
+  {/if}
+{/snippet}
+
 {#snippet about()}
   <p>{format(said, { title, version })}</p>
 {/snippet}
 
-<ActionItem label={localize('Lock.Heading')} {button} {about} />
+<ActionItem label={localize('Lock.Heading')} {button} {about} note={noted} />

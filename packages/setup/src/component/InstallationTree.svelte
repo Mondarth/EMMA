@@ -34,9 +34,11 @@
     pending?: readonly PendingPackage[];
     /** A row to open the tree to and select, as a panel's name links to it; a new object each time. */
     reveal?: { readonly key: string } | null;
+    /** The user's notes on what a row shows, as it is ignored, locked or pinned; none without. */
+    notesOf?: ((row: TreeRow) => readonly string[]) | undefined;
   }
 
-  let { overview, selected, onSelect, updates, pending = [], reveal: revealing = null }: Props = $props();
+  let { overview, selected, onSelect, updates, pending = [], reveal: revealing = null, notesOf }: Props = $props();
 
   // A column for the red arrows only once there are any, so that the tree is no wider without.
   const anyBlocked = $derived((updates?.search?.blocked.size ?? 0) > 0);
@@ -311,6 +313,12 @@
             }} />
         {/if}
         <span class="emma-tree-title">{row.title}</span>
+        {#each notesOf?.(row) ?? [] as note, index (index)}
+          <span class="emma-tree-note" data-tooltip={note}>
+            <span aria-hidden="true">[{note}]</span>
+            <span class="emma-visually-hidden">, {format('Note.Tree', { note })}</span>
+          </span>
+        {/each}
         {#if row.ignored}
           <span class="emma-visually-hidden">, {localize('Ignore.Tree')}</span>
         {/if}
@@ -507,6 +515,18 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+
+  /* A note, muted, after the title it is on; cut short, with the whole of it in its tooltip. */
+  .emma-tree-note {
+    flex: 0 1 auto;
+    min-width: 2rem;
+    max-width: 14rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.85em;
+    opacity: 0.7;
   }
 
   .emma-tree-title {

@@ -36,6 +36,8 @@
     onAcknowledge?: (() => void) | undefined;
     /** Open the tree to a package's row, and select it, as its name in the plan is clicked. */
     onOpen?: ((link: TreeSelection) => void) | undefined;
+    /** The user's note on a package's pin, shown beside the pin; none without. */
+    pinNoteOf?: ((key: string) => string | undefined) | undefined;
   }
 
   let {
@@ -48,6 +50,7 @@
     acknowledged = true,
     onAcknowledge,
     onOpen,
+    pinNoteOf,
   }: Props = $props();
 
   /**
@@ -360,6 +363,10 @@
                   <span class="emma-visually-hidden">{notNewest}</span>
                 {/if}
                 <PinToggle {updates} key={choice.key} title={updates.titleOf(choice.key)} version={choice.chosen} />
+                {#if updates.pinnedOf(choice.key) !== undefined && pinNoteOf?.(choice.key) !== undefined}
+                  {@const note = pinNoteOf(choice.key)}
+                  <span class="emma-plan-note" data-tooltip={note}>[{note}]</span>
+                {/if}
               </span>
             {/if}
             {#if choice.by !== undefined}
@@ -646,6 +653,13 @@
     display: inline-flex;
     align-items: center;
     gap: 0.15rem;
+    white-space: nowrap;
+  }
+
+  /* The note on a pin, beside it, as the tree shows it. */
+  .emma-plan-note {
+    font-size: 0.85em;
+    opacity: 0.7;
     white-space: nowrap;
   }
 

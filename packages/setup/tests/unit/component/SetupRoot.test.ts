@@ -404,6 +404,52 @@ describe('ignoring', () => {
     });
   });
 
+  test('takes a note on what is ignored, beside it in the tree, which goes when it stops being ignored', async () => {
+    const ignored = new Set<string>();
+    let kept: Record<string, string> = {};
+    const setup = new SetupState({
+      load: () =>
+        Promise.resolve(
+          buildOverview(
+            { ...installation({ worlds: [{ id: 'a', title: 'Alpha', system: 'dnd5e' }] }), ignored: [...ignored] },
+            new Map(),
+          ),
+        ),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: noUpdates,
+      installModule: noInstall,
+      ignore: (key: string, on: boolean) => {
+        if (on) ignored.add(key);
+        else ignored.delete(key);
+      },
+      notes: {
+        read: () => kept,
+        write: notes => {
+          kept = { ...notes };
+        },
+      },
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    const user = userEvent.setup();
+    await user.click(row(/^Alpha/));
+    await user.click(screen.getByRole('button', { name: 'Ignore Alpha' }));
+
+    const field = await screen.findByRole('textbox', { name: 'Note on ignoring Alpha' });
+    await user.type(field, 'Finished campaign');
+    // Kept as it is left.
+    field.blur();
+    expect(kept).toEqual({ 'ignore:world:a': 'Finished campaign' });
+    expect(row(/^Alpha/)).toHaveTextContent('Alpha [Finished campaign]');
+
+    await user.click(screen.getByRole('button', { name: 'Stop ignoring Alpha' }));
+    await vi.waitFor(() => {
+      expect(kept).toEqual({});
+    });
+    expect(row(/^Alpha/)).not.toHaveTextContent('Finished campaign');
+  });
+
   test('is not offered where it cannot be kept', async () => {
     const { user } = await setUp();
     expect(screen.queryByRole('group', { name: 'Ignore' })).toBeNull();
