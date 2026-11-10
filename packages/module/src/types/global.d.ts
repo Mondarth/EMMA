@@ -22,6 +22,7 @@ declare module 'fvtt-types/configuration' {
     'mondarth-emma.grouped': boolean;
     'mondarth-emma.badgeChecks': 'emma' | 'foundry';
     'mondarth-emma.hypotheticalIgnored': string[];
+    'mondarth-emma.hypotheticalNotes': Record<string, string>;
     'mondarth-emma.startupChanges': 'none' | 'dialog' | 'chat' | 'both';
   }
 }

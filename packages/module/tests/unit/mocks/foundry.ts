@@ -365,6 +365,8 @@ export function createFoundryNamespaceMock() {
   // Resolves as a dismissed dialog does, unless a test says otherwise.
   const confirm = vi.fn((_config?: object): Promise<boolean | null> => Promise.resolve(null));
   const prompt = vi.fn((_config?: object): Promise<unknown> => Promise.resolve(null));
+  // Dismissed, unless a test answers it.
+  const input = vi.fn((_config?: object): Promise<unknown> => Promise.resolve(null));
   // Foundry removes every tag and attribute it does not allow; removing scripts is enough to see it was called. The
   // HTML is parsed rather than matched with a regular expression, which cannot reliably find script elements.
   const cleanHTML = vi.fn((raw: string): string => {
@@ -436,7 +438,7 @@ export function createFoundryNamespaceMock() {
 
   return {
     applications: {
-      api: { ApplicationV2: ApplicationV2Mock, DialogV2: { confirm, prompt } },
+      api: { ApplicationV2: ApplicationV2Mock, DialogV2: { confirm, prompt, input } },
       apps: { FilePicker: { implementation: { browse, upload } } },
       settings: { SettingsConfig: { reloadConfirm } },
       // Foundry's context menu, recorded: its container, selector, entries and options.
@@ -484,6 +486,8 @@ export function createFoundryNamespaceMock() {
     confirm,
     /** `DialogV2.prompt`, which tells the user something, with one button. */
     prompt,
+    /** `DialogV2.input`, which asks the user for a form's values. */
+    input,
     /** `utils.cleanHTML`, which makes HTML safe to insert. */
     cleanHTML,
     /** `packages.Module.getVersionBadge`, which gives the badge for a package's availability. */

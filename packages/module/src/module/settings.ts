@@ -5,7 +5,7 @@ import type { DrawerField } from '@module/state/drawer-fields.svelte';
 import { DEFAULT_DRAWER_FIELDS, DRAWER_FIELDS, drawerFields, isDrawerField } from '@module/state/drawer-fields.svelte';
 import type { BadgeChecks } from '@module/state/badge-checks.svelte';
 import { setBadgeChecks } from '@module/state/badge-checks.svelte';
-import { setIgnoredModules } from '@module/state/hypothetical-ignored.svelte';
+import { setIgnoredModules, setIgnoredNotes } from '@module/state/hypothetical-ignored.svelte';
 
 /** Keys of the settings EMMA registers, without the module namespace. */
 export const SETTINGS = {
@@ -21,6 +21,8 @@ export const SETTINGS = {
   grouped: 'grouped',
   /** The IDs of the modules hypothetical mode ignores, shared by the world's GMs. */
   hypotheticalIgnored: 'hypotheticalIgnored',
+  /** The GMs' notes on the modules hypothetical mode ignores, by module ID, shared as the modules ignored are. */
+  hypotheticalNotes: 'hypotheticalNotes',
   /** Whose checks the badges outside hypothetical mode show: EMMA's, or Foundry's own. */
   badgeChecks: 'badgeChecks',
   /** How many versions before the one installed hypothetical mode offers, and its reports consider. */
@@ -96,6 +98,17 @@ export function registerSettings(): void {
     // Every GM's open window follows the change, wherever it was made.
     onChange: value => {
       setIgnoredModules(toModuleIds(value));
+    },
+  });
+
+  game.settings.register(MODULE_ID, SETTINGS.hypotheticalNotes, {
+    scope: 'world',
+    config: false,
+    type: Object,
+    default: {},
+    // As for the modules ignored.
+    onChange: value => {
+      setIgnoredNotes(toNotes(value));
     },
   });
 
@@ -314,4 +327,43 @@ export async function setHypotheticallyIgnored(id: string, ignored: boolean): Pr
   if (ignored) ids.add(id);
   else ids.delete(id);
   await game.settings.set(MODULE_ID, SETTINGS.hypotheticalIgnored, [...ids].sort());
+  // A note goes with what it is on.
+  if (!ignored) await setHypotheticalNote(id, '');
+}
+
+/** The longest a note may be, in characters. */
+export const MAX_NOTE_LENGTH = 200;
+
+/**
+ * Notes as the setting may hold them: an object of text by module ID, the rest left out.
+ * @param value - What the setting holds
+ * @returns The notes
+ */
+function toNotes(value: unknown): Record<string, string> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1] !== ''),
+  );
+}
+
+/**
+ * The GMs' notes on the modules hypothetical mode ignores.
+ * @returns The notes, by module ID
+ */
+export function getHypotheticalNotes(): Record<string, string> {
+  return toNotes(game.settings.get(MODULE_ID, SETTINGS.hypotheticalNotes));
+}
+
+/**
+ * Keep a note on a module hypothetical mode ignores, without the space around it and no longer than a note may be, or
+ * remove it, for empty text. Nothing is written when it is as kept.
+ * @param id - The module ID
+ * @param text - The note
+ */
+export async function setHypotheticalNote(id: string, text: string): Promise<void> {
+  const notes = getHypotheticalNotes();
+  const note = text.trim().slice(0, MAX_NOTE_LENGTH).trim();
+  if ((notes[id] ?? '') === note) return;
+  const rest = Object.fromEntries(Object.entries(notes).filter(([other]) => other !== id));
+  await game.settings.set(MODULE_ID, SETTINGS.hypotheticalNotes, note === '' ? rest : { ...rest, [id]: note });
 }

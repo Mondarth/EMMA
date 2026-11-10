@@ -688,6 +688,71 @@ describe('openEmma', () => {
       });
     });
 
+    test('offers a note on a module once it is ignored, asking for it, and keeping it for the world', async () => {
+      const { entries, row, game, foundry } = await menu({
+        settings: { 'mondarth-emma.hypotheticalIgnored': ['dice'], 'mondarth-emma.hypotheticalNotes': { dice: 'Old' } },
+      });
+      const note = entries[2];
+      expect(note?.label).toBe('MONDARTH-EMMA.Ignore.Note');
+      expect(shows(note, row)).toBe(true);
+      const other = document.createElement('li');
+      other.dataset['moduleId'] = 'other';
+      expect(shows(note, other)).toBe(false);
+
+      foundry.input.mockResolvedValueOnce({ note: '  No manifest to read  ' });
+      void note?.onClick?.(new PointerEvent('click'), row);
+      await vi.waitFor(() => {
+        expect(game.settings.get('mondarth-emma', 'hypotheticalNotes')).toEqual({ dice: 'No manifest to read' });
+      });
+      // It asks with the note kept, which it shows in its field.
+      const [config] = foundry.input.mock.calls[0] ?? [];
+      expect(config).toMatchObject({
+        window: { title: 'MONDARTH-EMMA.Ignore.NoteTitle {"module":"Dice So Nice!"}' },
+        rejectClose: false,
+      });
+      expect((config as { content: string }).content).toContain('value="Old"');
+
+      // Dismissed, it changes nothing; emptied, the note goes.
+      foundry.input.mockResolvedValueOnce(null);
+      await note?.onClick?.(new PointerEvent('click'), row);
+      expect(game.settings.get('mondarth-emma', 'hypotheticalNotes')).toEqual({ dice: 'No manifest to read' });
+      foundry.input.mockResolvedValueOnce({ note: '' });
+      void note?.onClick?.(new PointerEvent('click'), row);
+      await vi.waitFor(() => {
+        expect(game.settings.get('mondarth-emma', 'hypotheticalNotes')).toEqual({});
+      });
+    });
+
+    test('asks of a module with no note, or one not installed, by its ID, and keeps only text', async () => {
+      const { entries, game, foundry } = await menu({ settings: { 'mondarth-emma.hypotheticalIgnored': ['ghost'] } });
+      const ghost = document.createElement('li');
+      ghost.dataset['moduleId'] = 'ghost';
+
+      foundry.input.mockResolvedValueOnce({ note: 7 });
+      await entries[2]?.onClick?.(new PointerEvent('click'), ghost);
+      const [config] = foundry.input.mock.calls[0] ?? [];
+      expect(config).toMatchObject({ window: { title: 'MONDARTH-EMMA.Ignore.NoteTitle {"module":"ghost"}' } });
+      expect((config as { content: string }).content).toContain('value=""');
+      expect(game.settings.get('mondarth-emma', 'hypotheticalNotes')).toEqual({});
+    });
+
+    test('takes the note away with the ignore, and says so when a note cannot be saved', async () => {
+      const { entries, row, game, foundry, ui } = await menu({
+        settings: { 'mondarth-emma.hypotheticalIgnored': ['dice'], 'mondarth-emma.hypotheticalNotes': { dice: 'Why' } },
+      });
+      void entries[1]?.onClick?.(new PointerEvent('click'), row);
+      await vi.waitFor(() => {
+        expect(game.settings.get('mondarth-emma', 'hypotheticalNotes')).toEqual({});
+      });
+
+      vi.spyOn(game.settings, 'set').mockRejectedValueOnce(new Error('offline'));
+      foundry.input.mockResolvedValueOnce({ note: 'Again' });
+      void entries[2]?.onClick?.(new PointerEvent('click'), row);
+      await vi.waitFor(() => {
+        expect(ui.notifications.error).toHaveBeenCalledWith('MONDARTH-EMMA.Errors.IgnoreFailed');
+      });
+    });
+
     test('is not given to a player, who has no hypothetical mode', async () => {
       const { ContextMenu } = await menu({ isGM: false });
 
