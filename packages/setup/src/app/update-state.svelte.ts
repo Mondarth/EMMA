@@ -846,8 +846,11 @@ export class UpdateState {
     key: PackageKey,
   ): Promise<{ title: string; version: string }[]> {
     const remove: { title: string; version: string }[] = [];
+    // A completion for each choice: drawn between them, as one can take most of a second on a large installation.
+    const pace = paced();
     for (const [other, to] of picks) {
       if (other === key) continue;
+      await pace();
       if ((await planner.complete(withChoice(picks, other, null))).ok) {
         // A pin says so, as it is unpinned to take it out.
         const title = planner.titleOf(other);
