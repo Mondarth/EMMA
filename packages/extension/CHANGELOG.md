@@ -1,3 +1,14 @@
+## [0.8.0](https://github.com/Mondarth/EMMA/compare/extension-v0.7.1...extension-v0.8.0) (2026-11-10)
+
+### Features
+
+* **setup:** show a pin's note beside it on its line in the plan ([0099820](https://github.com/Mondarth/EMMA/commit/009982064c9a331392ca2a675fd916c072627ddf))
+* **setup:** take a note on what is pinned, locked or ignored ([3b80062](https://github.com/Mondarth/EMMA/commit/3b80062af64b09c57dd94e0767d90c3564d8d1f6))
+
+### Bug Fixes
+
+* **setup:** unpin a package on locking it, so a lock comes first ([2d187ca](https://github.com/Mondarth/EMMA/commit/2d187ca8f8296b4aac113d5c1f631f4763bc2736))
+
 ## [0.7.1](https://github.com/Mondarth/EMMA/compare/extension-v0.7.0...extension-v0.7.1) (2026-11-10)
 
 ### Performance Improvements
