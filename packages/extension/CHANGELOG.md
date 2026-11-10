@@ -1,3 +1,9 @@
+## [0.7.1](https://github.com/Mondarth/EMMA/compare/extension-v0.7.0...extension-v0.7.1) (2026-11-10)
+
+### Performance Improvements
+
+* **setup:** keep the search, and its planner, when nothing changed ([d3acf70](https://github.com/Mondarth/EMMA/commit/d3acf7013662efb95ff687d7a0bb482f102c0f12))
+
 ## [0.7.0](https://github.com/Mondarth/EMMA/compare/extension-v0.6.1...extension-v0.7.0) (2026-11-08)
 
 ### Features
