@@ -497,6 +497,13 @@ needs it changed is not either, and it cannot be uninstalled.
 wrapping only where the panel is too narrow. Each button names what it does; the **ⓘ** beside it shows, or hides again,
 what that is, hidden at first. Only why an uninstall is refused shows always, below its button.
 
+**Notes:** what you pin, lock or ignore can carry a note, such as why: once it is pinned, locked or ignored, a
+**Note (optional)** field shows under its button. A note is kept when you leave the field or press Enter, Escape puts
+back what was kept, and emptying it removes it; it is up to 200 characters. It shows in `[]` after the item's title in the
+tree, and in the root's **Pinned**, **Locked** and **Ignored** lists, its whole text in its tooltip. An item both locked
+and ignored has a note for each. A note goes with what it is on: unpinning, unlocking or no longer ignoring the item
+removes it, even when it is unlocked in Foundry rather than in EMMA. The browser keeps the notes for that server.
+
 The panel of each installed game system and module has a **Lock** action: **Lock <title> at <version>**, or **Unlock
 <title>**, which locks or unlocks it in Foundry at once, as Foundry's own package menu does, and reads the installation
 again. A choice of the package in the plan goes once it is locked.

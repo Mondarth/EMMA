@@ -13,6 +13,9 @@ import {
   PENDING_PLAN_KEY,
   CORE_LOCK_KEY,
   IGNORED_KEY,
+  NOTES_KEY,
+  readNotes,
+  writeNotes,
   OWNED_FOR_MS,
   OWNED_KEY,
   readOwnedKept,
@@ -107,6 +110,38 @@ describe('limiting the best versions to what worlds use', () => {
     expect(readBestInUseOnly()).toBe(false);
     expect(() => {
       writeBestInUseOnly(true);
+    }).not.toThrow();
+  });
+});
+
+describe("the user's notes", () => {
+  test('are none until one is written, and are kept, as none once all go', () => {
+    expect(readNotes()).toEqual({});
+    writeNotes({ 'ignore:module:a': 'Its manifest is wrong' });
+    expect(readNotes()).toEqual({ 'ignore:module:a': 'Its manifest is wrong' });
+    writeNotes({});
+    expect(localStorage.getItem(NOTES_KEY)).toBeNull();
+  });
+
+  test('are none when what is kept is not notes, and keep only the notes that are text', () => {
+    localStorage.setItem(NOTES_KEY, '["a"]');
+    expect(readNotes()).toEqual({});
+    localStorage.setItem(NOTES_KEY, 'null');
+    expect(readNotes()).toEqual({});
+    localStorage.setItem(NOTES_KEY, 'not json');
+    expect(readNotes()).toEqual({});
+    localStorage.setItem(NOTES_KEY, '{"lock:core":"Stay on 13","pin:module:a":2,"ignore:world:b":""}');
+    expect(readNotes()).toEqual({ 'lock:core': 'Stay on 13' });
+  });
+
+  test('are none, and are not kept, when the storage refuses', () => {
+    const blocked = () => {
+      throw new DOMException('Access denied', 'SecurityError');
+    };
+    vi.stubGlobal('localStorage', { getItem: blocked, setItem: blocked, removeItem: blocked });
+    expect(readNotes()).toEqual({});
+    expect(() => {
+      writeNotes({ 'lock:core': 'x' });
     }).not.toThrow();
   });
 });

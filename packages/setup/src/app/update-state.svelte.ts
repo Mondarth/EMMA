@@ -220,6 +220,8 @@ export class UpdateState {
   readonly #pinProblems = new SvelteMap<PackageKey, PinProblem>();
   /** Where the pins are kept. */
   readonly #pinStore: PinStore | undefined;
+  /** Told of each package unpinned, as its note goes with its pin. */
+  onUnpinned: ((key: PackageKey) => void) | undefined;
   /** The titles of the packages installed anew, as Foundry's listing gives them, by package key. */
   readonly #named = new SvelteMap<PackageKey, string>();
   /** The titles of every package on Foundry's listing, once read, by package key, to name any not installed by. */
@@ -423,6 +425,7 @@ export class UpdateState {
     const version = this.#pins.get(key);
     if (version === undefined || this.locked) return false;
     this.#pins.delete(key);
+    this.onUnpinned?.(key);
     this.#pinProblems.delete(key);
     this.#keepPins();
     this.changes++;

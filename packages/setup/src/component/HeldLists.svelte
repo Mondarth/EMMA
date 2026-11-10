@@ -41,6 +41,13 @@
   const uid = $props.id();
 </script>
 
+<!-- The user's note on an item, after its title, as the tree shows it. -->
+{#snippet noted(note: string | undefined)}
+  {#if note !== undefined}
+    <span class="emma-held-note" data-tooltip={note}>[{note}]</span>
+  {/if}
+{/snippet}
+
 {#snippet list(id: string, heading: string, items: readonly HeldItem[], lock: boolean)}
   {#if items.length > 0}
     <div class="emma-held-list">
@@ -52,7 +59,10 @@
           {@const activity = busy(item.key, lock)}
           {@const label = format(lock ? 'Held.Unlock' : 'Held.Unignore', { title: item.title })}
           <li>
-            <span class="emma-held-title"><TreeLink title={item.title} link={item.link} {onOpen} /></span>
+            <span class="emma-held-title">
+              <TreeLink title={item.title} link={item.link} {onOpen} />
+              {@render noted(item.note)}
+            </span>
             <button
               type="button"
               class="emma-held-toggle emma-busy-host"
@@ -88,6 +98,7 @@
             <span class="emma-held-title">
               <TreeLink title={item.title} link={item.link} {onOpen} />
               <span class="emma-held-version">{item.version}</span>
+              {@render noted(item.note)}
               {#if item.problem !== undefined}
                 <span class="emma-visually-hidden">{item.problem}</span>
               {/if}
@@ -124,6 +135,11 @@
 {/if}
 
 <style>
+  .emma-held-note {
+    font-size: 0.85em;
+    opacity: 0.7;
+  }
+
   .emma-held-box {
     container-type: inline-size;
     margin: 0.5rem 0 0.75rem;

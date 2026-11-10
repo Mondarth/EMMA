@@ -11,6 +11,7 @@ import {
   readAlphaAcknowledged,
   readBestInUseOnly,
   readCoreLocked,
+  readNotes,
   readPins,
   readIgnored,
   readGuardOn,
@@ -21,6 +22,7 @@ import {
   writeCoreLocked,
   writePins,
   writeIgnored,
+  writeNotes,
   writeGuardOn,
   writeOwnedKept,
   writePendingPlan,
@@ -135,6 +137,7 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
     lockCore: writeCoreLocked,
     pins: { initial: readPins(), keep: writePins },
     ignore: writeIgnored,
+    notes: { read: readNotes, write: writeNotes },
     bestInUseOnly: readBestInUseOnly(),
     onBestInUseOnlyChange: writeBestInUseOnly,
     findUpdates: async overview => {

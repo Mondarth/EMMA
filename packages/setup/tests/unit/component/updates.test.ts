@@ -2143,6 +2143,70 @@ describe('locking a package', () => {
   });
 });
 
+describe('notes on what is held', () => {
+  test('are written under a lock, shown in the tree and the root lists, and go when it is unlocked', async () => {
+    let locked = false;
+    let kept: Record<string, string> = {};
+    const overviewOf = () =>
+      buildOverview(
+        installation({
+          worlds: [{ id: 'a', title: 'Alpha', system: 'dnd5e' }],
+          modules: [{ ...installedModule('lib', 'Library', '1.0.0'), ...(locked && { locked: true as const }) }],
+        }),
+        new Map([['a', recorded(record('a', { modules: [{ id: 'lib', title: 'Library', version: '1.0.0' }] }))]]),
+      );
+    const setup = new SetupState({
+      load: () => Promise.resolve(overviewOf()),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: findingBlocked(),
+      installModule: noInstall,
+      lockPackage: (_type, _id, lock) => {
+        locked = lock;
+        return Promise.resolve();
+      },
+      notes: {
+        read: () => kept,
+        write: notes => {
+          kept = { ...notes };
+        },
+      },
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    const user = userEvent.setup();
+    const toggle = row(/Universal/).querySelector('.emma-tree-toggle');
+    if (toggle === null) throw new Error('No universal group to open');
+    await user.click(toggle);
+    await user.click(within(row(/Library 1\.0\.0/)).getByText('Library'));
+    // No note until it is locked.
+    expect(screen.queryByRole('textbox', { name: 'Note on locking Library' })).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Lock Library at 1.0.0' }));
+    const field = await screen.findByRole('textbox', { name: 'Note on locking Library' });
+    await user.type(field, '  Breaks at 2.0  {Enter}');
+
+    expect(kept).toEqual({ 'lock:module:lib': 'Breaks at 2.0' });
+    // Beside its title in the tree, as everywhere the locked module shows.
+    const selected = screen.getByRole('treeitem', { selected: true });
+    expect(selected).toHaveTextContent(/Library \[Breaks at 2\.0\]/);
+    expect(selected).toHaveAccessibleName(/Note: Breaks at 2\.0/);
+    // Escape puts back what was kept.
+    await user.type(field, ' or later{Escape}');
+    expect(field).toHaveValue('Breaks at 2.0');
+    expect(kept).toEqual({ 'lock:module:lib': 'Breaks at 2.0' });
+
+    await user.click(within(row(/^Foundry VTT/)).getByText(/Foundry VTT/));
+    expect(screen.getByRole('group', { name: 'Locked and ignored' })).toHaveTextContent('Library [Breaks at 2.0]');
+
+    await user.click(screen.getByRole('button', { name: 'Unlock Library' }));
+    await vi.waitFor(() => {
+      expect(kept).toEqual({});
+    });
+    expect(screen.queryByText('[Breaks at 2.0]')).toBeNull();
+  });
+});
+
 describe('locking Foundry VTT in EMMA', () => {
   test('locks and unlocks it from the root panel, reading the installation again, and marks it in the tree', async () => {
     let locked = false;

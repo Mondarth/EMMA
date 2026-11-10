@@ -7,7 +7,7 @@ import type { Overview } from '../../../src/lib/overview';
 import { buildOverview } from '../../../src/lib/overview';
 import type { RunStep } from '../../../src/lib/run';
 import type { PackageUpdate } from '../../../src/lib/updates';
-import { alone, installation, noInstall, noUpdates, unjudged } from '../../mocks/fixtures';
+import { alone, installation, installedModule, noInstall, noUpdates, unjudged } from '../../mocks/fixtures';
 
 const OVERVIEW = buildOverview(installation(), new Map());
 
@@ -771,6 +771,61 @@ describe('SetupState', () => {
       expect(setup.resumed).toBeNull();
       expect(setup.savedPlan).toBeNull();
       expect(keepPendingPlan).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe('the notes on what is held', () => {
+  test("keep only those on what is still ignored, locked or pinned when the installation is read, and a pin's with it", async () => {
+    let kept: Record<string, string> = {
+      'ignore:world:gone': 'An old campaign',
+      'ignore:module:dice': 'Rolls wrongly',
+      'lock:core': 'Stay on this build',
+      'lock:module:lib': 'Breaks at 2',
+      'pin:module:dice': 'Waiting for 2.1',
+      'pin:system:dnd5e': 'Not pinned now',
+      'lock:system:dnd5e': 'Waiting for the module',
+    };
+    const overview = buildOverview(
+      {
+        ...installation({
+          systems: [{ id: 'dnd5e', title: 'D&D 5e', version: '5.3.3', locked: true }],
+          modules: [{ ...installedModule('dice', 'Dice', '1.0.0'), locked: true }],
+        }),
+        coreLocked: true,
+        ignored: ['module:dice'],
+      },
+      new Map(),
+    );
+    const setup = new SetupState({
+      load: () => Promise.resolve(overview),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: noUpdates,
+      installModule: noInstall,
+      pins: { initial: { 'module:dice': '1.0.0' }, keep: vi.fn() },
+      notes: {
+        read: () => kept,
+        write: notes => {
+          kept = { ...notes };
+        },
+      },
+    });
+
+    await setup.refresh();
+    expect(kept).toEqual({
+      'ignore:module:dice': 'Rolls wrongly',
+      'lock:core': 'Stay on this build',
+      'pin:module:dice': 'Waiting for 2.1',
+      'lock:system:dnd5e': 'Waiting for the module',
+    });
+
+    await setup.updates.unpin('module:dice');
+    expect(setup.notes.of('pin', 'module:dice')).toBeUndefined();
+    expect(kept).toEqual({
+      'ignore:module:dice': 'Rolls wrongly',
+      'lock:core': 'Stay on this build',
+      'lock:system:dnd5e': 'Waiting for the module',
     });
   });
 });

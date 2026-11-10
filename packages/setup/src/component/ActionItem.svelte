@@ -18,11 +18,13 @@
     about: Snippet;
     /** What is shown below the button always, if anything. */
     shown?: Snippet | undefined;
+    /** The user's note on what the action holds, below the button, if it can have one. */
+    note?: Snippet | undefined;
     /** Whether what the action does includes a warning, so that the information button stands out. */
     warning?: boolean;
   }
 
-  let { label, button, about, shown, warning = false }: Props = $props();
+  let { label, button, about, shown, note, warning = false }: Props = $props();
   let showing = $state(false);
 
   const uid = $props.id();
@@ -44,6 +46,7 @@
       <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
     </button>
   </div>
+  {@render note?.()}
   {#if shown !== undefined}
     <div class="emma-action-text">{@render shown()}</div>
   {/if}
