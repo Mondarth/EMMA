@@ -46,6 +46,8 @@ import { readListing } from '../foundry/listing';
 import { lookUpReleases } from '../foundry/releases';
 import { localize } from '../lib/i18n';
 import { buildOverview } from '../lib/overview';
+import { searchesOnce } from '../lib/same-search';
+import type { UpdateSearch } from '../lib/updates';
 import { findUpdates } from '../lib/updates';
 import { openEmmaSetup } from './emma-setup-app';
 import { SetupState } from './setup-state.svelte';
@@ -119,6 +121,8 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
 
   // The guard follows the state's setting, and the state tells the guard when it changes.
   const placed: { guard?: Guard } = {};
+  // A search from what the last one found is that one, and keeps what its planner learned.
+  const searchOnce = searchesOnce<UpdateSearch>();
   const setup = new SetupState({
     load: async () => {
       const installation = {
@@ -141,16 +145,19 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
         catalogue: revealCatalogue(__EMMA_DEFAULT_CATALOGUE__),
         clientVersion: __EMMA_EXTENSION_VERSION__,
       });
-      const found = await findUpdates({
-        resolver: kit.resolver,
-        badges: kit.badges,
-        overview,
-        universe,
-        load,
-        lookUp,
-        readManifest,
-        titleOf,
-      });
+      const found = await searchOnce(kit, { overview, universe }, () =>
+        findUpdates({
+          resolver: kit.resolver,
+          badges: kit.badges,
+          overview,
+          universe,
+          load,
+          lookUp,
+          readManifest,
+          titleOf,
+        }),
+      );
+      // The catalogue's state is the one just found: when it last checked, and what it is fetching.
       return { ...found, catalogue };
     },
     installModule: async () => {
