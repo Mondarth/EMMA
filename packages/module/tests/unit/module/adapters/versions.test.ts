@@ -6,6 +6,7 @@ import { AVAILABILITY } from '@mondarth/fvtt-resolver';
 import { createInstalledJudge, createVersionJudge, incompatibleModules } from '@module/adapters/versions';
 import type { FoundryMockOptions, ModuleMockData } from '../../mocks/foundry';
 import { installFoundryMocks } from '../../mocks/foundry';
+import { setIgnoredNotes } from '@module/state/hypothetical-ignored.svelte';
 
 // Each universe a check is given, recorded: a judgement must give only what the check reads.
 const checked = vi.hoisted(() => ({ universes: [] as { releases: readonly unknown[] }[] }));
@@ -972,6 +973,13 @@ describe('what the catalogue says of the releases', () => {
     expect(judge.reportIgnored(active, NONE)).toEqual([]);
     // One it knows no title of is named by its ID.
     expect(judge.reportIgnored(['ghost'], { modules: new Map(), ignored: new Set(['ghost']) })).toEqual(['ghost']);
+    // With the GMs' note on why, as the views show it.
+    setIgnoredNotes({ synth: 'Midi-QOL makes it' });
+    try {
+      expect(judge.reportIgnored(active, choices)).toEqual(['synth [Midi-QOL makes it]']);
+    } finally {
+      setIgnoredNotes({});
+    }
   });
 });
 

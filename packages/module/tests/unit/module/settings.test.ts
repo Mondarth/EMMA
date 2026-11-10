@@ -1,8 +1,9 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 
 import {
   getBadgeChecks,
   getDrawerFields,
+  getHypotheticalNotes,
   getHypotheticallyIgnored,
   getOlderVersions,
   getStartupChanges,
@@ -10,10 +11,12 @@ import {
   isAutoRecommended,
   isEmmaDisabled,
   isGrouped,
+  MAX_NOTE_LENGTH,
   registerGmSettings,
   registerSettings,
   setDrawerFields,
   setGrouped,
+  setHypotheticalNote,
   setHypotheticallyIgnored,
   setView,
   versionLookup,
@@ -21,7 +24,7 @@ import {
 import { obscure } from '@mondarth/emma-core/obscure';
 import { drawerFields } from '@module/state/drawer-fields.svelte';
 import { badgeChecks, setBadgeChecks } from '@module/state/badge-checks.svelte';
-import { ignoredModules } from '@module/state/hypothetical-ignored.svelte';
+import { ignoredModules, ignoredNotes } from '@module/state/hypothetical-ignored.svelte';
 import { installFoundryMocks } from '../mocks/foundry';
 
 describe('registerSettings', () => {
@@ -424,6 +427,44 @@ describe('the modules hypothetical mode ignores', () => {
     expect([...ignoredModules]).toEqual(['synth']);
     await setHypotheticallyIgnored('synth', false);
     expect([...ignoredModules]).toEqual([]);
+  });
+
+  test("keep the GMs' notes on them for the world, tidied, followed by every window, and gone with the ignore", async () => {
+    const { game } = installFoundryMocks();
+    registerSettings();
+    expect(game.settings.register).toHaveBeenCalledWith(
+      'mondarth-emma',
+      'hypotheticalNotes',
+      expect.objectContaining({ scope: 'world', config: false, type: Object, default: {} }),
+    );
+    expect(getHypotheticalNotes()).toEqual({});
+
+    await setHypotheticallyIgnored('synth', true);
+    await setHypotheticalNote('synth', '  Midi-QOL makes it  ');
+    await setHypotheticalNote('long', 'x'.repeat(MAX_NOTE_LENGTH + 9));
+    expect(getHypotheticalNotes()).toEqual({ synth: 'Midi-QOL makes it', long: 'x'.repeat(MAX_NOTE_LENGTH) });
+    expect(ignoredNotes.get('synth')).toBe('Midi-QOL makes it');
+
+    // Kept as it is, it is not written again.
+    const writes = vi.mocked(game.settings.set).mock.calls.length;
+    await setHypotheticalNote('synth', 'Midi-QOL makes it ');
+    expect(vi.mocked(game.settings.set).mock.calls.length).toBe(writes);
+
+    await setHypotheticalNote('long', '   ');
+    await setHypotheticallyIgnored('synth', false);
+    expect(getHypotheticalNotes()).toEqual({});
+    expect([...ignoredNotes]).toEqual([]);
+  });
+
+  test('read only notes that are text, by module', () => {
+    for (const kept of [['a'], 'note', null, 7]) {
+      installFoundryMocks({ settings: { 'mondarth-emma.hypotheticalNotes': kept } });
+      registerSettings();
+      expect(getHypotheticalNotes()).toEqual({});
+    }
+    installFoundryMocks({ settings: { 'mondarth-emma.hypotheticalNotes': { synth: 'Why', empty: '', number: 3 } } });
+    registerSettings();
+    expect(getHypotheticalNotes()).toEqual({ synth: 'Why' });
   });
 
   test('leave out anything that is not a module ID', () => {

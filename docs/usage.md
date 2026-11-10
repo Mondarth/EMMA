@@ -342,6 +342,12 @@ require it are satisfied, whatever version of it they ask for. Every report name
 they suit the setup is not known. It can still be activated and deactivated as usual. To have the mode consider it again,
 right-click its row and choose **Add to hypotheticals**.
 
+A GM can say why a module is ignored, for the other GMs and for later: right-click its row, while it is ignored, and
+choose **Note…**, then write the note, up to 200 characters, and **Save note**. The note shows in `[]` after the
+module's title in either view, in its tooltip, and beside its name where a report names the modules it leaves out.
+Saving an empty note removes it, and having the mode consider the module again removes its note too. The notes are kept
+for the world, as the modules ignored are.
+
 The modules ignored are shared by the world's GMs, and kept until a GM adds them back. Players are not offered the menu.
 
 ## Saving

@@ -12,23 +12,31 @@ import { saveModules } from '@module/app/save';
 import { MODULE_ID } from '@module/lib/constants';
 import { log } from '@module/lib/logger';
 import type { View } from '@module/settings';
-import { localize } from '@module/lib/i18n';
+import { format, localize } from '@module/lib/i18n';
 import { badgeChecks, setBadgeChecks } from '@module/state/badge-checks.svelte';
 import {
   getBadgeChecks,
   getDrawerFields,
+  getHypotheticalNotes,
   getHypotheticallyIgnored,
   getOlderVersions,
+  MAX_NOTE_LENGTH,
   getView,
   isAutoRecommended,
   isGrouped,
   setGrouped,
+  setHypotheticalNote,
   setHypotheticallyIgnored,
   setView,
   versionLookup,
 } from '@module/settings';
 import { drawerFields } from '@module/state/drawer-fields.svelte';
-import { ignoredModules, setIgnoredModules } from '@module/state/hypothetical-ignored.svelte';
+import {
+  ignoredModules,
+  ignoredNotes,
+  setIgnoredModules,
+  setIgnoredNotes,
+} from '@module/state/hypothetical-ignored.svelte';
 import { ModuleState } from '@module/state/module-state.svelte';
 
 /** What to ask before closing EMMA with changes staged. */
@@ -133,6 +141,7 @@ export class EmmaApp extends foundry.applications.api.ApplicationV2 {
     this.#modules = modules;
     drawerFields.set(getDrawerFields());
     setIgnoredModules(getHypotheticallyIgnored());
+    setIgnoredNotes(getHypotheticalNotes());
     setBadgeChecks(getBadgeChecks());
     this.#component = mount(EmmaRoot, {
       target: content,
@@ -258,6 +267,35 @@ function setIgnored(id: string, ignored: boolean): void {
 }
 
 /**
+ * Ask for the note on a module hypothetical mode ignores, such as why, and keep it, saying so if that cannot be saved.
+ * Cancelled, the note stays as it was; emptied, it goes.
+ * @param id - The module ID
+ */
+async function askNote(id: string): Promise<void> {
+  const field = document.createElement('input');
+  field.type = 'text';
+  field.name = 'note';
+  field.maxLength = MAX_NOTE_LENGTH;
+  field.setAttribute('value', ignoredNotes.get(id) ?? '');
+  field.setAttribute('aria-label', localize('MONDARTH-EMMA.Ignore.NoteLabel'));
+  field.setAttribute('autofocus', '');
+  const title = game.modules.get(id)?.title ?? id;
+  // The form's data, or null when it is dismissed.
+  const answer: unknown = await foundry.applications.api.DialogV2.input({
+    window: { title: format('MONDARTH-EMMA.Ignore.NoteTitle', { module: title }) },
+    content: `<p>${localize('MONDARTH-EMMA.Ignore.NoteHint')}</p>${field.outerHTML}`,
+    ok: { label: 'MONDARTH-EMMA.Ignore.NoteSave', icon: 'fa-solid fa-floppy-disk' },
+    rejectClose: false,
+  });
+  const note = typeof answer === 'object' && answer !== null ? (answer as { note?: unknown }).note : undefined;
+  if (typeof note !== 'string') return;
+  await setHypotheticalNote(id, note).catch((error: unknown) => {
+    log.error('Unable to save the note on a module hypothetical mode ignores', error);
+    ui.notifications?.error(localize('MONDARTH-EMMA.Errors.IgnoreFailed'));
+  });
+}
+
+/**
  * Give each module's row a context menu, opened with a right click, to have hypothetical mode ignore the module, or
  * stop ignoring it. The menu listens on the content, so it serves the rows the views render as they change. Only GMs
  * have hypothetical mode, and only they may change a world setting.
@@ -282,6 +320,14 @@ function attachIgnoreMenu(content: HTMLElement): void {
         visible: target => ignoredModules.has(moduleIdOf(target)),
         onClick: (_event, target) => {
           setIgnored(moduleIdOf(target), false);
+        },
+      },
+      {
+        label: 'MONDARTH-EMMA.Ignore.Note',
+        icon: '<i class="fa-solid fa-note-sticky"></i>',
+        visible: target => ignoredModules.has(moduleIdOf(target)),
+        onClick: (_event, target) => {
+          void askNote(moduleIdOf(target));
         },
       },
     ],

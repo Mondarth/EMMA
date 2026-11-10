@@ -303,7 +303,13 @@
     "Ignore": {
       "Add": "No hypotheticals",
       "Remove": "Add to hypotheticals",
-      "Tooltip": "Hypothetical mode ignores this module: it is never looked up or judged, and is taken as present for the modules that require it."
+      "Tooltip": "Hypothetical mode ignores this module: it is never looked up or judged, and is taken as present for the modules that require it.",
+      "Note": "Note…",
+      "NoteTitle": "Note on {module}",
+      "NoteHint": "Why hypothetical mode ignores this module, for the other GMs and for later. Leave it empty for no note.",
+      "NoteLabel": "Note",
+      "NoteSave": "Save note",
+      "Noted": "Note: {note}"
     },
     "Errors": {
       "OpenFailed": "EMMA could not open, so Foundry's Module Management window has been opened instead. See the console for details.",
