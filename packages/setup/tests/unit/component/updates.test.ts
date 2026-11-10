@@ -2526,6 +2526,39 @@ describe('what a module recommends, installed or not to be had', () => {
 });
 
 describe('pins in the window', () => {
+  test("show the pin's note beside it on the plan's line, and in the tree", async () => {
+    const setup = new SetupState({
+      load: () => Promise.resolve(OVERVIEW),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: findingBlocked(),
+      installModule: noInstall,
+      pins: { initial: {}, keep: vi.fn() },
+      notes: { read: () => ({}), write: vi.fn() },
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    await vi.waitFor(() => {
+      expect(setup.updates.status).toBe('found');
+    });
+    const user = userEvent.setup();
+    await setup.updates.choose('system:dnd5e', '5.4.0');
+    const plan = await screen.findByRole('region', { name: 'Update plan' });
+    const line = () => changesIn(plan).getAllByRole('row')[1] as HTMLElement;
+
+    await user.click(within(plan).getByRole('button', { name: 'Pin D&D 5e at 5.4.0' }));
+
+    // Its note, as its action's field takes it.
+    await vi.waitFor(() => {
+      expect(setup.updates.pinnedOf('system:dnd5e')).toBe('5.4.0');
+    });
+    setup.notes.set('pin', 'system:dnd5e', 'Wait for Midi');
+    await vi.waitFor(() => {
+      expect(within(line()).getByText('[Wait for Midi]')).toHaveAttribute('data-tooltip', 'Wait for Midi');
+    });
+    expect(row(/D&D 5e/)).toHaveTextContent('[Wait for Midi]');
+  });
+
   test('pin from the tree, the plan and the panel, list them under Plan Updates, and keep them as the plan is cleared', async () => {
     const keep = vi.fn();
     const setup = new SetupState({

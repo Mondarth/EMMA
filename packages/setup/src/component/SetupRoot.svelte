@@ -623,6 +623,7 @@
             {coreBlocked}
             run={setup.shownRun}
             onOpen={openLink}
+            pinNoteOf={(key: string) => setup.notes.of('pin', key)}
             acknowledged={setup.alphaAcknowledged}
             onAcknowledge={() => {
               setup.acknowledgeAlpha();
