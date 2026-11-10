@@ -117,6 +117,13 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
     return false;
   }
 
+  // Research (to-do 41): in the dev server, record the main thread's long tasks, and offer the console helpers.
+  if (import.meta.env.DEV) {
+    const research = await import('./timing');
+    research.watchLongTasks();
+    research.offerConsoleHelpers();
+  }
+
   // The guard follows the state's setting, and the state tells the guard when it changes.
   const placed: { guard?: Guard } = {};
   const setup = new SetupState({
@@ -134,23 +141,30 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
     bestInUseOnly: readBestInUseOnly(),
     onBestInUseOnlyChange: writeBestInUseOnly,
     findUpdates: async overview => {
+      // Research (to-do 41): the dev server times the resolver, the planner and the search.
+      const research = import.meta.env.DEV ? await import('./timing') : undefined;
       // The resolver comes from the installed EMMA module's setup kit, if it fits.
-      const { installed, kit } = await kitIn(game);
+      const { installed, kit: given } = await kitIn(game);
+      const kit = research === undefined ? given : { ...given, resolver: research.timedResolver(given.resolver) };
       const { universe, load, lookUp, readManifest, titleOf, catalogue } = await lookUpReleases(installed, {
         kit,
         catalogue: revealCatalogue(__EMMA_DEFAULT_CATALOGUE__),
         clientVersion: __EMMA_EXTENSION_VERSION__,
       });
-      const found = await findUpdates({
-        resolver: kit.resolver,
-        badges: kit.badges,
-        overview,
-        universe,
-        load,
-        lookUp,
-        readManifest,
-        titleOf,
-      });
+      if (research !== undefined) research.keepForDump(overview, universe);
+      const search = () =>
+        findUpdates({
+          resolver: kit.resolver,
+          badges: kit.badges,
+          overview,
+          universe,
+          load,
+          lookUp,
+          readManifest,
+          titleOf,
+        });
+      const found = research === undefined ? await search() : await research.timedSearch(search);
+      if (research !== undefined) Object.assign(found, { planner: research.timedPlanner(found.planner) });
       return { ...found, catalogue };
     },
     installModule: async () => {

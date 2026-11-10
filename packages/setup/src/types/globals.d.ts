@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 /**
  * What Vite's `define` puts in the bundle (see vite.config.ts).
  */
