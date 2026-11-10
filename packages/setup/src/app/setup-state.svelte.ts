@@ -312,6 +312,8 @@ export class SetupState {
     } catch {
       return false;
     }
+    // A lock comes before a pin: the package is kept as it is installed, so its pin goes, with the pin's note.
+    if (lock) await this.updates.unpin(key);
     await this.refresh();
     return true;
   }
@@ -335,6 +337,8 @@ export class SetupState {
     const lockCore = this.#options.lockCore;
     if (lockCore === undefined || this.running || this.updates.locked) return false;
     lockCore(lock);
+    // As for a package locked.
+    if (lock) await this.updates.unpin('core');
     await this.refresh();
     return true;
   }

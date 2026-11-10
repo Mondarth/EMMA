@@ -829,3 +829,43 @@ describe('the notes on what is held', () => {
     });
   });
 });
+
+describe('a lock and a pin', () => {
+  test('a lock comes first: locking what is pinned unpins it, with its note, a package or Foundry VTT', async () => {
+    let kept: Record<string, string> = { 'pin:module:dice': 'Waiting for 2.1', 'pin:core': 'Stay' };
+    const pins = { initial: { 'module:dice': '1.0.0', core: '14.368' }, keep: vi.fn() };
+    const setup = new SetupState({
+      load: () =>
+        Promise.resolve(
+          buildOverview(installation({ modules: [installedModule('dice', 'Dice', '1.0.0')] }), new Map()),
+        ),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: noUpdates,
+      installModule: noInstall,
+      pins,
+      lockPackage: () => Promise.resolve(),
+      lockCore: vi.fn(),
+      notes: {
+        read: () => kept,
+        write: notes => {
+          kept = { ...notes };
+        },
+      },
+    });
+    await setup.refresh();
+
+    await expect(setup.setLocked('module:dice', true)).resolves.toBe(true);
+    expect(setup.updates.pinnedOf('module:dice')).toBeUndefined();
+    expect(kept).toEqual({ 'pin:core': 'Stay' });
+
+    await expect(setup.setCoreLocked(true)).resolves.toBe(true);
+    expect(setup.updates.pinnedOf('core')).toBeUndefined();
+    expect(kept).toEqual({});
+    expect(pins.keep).toHaveBeenLastCalledWith({});
+
+    // Unlocking pins nothing again.
+    await setup.setLocked('module:dice', false);
+    expect(setup.updates.pinnedOf('module:dice')).toBeUndefined();
+  });
+});
