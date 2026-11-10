@@ -1,3 +1,9 @@
+## [0.13.0](https://github.com/Mondarth/EMMA/compare/v0.12.1...v0.13.0) (2026-11-10)
+
+### Features
+
+* **module:** take a note on a module hypothetical mode ignores ([d0b1922](https://github.com/Mondarth/EMMA/commit/d0b192235117514a17637146f61796267c07accb))
+
 ## [0.12.1](https://github.com/Mondarth/EMMA/compare/v0.12.0...v0.12.1) (2026-11-10)
 
 ### Performance Improvements
