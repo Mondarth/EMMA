@@ -1,3 +1,11 @@
+## [0.12.1](https://github.com/Mondarth/EMMA/compare/v0.12.0...v0.12.1) (2026-11-10)
+
+### Performance Improvements
+
+* **module:** run the setup kit on @mondarth/fvtt-resolver 0.11.2 ([4e37c51](https://github.com/Mondarth/EMMA/commit/4e37c51a327cc72f148e74a38d8598dadc039329))
+* **module:** run the setup kit on @mondarth/fvtt-resolver 0.11.3 ([8ca320c](https://github.com/Mondarth/EMMA/commit/8ca320c717c4b85df4ea5327b4261bbc7eacf95f))
+* **module:** run the setup kit on @mondarth/fvtt-resolver 0.11.4 ([e1cbc88](https://github.com/Mondarth/EMMA/commit/e1cbc88b7bfae4a98748738427271a8a77b00466))
+
 ## [0.12.0](https://github.com/Mondarth/EMMA/compare/v0.11.0...v0.12.0) (2026-11-07)
 
 ### Features
