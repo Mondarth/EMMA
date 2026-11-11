@@ -25,7 +25,19 @@ export interface ChromeMockOptions {
   allow?: boolean;
   /** The tab the user is on. */
   tab?: { id?: number; url?: string };
+  /**
+   * Whether asking for a permission closes the popup, as Chromium may: the user's answer is never given back to the
+   * popup's script, though the permission is still added.
+   */
+  closesPopup?: boolean;
 }
+
+/** A listener for `chrome.runtime.onMessage`. */
+type MessageListener = (
+  message: unknown,
+  sender: chrome.runtime.MessageSender,
+  sendResponse: (response?: unknown) => void,
+) => boolean | undefined;
 
 /**
  * Install a stand-in for the `chrome` extension API for the current test. Undone after each test, as `unstubGlobals`
@@ -34,19 +46,35 @@ export interface ChromeMockOptions {
  * @returns The mock, with the scripts registered and the permissions held
  */
 export function installChromeMock(options: ChromeMockOptions = {}) {
-  const { allow = true, tab = { id: 7, url: 'http://localhost:30000/setup' } } = options;
+  const { allow = true, tab = { id: 7, url: 'http://localhost:30000/setup' }, closesPopup = false } = options;
   const storage = new Map<string, unknown>(Object.entries(options.storage ?? {}));
+  const session = new Map<string, unknown>();
   const registered = new Map<string, Registered>();
   const origins = new Set<string>();
-  const listeners = { installed: [] as (() => void)[], startup: [] as (() => void)[], message: [] as unknown[] };
+  const listeners = {
+    installed: [] as (() => void)[],
+    startup: [] as (() => void)[],
+    message: [] as MessageListener[],
+    added: [] as ((permissions: { origins?: string[] }) => void)[],
+  };
 
   const chromeMock = {
     runtime: {
       id: 'emma-extension',
       onInstalled: { addListener: vi.fn((fn: () => void) => listeners.installed.push(fn)) },
       onStartup: { addListener: vi.fn((fn: () => void) => listeners.startup.push(fn)) },
-      onMessage: { addListener: vi.fn((fn: unknown) => listeners.message.push(fn)) },
-      sendMessage: vi.fn(() => Promise.resolve()),
+      onMessage: { addListener: vi.fn((fn: MessageListener) => listeners.message.push(fn)) },
+      // Sent from one of the extension's pages, such as the popup, to the listeners the background script added.
+      sendMessage: vi.fn(
+        (message: unknown) =>
+          new Promise<unknown>(resolve => {
+            let waiting = false;
+            for (const listener of listeners.message) {
+              if (listener(message, { id: 'emma-extension' }, resolve) === true) waiting = true;
+            }
+            if (!waiting) resolve(undefined);
+          }),
+      ),
       openOptionsPage: vi.fn(() => Promise.resolve()),
     },
     storage: {
@@ -57,12 +85,36 @@ export function installChromeMock(options: ChromeMockOptions = {}) {
           return Promise.resolve();
         }),
       },
+      session: {
+        get: vi.fn((key: string) => Promise.resolve(session.has(key) ? { [key]: session.get(key) } : {})),
+        set: vi.fn((items: Record<string, unknown>) => {
+          for (const [key, value] of Object.entries(items)) session.set(key, structuredClone(value));
+          return Promise.resolve();
+        }),
+        remove: vi.fn((key: string) => {
+          session.delete(key);
+          return Promise.resolve();
+        }),
+      },
     },
     permissions: {
       request: vi.fn(({ origins: asked = [] }: { origins?: string[] }) => {
-        if (allow) for (const origin of asked) origins.add(origin);
-        return Promise.resolve(allow);
+        const added = allow ? asked.filter(origin => !origins.has(origin)) : [];
+        for (const origin of added) origins.add(origin);
+        // The browser tells the background later, once the user's answer is in.
+        if (added.length > 0) {
+          setTimeout(() => {
+            for (const listener of listeners.added) listener({ origins: added });
+          });
+        }
+        return closesPopup ? new Promise<boolean>(() => undefined) : Promise.resolve(allow);
       }),
+      contains: vi.fn(({ origins: held = [] }: { origins?: string[] }) =>
+        Promise.resolve(held.every(origin => origins.has(origin))),
+      ),
+      onAdded: {
+        addListener: vi.fn((fn: (permissions: { origins?: string[] }) => void) => listeners.added.push(fn)),
+      },
       remove: vi.fn(({ origins: dropped = [] }: { origins?: string[] }) => {
         for (const origin of dropped) origins.delete(origin);
         return Promise.resolve(true);
@@ -96,5 +148,5 @@ export function installChromeMock(options: ChromeMockOptions = {}) {
     },
   };
   vi.stubGlobal('chrome', chromeMock);
-  return { chrome: chromeMock, storage, registered, origins, listeners };
+  return { chrome: chromeMock, storage, session, registered, origins, listeners };
 }

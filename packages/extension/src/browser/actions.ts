@@ -3,7 +3,17 @@
  */
 import type { Site } from '../lib/sites';
 import { isSetupPage, originOf, patternFor, patternInUse, withoutSite, withSite } from '../lib/sites';
-import { injectSetup, readSites, removePermission, requestPermission, syncLoader, writeSites } from './api';
+import {
+  askToFinishActivation,
+  injectSetup,
+  keepPending,
+  readSites,
+  removePermission,
+  requestPermission,
+  syncLoader,
+  takePending,
+  writeSites,
+} from './api';
 
 /** The tab the user is on. */
 export interface Tab {
@@ -14,18 +24,25 @@ export interface Tab {
 /**
  * Activate EMMA on the tab's server, with the user's permission, so that it opens by itself on its setup screen from
  * now on, and open it at once if the tab is a setup screen. The permission is asked for first, while the browser still
- * counts the user's click.
+ * counts the user's click. The background script finishes the activation, as Chromium may close the popup when it
+ * asks, ending this script before the user answers: it finishes when the permission is added, and the popup, if still
+ * open, waits for it.
  * @param tab - The tab
  * @returns `activated`; `refused` if the user did not allow it; `unsupported` for a page not on a web server
  */
 export async function activate(tab: Tab): Promise<'activated' | 'refused' | 'unsupported'> {
   const server = originOf(tab.url);
   if (server === undefined) return 'unsupported';
-  if (!(await requestPermission([patternFor(server, __TARGET__)]))) return 'refused';
-  const sites = withSite(await readSites(), server, true);
-  await writeSites(sites);
-  await syncLoader(sites, __TARGET__);
-  if (tab.id !== undefined && isSetupPage(tab.url)) await injectSetup(tab.id);
+  const asked = requestPermission([patternFor(server, __TARGET__)]);
+  // Kept at once, not after an await, so that it is there however soon the user answers.
+  const kept = keepPending({ server, tabId: tab.id, url: tab.url });
+  const allowed = await asked;
+  await kept;
+  if (!allowed) {
+    await takePending();
+    return 'refused';
+  }
+  await askToFinishActivation();
   return 'activated';
 }
 
