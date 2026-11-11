@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 
-import { LOADER_ID, SETUP_PAGE_MESSAGE, SITES_KEY } from '../../../src/browser/api';
+import { ACTIVATE_MESSAGE, LOADER_ID, PENDING_KEY, SETUP_PAGE_MESSAGE, SITES_KEY } from '../../../src/browser/api';
 import { installChromeMock } from '../../mocks/chrome';
 
 const SITES = { [SITES_KEY]: [{ origin: 'http://localhost:30000', auto: true }] };
@@ -76,5 +76,28 @@ describe('the background script', () => {
     await expect(onSetupPage(message, from)).resolves.toBe(false);
 
     expect(chrome.scripting.executeScript).not.toHaveBeenCalled();
+  });
+
+  test("answers the popup's message once it has finished the activation, or failed to", async () => {
+    const { chrome, session, origins } = await load();
+    origins.add('http://localhost:30000/*');
+    session.set(PENDING_KEY, { server: 'http://localhost:30000' });
+    chrome.storage.local.set.mockRejectedValueOnce(new Error('quota'));
+
+    await expect(chrome.runtime.sendMessage({ type: ACTIVATE_MESSAGE })).resolves.toBe(false);
+
+    session.set(PENDING_KEY, { server: 'http://localhost:30000' });
+    await expect(chrome.runtime.sendMessage({ type: ACTIVATE_MESSAGE })).resolves.toBe(true);
+  });
+
+  test.each([
+    ['a message from a tab', { type: ACTIVATE_MESSAGE }, sender('http://localhost:30000/setup')],
+    ['another extension', { type: ACTIVATE_MESSAGE }, { id: 'other' }],
+    ['another message', { type: SETUP_PAGE_MESSAGE }, { id: 'emma-extension' }],
+    ['no message', null, { id: 'emma-extension' }],
+  ])('does not take %s as the popup saying an activation was allowed', async (_label, message, from) => {
+    const { isActivateMessage } = await load();
+
+    expect(isActivateMessage(message, from)).toBe(false);
   });
 });

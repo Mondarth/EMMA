@@ -1,14 +1,26 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 
 import { activate, forget, openOnce, setAuto } from '../../../src/browser/actions';
-import { LOADER_ID, LOADER_SCRIPT, SETUP_SCRIPT, SITES_KEY } from '../../../src/browser/api';
+import { LOADER_ID, LOADER_SCRIPT, PENDING_KEY, SETUP_SCRIPT, SITES_KEY } from '../../../src/browser/api';
 import { installChromeMock } from '../../mocks/chrome';
 
 const LOCAL = 'http://localhost:30000';
 
+/**
+ * Install the browser's stand-in and load the background script afresh, which finishes activations.
+ * @param options - What the browser holds
+ * @returns The mock
+ */
+async function withBackground(options: Parameters<typeof installChromeMock>[0] = {}) {
+  const mocks = installChromeMock(options);
+  vi.resetModules();
+  await import('../../../src/background');
+  return mocks;
+}
+
 describe('activate', () => {
   test("asks for the server's permission, remembers it, registers the loader and opens EMMA", async () => {
-    const { chrome, storage, registered, origins } = installChromeMock();
+    const { chrome, storage, session, registered, origins } = await withBackground();
 
     await expect(activate({ id: 7, url: `${LOCAL}/setup` })).resolves.toBe('activated');
 
@@ -26,20 +38,55 @@ describe('activate', () => {
       files: ['/emma-setup.js'],
       world: 'MAIN',
     });
+    expect(session.has(PENDING_KEY)).toBe(false);
+  });
+
+  test('finishes once, though both the popup and the added permission ask the background to', async () => {
+    const { chrome, listeners } = await withBackground();
+
+    await activate({ id: 7, url: `${LOCAL}/setup` });
+    for (const listener of listeners.added) listener({ origins: ['http://localhost:30000/*'] });
+    await new Promise(resolve => setTimeout(resolve));
+
+    expect(chrome.scripting.executeScript).toHaveBeenCalledOnce();
+    expect(chrome.scripting.registerContentScripts).toHaveBeenCalledOnce();
+  });
+
+  test('finishes in the background when asking for the permission closes the popup, as Chromium may', async () => {
+    const { chrome, storage } = await withBackground({ closesPopup: true });
+
+    void activate({ id: 7, url: `${LOCAL}/setup` });
+
+    await vi.waitFor(() => {
+      expect(chrome.scripting.executeScript).toHaveBeenCalledOnce();
+    });
+    expect(storage.get(SITES_KEY)).toEqual([{ origin: LOCAL, auto: true }]);
+  });
+
+  test('finishes at once when the permission is already held, as the browser then adds nothing', async () => {
+    const { chrome, origins, storage } = await withBackground();
+    origins.add('http://localhost:30000/*');
+
+    await expect(activate({ id: 7, url: `${LOCAL}/setup` })).resolves.toBe('activated');
+
+    expect(storage.get(SITES_KEY)).toEqual([{ origin: LOCAL, auto: true }]);
+    expect(chrome.scripting.executeScript).toHaveBeenCalledOnce();
   });
 
   test('asks for the permission before anything else, while the click still counts', async () => {
-    const { chrome } = installChromeMock();
+    const { chrome } = await withBackground();
 
     await activate({ id: 7, url: `${LOCAL}/setup` });
 
     const asked = chrome.permissions.request.mock.invocationCallOrder[0] ?? Infinity;
+    const kept = chrome.storage.session.set.mock.invocationCallOrder[0] ?? -Infinity;
     const read = chrome.storage.local.get.mock.invocationCallOrder[0] ?? -Infinity;
+    expect(asked).toBeLessThan(kept);
     expect(asked).toBeLessThan(read);
   });
 
   test('remembers a server from a page that is not its setup screen, without opening EMMA', async () => {
-    const { chrome, storage } = installChromeMock();
+    const { chrome, storage } = await withBackground();
 
     await expect(activate({ id: 7, url: `${LOCAL}/game` })).resolves.toBe('activated');
 
@@ -48,16 +95,17 @@ describe('activate', () => {
   });
 
   test('changes nothing when the user does not allow it', async () => {
-    const { chrome, storage } = installChromeMock({ allow: false });
+    const { chrome, storage, session } = await withBackground({ allow: false });
 
     await expect(activate({ id: 7, url: `${LOCAL}/setup` })).resolves.toBe('refused');
 
     expect(storage.has(SITES_KEY)).toBe(false);
+    expect(session.has(PENDING_KEY)).toBe(false);
     expect(chrome.scripting.registerContentScripts).not.toHaveBeenCalled();
   });
 
   test('does nothing for a page not on a web server', async () => {
-    const { chrome } = installChromeMock();
+    const { chrome } = await withBackground();
 
     await expect(activate({ id: 7, url: 'chrome://extensions' })).resolves.toBe('unsupported');
 
@@ -67,7 +115,7 @@ describe('activate', () => {
 
 describe('the scripts', () => {
   test("are named from the extension's root, as Firefox resolves a relative path from the page that asks", async () => {
-    const { chrome, registered } = installChromeMock();
+    const { chrome, registered } = await withBackground();
 
     await activate({ id: 7, url: `${LOCAL}/setup` });
 
