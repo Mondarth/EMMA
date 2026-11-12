@@ -83,10 +83,11 @@
   let header: HTMLElement | undefined = $state();
 
   /**
-   * Bring the plan's steps into view once a run starts. The confirmation above them closes as the run starts, so a plan
-   * scrolled down to its **Run** button would otherwise be left below the steps, as they move up past where it shows.
+   * Bring the top of the plan into view: the run's order once **Run plan** asks to confirm it, as a long plan may be
+   * scrolled to its end; and the steps once the run starts, as the confirmation above them closes and they move up past
+   * where a plan scrolled down to its **Run** button shows.
    */
-  async function showRun(): Promise<void> {
+  async function showTop(): Promise<void> {
     await tick();
     if (section !== undefined) section.scrollTop = 0;
     // And the plan itself into view, in whatever scrolls around it.
@@ -217,6 +218,7 @@
         disabled={running || confirming}
         onclick={() => {
           confirming = true;
+          void showTop();
         }}>
         <i class="fa-solid fa-play" aria-hidden="true"></i>
         {localize('Run.Run')}
@@ -259,7 +261,7 @@
         onclick={() => {
           confirming = false;
           onRun();
-          void showRun();
+          void showTop();
         }}>
         <i class="fa-solid fa-play" aria-hidden="true"></i>
         {localize('Run.Go')}

@@ -293,8 +293,8 @@ Each has a note, which Foundry keeps with it, written for it at first and free t
 space it needs and the space free, as Foundry's own dialog does, and says when there is too little; Foundry does not
 say what a world's backup needs, so its row gives the space free alone. What is checked is made before anything changes.
 
-**Run plan** lists the steps and asks to confirm them, then runs them, scrolling the plan back to its top so that the
-steps are in view:
+**Run plan** scrolls the plan to its top, where it lists the steps and asks to confirm them, then runs them, scrolling
+back to the top so that the steps are in view:
 
 1. the snapshot and backups checked, one at a time, as Foundry's **Manage Backups** makes them;
 2. the package changes, a package installed anew among them, each installed from the manifest URL of the version
