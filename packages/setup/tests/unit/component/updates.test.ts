@@ -1182,6 +1182,41 @@ describe('installing anew, by group', () => {
     ).toBe(false);
   });
 
+  test('installs an installed module again from its manifest against advice, as one installed by hand may need', async () => {
+    const url = 'https://example.org/lib/module.json';
+    const user = await listing(
+      () => Promise.resolve([]),
+      () =>
+        Promise.resolve({
+          updates: new Map(),
+          blocked: new Map(),
+          unresolved: [],
+          judge,
+          planner: alone(),
+          readManifest: () =>
+            Promise.resolve({
+              ok: true as const,
+              release: { ...release('module:lib', '1.2.0'), manifest: url, versionManifest: url },
+              title: 'Library',
+            }),
+        }),
+    );
+    await user.click(within(row(/^Modules/)).getByText('Modules'));
+    const section = await screen.findByRole('region', { name: 'Install a module' });
+
+    await user.type(within(section).getByRole('textbox', { name: 'Manifest URL' }), `${url}{Enter}`);
+    const refused = await within(section).findByRole('alert');
+    expect(refused).toHaveTextContent('Library 1.0.0 is installed already');
+    await user.click(within(refused).getByRole('button', { name: 'Override and add anyway' }));
+
+    const again = changesIn(screen.getByRole('region', { name: 'Update plan' }))
+      .getAllByRole('row')
+      .find(tr => tr.textContent.includes('Library'));
+    expect(again).toHaveClass('emma-plan-forced');
+    expect(again).toHaveTextContent(/Library\s*1\.0\.0\s*1\.2\.0\s*Added against EMMA's advice/);
+    expect(section).toHaveTextContent("Library 1.2.0 is in the plan against EMMA's advice.");
+  });
+
   test('lists what a module to install requires and recommends in its drawer, recommending as asked', async () => {
     const url = 'https://example.org/new/module.json';
     const fromManifest = {

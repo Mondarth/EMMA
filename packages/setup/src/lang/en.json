@@ -340,7 +340,7 @@
     "NotManifest": "That is not a game system's or module's manifest.",
     "IsSystem": "That is a game system's manifest, not a module's.",
     "IsModule": "That is a module's manifest, not a game system's.",
-    "Installed": "{title} is installed already: its updates are offered in the installation tree.",
+    "Installed": "{title} {installed} is installed already: its updates are offered in the installation tree. To install it again from this manifest, as a package installed by hand may need, override EMMA.",
     "Planned": "{title} is in the plan already.",
     "Refused": "The plan cannot take it.",
     "Override": "Override and add anyway",
