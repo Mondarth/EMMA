@@ -7,6 +7,8 @@
   row saying how far its step has got.
 -->
 <script lang="ts">
+  import { tick } from 'svelte';
+
   import type { PlanRun, SnapshotSpaceState } from '../app/setup-state.svelte';
   import type { NewerCore, UpdateState } from '../app/update-state.svelte';
   import { format, formatSize, localize } from '../lib/i18n';
@@ -76,6 +78,20 @@
 
   /** Whether the user is asked to confirm a run. */
   let confirming = $state(false);
+
+  let section: HTMLElement | undefined = $state();
+  let header: HTMLElement | undefined = $state();
+
+  /**
+   * Bring the plan's steps into view once a run starts. The confirmation above them closes as the run starts, so a plan
+   * scrolled down to its **Run** button would otherwise be left below the steps, as they move up past where it shows.
+   */
+  async function showRun(): Promise<void> {
+    await tick();
+    if (section !== undefined) section.scrollTop = 0;
+    // And the plan itself into view, in whatever scrolls around it.
+    header?.scrollIntoView({ block: 'nearest' });
+  }
   const running = $derived(run !== null && !run.over);
   /** The steps a run would take now. */
   const steps = $derived(runSteps(updates.safeguards, updates.plan, key => updates.titleOf(key)));
@@ -192,8 +208,8 @@
   {/if}
 {/snippet}
 
-<section class="emma-update-plan" aria-labelledby="{uid}-heading">
-  <header>
+<section bind:this={section} class="emma-update-plan" aria-labelledby="{uid}-heading">
+  <header bind:this={header}>
     <h3 id="{uid}-heading">{localize('Update.Plan')}</h3>
     {#if onRun !== undefined}
       <button
@@ -243,6 +259,7 @@
         onclick={() => {
           confirming = false;
           onRun();
+          void showRun();
         }}>
         <i class="fa-solid fa-play" aria-hidden="true"></i>
         {localize('Run.Go')}

@@ -47,9 +47,14 @@ interface Held {
  * @param options - What else the plan has
  * @param options.snapshot - Whether it makes a snapshot first
  * @param options.oldNeedsLib - Whether Old's version requires the Library's, so waits for it
+ * @param options.beforeRun - Called with the plan's region just before the run is confirmed
  * @returns The steps as they start, and the plan's region
  */
-async function running({ snapshot = false, oldNeedsLib = false } = {}) {
+async function running({
+  snapshot = false,
+  oldNeedsLib = false,
+  beforeRun,
+}: { snapshot?: boolean; oldNeedsLib?: boolean; beforeRun?: (plan: HTMLElement) => void } = {}) {
   const held: Held[] = [];
   const runStep = vi.fn(
     (step: Exclude<RunStep, { kind: 'core' }>, onProgress?: (progress: StepProgress) => void) =>
@@ -90,6 +95,7 @@ async function running({ snapshot = false, oldNeedsLib = false } = {}) {
   const user = userEvent.setup();
   const plan = await screen.findByRole('region', { name: 'Update plan' });
   await user.click(within(plan).getByRole('button', { name: 'Run plan' }));
+  beforeRun?.(plan);
   await user.click(within(plan).getByRole('button', { name: 'Run' }));
   // The snapshot first, alone; or else both installs at once, as neither needs the other.
   await vi.waitFor(() => {
@@ -101,6 +107,22 @@ async function running({ snapshot = false, oldNeedsLib = false } = {}) {
 }
 
 describe("a plan's run, step by step", () => {
+  test('brings its steps into view as it starts, the plan having been scrolled down to its Run button', async () => {
+    const shown = vi.spyOn(HTMLElement.prototype, 'scrollIntoView');
+    const { plan } = await running({
+      beforeRun: region => {
+        region.scrollTop = 300;
+      },
+    });
+
+    await vi.waitFor(() => {
+      expect(plan.scrollTop).toBe(0);
+    });
+    const header = plan.querySelector('header');
+    expect(shown.mock.contexts).toContain(header);
+    expect(shown).toHaveBeenCalledWith({ block: 'nearest' });
+  });
+
   test('says how far an install has downloaded, then installed, with a bar below its name, underlined when done', async () => {
     const { held, rowOf } = await running();
     const [first] = held;
