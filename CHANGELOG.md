@@ -1,3 +1,9 @@
+## [0.13.1](https://github.com/Mondarth/EMMA/compare/v0.13.0...v0.13.1) (2026-11-12)
+
+### Bug Fixes
+
+* **module:** keep an open version list with its button on scrolling ([f8afdf8](https://github.com/Mondarth/EMMA/commit/f8afdf8620305a6b1739eed243333ca875ebad08))
+
 ## [0.13.0](https://github.com/Mondarth/EMMA/compare/v0.12.1...v0.13.0) (2026-11-10)
 
 ### Features
