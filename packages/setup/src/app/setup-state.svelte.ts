@@ -512,6 +512,12 @@ export class SetupState {
       else this.#options.keepPendingPlan?.(null);
     } finally {
       updates.locked = false;
+      // What was added against EMMA's advice, now installed, is done with.
+      updates.forcedDone(
+        steps
+          .filter(step => step.kind === 'install' && step.forced === true && states[step.key] === 'done')
+          .map(({ key }) => key),
+      );
       this.run = { steps, states, progress, needed, failures, over: true, ...end };
       this.#ranUntil = updates.changes;
     }
