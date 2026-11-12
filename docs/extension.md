@@ -86,8 +86,9 @@ gives EMMA's version, such as **EMMA - installation (0.1.1)**. While EMMA is an 
 with a link to [EMMA's alpha](alpha.md), and asks once for each new version that you acknowledge it with **I
 understand**: until you do, the plan cannot be run.
 
-**While the window opens**, a large spinner and **Analyzing** sit in its middle, until EMMA has read the installation
-and first looked for updates; reading it again later shows only the **Read again** button busy.
+**While the window opens**, each time it does, a large spinner and **Analyzing** sit in its middle, until EMMA has read
+the installation and looked for updates; reading it again while the window is open shows only the **Read again** button
+busy.
 
 **Foundry's own installs, updates, uninstalls and locks are disabled**: the **Install** button, **Update All**, and the
 update button on each package are greyed out, and say that EMMA manages packages on this screen if chosen. So do

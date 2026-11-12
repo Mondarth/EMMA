@@ -66,14 +66,15 @@ export class EmmaSetupApp extends foundry.applications.api.ApplicationV2 {
   }
 
   /**
-   * Mount the Svelte component on first render, and read the installation afresh. Later renders leave it in place.
+   * Mount the Svelte component on first render, and read the installation afresh, showing EMMA as opening until its
+   * updates are found, as each time the window opens. Later renders leave it in place.
    * @param _result - The (empty) result of {@link EmmaSetupApp._renderHTML}
    * @param content - The window's content element
    */
   protected override _replaceHTML(_result: unknown, content: HTMLElement): void {
     if (this.#component !== null) return;
     this.#component = mount(SetupRoot, { target: content, props: { setup: this.setup } });
-    void this.setup.refresh();
+    void this.setup.open();
   }
 
   /**

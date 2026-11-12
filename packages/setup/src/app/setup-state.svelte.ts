@@ -125,10 +125,12 @@ export class SetupState {
   /** Whether the installation is being read. */
   loading = $state(false);
   /**
-   * Whether the window is still opening: until the installation is first read and its updates first looked for, or the
-   * reading failed. Not again when it is read afresh.
+   * Whether the window is still opening: until the installation is read and its updates looked for, or the reading
+   * failed, each time the window opens (see {@link open}). Not when it is read afresh while open.
    */
   opening = $state(true);
+  /** Counts the readings, so that only the latest search ends the window's opening. */
+  #readings = 0;
   /** Whether the last reading failed. */
   failed = $state(false);
   /** Whether the EMMA module is being installed or updated. */
@@ -261,11 +263,22 @@ export class SetupState {
   }
 
   /**
+   * Open the window's content: read the installation afresh and look for its updates, showing the window as opening
+   * until they are found, each time it opens, as the state outlives the window.
+   * @returns Once read, or failed; the search may still be going on
+   */
+  open(): Promise<void> {
+    this.opening = true;
+    return this.refresh();
+  }
+
+  /**
    * Read the installation afresh, then search for its updates in the background. A failure is kept in {@link failed},
    * or in the updates' status, never thrown.
    * @returns Once read, or failed; the search may still be going on
    */
   async refresh(): Promise<void> {
+    const reading = ++this.#readings;
     this.loading = true;
     try {
       const overview = await this.#options.load();
@@ -276,7 +289,8 @@ export class SetupState {
       this.coreTarget = null;
       this.failed = false;
       void this.updates.searchFor(overview).then(() => {
-        this.opening = false;
+        // A search a later reading took the place of does not end the opening: that reading's does.
+        if (reading === this.#readings) this.opening = false;
         return this.#resume(overview);
       });
     } catch {

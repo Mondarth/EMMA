@@ -68,9 +68,16 @@ describe('openEmmaSetup', () => {
     await app.close();
     expect(screen.queryByRole('tree')).toBeNull();
 
+    const opened = vi.spyOn(setup, 'open');
     const reopened = await openEmmaSetup(setup);
     expect(reopened).not.toBe(app);
     expect(load).toHaveBeenCalledTimes(2);
+    // Shown as opening again, until its updates are looked for again.
+    expect(opened).toHaveBeenCalledOnce();
+    expect(screen.getByTestId('emma-opening')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(screen.queryByTestId('emma-opening')).toBeNull();
+    });
   });
 });
 
