@@ -42,6 +42,9 @@ describe('Popup', () => {
 
   test('activates EMMA on the server and closes, EMMA now open', async () => {
     const { user, onDone, registered } = setUp(`${LOCAL}/setup`);
+    // The background script finishes the activation.
+    vi.resetModules();
+    await import('../../../src/background');
 
     await user.click(screen.getByRole('button', { name: 'Activate on this server' }));
 

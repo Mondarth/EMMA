@@ -23,6 +23,60 @@ export const LOADER_SCRIPT = '/loader.js';
 /** The message the loader sends when a page it runs on may be a setup screen. */
 export const SETUP_PAGE_MESSAGE = 'mondarth-emma/setup-page';
 
+/** The message the popup sends once the user has allowed EMMA on a server, for the background to finish activating. */
+export const ACTIVATE_MESSAGE = 'mondarth-emma/activate';
+
+/** The key an activation waiting on the user's permission is kept under, in the browser's session storage. */
+export const PENDING_KEY = 'pendingActivation';
+
+/**
+ * An activation waiting on the user's permission. It is kept where the background can find it, as Chromium may close
+ * the popup when it asks, ending the popup's script before the user answers.
+ */
+export interface Pending {
+  /** The server's origin. */
+  readonly server: string;
+  /** The tab the user activated it from. */
+  readonly tabId?: number | undefined;
+  /** That tab's address. */
+  readonly url?: string | undefined;
+}
+
+/**
+ * Keep an activation waiting on the user's permission, replacing any kept before.
+ * @param pending - The activation
+ */
+export async function keepPending(pending: Pending): Promise<void> {
+  await chrome.storage.session.set({ [PENDING_KEY]: pending });
+}
+
+/**
+ * Take the activation waiting on the user's permission, if any, so that it is finished only once.
+ * @returns The activation, or `undefined` if none is kept or what is kept is not one
+ */
+export async function takePending(): Promise<Pending | undefined> {
+  const stored = await chrome.storage.session.get(PENDING_KEY);
+  await chrome.storage.session.remove(PENDING_KEY);
+  const value: unknown = stored[PENDING_KEY];
+  if (typeof value !== 'object' || value === null) return undefined;
+  const { server, tabId, url } = value as Record<string, unknown>;
+  if (typeof server !== 'string') return undefined;
+  return {
+    server,
+    tabId: typeof tabId === 'number' ? tabId : undefined,
+    url: typeof url === 'string' ? url : undefined,
+  };
+}
+
+/**
+ * Whether the extension holds permission to run on pages.
+ * @param patterns - The permission patterns
+ * @returns `true` if it holds every one
+ */
+export function holdsPermission(patterns: readonly string[]): Promise<boolean> {
+  return chrome.permissions.contains({ origins: [...patterns] });
+}
+
 /**
  * Read the servers remembered.
  * @returns The servers
@@ -80,4 +134,12 @@ export async function syncLoader(sites: readonly Site[], target: Target): Promis
  */
 export async function injectSetup(tabId: number): Promise<void> {
   await chrome.scripting.executeScript({ target: { tabId }, files: [SETUP_SCRIPT], world: 'MAIN' });
+}
+
+/**
+ * Ask the background script to finish an activation the user has allowed, and wait until it has.
+ * @returns Once finished
+ */
+export async function askToFinishActivation(): Promise<void> {
+  await chrome.runtime.sendMessage({ type: ACTIVATE_MESSAGE });
 }

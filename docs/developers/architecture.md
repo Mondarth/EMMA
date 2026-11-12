@@ -155,7 +155,11 @@ module:
 : The extension, built for Chromium and Firefox from the same source (`vite build --mode chromium` or `--mode
   firefox`, which sets `__TARGET__`), into `dist/<browser>`, with the setup screen's script copied in. Its manifest
   (`scripts/manifest.ts`) asks for no site: host permissions are optional, asked for per server when the user activates
-  EMMA on it (`src/browser/actions.ts`). The servers activated are kept in `chrome.storage.local`. For those EMMA opens
+  EMMA on it (`src/browser/actions.ts`). Chromium may close the popup when it asks, ending the popup's script before
+  the user answers, so the popup keeps the activation in `chrome.storage.session` and the background script finishes
+  it (`src/browser/activation.ts`), when `chrome.permissions.onAdded` fires or when the popup, still open, says it was
+  allowed; whichever comes first takes it, so it is finished once. The servers activated are kept in
+  `chrome.storage.local`. For those EMMA opens
   on by itself, a small loader (`src/loader.ts`) is registered as a content script; on a setup screen it asks the
   background script (`src/background.ts`), which checks the server's origin against those remembered and injects
   `emma-setup.js` into the page itself (`world: "MAIN"`, Chrome 102 and Firefox 128). The background checks the

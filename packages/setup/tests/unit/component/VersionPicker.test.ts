@@ -181,4 +181,84 @@ describe('VersionPicker', () => {
     expect(options[1]).toHaveClass('active');
     expect(screen.getByRole('listbox')).toHaveAttribute('aria-activedescendant', options[1]?.id);
   });
+
+  describe('while open', () => {
+    /**
+     * Open the list in a scrolling panel, its button at a place the test moves.
+     * @returns The panel, the button, the list's popup, and a way to move the button
+     */
+    async function openInPanel() {
+      renderPicker();
+      const button = screen.getByRole('button', { name: CHOOSE });
+      const panel = button.parentElement as HTMLElement;
+      let at = { left: 40, top: 100 };
+      vi.spyOn(button, 'getBoundingClientRect').mockImplementation(() => new DOMRect(at.left, at.top, 60, 20));
+      vi.spyOn(panel, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 50, 400, 300));
+      await userEvent.click(button);
+      const popup = screen.getByRole('listbox').parentElement as HTMLElement;
+      return {
+        panel,
+        button,
+        popup,
+        moveTo: (left: number, top: number) => {
+          at = { left, top };
+        },
+      };
+    }
+
+    test('follows its button as the panel scrolls, and as the window is resized', async () => {
+      const { panel, popup, moveTo } = await openInPanel();
+      expect(popup.style.top).toBe('122px');
+
+      moveTo(40, 160);
+      await fireEvent.scroll(panel);
+      expect(popup.style.top).toBe('182px');
+      expect(popup.style.left).toBe('40px');
+
+      moveTo(70, 160);
+      await fireEvent(window, new Event('resize'));
+      expect(popup.style.left).toBe('70px');
+    });
+
+    test('follows its button as the page, or a panel beside it, scrolls', async () => {
+      const { popup, moveTo } = await openInPanel();
+      const beside = document.createElement('div');
+      document.body.append(beside);
+
+      moveTo(40, 160);
+      await fireEvent.scroll(document);
+      expect(popup.style.top).toBe('182px');
+
+      moveTo(40, 200);
+      await fireEvent.scroll(beside);
+      expect(popup.style.top).toBe('222px');
+      beside.remove();
+    });
+
+    test('stays put as its own list scrolls', async () => {
+      const { popup, moveTo } = await openInPanel();
+
+      moveTo(40, 160);
+      await fireEvent.scroll(popup);
+
+      expect(popup.style.top).toBe('122px');
+    });
+
+    test.each([
+      ['above', 20],
+      ['below', 360],
+    ])('closes once its button scrolls out of view %s, and stops following it', async (_where, top) => {
+      const { panel, button, popup, moveTo } = await openInPanel();
+
+      moveTo(40, top);
+      await fireEvent.scroll(panel);
+
+      expect(button).toHaveAttribute('aria-expanded', 'false');
+      expect(button).not.toHaveFocus();
+      moveTo(40, 160);
+      await fireEvent.scroll(panel);
+      // Where it was before its button scrolled away.
+      expect(popup.style.top).toBe('122px');
+    });
+  });
 });

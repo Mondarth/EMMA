@@ -105,6 +105,11 @@ export interface ForcedInstall {
   readonly title: string;
   readonly version: string;
   readonly manifest: string;
+  /**
+   * The version installed when it was added, for a package installed already, that the user installs again from its
+   * manifest, as one installed by hand may need (such as Plutonium). It stays in the plan until it is run.
+   */
+  readonly installed?: string;
 }
 
 /**
@@ -277,12 +282,16 @@ export class UpdateState {
         }),
         ...(this.#recommendedBy.has(key) && { recommendedBy: this.titleOf(this.#recommendedBy.get(key) ?? key) }),
       })),
-    ...[...this.#forced.values()].map(({ key, version, manifest }) => ({
-      key,
-      chosen: version,
-      manifest,
-      forced: true as const,
-    })),
+    ...[...this.#forced.values()].map(({ key, version, manifest }) => {
+      const installed = this.#installedOf(key);
+      return {
+        key,
+        ...(installed !== undefined && { installed }),
+        chosen: version,
+        manifest,
+        forced: true as const,
+      };
+    }),
   ]);
 
   /**
@@ -481,7 +490,10 @@ export class UpdateState {
       this.#listed = {};
       // What the user read from manifests is known again; what they added against advice stays until it is installed.
       found.planner.include([...this.#manual.values()]);
-      for (const key of [...this.#forced.keys()]) if (this.#installedOf(key) !== undefined) this.#forced.delete(key);
+      // One installed again, over what is installed, stays until it is run (see forcedDone).
+      for (const [key, { installed }] of [...this.#forced]) {
+        if (installed === undefined && this.#installedOf(key) !== undefined) this.#forced.delete(key);
+      }
       // The choices are kept that the new search still offers, and planned again: an uninstall, while the package is
       // installed still, and every uninstall may still be made. A package to install anew is looked up again.
       // The pins are chosen too, as they are in every plan.
@@ -1203,7 +1215,9 @@ export class UpdateState {
   /**
    * Install a package from a manifest the user gives: check it is a manifest of the type asked for, of a package not
    * installed nor in the plan, look up what it requires, and add it to the plan if the plan can take it. If it cannot,
-   * say why, and give the install to add against EMMA's advice.
+   * say why, and give the install to add against EMMA's advice. A package installed already is not planned, its updates
+   * being offered in the installation tree, but may be installed again from its manifest against EMMA's advice, as one
+   * installed by hand may need.
    * @param url - The manifest's URL
    * @param type - The type of package it must be
    * @returns The version added, or why it was not
@@ -1216,10 +1230,16 @@ export class UpdateState {
     if (!found.ok) return { ok: false, reason: unreadText(found) };
     const { release, title } = found;
     const key = `${release.package.type}:${release.package.id}`;
-    if (this.#installedOf(key) !== undefined) return { ok: false, reason: format('Manifest.Installed', { title }) };
-    if (this.#picks.has(key) || this.#forced.has(key)) {
-      return { ok: false, reason: format('Manifest.Planned', { title }) };
+    if (this.#forced.has(key)) return { ok: false, reason: format('Manifest.Planned', { title }) };
+    const installed = this.#installedOf(key);
+    if (installed !== undefined) {
+      return {
+        ok: false,
+        reason: format('Manifest.Installed', { title, installed }),
+        override: { key, title, version: release.version, manifest: url, installed },
+      };
     }
+    if (this.#picks.has(key)) return { ok: false, reason: format('Manifest.Planned', { title }) };
     this.#named.set(key, title);
     this.#manual.set(key, release);
     const { planner } = search;
@@ -1241,16 +1261,30 @@ export class UpdateState {
 
   /**
    * Add a package to the plan against EMMA's advice: it is installed as given, and left out of what the plan resolves,
-   * so that it stops nothing else being planned.
+   * so that it stops nothing else being planned. One installed already is installed again over it, in place of any
+   * change the plan makes to it.
    * @param install - The install, as {@link installFrom} gave it
    * @returns Whether it was added
    */
   force(install: ForcedInstall): boolean {
-    if (this.locked || this.#installedOf(install.key) !== undefined) return false;
+    if (this.locked) return false;
+    // A package installed since it was read is not installed again unless that is what was asked.
+    if (install.installed === undefined && this.#installedOf(install.key) !== undefined) return false;
     this.#named.set(install.key, install.title);
     this.#forced.set(install.key, install);
     this.changes++;
     return true;
+  }
+
+  /**
+   * Take what was added against EMMA's advice, and has now been installed, out of the plan, once a run is over: one
+   * installed again over what was installed would otherwise stay in it, as it is installed still.
+   * @param keys - The packages installed
+   */
+  forcedDone(keys: readonly PackageKey[]): void {
+    let changed = false;
+    for (const key of keys) changed = this.#forced.delete(key) || changed;
+    if (changed) this.changes++;
   }
 
   /**

@@ -742,7 +742,9 @@ describe('installing from a manifest URL', () => {
     });
     await expect(installed.updates.installFrom(DICE_URL, 'module')).resolves.toEqual({
       ok: false,
-      reason: 'App is installed already: its updates are offered in the installation tree.',
+      reason:
+        'App 1.0.0 is installed already: its updates are offered in the installation tree. To install it again from this manifest, as a package installed by hand may need, override EMMA.',
+      override: { key: 'module:app', title: 'App', version: '1.2.0', manifest: DICE_URL, installed: '1.0.0' },
     });
     // Without a search, or a way to read manifests, none is read.
     await expect(new UpdateState(() => Promise.resolve(finding(APP))).installFrom(DICE_URL, 'module')).resolves.toEqual(
@@ -808,6 +810,39 @@ describe('installing from a manifest URL', () => {
     const now = buildOverview(installation({ modules: [installedModule('dice', 'Dice', '9.0.0')] }), new Map());
     await updates.searchFor(now);
     expect(updates.forced).toEqual([]);
+  });
+
+  test('installs an installed package again against advice, in place of its change, until it is run', async () => {
+    const { updates } = await searched({
+      ok: true,
+      release: { ...DICE, package: { type: 'module', id: 'app' } },
+      title: 'App',
+    });
+    await updates.choose('module:app', UNINSTALL);
+
+    const refused = await updates.installFrom(DICE_URL, 'module');
+    if (refused.ok || refused.override === undefined) throw new Error('No override');
+    expect(updates.force(refused.override)).toBe(true);
+
+    // Shown with the version installed, and run in place of the uninstall chosen before.
+    expect(updates.choices.filter(({ key }) => key === 'module:app')).toEqual([
+      { key: 'module:app', installed: '1.0.0', chosen: '1.2.0', manifest: DICE_URL, forced: true },
+    ]);
+    expect(updates.runPlan).toEqual([{ key: 'module:app', version: '1.2.0', manifest: DICE_URL, forced: true }]);
+    // Asked again, it is in the plan already.
+    await expect(updates.installFrom(DICE_URL, 'module')).resolves.toEqual({
+      ok: false,
+      reason: 'App is in the plan already.',
+    });
+    // Installed still, it stays through a new search, until a run has installed it.
+    await updates.searchFor(OVERVIEW);
+    expect(updates.forced).toHaveLength(1);
+    const changes = updates.changes;
+    updates.forcedDone(['module:lib']);
+    expect(updates.changes).toBe(changes);
+    updates.forcedDone(['module:app']);
+    expect(updates.forced).toEqual([]);
+    expect(updates.changes).toBe(changes + 1);
   });
 });
 

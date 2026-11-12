@@ -90,14 +90,59 @@
       options = keep(listed);
       checking = false;
     }
-    // In the top layer, so the module list's scrolling cannot clip it; placed under the button by hand, as CSS anchor
-    // positioning is not in every browser Foundry supports.
-    const { left, bottom } = anchor.getBoundingClientRect();
-    popup?.style.setProperty('left', `${String(left)}px`);
-    popup?.style.setProperty('top', `${String(bottom + 2)}px`);
+    place(anchor);
     popup?.showPopover();
     listbox?.focus();
   }
+
+  /**
+   * Place the list under the button. It is in the top layer, so the panels' scrolling cannot clip it, and placed by
+   * hand, as CSS anchor positioning is not in every browser Foundry supports.
+   * @param anchor - The button
+   */
+  function place(anchor: HTMLElement): void {
+    const { left, bottom } = anchor.getBoundingClientRect();
+    popup?.style.setProperty('left', `${String(left)}px`);
+    popup?.style.setProperty('top', `${String(bottom + 2)}px`);
+  }
+
+  /**
+   * Keep the open list with its button as anything around it scrolls, closing it once the button scrolls out of view.
+   * The list's own scrolling is left alone.
+   * @param event - The scroll
+   * @param anchor - The button
+   */
+  function follow(event: Event, anchor: HTMLElement): void {
+    const scrolled = event.target;
+    if (scrolled instanceof Node && popup?.contains(scrolled) === true) return;
+    if (scrolled instanceof Element && scrolled.contains(anchor)) {
+      const view = scrolled.getBoundingClientRect();
+      const { top, bottom } = anchor.getBoundingClientRect();
+      if (bottom <= view.top || top >= view.bottom) {
+        hide(false);
+        return;
+      }
+    }
+    place(anchor);
+  }
+
+  // Only while the list is open; scrolls do not bubble, so they are caught on the way down.
+  $effect(() => {
+    const anchor = button;
+    if (!expanded || anchor === undefined) return;
+    const onScroll = (event: Event) => {
+      follow(event, anchor);
+    };
+    const onResize = () => {
+      place(anchor);
+    };
+    window.addEventListener('scroll', onScroll, { capture: true, passive: true });
+    window.addEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('scroll', onScroll, { capture: true });
+      window.removeEventListener('resize', onResize);
+    };
+  });
 
   /**
    * Whether a version is shown but cannot be chosen: other choices stand in its way, or it has no manifest of its own.

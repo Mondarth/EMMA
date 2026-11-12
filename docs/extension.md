@@ -86,8 +86,9 @@ gives EMMA's version, such as **EMMA - installation (0.1.1)**. While EMMA is an 
 with a link to [EMMA's alpha](alpha.md), and asks once for each new version that you acknowledge it with **I
 understand**: until you do, the plan cannot be run.
 
-**While the window opens**, a large spinner and **Analyzing** sit in its middle, until EMMA has read the installation
-and first looked for updates; reading it again later shows only the **Read again** button busy.
+**While the window opens**, each time it does, a large spinner and **Analyzing** sit in its middle, until EMMA has read
+the installation and looked for updates; reading it again while the window is open shows only the **Read again** button
+busy.
 
 **Foundry's own installs, updates, uninstalls and locks are disabled**: the **Install** button, **Update All**, and the
 update button on each package are greyed out, and say that EMMA manages packages on this screen if chosen. So do
@@ -293,7 +294,8 @@ Each has a note, which Foundry keeps with it, written for it at first and free t
 space it needs and the space free, as Foundry's own dialog does, and says when there is too little; Foundry does not
 say what a world's backup needs, so its row gives the space free alone. What is checked is made before anything changes.
 
-**Run plan** lists the steps and asks to confirm them, then runs them:
+**Run plan** scrolls the plan to its top, where it lists the steps and asks to confirm them, then runs them, scrolling
+back to the top so that the steps are in view:
 
 1. the snapshot and backups checked, one at a time, as Foundry's **Manage Backups** makes them;
 2. the package changes, a package installed anew among them, each installed from the manifest URL of the version
@@ -426,7 +428,9 @@ the plan again, with what it brought in. A premium package you do not own has it
 **Manifest URL**, at the top of the section, installs a package from a manifest you give, as Foundry's own Install
 dialog can. **+** (or Enter) has EMMA's package catalogue read it, and checks that it is a
 manifest of the section's type: by its file name, `module.json` or `system.json`, or failing that by the fields only a
-game system declares. A package installed already, or in the plan already, is refused. EMMA then looks up the modules
+game system declares. A package in the plan already is refused. One installed already is not planned, as its updates
+are offered in the installation tree, but can be installed again from its manifest against EMMA's advice (below), as
+a package installed by hand may need, such as Plutonium. Otherwise EMMA looks up the modules
 it requires, and checks the version it gives against the plan, as for any other: if the plan can take it, it is added,
 at the manifest's URL as its own.
 
@@ -435,6 +439,8 @@ against EMMA's advice: it is installed as the manifest gives it, and left out of
 stops nothing else being planned, nor is anything planned around it. Its row in the plan is red, and says **Added
 against EMMA's advice**, and the section says it is in the plan, with a button to take it out again. A package added
 this way is kept through a new search, until it is installed, but not through a reload for Foundry VTT's own update.
+One installed already is installed again over what is installed, in place of any change the plan makes to it; its row
+gives the version installed, and it stays in the plan until a run has installed it.
 
 Foundry's listing gives each package's newest version alone, without the modules it requires, and looking up every
 listed package's releases would take thousands of requests. So the section filters by what the listing says, and a

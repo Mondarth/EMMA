@@ -636,6 +636,41 @@ describe('opening the window', () => {
     expect(screen.queryByTestId('emma-opening')).not.toBeInTheDocument();
   });
 
+  test('shows it again each time the window opens, until that opening has looked for updates', async () => {
+    const searches: (() => void)[] = [];
+    const setup = new SetupState({
+      load: () => Promise.resolve(OVERVIEW),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: () =>
+        new Promise(resolve => {
+          searches.push(() => {
+            void noUpdates().then(resolve);
+          });
+        }),
+      installModule: noInstall,
+    });
+    render(SetupRoot, { setup });
+    await setup.open();
+    searches[0]?.();
+    await vi.waitFor(() => {
+      expect(screen.queryByTestId('emma-opening')).not.toBeInTheDocument();
+    });
+
+    // Closed and opened again: the same state, read afresh, with its updates looked for again.
+    await setup.refresh();
+    await setup.open();
+    expect(screen.getByTestId('emma-opening')).toHaveTextContent('Analyzing');
+    // The search the reopening took the place of ends without ending the opening.
+    searches[1]?.();
+    await new Promise(resolve => setTimeout(resolve));
+    expect(screen.getByTestId('emma-opening')).toBeInTheDocument();
+    searches[2]?.();
+    await vi.waitFor(() => {
+      expect(screen.queryByTestId('emma-opening')).not.toBeInTheDocument();
+    });
+  });
+
   test('stops showing it once the installation could not be read', async () => {
     const setup = new SetupState({
       load: () => Promise.reject(new Error('offline')),

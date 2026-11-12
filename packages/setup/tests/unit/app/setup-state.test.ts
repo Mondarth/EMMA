@@ -322,6 +322,30 @@ describe('SetupState', () => {
       expect(setup.run).toMatchObject({ over: true });
     });
 
+    test('takes what it installed again against advice out of the plan, once done, but not what failed', async () => {
+      const runStep = vi.fn((step: Exclude<RunStep, { kind: 'core' }>) =>
+        step.key === 'module:lib' ? Promise.reject(new Error('Refused')) : Promise.resolve(),
+      );
+      const { setup } = await planned(runStep, []);
+      const again = (key: string, title: string) => ({
+        key,
+        title,
+        version: '1.0.0',
+        manifest: `https://example.org/${title}.json`,
+        installed: '1.0.0',
+      });
+      expect(setup.updates.force(again('module:app', 'App'))).toBe(true);
+      expect(setup.updates.force(again('module:lib', 'Library'))).toBe(true);
+
+      await setup.runPlan();
+
+      expect(runStep).toHaveBeenCalledTimes(2);
+      await vi.waitFor(() => {
+        expect(setup.updates.status).toBe('found');
+      });
+      expect(setup.updates.forced.map(({ key }) => key)).toEqual(['module:lib']);
+    });
+
     test('makes the snapshot checked, then each change, in order, the choices fixed meanwhile, then reads again', async () => {
       const seen: string[] = [];
       const running: { setup?: SetupState } = {};
