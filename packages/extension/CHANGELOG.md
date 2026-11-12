@@ -1,3 +1,17 @@
+## [0.9.0](https://github.com/Mondarth/EMMA/compare/extension-v0.8.0...extension-v0.9.0) (2026-11-12)
+
+### Features
+
+* **setup:** let an installed package be installed again by manifest ([20fbdd4](https://github.com/Mondarth/EMMA/commit/20fbdd4e5f64198b414a2bf0f184b963ab1c4c74))
+
+### Bug Fixes
+
+* **extension:** finish activating a server in the background ([5fbb025](https://github.com/Mondarth/EMMA/commit/5fbb0255eebac0c8a575d55e0aace5f786d56baf))
+* **setup:** bring the plan's steps into view as a run starts ([7606293](https://github.com/Mondarth/EMMA/commit/7606293291a8144bbb0c7687108e8010f0bb6a51))
+* **setup:** keep an open version list with its button on scrolling ([4025478](https://github.com/Mondarth/EMMA/commit/4025478f547d9e2240f2937292ead538e4e1649c))
+* **setup:** show a long plan's run order at its top on Run plan ([7608f16](https://github.com/Mondarth/EMMA/commit/7608f1682d435173335c85761ddc297bdb85c4d4))
+* **setup:** show Analyzing each time the window opens ([060548d](https://github.com/Mondarth/EMMA/commit/060548d8f8fda4931040a345814a557cad013db0))
+
 ## [0.8.0](https://github.com/Mondarth/EMMA/compare/extension-v0.7.1...extension-v0.8.0) (2026-11-10)
 
 ### Features
