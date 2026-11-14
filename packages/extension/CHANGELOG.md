@@ -1,3 +1,9 @@
+## [0.10.0](https://github.com/Mondarth/EMMA/compare/extension-v0.9.0...extension-v0.10.0) (2026-11-14)
+
+### Features
+
+* **setup:** offer versions that are not on Foundry's listing ([43879b4](https://github.com/Mondarth/EMMA/commit/43879b46eb8f39760317ff76687eec6a26e97316))
+
 ## [0.9.0](https://github.com/Mondarth/EMMA/compare/extension-v0.8.0...extension-v0.9.0) (2026-11-12)
 
 ### Features
