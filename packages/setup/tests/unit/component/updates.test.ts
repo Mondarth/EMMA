@@ -204,7 +204,7 @@ describe('updates in the window', () => {
     await user.click(screen.getByRole('option', { name: /^14\.369/ }));
     const plan = screen.getByRole('region', { name: 'Update plan' });
     expect(changesIn(plan).getAllByRole('row')[1]).toHaveTextContent(
-      'Foundry VTT14.36814.369 Foundry VTT updates itself',
+      /^Foundry VTT\s*14\.36814\.369 Foundry VTT updates itself$/,
     );
 
     await user.click(within(root).getByText('Foundry VTT'));
@@ -373,6 +373,18 @@ describe('updates in the window', () => {
       ['Package', 'Installed', 'Chosen', 'Manifest URL', ''],
       ['D&D 5e', '5.3.3', '5.4.0', 'https://example.org/system:dnd5e/5.4.0/module.json', ''],
     ]);
+    // Laid out in fixed columns: the name on one line, cut short where too long, its whole on its tooltip; the manifest
+    // URL on one line, scrolling sideways.
+    const changes = within(plan).getByRole('table', { name: 'Changes' });
+    expect(changes).toHaveClass('emma-plan-changes');
+    expect(changes.querySelectorAll('colgroup col')).toHaveLength(5);
+    const name = changes.querySelector('tbody .emma-plan-line .emma-plan-name');
+    expect(name).toHaveAttribute('data-tooltip', 'D&D 5e');
+    expect(name).toHaveTextContent('D&D 5e');
+    expect(changes.querySelector('tbody .emma-plan-url a')).toHaveAttribute(
+      'href',
+      'https://example.org/system:dnd5e/5.4.0/module.json',
+    );
     expect(screen.getByRole('separator', { name: 'Resize the update plan' })).toBeInTheDocument();
 
     await user.click(within(plan).getByRole('button', { name: 'Clear choices' }));
@@ -1884,7 +1896,7 @@ describe("the plan's snapshot and backups", () => {
     expect(mark).toHaveAttribute('data-tooltip', expect.stringContaining(reason));
     expect(mark).toHaveClass('fa-triangle-exclamation');
     // The mark comes before the title.
-    expect(coreRow.querySelector('th')?.firstElementChild).toBe(mark);
+    expect(coreRow.querySelector('.emma-plan-line')?.firstElementChild).toBe(mark);
     expect(check).toHaveBeenCalledTimes(state.canUpdate ? 1 : 0);
   });
 

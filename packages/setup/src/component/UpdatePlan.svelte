@@ -162,13 +162,19 @@
         aria-hidden="true"></i>
       {localize(`Run.State.${state}`)}
     </span>
-    {#if state === 'failed' && onOpen !== undefined}
-      <span class="emma-plan-needed">{localize('Run.SeeWhy')}</span>
-    {/if}
-    {@const stopped = run?.needed?.[key]}
-    {#if state === 'skipped' && stopped !== undefined}
-      <span class="emma-plan-needed">{format('Run.Needs', { steps: stopped.map(stepText).join(', ') })}</span>
-    {/if}
+  {/if}
+{/snippet}
+
+<!-- What more a step's state says, on lines of their own below its name. -->
+{#snippet whyOf(key: string)}
+  {@const state = run?.states[key]}
+  {#if state === 'failed' && onOpen !== undefined}
+    <span class="emma-plan-needed emma-plan-below">{localize('Run.SeeWhy')}</span>
+  {/if}
+  {@const stopped = run?.needed?.[key]}
+  {#if state === 'skipped' && stopped !== undefined}
+    <span class="emma-plan-needed emma-plan-below"
+      >{format('Run.Needs', { steps: stopped.map(stepText).join(', ') })}</span>
   {/if}
 {/snippet}
 
@@ -323,7 +329,15 @@
       </tbody>
     </table>
   {/if}
-  <table aria-label={localize('Plan.Changes')}>
+  <table class="emma-plan-changes" aria-label={localize('Plan.Changes')}>
+    <!-- Fixed widths, so that a long name is cut short and a long URL scrolls, rather than either widening its column. -->
+    <colgroup>
+      <col class="emma-plan-col-package" />
+      <col class="emma-plan-col-installed" />
+      <col class="emma-plan-col-chosen" />
+      <col class="emma-plan-col-manifest" />
+      <col class="emma-plan-col-remove" />
+    </colgroup>
     <thead>
       <tr>
         <th scope="col">{localize('Update.Package')}</th>
@@ -341,16 +355,22 @@
           class={['emma-busy-host', choice.forced && 'emma-plan-forced']}
           aria-busy={updates.busy.activityOf(`plan:${choice.key}`) !== undefined}>
           <th scope="row" class="emma-plan-title">
-            {#if choice.key === 'core' && coreBlocked !== undefined}
-              <i
-                class="fa-solid fa-triangle-exclamation emma-plan-blocked"
-                role="img"
-                aria-label={format('Plan.CoreBlocked', { reason: coreBlocked })}
-                data-tooltip={coreBlocked}></i>
-            {/if}
             <!-- Before the name, so that it adds no space between the name and what follows it. -->
             {@render barOf(choice.key)}
-            <TreeLink title={name} link={linkOf(choice.key)} {onOpen} />{@render stateOf(choice.key)}
+            <!-- The name on one line, cut short where it is too long, its state never. -->
+            <span class="emma-plan-line">
+              {#if choice.key === 'core' && coreBlocked !== undefined}
+                <i
+                  class="fa-solid fa-triangle-exclamation emma-plan-blocked"
+                  role="img"
+                  aria-label={format('Plan.CoreBlocked', { reason: coreBlocked })}
+                  data-tooltip={coreBlocked}></i>
+              {/if}
+              <span class="emma-plan-name" data-tooltip={name}
+                ><TreeLink title={name} link={linkOf(choice.key)} {onOpen} /></span>
+              {@render stateOf(choice.key)}
+            </span>
+            {@render whyOf(choice.key)}
           </th>
           <td>
             {#if choice.installed === undefined}
@@ -430,15 +450,18 @@
             {/if}
           </td>
           <td class="emma-plan-manifest">
-            {#if choice.chosen === UNINSTALL}
-              <span class="emma-plan-note">{localize('Update.NothingToInstall')}</span>
-            {:else if choice.manifest !== undefined}
-              <a href={choice.manifest} target="_blank" rel="noopener noreferrer">{choice.manifest}</a>
-            {:else if choice.key === 'core'}
-              <span class="emma-plan-note">{localize('Update.CoreManifest')}</span>
-            {:else}
-              <span class="emma-plan-missing">{localize('Update.NoManifest')}</span>
-            {/if}
+            <!-- On one line, scrolling sideways where it is longer than its column. -->
+            <div class="emma-plan-url">
+              {#if choice.chosen === UNINSTALL}
+                <span class="emma-plan-note">{localize('Update.NothingToInstall')}</span>
+              {:else if choice.manifest !== undefined}
+                <a href={choice.manifest} target="_blank" rel="noopener noreferrer">{choice.manifest}</a>
+              {:else if choice.key === 'core'}
+                <span class="emma-plan-note">{localize('Update.CoreManifest')}</span>
+              {:else}
+                <span class="emma-plan-missing">{localize('Update.NoManifest')}</span>
+              {/if}
+            </div>
           </td>
           <td class="emma-plan-remove">
             {#if updates.canTakeOut(choice.key)}
@@ -616,7 +639,69 @@
 
   .emma-plan-manifest {
     font-size: 0.85em;
-    overflow-wrap: anywhere;
+  }
+
+  .emma-plan-url {
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: thin;
+  }
+
+  /*
+   * The changes' columns: the package never narrower than 20 characters, the version chosen with its pin on one line,
+   * the manifest URL the rest. Below their least, the plan scrolls sideways rather than squeeze them.
+   */
+  .emma-plan-changes {
+    table-layout: fixed;
+    min-width: 46rem;
+  }
+
+  .emma-plan-col-package {
+    width: max(20ch, 28%);
+  }
+
+  .emma-plan-col-installed {
+    width: 11ch;
+  }
+
+  .emma-plan-col-chosen {
+    width: max(18ch, 24%);
+  }
+
+  .emma-plan-col-remove {
+    width: 2.5rem;
+  }
+
+  .emma-plan-line {
+    display: flex;
+    align-items: baseline;
+    gap: 0.25rem;
+    white-space: nowrap;
+  }
+
+  /* The name gives way first: cut short, with an ellipsis, its whole on its tooltip. */
+  .emma-plan-name {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .emma-plan-name :global(.emma-tree-link) {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .emma-plan-line > :not(.emma-plan-name) {
+    flex: none;
+  }
+
+  .emma-plan-below {
+    display: block;
+    white-space: normal;
   }
 
   .emma-plan-note,
