@@ -204,7 +204,7 @@ describe('updates in the window', () => {
     await user.click(screen.getByRole('option', { name: /^14\.369/ }));
     const plan = screen.getByRole('region', { name: 'Update plan' });
     expect(changesIn(plan).getAllByRole('row')[1]).toHaveTextContent(
-      'Foundry VTT14.36814.369 Foundry VTT updates itself',
+      /^Foundry VTT\s*14\.36814\.369 Foundry VTT updates itself$/,
     );
 
     await user.click(within(root).getByText('Foundry VTT'));
@@ -373,6 +373,18 @@ describe('updates in the window', () => {
       ['Package', 'Installed', 'Chosen', 'Manifest URL', ''],
       ['D&D 5e', '5.3.3', '5.4.0', 'https://example.org/system:dnd5e/5.4.0/module.json', ''],
     ]);
+    // Laid out in fixed columns: the name on one line, cut short where too long, its whole on its tooltip; the manifest
+    // URL on one line, scrolling sideways.
+    const changes = within(plan).getByRole('table', { name: 'Changes' });
+    expect(changes).toHaveClass('emma-plan-changes');
+    expect(changes.querySelectorAll('colgroup col')).toHaveLength(5);
+    const name = changes.querySelector('tbody .emma-plan-line .emma-plan-name');
+    expect(name).toHaveAttribute('data-tooltip', 'D&D 5e');
+    expect(name).toHaveTextContent('D&D 5e');
+    expect(changes.querySelector('tbody .emma-plan-url a')).toHaveAttribute(
+      'href',
+      'https://example.org/system:dnd5e/5.4.0/module.json',
+    );
     expect(screen.getByRole('separator', { name: 'Resize the update plan' })).toBeInTheDocument();
 
     await user.click(within(plan).getByRole('button', { name: 'Clear choices' }));
@@ -637,7 +649,7 @@ describe('updates in the window', () => {
         Promise.resolve({
           updates: new Map(),
           blocked: new Map(),
-          unresolved: ['a'],
+          unresolved: [{ id: 'a', title: 'A', explanation: ['A cannot run with B.'] }],
           judge: unjudged,
           planner: alone(),
         }),
@@ -648,6 +660,38 @@ describe('updates in the window', () => {
 
     expect(screen.getByRole('status')).toHaveTextContent(text);
     expect(screen.queryByRole('button', { name: /^Version of/ })).toBeNull();
+  });
+
+  test('says why no working setup was found for a world, in the footer and in its panel', async () => {
+    const why = ['Because Library 1.0.0 depends on Gone, Library needs Gone.', 'So Alpha cannot keep working. (1)'];
+    const { user } = await setUp(() =>
+      Promise.resolve({
+        updates: new Map(),
+        blocked: new Map(),
+        unresolved: [{ id: 'a', title: 'Alpha', explanation: why }],
+        judge: unjudged,
+        planner: alone(),
+      }),
+    );
+
+    const summary = screen.getByText('Why, world by world');
+    const footer = summary.closest('details') as HTMLElement;
+    expect(footer.closest('footer')).not.toBeNull();
+    await user.click(summary);
+    expect(within(footer).getByText('Alpha')).toBeVisible();
+    expect(
+      within(footer)
+        .getAllByRole('listitem')
+        .map(item => item.textContent),
+    ).toEqual(expect.arrayContaining(why));
+
+    await user.click(screen.getByRole('treeitem', { name: /^Alpha/ }));
+    const panel = screen.getByRole('region', { name: 'No working setup' });
+    expect(
+      within(panel)
+        .getAllByRole('listitem')
+        .map(item => item.textContent),
+    ).toEqual(why);
   });
 
   test('says it is looking while the search goes on', async () => {
@@ -1852,7 +1896,7 @@ describe("the plan's snapshot and backups", () => {
     expect(mark).toHaveAttribute('data-tooltip', expect.stringContaining(reason));
     expect(mark).toHaveClass('fa-triangle-exclamation');
     // The mark comes before the title.
-    expect(coreRow.querySelector('th')?.firstElementChild).toBe(mark);
+    expect(coreRow.querySelector('.emma-plan-line')?.firstElementChild).toBe(mark);
     expect(check).toHaveBeenCalledTimes(state.canUpdate ? 1 : 0);
   });
 

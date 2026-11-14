@@ -69,7 +69,9 @@
     "Needs": "Will need when next run",
     "Need": "{title}: now required by {modules}, updated since the world last ran",
     "Unreadable": "EMMA cannot read this world's record. Open the world once, with EMMA active, to record its setup again.",
-    "NeedBy": "now required by {modules}, updated since the world last ran"
+    "NeedBy": "now required by {modules}, updated since the world last ran",
+    "Unresolved": "No working setup",
+    "UnresolvedHint": "EMMA found no versions of what this world uses that work together on the installed build of Foundry VTT, as their manifests declare, so nothing it uses is offered an update. Why:"
   },
   "ModuleInfo": {
     "InWorld": "In {world}",
@@ -163,7 +165,9 @@
     "Installing": "Installing the EMMA module…",
     "UpdateExtension": "Get the newest browser extension",
     "HeldBack": "Update available, but not with the plan as it stands (its choices or locks): open its versions to see why",
-    "HiddenHeldBack": "Updates in the rows under it, but none with the plan as it stands"
+    "HiddenHeldBack": "Updates in the rows under it, but none with the plan as it stands",
+    "UnresolvedWhy": "Why, world by world",
+    "UnresolvedUnread": "EMMA could not read the manifests of {releases}, so cannot tell what they need."
   },
   "Plan": {
     "Safeguards": "Keep first",

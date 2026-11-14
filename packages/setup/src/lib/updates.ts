@@ -42,7 +42,7 @@ import type { KitBadge, KitBadges, KitResolver } from '@mondarth/emma-core/setup
 
 import { format, localize } from './i18n';
 import type { Planner, UpdateHold } from './plans';
-import { createPlanner } from './plans';
+import { createPlanner, toldOfWorld } from './plans';
 import type { Use, WorldUses } from './setups';
 import { considered, keepsLocked, newerIn, newestFirst, oldest, runsOn, unique, usedBy } from './setups';
 
@@ -115,13 +115,21 @@ export interface BlockedUpdate {
 }
 
 /** What the search found. */
+/** A recorded world no working setup was found for, and why, in the resolver's words. */
+export interface UnresolvedWorld {
+  readonly id: string;
+  readonly title: string;
+  /** One sentence to a line, a numbered one ending with its number. */
+  readonly explanation: readonly string[];
+}
+
 export interface UpdateSearch {
   /** The installed packages with newer versions on offer, by package key. */
   readonly updates: ReadonlyMap<PackageKey, PackageUpdate>;
   /** The installed packages with a newer version EMMA cannot offer, by package key; some may have an update too. */
   readonly blocked: ReadonlyMap<PackageKey, BlockedUpdate>;
-  /** The IDs of the recorded worlds no setup was found for, so that nothing they use is offered an update. */
-  readonly unresolved: readonly string[];
+  /** The recorded worlds no setup was found for, so that nothing they use is offered an update, each saying why. */
+  readonly unresolved: readonly UnresolvedWorld[];
   /** Badges the versions on offer. */
   readonly judge: VersionJudge;
   /** Plans the versions chosen, with what they need. */
@@ -264,7 +272,17 @@ export async function findUpdates(given: UpdateInputs): Promise<UpdateSearch> {
   const accept = (key: PackageKey, version: string, hold: UpdateHold): void => {
     accepted.set(key, [...(accepted.get(key) ?? []), { version, hold }]);
   };
-  const unresolved: string[] = [];
+  const unresolved: UnresolvedWorld[] = [];
+  // The resolver's words, naming the installed packages by their titles, as the plans do.
+  const titles = new Map<PackageKey, string>([
+    [CORE, localize('Tree.Root')],
+    ...overview.systems.map(({ id, title }) => [packageKey({ type: 'system', id }), title] as const),
+    ...overview.modules.map(({ module: { id, title } }) => [packageKey({ type: 'module', id }), title] as const),
+  ]);
+  const messages = {
+    ...resolver.englishMessages,
+    name: (key: PackageKey) => titles.get(key) ?? resolver.englishMessages.name(key),
+  };
   for (const world of overview.worlds) {
     const { id, title } = world.world;
     const uses = usedBy(resolver, world);
@@ -290,7 +308,22 @@ export async function findUpdates(given: UpdateInputs): Promise<UpdateSearch> {
       for (const release of [resolution.setup.system, ...resolution.setup.modules])
         accept(packageKey(release.package), release.version, { reason: 'inconsistent', world: { id, title } });
     } else {
-      unresolved.push(id);
+      unresolved.push({
+        id,
+        title,
+        explanation:
+          'failure' in resolution
+            ? resolver
+                .explain(resolution.failure, toldOfWorld(messages, title))
+                .map(({ text, number }) => (number === undefined ? text : `${text} (${String(number)})`))
+            : [
+                format('Update.UnresolvedUnread', {
+                  releases: resolution.needs
+                    .map(({ package: needed, version: at }) => `${messages.name(needed)} ${at}`)
+                    .join(', '),
+                }),
+              ],
+      });
       for (const key of used) {
         const version = installed.get(key);
         if (version !== undefined) accept(key, version, { reason: 'unresolved', world: { id, title } });
