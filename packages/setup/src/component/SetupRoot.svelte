@@ -151,7 +151,9 @@
     const stopped = format('Run.BeforeCore', { version: run.beforeCore });
     return `${stopped} ${localize(run.kept === true ? 'Core.Kept' : 'Core.NotKept')}`;
   });
-  const unresolved = $derived(updates.search?.unresolved.length ?? 0);
+  /** The recorded worlds no working setup was found for, each saying why. */
+  const unresolvedWorlds = $derived(updates.search?.unresolved ?? []);
+  const unresolved = $derived(unresolvedWorlds.length);
   const problem = $derived(updates.status === 'unavailable' ? updates.problem : null);
 
   /**
@@ -579,7 +581,11 @@
                 }} />
             {/if}
           {:else if world !== undefined}
-            <WorldPanel {world} onOpen={openLink} actions={worldActions} />
+            <WorldPanel
+              {world}
+              onOpen={openLink}
+              actions={worldActions}
+              unresolved={unresolvedWorlds.find(({ id }) => id === world.world.id)?.explanation} />
           {:else}
             <RootPanel
               actions={rootActions}
@@ -670,6 +676,24 @@
           <span class="emma-setup-note">{runStatus}</span>
         {/if}
       </p>
+      {#if unresolved > 0}
+        <!-- Why, world by world, in the resolver's words, as each world's panel says too. -->
+        <details class="emma-setup-unresolved">
+          <summary>{localize('Update.UnresolvedWhy')}</summary>
+          <ul>
+            {#each unresolvedWorlds as unresolvedWorld (unresolvedWorld.id)}
+              <li>
+                <strong>{unresolvedWorld.title}</strong>
+                <ol>
+                  {#each unresolvedWorld.explanation as line, index (index)}
+                    <li>{line}</li>
+                  {/each}
+                </ol>
+              </li>
+            {/each}
+          </ul>
+        </details>
+      {/if}
       {#if problem?.reason === 'extension-too-old'}
         <a class="emma-setup-get" href={EXTENSION_RELEASES} target="_blank" rel="noopener noreferrer">
           <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
@@ -825,6 +849,17 @@
     gap: 0.5rem;
     padding-top: 0.5rem;
     border-top: 1px solid var(--color-border, #555);
+  }
+
+  /* Its own line of the footer, scrolling rather than pushing the window's content away. */
+  .emma-setup-unresolved {
+    flex-basis: 100%;
+    max-height: 12rem;
+    overflow: auto;
+  }
+
+  .emma-setup-unresolved summary {
+    cursor: pointer;
   }
 
   .emma-setup-footer button {

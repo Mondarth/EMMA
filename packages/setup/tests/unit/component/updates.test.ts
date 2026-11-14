@@ -637,7 +637,7 @@ describe('updates in the window', () => {
         Promise.resolve({
           updates: new Map(),
           blocked: new Map(),
-          unresolved: ['a'],
+          unresolved: [{ id: 'a', title: 'A', explanation: ['A cannot run with B.'] }],
           judge: unjudged,
           planner: alone(),
         }),
@@ -648,6 +648,38 @@ describe('updates in the window', () => {
 
     expect(screen.getByRole('status')).toHaveTextContent(text);
     expect(screen.queryByRole('button', { name: /^Version of/ })).toBeNull();
+  });
+
+  test('says why no working setup was found for a world, in the footer and in its panel', async () => {
+    const why = ['Because Library 1.0.0 depends on Gone, Library needs Gone.', 'So Alpha cannot keep working. (1)'];
+    const { user } = await setUp(() =>
+      Promise.resolve({
+        updates: new Map(),
+        blocked: new Map(),
+        unresolved: [{ id: 'a', title: 'Alpha', explanation: why }],
+        judge: unjudged,
+        planner: alone(),
+      }),
+    );
+
+    const summary = screen.getByText('Why, world by world');
+    const footer = summary.closest('details') as HTMLElement;
+    expect(footer.closest('footer')).not.toBeNull();
+    await user.click(summary);
+    expect(within(footer).getByText('Alpha')).toBeVisible();
+    expect(
+      within(footer)
+        .getAllByRole('listitem')
+        .map(item => item.textContent),
+    ).toEqual(expect.arrayContaining(why));
+
+    await user.click(screen.getByRole('treeitem', { name: /^Alpha/ }));
+    const panel = screen.getByRole('region', { name: 'No working setup' });
+    expect(
+      within(panel)
+        .getAllByRole('listitem')
+        .map(item => item.textContent),
+    ).toEqual(why);
   });
 
   test('says it is looking while the search goes on', async () => {
