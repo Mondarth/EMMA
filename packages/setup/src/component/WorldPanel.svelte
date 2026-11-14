@@ -17,9 +17,11 @@
     onOpen?: ((link: TreeSelection) => void) | undefined;
     /** The actions on what it shows, such as Lock, Ignore and Uninstall, just below its title; none by default. */
     actions?: Snippet | undefined;
+    /** Why no working setup was found for it, in the resolver's words, if none was. */
+    unresolved?: readonly string[] | undefined;
   }
 
-  let { world, onOpen, actions }: Props = $props();
+  let { world, onOpen, actions, unresolved }: Props = $props();
 
   const recorded = $derived(
     world.record === undefined
@@ -46,6 +48,21 @@
 <h2>{world.world.title}</h2>
 {@render actions?.()}
 <p class={['emma-status', `emma-status-${world.status}`]}>{localize(`Status.${world.status}`)}</p>
+
+{#if unresolved !== undefined}
+  <section class="emma-world-unresolved" aria-labelledby="emma-world-unresolved">
+    <h3 id="emma-world-unresolved">
+      <i class="fa-solid fa-triangle-exclamation" aria-hidden="true" style:color="var(--color-level-error, #e55)"></i>
+      {localize('World.Unresolved')}
+    </h3>
+    <p>{localize('World.UnresolvedHint')}</p>
+    <ol style:padding-left="1.2rem" style:list-style="none">
+      {#each unresolved as line, index (index)}
+        <li>{line}</li>
+      {/each}
+    </ol>
+  </section>
+{/if}
 
 <dl>
   <dt>{localize('World.System')}</dt>

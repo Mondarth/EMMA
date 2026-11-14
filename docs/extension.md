@@ -216,7 +216,10 @@ package for all of them:
 - For each world with a record, EMMA works out the best setup of the installed Foundry VTT, the world's game system and
   the modules its record says are active, each moved up to the newest version that works with the others. A package is
   offered the newest version that every world using it can take. If EMMA finds no working setup for a world, nothing
-  that world uses is offered an update, and the footer says so.
+  that world uses is offered an update, and the footer says so. **Why, world by world**, in the footer, opens to say
+  why for each such world, in the resolver's words: which packages' declared requirements cannot all be met together,
+  or which manifests EMMA could not read. The world's panel says the same, under **No working setup**. Packages EMMA
+  ignores are never the cause: they are taken as installed, and whatever needs them as met.
 - The game system of a world without a record is not offered an update, as EMMA cannot tell whether the modules the
   world runs would work with one.
 - A package no world with a record uses, such as a module that no world has active, is offered its newest version that

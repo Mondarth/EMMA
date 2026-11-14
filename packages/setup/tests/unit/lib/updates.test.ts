@@ -1,4 +1,4 @@
-import type { CoreRelease, Release } from '@mondarth/fvtt-resolver';
+import type { CoreRelease, Release, Universe } from '@mondarth/fvtt-resolver';
 import { describe, expect, test, vi } from 'vitest';
 
 import type { RecordState } from '../../../src/foundry/records';
@@ -177,8 +177,54 @@ describe('findUpdates', () => {
       release('module:app', '2.0.0', { requires: { gone: {} } }),
     ]);
 
-    expect(found.unresolved).toEqual(['a']);
+    expect(found.unresolved).toEqual([
+      {
+        id: 'a',
+        title: 'a',
+        // In the resolver's words, told of the world rather than of the resolver's requirements.
+        explanation: expect.arrayContaining([
+          expect.stringContaining('app 2.0.0 depends on gone'),
+          'So, because no version of gone is available and a runs app, a cannot keep working. (1)',
+        ]) as unknown,
+      },
+    ]);
     expect(found.updates.size).toBe(0);
+  });
+
+  test('says which manifests it could not read, for a world no setup is found for for want of them', async () => {
+    const overview = buildOverview(
+      installation({
+        worlds: [{ id: 'a', title: 'Alpha', system: 'dnd5e' }],
+        modules: [installedModule('app', 'App', '1.0.0')],
+        systems: [{ id: 'dnd5e', title: 'D&D 5e', version: '5.3.3' }],
+      }),
+      new Map<string, RecordState>([
+        ['a', recorded(record('a', { modules: [{ id: 'app', title: 'App', version: '1.0.0' }] }))],
+      ]),
+    );
+    const found = await findUpdates({
+      resolver: {
+        ...KIT.resolver,
+        // A resolution that, after its rounds, still waits on a manifest no round could load.
+        resolveInRounds: ((universe: Universe) =>
+          Promise.resolve({
+            universe,
+            resolution: { ok: false, needs: [{ package: 'module:app', version: '2.0.0' }], warnings: [] },
+          })) as unknown as typeof KIT.resolver.resolveInRounds,
+      },
+      badges: KIT.badges,
+      overview,
+      universe: { core: [CORE], releases: [...DND, release('module:app', '1.0.0'), release('module:app', '2.0.0')] },
+      load: () => Promise.resolve([]),
+    });
+
+    expect(found.unresolved).toEqual([
+      {
+        id: 'a',
+        title: 'Alpha',
+        explanation: ['EMMA could not read the manifests of App 2.0.0, so cannot tell what they need.'],
+      },
+    ]);
   });
 
   test('offers a package no recorded world uses its newest version the installed Foundry can run', async () => {
@@ -424,7 +470,7 @@ describe('the updates EMMA cannot offer', () => {
       release('module:app', '2.0.0', { requires: { gone: {} } }),
     ]);
 
-    expect(found.unresolved).toEqual(['a']);
+    expect(found.unresolved.map(({ id }) => id)).toEqual(['a']);
     expect(found.blocked.get('module:app')?.explanation).toContain(
       'Because app 2.0.0 depends on gone and no version of gone is available, app 2.0.0 cannot be used.',
     );
