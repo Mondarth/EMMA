@@ -267,6 +267,10 @@ through Foundry VTT. Each change that needs it is named, with the changes on the
 the changes in the order they are to be installed: Foundry VTT first, then the game systems, then the modules, each after
 the modules in the plan it requires.
 
+Each row keeps its name and its manifest URL on one line. A name too long for its column, which is never narrower than
+20 characters, is cut short with an ellipsis, its whole on its tooltip, while the state of a run beside it is shown
+whole; a URL too long for its column scrolls sideways. In a panel too narrow for the columns, the plan scrolls sideways.
+
 Each change chosen has **−** at the right of its row, **Take <title> out of the plan**. A change another needs has
 none: it is locked in while that change is in the plan. A click takes out that change alone: what it brought in stays,
 chosen at the versions the plan has, so the rest of the plan is as it was; what another change still needs stays

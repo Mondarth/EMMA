@@ -239,6 +239,11 @@ describe('a step that needs one that failed', () => {
       expect(rowOf('Old')).toHaveTextContent('Not run');
     });
     expect(rowOf('Old')).toHaveTextContent('It needs install Library 2.0.0, which failed or was not run.');
+    // On a line of its own below the name, which stays on one line with its state.
+    const needs = within(rowOf('Old')).getByText('It needs install Library 2.0.0, which failed or was not run.');
+    expect(needs).toHaveClass('emma-plan-below');
+    expect(needs.closest('.emma-plan-line')).toBeNull();
+    expect(rowOf('Old').querySelector('.emma-plan-line')).toHaveTextContent(/Old\s*Not run/);
     expect(rowOf('Old').querySelector('.fa-ban')).not.toBeNull();
     expect(rowOf('Old').querySelector('.emma-plan-bar')).toBeNull();
     expect(held).toHaveLength(1);
