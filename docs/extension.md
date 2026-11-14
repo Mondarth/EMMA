@@ -247,7 +247,13 @@ change. A version that other choices in the plan stand in the way of is listed t
 panel says which choices to take out of the plan for it, and why. So is a version EMMA found but could not locate a
 manifest URL for that version alone, which EMMA needs to install it: it is marked **No manifest for this version**, its
 tooltip and the panel say why, and it can never be chosen, nor does a plan ever bring it in. Nor is such a version ever
-the update offered; when it is the newest, its red arrow says so. The installed versions need none. A version chosen is never changed to suit another. Choosing a version brings in whatever else it needs, from the fewest changes that work: a world's other packages
+the update offered; when it is the newest, its red arrow says so. The installed versions need none.
+
+A version that is not on Foundry's package listing, such as one its author publishes only on GitLab or GitHub ahead of
+the listing (midi-qol's 14.6 line), is offered too, its badge saying **Not on Foundry's package listing**. While a
+listed version newer than the installed one is offered, that one is the update the row's arrow offers, as the plan takes
+an unlisted version only when no listed one fits. A package the plan changes has its version list and badge in the tree
+even when nothing newer runs on the installed build of Foundry VTT, as when the plan takes the newer build with it. A version chosen is never changed to suit another. Choosing a version brings in whatever else it needs, from the fewest changes that work: a world's other packages
 stay as they are where they can, and Foundry VTT moves only as far as it must. Choosing a version other than the installed one opens the **Update plan** below the tree and the panel, the full width of the window, listing each package that
 changes with its installed and new versions, and, for one a choice brings in, which choice needs it, and, where the
 choice does not name it itself, the changes it is needed through: "needed for DAE 14.6.0, through D&D 5e 5.4.0", for a

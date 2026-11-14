@@ -49,6 +49,39 @@ describe('UpdateState', () => {
     expect(updates.chosenOf('module:app')).toBe('1.0.0');
   });
 
+  test('gives a version list to a package the plan changes, though no update is offered on the installed build', async () => {
+    // As midi-qol 14.6.4, which the plan takes with a newer Foundry build than the one installed.
+    const MID: PackageUpdate = {
+      key: 'module:mid',
+      installed: '14.6.0',
+      newest: '14.6.4',
+      versions: ['14.6.4', '14.6.0'],
+    };
+    const overview = buildOverview(installation({ modules: [installedModule('mid', 'Mid', '14.6.0')] }), new Map());
+    const updates = new UpdateState(() =>
+      Promise.resolve({ ...finding(APP), planner: alone(APP, MID), updates: new Map([[APP.key, APP]]) }),
+    );
+    await updates.searchFor(overview);
+    expect(updates.updateOf('module:mid')).toBeUndefined();
+    expect(updates.pickerOf('module:mid')).toBeUndefined();
+    await expect(updates.optionsFor('module:mid')).resolves.toEqual([]);
+
+    await updates.choose('module:mid', '14.6.4');
+    expect(updates.updateOf('module:mid')).toBeUndefined();
+    expect(updates.pickerOf('module:mid')).toEqual({
+      key: 'module:mid',
+      installed: '14.6.0',
+      newest: '14.6.4',
+      versions: ['14.6.4', '14.6.0'],
+    });
+    expect((await updates.optionsFor('module:mid')).map(({ version }) => version)).toContain('14.6.4');
+    // A package with an update has it, as before; one uninstalled, or not installed, has none.
+    expect(updates.pickerOf('module:app')).toBe(APP);
+    await updates.choose('module:mid', UNINSTALL);
+    expect(updates.pickerOf('module:mid')).toBeUndefined();
+    expect(updates.pickerOf('module:nowhere')).toBeUndefined();
+  });
+
   test('gives the newer version of a package EMMA cannot offer, once found', async () => {
     const blocked = { key: 'module:app', newest: '3.0.0', holds: [] };
     const updates = new UpdateState(() =>
