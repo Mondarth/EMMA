@@ -1,3 +1,13 @@
+## [0.11.0](https://github.com/Mondarth/EMMA/compare/extension-v0.10.0...extension-v0.11.0) (2026-11-14)
+
+### Features
+
+* **setup:** say why no working setup was found for a world ([dea5dd0](https://github.com/Mondarth/EMMA/commit/dea5dd0d9b418bea451988844fb05984d661e301))
+
+### Bug Fixes
+
+* **setup:** keep each plan row's name and manifest URL on one line ([7f5e622](https://github.com/Mondarth/EMMA/commit/7f5e622a0f080d96f22eb512053e110f46a2dcea))
+
 ## [0.10.0](https://github.com/Mondarth/EMMA/compare/extension-v0.9.0...extension-v0.10.0) (2026-11-14)
 
 ### Features
