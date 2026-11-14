@@ -39,8 +39,10 @@ export function usedBy(resolver: KitResolver, world: Overview['worlds'][number])
 }
 
 /**
- * Whether a release may be offered on its own: one the Foundry build can run by the core compatibility it declares,
- * listed, and not a pre-release, as the resolver's policy has it.
+ * Whether a release may be offered on its own: one the Foundry build can run by the core compatibility it declares, and
+ * not a pre-release, as the resolver's policy has it. One not on Foundry's listing, such as a line its author publishes
+ * only on GitLab or GitHub, is offered too, badged so (see `VersionOption.unlisted`); the resolver takes one only when no
+ * listed version fits.
  * @param resolver - The resolver
  * @param release - The release
  * @param core - The Foundry build
@@ -50,12 +52,7 @@ export function usedBy(resolver: KitResolver, world: Overview['worlds'][number])
 export function runsOn(resolver: KitResolver, release: Release, core: string, universe: Universe): boolean {
   const { AVAILABILITY, coreAvailability, isUnavailable, looksLikePrerelease } = resolver;
   const availability = coreAvailability({ ...release.compatibility, ...release.listing }, core, universe.core);
-  return (
-    availability !== AVAILABILITY.UNKNOWN &&
-    !isUnavailable(availability) &&
-    release.unlisted !== true &&
-    !looksLikePrerelease(release.version)
-  );
+  return availability !== AVAILABILITY.UNKNOWN && !isUnavailable(availability) && !looksLikePrerelease(release.version);
 }
 
 /**

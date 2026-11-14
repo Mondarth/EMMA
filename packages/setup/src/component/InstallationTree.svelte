@@ -237,6 +237,8 @@
       {@const status = statusText(row)}
       {@const key = packageOf(row.selection)}
       {@const update = key === undefined ? undefined : updates?.updateOf(key)}
+      <!-- An update, or a change the plan makes though no update is offered on the installed build. -->
+      {@const picker = key === undefined ? undefined : updates?.pickerOf(key)}
       {@const blocked = key !== undefined && updates?.blockedOf(key) !== undefined}
       {@const removing = key !== undefined && row.installed === true && updates?.chosenOf(key) === UNINSTALL}
       {@const hidden =
@@ -331,13 +333,13 @@
         {/if}
         {#if removing}
           <span class="emma-tree-uninstall">{localize('Update.Uninstall')}</span>
-        {:else if updates !== undefined && update !== undefined && key !== undefined && row.installed === true}
-          <PinToggle {updates} {key} title={row.title} version={updates.chosenOf(key) ?? update.installed} />
+        {:else if updates !== undefined && picker !== undefined && key !== undefined && row.installed === true}
+          <PinToggle {updates} {key} title={row.title} version={updates.chosenOf(key) ?? picker.installed} />
           <VersionPicker
             title={row.title}
-            chosen={updates.optionOf(key, updates.chosenOf(key) ?? update.installed)}
+            chosen={updates.optionOf(key, updates.chosenOf(key) ?? picker.installed)}
             versions={() => updates.optionsFor(key)}
-            installed={update.installed}
+            installed={picker.installed}
             onChoose={(version: string) => {
               void updates.busy.run(`tree:${row.key}`, 'planning', () => updates.choose(key, version));
             }}

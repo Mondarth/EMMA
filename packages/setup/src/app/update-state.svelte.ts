@@ -652,6 +652,22 @@ export class UpdateState {
   }
 
   /**
+   * What a package's version list offers from: its update, or, for a package the plan changes though no update is
+   * offered on the installed Foundry build, as one it takes with a newer build (midi-qol 14.6.4 with Foundry 14.369),
+   * the installed version and the one planned, so that its row shows the version planned, badged, and its list.
+   * @param key - The package's key
+   * @returns The update, or the plan's change, or `undefined` if neither
+   */
+  pickerOf(key: PackageKey): PackageUpdate | undefined {
+    const update = this.updateOf(key);
+    if (update !== undefined) return update;
+    const planned = this.plan.find(entry => entry.key === key)?.version;
+    const installed = this.#installedOf(key);
+    if (planned === undefined || planned === UNINSTALL || installed === undefined) return undefined;
+    return { key, installed, newest: planned, versions: [planned, installed] };
+  }
+
+  /**
    * Whether a package's update is held back by the plan as it stands: a newer version is offered, but the plan, with its
    * choices and locks, can take none of them, so that its version list offers nothing newer. As last checked (see
    * {@link checkHeldBack}); not, before it is checked.
@@ -808,7 +824,7 @@ export class UpdateState {
    */
   async optionsFor(key: PackageKey): Promise<readonly VersionOption[]> {
     const search = this.search;
-    const installed = this.updateOf(key)?.installed;
+    const installed = this.pickerOf(key)?.installed;
     if (search === null || installed === undefined) return [];
     const { planner } = search;
     const chosen = (other: PackageKey) => this.chosenOf(other);
