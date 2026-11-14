@@ -352,20 +352,45 @@ export async function findUpdates(given: UpdateInputs): Promise<UpdateSearch> {
       resolver,
       runnable.map(release => release.version),
     );
-    // A version with no manifest URL of its own cannot be installed, so is never the newest offered.
+    // A version with no manifest URL of its own cannot be installed, so is never the newest offered; nor, while a listed
+    // one may be, one not on Foundry's listing, which the resolver takes only when no listed version fits.
     const installable = newestFirst(
       resolver,
       runnable.filter(release => !resolver.missingManifest(release)).map(release => release.version),
     );
+    const listed = newestFirst(
+      resolver,
+      runnable
+        .filter(release => !resolver.missingManifest(release) && release.unlisted !== true)
+        .map(release => release.version),
+    );
     const bests = accepted.get(key);
+    /**
+     * The newest of some versions, listed first: a listed one newer than the installed one, or else any.
+     * @param listedOnes - Those on Foundry's listing, newest first
+     * @param all - All of them, newest first
+     * @returns The version, or `undefined` for none
+     */
+    const preferListed = (listedOnes: readonly string[], all: readonly string[]): string | undefined => {
+      const newerListed = listedOnes[0];
+      return newerListed !== undefined && newer(newerListed, version) ? newerListed : all[0];
+    };
     const newest =
       bests === undefined
-        ? installable[0]
+        ? preferListed(listed, installable)
         : oldest(
             resolver,
             bests.map(({ version: best }) => best),
           );
-    const available = choosable[0];
+    // The newest there is, as an update would offer it: listed, while one is, as the resolver prefers. Those not on the
+    // listing are still in the version list (see `planner.candidates`).
+    const available = preferListed(
+      newestFirst(
+        resolver,
+        runnable.filter(release => release.unlisted !== true).map(release => release.version),
+      ),
+      choosable,
+    );
     if (available !== undefined && newer(available, newest ?? version) && newer(available, version)) {
       const holds = (bests ?? []).filter(({ version: best }) => newer(available, best)).map(({ hold }) => hold);
       blocked.set(key, { key, newest: available, holds });

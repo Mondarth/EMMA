@@ -195,6 +195,21 @@ describe('findUpdates', () => {
 
     expect(found.updates.get('module:idle')).toMatchObject({ newest: '1.1.0', versions: ['1.1.0', '1.0.0'] });
     expect(found.updates.get('system:dnd5e')).toMatchObject({ newest: '5.5.0' });
+    // One not on the listing is not the newest offered while a listed one is, but it can still be chosen.
+    expect(found.planner.candidates('module:idle')).toContain('1.3.0');
+    expect(found.blocked.has('module:idle')).toBe(false);
+  });
+
+  test('offer a version not on the listing, as one published only on GitLab or GitHub, when no listed one is newer', async () => {
+    const found = await search([['idle', '1.0.0']], {}, [
+      ...DND,
+      release('module:idle', '1.0.0'),
+      release('module:idle', '1.3.0', { unlisted: true }),
+      release('module:idle', '1.2.0', { unlisted: true }),
+    ]);
+
+    expect(found.updates.get('module:idle')).toMatchObject({ newest: '1.3.0', versions: ['1.3.0', '1.2.0', '1.0.0'] });
+    expect(found.judge('module:idle', '1.3.0', () => undefined)).toMatchObject({ unlisted: true });
   });
 
   test('offers no version found without a manifest of its own, blocking it and saying why', async () => {
