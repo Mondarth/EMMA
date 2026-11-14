@@ -33,6 +33,13 @@ List view
 : Every installed module, with its version, under a title counting how many are active and inactive. Check or
   uncheck a module to activate or deactivate it. Modules you have changed are marked at their left edge.
 
+  ```{figure} images/usage/EMMA_list.png
+  :alt: EMMA's list view
+  :width: 600px
+
+  List view, similar to Foundry's own Module Management
+  ```
+
   The checkbox at the start of the title row shows whether every module is active (checked), none is (unchecked), or
   some are (a dash). Click it to activate every module, or, when every module is active, to deactivate every one,
   EMMA included.
@@ -46,6 +53,13 @@ Split view
 : Inactive modules on the left, active modules on the right, each side's count in parentheses beside its title. Select modules on one side, then move them across with
   the buttons between the lists: **<** deactivates the modules selected on the active side, and **>** activates the
   modules selected on the inactive side. Moved modules stay selected, so the opposite button undoes a move.
+
+  ```{figure} images/usage/EMMA_split.png
+  :alt: EMMA's split view
+  :width: 600px
+
+  Split view: inactive on left, active on right
+  ```
 
 In both views each module's version is shown in a badge, in Foundry's own colours and icons, coloured by how well the
 module suits your world. Hover over the badge for the reason.
@@ -172,8 +186,9 @@ until you choose otherwise.
 
 ## Hypothetical mode
 
-GMs have a **Hypothetical mode** button, a flask, at the far left of the toolbar. Click it to turn the mode on; it
-stays pressed while on, and two buttons appear just to its right:
+GMs have a **Hypothetical mode** button, a flask ![hypothetical mode button](images/usage/EMMA_tool_hypothetical.png),
+at the far left of the toolbar. Click it to turn the mode on; it stays pressed while on, and two buttons appear just
+to its right:
 
 - **Core**, showing the Foundry version you are running, such as `14.368`.
 - **System**, showing the ID and version of the game system in use, such as `dnd5e 5.1.0`. Hover over it for the
@@ -186,6 +201,13 @@ module you stage active, by checking it or moving it to the active side, is look
 after a second or two, once EMMA has found its versions and judged them. Each module is looked up only once while
 EMMA is open, so staging it inactive and active again shows its drop-down straight away. A spinner shows beside the
 System button while it looks.
+
+```{figure} images/usage/EMMA_hypothetical.png
+:alt: EMMA in hypothetical mode
+:width: 600px
+
+EMMA in hypothetical mode
+```
 
 ### Choosing versions
 
@@ -231,31 +253,49 @@ version, the system and the modules staged active, at the versions chosen. They 
 looked up. Each report opens in a window of its own, so any of them can be open beside the others; a button shows
 pressed while its report is open, and pressing it again closes the report:
 
-- **Plan** (a numbered list): the active modules in the order to install them, numbered, in three columns: each
-  module's ID, its name, and a manifest URL for the version chosen alone, such as a GitHub release's own
-  `module.json`, so that installing from it installs that version. A module's own manifest URL usually gives whatever
-  version is newest, so it is never shown; where no source gives a URL for the version, the plan says _none for this
-  version_. The plan is in two lists, each under its title and numbered from 1:
+- **Plan** ![plan tool button](images/usage/EMMA_tool_plan.png) (a numbered list): the active modules in the order to
+  install them, numbered, in three columns: each module's ID, its name, and a manifest URL for the version chosen
+  alone, such as a GitHub release's own `module.json`, so that installing from it installs that version. A module's
+  own manifest URL usually gives whatever version is newest, so it is never shown; where no source gives a URL for the
+  version, the plan says _none for this version_. The plan is in two lists, each under its title and numbered from 1:
   first the modules to install (a version other than the one installed, or a module not installed), then those kept at
   the version installed. In each, a module comes before the modules that depend on it: the modules are ordered by how
   deep the tree of active modules depending on each one goes, deepest first, so the libraries others build on come
   first.
-- **Check** (a clipboard with a tick): whether every package can be used in the setup, then every active module with
-  its badge, Foundry's verdict and, in words, everything found about it: what keeps it from being used (a module it
-  depends on at the wrong version, a system it does not run in), what it prefers and is not given (a Foundry version
-  or system version it is not verified with), what it advises (a module it recommends that is not active), and whether
-  it is not known, or known only from a listing and so checked without its dependencies. The modules it finds nothing
-  to report on are grouped after the others in a folded section, **Nothing to report**, with how many there are: click
-  it to list them, each with its badge and verdict. In the downloaded text they follow the others after two blank
-  lines.
-- **Update** (an arrow up in a circle): the best versions of the active modules for the Foundry version and system
-  chosen: the newest version of each, from the one chosen up, that works with the others' and with
-  that Foundry version and system. A version that is only a compatibility risk (not verified for this Foundry, but not
-  ruled out) is acceptable; one that needs another Foundry version, does not support the system version, or declares
-  no compatibility at all is not, nor is a pre-release. It lists the versions to change, and modules an active module
-  needs that it would add; or, when no versions work together, explains why in numbered sentences. It may need the
-  manifests of versions known only from a listing, which it tries to fetch, so it can take a moment; versions whose
-  manifests could not be loaded are named.
+  ```{figure} images/usage/EMMA_report_plan.png
+  :alt: The hypothetical mode's plan report
+  :width: 600px
+
+  Plan report showing the recommended ordered install list.
+  ```
+- **Check** ![check tool button](images/usage/EMMA_tool_check.png) (a clipboard with a tick): whether every package
+  can be used in the setup, then every active module with its badge, Foundry's verdict and, in words, everything found
+  about it: what keeps it from being used (a module it depends on at the wrong version, a system it does not run in),
+  what it prefers and is not given (a Foundry version or system version it is not verified with), what it advises (a
+  module it recommends that is not active), and whether it is not known, or known only from a listing and so checked
+  without its dependencies. The modules it finds nothing to report on are grouped after the others in a folded
+  section, **Nothing to report**, with how many there are: click it to list them, each with its badge and verdict. In
+  the downloaded text they follow the others after two blank lines.
+  ```{figure} images/usage/EMMA_report_check.png
+  :alt: The hypothetical mode's check report
+  :width: 600px
+
+  Report showing how the current staged versions of active modules fit.
+  ```
+- **Update** ![update tool button](images/usage/EMMA_tool_update.png) (an arrow up in a circle): the best versions of
+  the active modules for the Foundry version and system chosen: the newest version of each, from the one chosen up,
+  that works with the others' and with that Foundry version and system. A version that is only a compatibility risk
+  (not verified for this Foundry, but not ruled out) is acceptable; one that needs another Foundry version, does not
+  support the system version, or declares no compatibility at all is not, nor is a pre-release. It lists the versions
+  to change, and modules an active module needs that it would add; or, when no versions work together, explains why in
+  numbered sentences. It may need the manifests of versions known only from a listing, which it tries to fetch, so it
+  can take a moment; versions whose manifests could not be loaded are named.
+  ```{figure} images/usage/EMMA_report_update.png
+  :alt: The hypothetical mode's update report
+  :width: 600px
+
+  The update report
+  ```
 
 When the **Update** changes any version, a button (a wand) just left of its download button chooses the versions it
 recommends in the hypothetical setup, as if you had picked each from its drop-down. Every other choice is left as it
