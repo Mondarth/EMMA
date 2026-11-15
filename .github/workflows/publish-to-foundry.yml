@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: The module's version to publish, such as 0.13.1; the latest module release if left empty
+        description: The module's version to publish, such as 0.13.1; the latest module release if left empty. Only the module's releases (v<version>) are published, never the extension's
         type: string
         required: false
       dry-run:
@@ -34,14 +34,24 @@ jobs:
       - name: Find the release's manifest
         id: manifest
         run: |
+          # Only the module's releases, tagged v<version>, are Foundry packages: told apart by their tags alone, never by
+          # whether a release is a pre-release, so that the extension's (extension-v<version>) never are, whatever they
+          # are marked.
+          module_tag='^v[0-9]+[.][0-9]+[.][0-9]+$'
           version="${VERSION#v}"
           if [ -z "$version" ]; then
-            # The module's releases are tagged v<version>; the extension's extension-v<version> are pre-releases.
-            version="$(gh release list --repo "$REPOSITORY" --exclude-pre-releases --exclude-drafts --limit 50 \
-              --json tagName --jq '[.[] | select(.tagName | test("^v[0-9]"))][0].tagName' | sed 's/^v//')"
+            # The newest module release, by when it was published.
+            version="$(gh release list --repo "$REPOSITORY" --exclude-drafts --limit 100 \
+              --json tagName,publishedAt \
+              --jq "[.[] | select(.tagName | test(\"${module_tag}\"))] | sort_by(.publishedAt) | last | .tagName // empty" \
+              | sed 's/^v//')"
           fi
           if [ -z "$version" ]; then
             echo "::error::No module release found."
+            exit 1
+          fi
+          if ! [[ "v${version}" =~ $module_tag ]]; then
+            echo "::error::${VERSION} is not a version of the module, such as 0.13.1."
             exit 1
           fi
           url="https://github.com/${REPOSITORY}/releases/download/v${version}/module.json"

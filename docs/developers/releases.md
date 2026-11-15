@@ -40,7 +40,8 @@ The publishing is a workflow of its own, `.github/workflows/publish-to-foundry.y
 It can be run by hand too (Actions, *Publish to Foundry VTT*, *Run workflow*) to publish a release made before it
 existed, or one whose publishing failed: the latest module release by default, or the version given, and with
 **dry-run** ticked Foundry VTT checks the release without publishing it. It checks first that the release attaches a
-`module.json`. The
+`module.json`. Only the module's releases are ever published: it tells them by their tags, `v<version>`, never by whether
+a release is a pre-release, so the extension's (`extension-v<version>`) are never published, however they are marked. The
 browser extension is not a Foundry package, so is not published there.
 
 ### Which commits count
