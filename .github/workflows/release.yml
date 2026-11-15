@@ -7,6 +7,8 @@ name: Release
 #      the module first, then the browser extension. For each, it works out the version from the commits, stamps and
 #      packages the package, commits its changelog and version, tags the commit and publishes the GitHub release.
 #   3. If either was released, the documentation is deployed and `dev` is brought up to date with the release commits.
+#   4. If the module was released, the release is published to Foundry VTT's package listing, so that Foundry's Setup
+#      screen offers it (docs/developers/releases.md).
 #
 # It can also be started by hand on `main` (Actions > Release > Run workflow); it then releases only if there is
 # something to release.
@@ -130,6 +132,21 @@ jobs:
           GIT_AUTHOR_EMAIL: ${{ steps.identity.outputs.email }}
           GIT_COMMITTER_NAME: ${{ steps.identity.outputs.name }}
           GIT_COMMITTER_EMAIL: ${{ steps.identity.outputs.email }}
+
+  foundry:
+    name: Publish to Foundry VTT
+    needs: release
+    if: ${{ needs.release.outputs.module-version != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      # Foundry VTT's Package Release API, given the manifest of the version released alone: the one the GitHub release
+      # attaches, which names that version's own zip. The token is the package's, from its page on foundryvtt.com.
+      # Pinned to the commit of its latest release, v1.0.3, as it is given a secret.
+      - name: Publish the module's release
+        uses: illandril/FoundryVTT-package-release-action@c7726a2aa3e1c65c4f24cc8f115c5dda01e68d9f # v1.0.3
+        with:
+          package-release-token: ${{ secrets.FOUNDRY_PACKAGE_RELEASE_TOKEN }}
+          manifest-url: https://github.com/${{ github.repository }}/releases/download/v${{ needs.release.outputs.module-version }}/module.json
 
   docs:
     name: Publish documentation
