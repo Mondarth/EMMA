@@ -34,7 +34,13 @@ version's own zip. Foundry reads the version and its compatibility from it.
 
 It needs the secret `FOUNDRY_PACKAGE_RELEASE_TOKEN`: the package release token on the module's page on foundryvtt.com
 (Edit package, then the release token), which only the package's owner can see. Without it the job fails, after the
-GitHub release is made; the release can then be added on the package's page by hand, from the same manifest URL. The
+GitHub release is made.
+
+The publishing is a workflow of its own, `.github/workflows/publish-to-foundry.yml`, which the *Release* workflow calls.
+It can be run by hand too (Actions, *Publish to Foundry VTT*, *Run workflow*) to publish a release made before it
+existed, or one whose publishing failed: the latest module release by default, or the version given, and with
+**dry-run** ticked Foundry VTT checks the release without publishing it. It checks first that the release attaches a
+`module.json`. The
 browser extension is not a Foundry package, so is not published there.
 
 ### Which commits count
