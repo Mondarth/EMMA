@@ -26,11 +26,15 @@ Both streams run from the repository's root, so that each can commit files outsi
 
 Once the module is released, the *Release* workflow's **Publish to Foundry VTT** job publishes the release to Foundry
 VTT's package listing, through its [Package Release API](https://foundryvtt.com/article/package-release-api/), so that
-Foundry's Setup screen offers it. It runs
-[illandril/FoundryVTT-package-release-action](https://github.com/illandril/FoundryVTT-package-release-action), pinned
-to the commit of its latest release, `v1.0.3`, with the manifest of the version released alone: the `module.json` attached to
-its GitHub release, `https://github.com/Mondarth/EMMA/releases/download/v<version>/module.json`, which names that
-version's own zip. Foundry reads the version and its compatibility from it.
+Foundry's Setup screen offers it. It asks the API itself, with `curl`: the package's `id`, the version, its
+compatibility and, as its manifest, the manifest of that version alone, the `module.json` attached to its GitHub
+release, `https://github.com/Mondarth/EMMA/releases/download/v<version>/module.json`, which names that version's own
+zip; its notes are the GitHub release's page. It prints what it sends and what Foundry answers, and fails unless the
+answer's `status` is `success`.
+
+It does not use illandril/FoundryVTT-package-release-action, which it first did: that action sends the fetched
+manifest's own `manifest` field, EMMA's stable URL on `main` that always gives the newest version, in place of the URL
+it is given, so Foundry's listing would have offered every version from a manifest of the newest.
 
 It needs the secret `FOUNDRY_PACKAGE_RELEASE_TOKEN`: the package release token on the module's page on foundryvtt.com
 (Edit package, then the release token), which only the package's owner can see. Without it the job fails, after the
