@@ -4,6 +4,7 @@
 -->
 <script lang="ts">
   import type { PlanRun } from '../app/setup-state.svelte';
+  import { failureHint } from '../lib/failures';
   import { format, localize } from '../lib/i18n';
 
   interface Props {
@@ -37,7 +38,7 @@
     <p>{localize('Failure.Answered')}</p>
     <blockquote>{message !== undefined && message !== '' ? message : localize('Failure.NoAnswer')}</blockquote>
     {#if step.kind === 'install'}
-      <p class="emma-failed-hint">{localize('Failure.ManifestHint')}</p>
+      <p class="emma-failed-hint">{failureHint(message)}</p>
     {/if}
   </section>
 {/if}
