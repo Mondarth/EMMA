@@ -1,3 +1,9 @@
+## [0.11.2](https://github.com/Mondarth/EMMA/compare/extension-v0.11.1...extension-v0.11.2) (2026-11-15)
+
+### Bug Fixes
+
+* **setup:** suggest what fits Foundry's answer when an install fails ([e5b7a7c](https://github.com/Mondarth/EMMA/commit/e5b7a7c8d6a7894a99caf1e28872fc92c309ea06))
+
 ## [0.11.0](https://github.com/Mondarth/EMMA/compare/extension-v0.10.0...extension-v0.11.0) (2026-11-14)
 
 ### Features
