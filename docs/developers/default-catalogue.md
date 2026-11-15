@@ -1,7 +1,7 @@
 # The default catalogue
 
 EMMA looks up versions in a default package catalogue, built into every release: the
-[Foundry VTT package catalogue](https://github.com/Mondarth/fvtt-package-catalogue), which asks for an API key. It is
+[Foundry VTT package catalogue](https://mondarth.github.io/fvtt-package-catalogue/), which asks for an API key. It is
 the only service EMMA asks for versions, from the module and from the EMMA extension alike. Earlier versions also
 asked a CORS proxy; it is no longer built in or used.
 
