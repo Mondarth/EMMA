@@ -22,6 +22,32 @@ hand.
 Both streams run from the repository's root, so that each can commit files outside its package, such as the module's
 `docs/conf.py`. The extension's stream runs after the module's, from the module's release commit if there is one.
 
+### Publishing the module to Foundry VTT
+
+Once the module is released, the *Release* workflow's **Publish to Foundry VTT** job publishes the release to Foundry
+VTT's package listing, through its [Package Release API](https://foundryvtt.com/article/package-release-api/), so that
+Foundry's Setup screen offers it. It asks the API itself, with `curl`: the package's `id`, the version, its
+compatibility and, as its manifest, the manifest of that version alone, the `module.json` attached to its GitHub
+release, `https://github.com/Mondarth/EMMA/releases/download/v<version>/module.json`, which names that version's own
+zip; its notes are the GitHub release's page. It prints what it sends and what Foundry answers, and fails unless the
+answer's `status` is `success`.
+
+It does not use illandril/FoundryVTT-package-release-action, which it first did: that action sends the fetched
+manifest's own `manifest` field, EMMA's stable URL on `main` that always gives the newest version, in place of the URL
+it is given, so Foundry's listing would have offered every version from a manifest of the newest.
+
+It needs the secret `FOUNDRY_PACKAGE_RELEASE_TOKEN`: the package release token on the module's page on foundryvtt.com
+(Edit package, then the release token), which only the package's owner can see. Without it the job fails, after the
+GitHub release is made.
+
+The publishing is a workflow of its own, `.github/workflows/publish-to-foundry.yml`, which the *Release* workflow calls.
+It can be run by hand too (Actions, *Publish to Foundry VTT*, *Run workflow*) to publish a release made before it
+existed, or one whose publishing failed: the latest module release by default, or the version given, and with
+**dry-run** ticked Foundry VTT checks the release without publishing it. It checks first that the release attaches a
+`module.json`. Only the module's releases are ever published: it tells them by their tags, `v<version>`, never by whether
+a release is a pre-release, so the extension's (`extension-v<version>`) are never published, however they are marked. The
+browser extension is not a Foundry package, so is not published there.
+
 ### Which commits count
 
 A package's releases are made from the commits that change files in its folder, or in the folders of the workspace

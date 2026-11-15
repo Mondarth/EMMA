@@ -7,6 +7,8 @@ name: Release
 #      the module first, then the browser extension. For each, it works out the version from the commits, stamps and
 #      packages the package, commits its changelog and version, tags the commit and publishes the GitHub release.
 #   3. If either was released, the documentation is deployed and `dev` is brought up to date with the release commits.
+#   4. If the module was released, the release is published to Foundry VTT's package listing, so that Foundry's Setup
+#      screen offers it (docs/developers/releases.md).
 #
 # It can also be started by hand on `main` (Actions > Release > Run workflow); it then releases only if there is
 # something to release.
@@ -130,6 +132,15 @@ jobs:
           GIT_AUTHOR_EMAIL: ${{ steps.identity.outputs.email }}
           GIT_COMMITTER_NAME: ${{ steps.identity.outputs.name }}
           GIT_COMMITTER_EMAIL: ${{ steps.identity.outputs.email }}
+
+  foundry:
+    name: Publish to Foundry VTT
+    needs: release
+    if: ${{ needs.release.outputs.module-version != '' }}
+    uses: ./.github/workflows/publish-to-foundry.yml
+    with:
+      version: ${{ needs.release.outputs.module-version }}
+    secrets: inherit
 
   docs:
     name: Publish documentation
