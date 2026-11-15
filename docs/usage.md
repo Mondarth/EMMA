@@ -322,7 +322,7 @@ with it.
 
 ### Where versions come from
 
-EMMA looks every version up in its [package catalogue](https://github.com/Mondarth/fvtt-package-catalogue), which
+EMMA looks every version up in its [package catalogue](https://mondarth.github.io/fvtt-package-catalogue/), which
 keeps every version of Foundry's listed packages and of those it is asked for, each read from its own manifest, with
 what they require and run in, and Foundry's own builds. When hypothetical mode is first turned on, one request gives
 the versions of the game system and every installed module, so turning modules on and off asks nothing more. EMMA
