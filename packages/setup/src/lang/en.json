@@ -435,6 +435,10 @@
     "Asked": "EMMA asked Foundry to install {version} from:",
     "Answered": "Foundry answered:",
     "ManifestHint": "A manifest URL can give a version other than the one it is listed for, as one that always gives the newest does: then Foundry cannot install the version the plan chose. Take it out of the plan, or choose another version.",
+    "RateLimitedHint": "{host} refused the download for too many requests. That is often its limit on one file for everyone downloading it, not only this server: try again in a few minutes.",
+    "NotFoundHint": "{host} has no file at the address the manifest gives: its author may have moved or removed it. Choose another version, or take it out of the plan.",
+    "RefusedHint": "{host} refused the download: the file may need signing in, or buying, as a premium package's does.",
+    "DownloadHint": "Foundry could not download the package's file from {host}. If it answers again later, run the plan again.",
     "NoAnswer": "Foundry said nothing of why."
   },
   "Action": {

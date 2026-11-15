@@ -330,7 +330,10 @@ installs. A step done is underlined in green, with a tick and **Done**; a step t
 Foundry says nothing of how far a snapshot, a backup or an uninstall has got, so those show a spinner until done. The plan's title and its **Run the plan** and **Clear choices** buttons stay in view as its tables
 scroll. The footer names the first step that failed, and why, and counts any others that failed or were not run. Each
 package's name in the plan opens its row in the tree, and its panel: a step that failed leads it with what EMMA asked
-Foundry to do (the version, and the manifest URL it was installed from) and what Foundry answered. A
+Foundry to do (the version, and the manifest URL it was installed from) and what Foundry answered, with a hint that
+fits the answer: when the package's file could not be downloaded, whether its host refused for too many requests (try
+again in a few minutes), had no file there, or refused it outright; otherwise, that the manifest may give another
+version than the one the plan chose. A
 run stops before Foundry VTT's own update: updating Foundry in place restarts it, and is for the user to do with
 care. Meanwhile the choices cannot change. After a run, EMMA reads the installation again, so what was done leaves the
 plan and the rest stays in it, to run again.
