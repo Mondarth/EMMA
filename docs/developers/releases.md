@@ -22,6 +22,21 @@ hand.
 Both streams run from the repository's root, so that each can commit files outside its package, such as the module's
 `docs/conf.py`. The extension's stream runs after the module's, from the module's release commit if there is one.
 
+### Publishing the module to Foundry VTT
+
+Once the module is released, the *Release* workflow's **Publish to Foundry VTT** job publishes the release to Foundry
+VTT's package listing, through its [Package Release API](https://foundryvtt.com/article/package-release-api/), so that
+Foundry's Setup screen offers it. It runs
+[illandril/FoundryVTT-package-release-action](https://github.com/illandril/FoundryVTT-package-release-action), pinned
+to the commit its `v1` tag points at, with the manifest of the version released alone: the `module.json` attached to
+its GitHub release, `https://github.com/Mondarth/EMMA/releases/download/v<version>/module.json`, which names that
+version's own zip. Foundry reads the version and its compatibility from it.
+
+It needs the secret `FOUNDRY_PACKAGE_RELEASE_TOKEN`: the package release token on the module's page on foundryvtt.com
+(Edit package, then the release token), which only the package's owner can see. Without it the job fails, after the
+GitHub release is made; the release can then be added on the package's page by hand, from the same manifest URL. The
+browser extension is not a Foundry package, so is not published there.
+
 ### Which commits count
 
 A package's releases are made from the commits that change files in its folder, or in the folders of the workspace

@@ -49,6 +49,7 @@ Under *Settings → Secrets and variables → Actions → Secrets*:
 | `EMMA_DEFAULT_CATALOGUE_KEY` | Release | Required. The API key of the default package catalogue (see {doc}`default-catalogue`) |
 | `AMO_JWT_ISSUER`        | Release | Optional. The issuer of an API key from addons.mozilla.org, to have Mozilla sign the Firefox extension |
 | `AMO_JWT_SECRET`        | Release | Optional. That API key's secret                                          |
+| `FOUNDRY_PACKAGE_RELEASE_TOKEN` | Release | The module's package release token, from its page on foundryvtt.com, to publish each release to Foundry VTT's package listing |
 
 And under *Variables*, `EMMA_DEFAULT_CATALOGUE_URL`, the default catalogue's URL. A release of the module or of the
 browser extension stops before it changes anything when either is not set, as a build without them would ship with no
