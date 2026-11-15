@@ -61,16 +61,51 @@ jobs:
           fi
           echo "Publishing ${version} from ${url}"
           echo "url=${url}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           VERSION: ${{ inputs.version }}
 
-      # The token is the package's, from its page on foundryvtt.com. Pinned to the commit of the action's latest release,
-      # v1.0.3, as it is given a secret.
+      # Foundry VTT's Package Release API (https://foundryvtt.com/article/package-release-api/), asked directly rather
+      # through a third-party action, which sent the manifest's own `manifest` field, EMMA's stable URL that always gives
+      # the newest version, in place of the manifest of this version alone. The token is the package's, from its page on
+      # foundryvtt.com, and is only ever passed in the environment.
       - name: Publish it
-        uses: illandril/FoundryVTT-package-release-action@c7726a2aa3e1c65c4f24cc8f115c5dda01e68d9f # v1.0.3
-        with:
-          package-release-token: ${{ secrets.FOUNDRY_PACKAGE_RELEASE_TOKEN }}
-          manifest-url: ${{ steps.manifest.outputs.url }}
-          dry-run: ${{ inputs.dry-run == true }}
+        run: |
+          manifest="$(mktemp)"
+          curl --fail --silent --show-error --location --output "$manifest" "$URL"
+          id="$(jq -r .id "$manifest")"
+          declared="$(jq -r .version "$manifest")"
+          if [ "$declared" != "$VERSION" ]; then
+            echo "::error::The manifest at ${URL} is of version ${declared}, not ${VERSION}."
+            exit 1
+          fi
+          body="$(jq -n \
+            --arg id "$id" \
+            --arg version "$VERSION" \
+            --arg manifest "$URL" \
+            --arg notes "https://github.com/${REPOSITORY}/releases/tag/v${VERSION}" \
+            --argjson compatibility "$(jq '.compatibility // {}' "$manifest")" \
+            --argjson dryRun "$DRY_RUN" \
+            '{id: $id, release: {version: $version, manifest: $manifest, notes: $notes, compatibility: $compatibility}}
+              + (if $dryRun then {"dry-run": true} else {} end)')"
+          echo "Asking Foundry VTT to $([ "$DRY_RUN" = true ] && echo 'check, without publishing,' || echo 'publish') this release:"
+          echo "$body" | jq .
+          response="$(curl --silent --show-error --request POST \
+            --header 'Content-Type: application/json' \
+            --header "Authorization: ${TOKEN}" \
+            --data "$body" \
+            https://api.foundryvtt.com/_api/packages/release_version/)"
+          echo "Foundry VTT answered:"
+          echo "$response" | jq . 2>/dev/null || echo "$response"
+          if [ "$(echo "$response" | jq -r '.status // empty' 2>/dev/null)" != 'success' ]; then
+            echo "::error::Foundry VTT did not accept the release."
+            exit 1
+          fi
+        env:
+          TOKEN: ${{ secrets.FOUNDRY_PACKAGE_RELEASE_TOKEN }}
+          URL: ${{ steps.manifest.outputs.url }}
+          VERSION: ${{ steps.manifest.outputs.version }}
+          REPOSITORY: ${{ github.repository }}
+          DRY_RUN: ${{ inputs.dry-run == true }}
