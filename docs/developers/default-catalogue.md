@@ -42,9 +42,10 @@ The release workflow sets two values in the environment of the release build:
 : A repository secret: the API key.
 
 `packages/core/scripts/default-catalogue-define.ts` gives both to Vite's `define` as `__EMMA_DEFAULT_CATALOGUE__`,
-obscured by `packages/core/src/obscure.ts`: each is split into chunks, and each chunk masked by random bytes of its
-own, so neither the key nor any long run of it is in the bundle as text. The pads are new with every build. It is not
-encryption, as the pads ship beside the chunks; it keeps the key out of casual sight, and out of a search of the code.
+obscured by `packages/core/src/obscure.ts`: each is split into chunks, and each chunk masked by bytes of its own that
+look random, so neither the key nor any long run of it is in the bundle as text. The pads are made from the text, so
+every build of a release is the same, which signing the extension again relies on (see
+[Releases](releases.md#signing-the-extension-again)). It is not encryption, as the pads ship beside the chunks; it keeps the key out of casual sight, and out of a search of the code.
 EMMA reveals it when it uses it, with `defaultCatalogue()` (`src/module/lib/default-catalogue.ts`, through
 `packages/core/src/default-catalogue.ts`). The EMMA extension is built with it in the same way, in the browser
 extension's release step.
