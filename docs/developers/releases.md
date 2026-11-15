@@ -28,7 +28,7 @@ Once the module is released, the *Release* workflow's **Publish to Foundry VTT**
 VTT's package listing, through its [Package Release API](https://foundryvtt.com/article/package-release-api/), so that
 Foundry's Setup screen offers it. It runs
 [illandril/FoundryVTT-package-release-action](https://github.com/illandril/FoundryVTT-package-release-action), pinned
-to the commit its `v1` tag points at, with the manifest of the version released alone: the `module.json` attached to
+to the commit of its latest release, `v1.0.3`, with the manifest of the version released alone: the `module.json` attached to
 its GitHub release, `https://github.com/Mondarth/EMMA/releases/download/v<version>/module.json`, which names that
 version's own zip. Foundry reads the version and its compatibility from it.
 
