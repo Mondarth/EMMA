@@ -1,0 +1,76 @@
+name: Publish to Foundry VTT
+
+# Publishes a release of the module to Foundry VTT's package listing, through its Package Release API, so that Foundry's
+# Setup screen offers it (docs/developers/releases.md). The Release workflow calls it after each module release. It can
+# also be run by hand (Actions > Publish to Foundry VTT > Run workflow), for a release made before it existed, or one
+# whose publishing failed: the latest module release by default, or the version given.
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: The module's version released, such as 0.13.1
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The module's version to publish, such as 0.13.1; the latest module release if left empty. Only the module's releases (v<version>) are published, never the extension's
+        type: string
+        required: false
+      dry-run:
+        description: Have Foundry VTT check the release without publishing it
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish the module's release
+    runs-on: ubuntu-latest
+    steps:
+      # The manifest of the version alone: the one its GitHub release attaches, which names that version's own zip.
+      - name: Find the release's manifest
+        id: manifest
+        run: |
+          # Only the module's releases, tagged v<version>, are Foundry packages: told apart by their tags alone, never by
+          # whether a release is a pre-release, so that the extension's (extension-v<version>) never are, whatever they
+          # are marked.
+          module_tag='^v[0-9]+[.][0-9]+[.][0-9]+$'
+          version="${VERSION#v}"
+          if [ -z "$version" ]; then
+            # The newest module release, by when it was published.
+            version="$(gh release list --repo "$REPOSITORY" --exclude-drafts --limit 100 \
+              --json tagName,publishedAt \
+              --jq "[.[] | select(.tagName | test(\"${module_tag}\"))] | sort_by(.publishedAt) | last | .tagName // empty" \
+              | sed 's/^v//')"
+          fi
+          if [ -z "$version" ]; then
+            echo "::error::No module release found."
+            exit 1
+          fi
+          if ! [[ "v${version}" =~ $module_tag ]]; then
+            echo "::error::${VERSION} is not a version of the module, such as 0.13.1."
+            exit 1
+          fi
+          url="https://github.com/${REPOSITORY}/releases/download/v${version}/module.json"
+          if ! gh release view "v${version}" --repo "$REPOSITORY" --json assets --jq '.assets[].name' | grep -qx 'module.json'; then
+            echo "::error::Release v${version} has no module.json to publish."
+            exit 1
+          fi
+          echo "Publishing ${version} from ${url}"
+          echo "url=${url}" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          VERSION: ${{ inputs.version }}
+
+      # The token is the package's, from its page on foundryvtt.com. Pinned to the commit of the action's latest release,
+      # v1.0.3, as it is given a secret.
+      - name: Publish it
+        uses: illandril/FoundryVTT-package-release-action@c7726a2aa3e1c65c4f24cc8f115c5dda01e68d9f # v1.0.3
+        with:
+          package-release-token: ${{ secrets.FOUNDRY_PACKAGE_RELEASE_TOKEN }}
+          manifest-url: ${{ steps.manifest.outputs.url }}
+          dry-run: ${{ inputs.dry-run == true }}

@@ -137,16 +137,10 @@ jobs:
     name: Publish to Foundry VTT
     needs: release
     if: ${{ needs.release.outputs.module-version != '' }}
-    runs-on: ubuntu-latest
-    steps:
-      # Foundry VTT's Package Release API, given the manifest of the version released alone: the one the GitHub release
-      # attaches, which names that version's own zip. The token is the package's, from its page on foundryvtt.com.
-      # Pinned to the commit of its latest release, v1.0.3, as it is given a secret.
-      - name: Publish the module's release
-        uses: illandril/FoundryVTT-package-release-action@c7726a2aa3e1c65c4f24cc8f115c5dda01e68d9f # v1.0.3
-        with:
-          package-release-token: ${{ secrets.FOUNDRY_PACKAGE_RELEASE_TOKEN }}
-          manifest-url: https://github.com/${{ github.repository }}/releases/download/v${{ needs.release.outputs.module-version }}/module.json
+    uses: ./.github/workflows/publish-to-foundry.yml
+    with:
+      version: ${{ needs.release.outputs.module-version }}
+    secrets: inherit
 
   docs:
     name: Publish documentation
