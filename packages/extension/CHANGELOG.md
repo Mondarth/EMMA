@@ -1,3 +1,9 @@
+## [0.11.3](https://github.com/Mondarth/EMMA/compare/extension-v0.11.2...extension-v0.11.3) (2026-11-16)
+
+### Bug Fixes
+
+* **extension:** take the add-on AMO signed before when signing again ([9401cda](https://github.com/Mondarth/EMMA/commit/9401cda9e55d59809ce9763c02088275ca3d4cda))
+
 ## [0.11.2](https://github.com/Mondarth/EMMA/compare/extension-v0.11.1...extension-v0.11.2) (2026-11-15)
 
 ### Bug Fixes
