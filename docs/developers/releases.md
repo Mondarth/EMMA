@@ -72,6 +72,23 @@ Copies of the module installed before 0.9.0 find updates at
 release became the latest, they would find no manifest there. So the extension's releases are always published as
 pre-releases, which GitHub never makes the latest: they are alphas, too. The module's releases stay the latest.
 
+### Signing the extension again
+
+Mozilla signs the Firefox build as an unlisted add-on on addons.mozilla.org (AMO), which **never takes the same version
+twice**. A release that submits a version and then fails, such as when the connection drops while `web-ext sign`
+waits for Mozilla's approval, leaves that version on AMO without a tag; run again, it computes the same version and AMO
+refuses it ("Version … already exists").
+
+So when signing fails and AMO already holds the version, `scripts/release/package.ts` takes the add-on AMO signed then
+instead (`scripts/amo.ts`): it waits for Mozilla's signature if it is still to come, downloads the signed add-on with
+the API key, checks it against AMO's hash, and takes it only if its files are byte for byte this build's, Mozilla's
+`META-INF/` signature aside. The extension builds the same each time, its catalogue obscured the same way, so a release
+run again for the same commit passes, and one for any other build fails, saying which files differ.
+
+A version AMO holds from another build cannot be released. Skip it: tag `extension-v<version>` on the commit the last
+extension release is tagged on, and run the release again, which then releases the next version. Extension 0.11.1 was
+skipped so, as it was submitted by a release whose wait broke off, before the extension built the same each time.
+
 ### Tags
 
 semantic-release finds a stream's last release by its tags: `v<version>` for the module and `extension-v<version>`

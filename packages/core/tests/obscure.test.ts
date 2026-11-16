@@ -43,8 +43,16 @@ describe('obscure', () => {
     expect(obscured.reduce((total, [, masked]) => total + masked.length, 0)).toBe(KEY.length);
   });
 
-  test('masks the text with fresh pads each time', () => {
-    expect(JSON.stringify(obscure(KEY))).not.toBe(JSON.stringify(obscure(KEY)));
+  // So that building a release twice gives the same bundle, which a release signed again relies on.
+  test('masks a text the same way each time', () => {
+    expect(JSON.stringify(obscure(KEY))).toBe(JSON.stringify(obscure(KEY)));
+  });
+
+  test('masks each chunk, and each text, with a pad of its own', () => {
+    const pads = obscure(KEY).map(([pad]) => JSON.stringify(pad));
+    expect(new Set(pads).size).toBe(pads.length);
+    const other = KEY.replace('k3y', 'k4y');
+    expect(JSON.stringify(obscure(other)[0]?.[0])).not.toBe(pads[0]);
   });
 
   test('gives as many chunks as the text has bytes when it is short', () => {
