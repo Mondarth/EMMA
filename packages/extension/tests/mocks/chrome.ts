@@ -84,6 +84,10 @@ export function installChromeMock(options: ChromeMockOptions = {}) {
           for (const [key, value] of Object.entries(items)) storage.set(key, structuredClone(value));
           return Promise.resolve();
         }),
+        remove: vi.fn((key: string) => {
+          storage.delete(key);
+          return Promise.resolve();
+        }),
       },
       session: {
         get: vi.fn((key: string) => Promise.resolve(session.has(key) ? { [key]: session.get(key) } : {})),
@@ -137,7 +141,10 @@ export function installChromeMock(options: ChromeMockOptions = {}) {
       }),
       executeScript: vi.fn((_injection: object) => Promise.resolve([])),
     },
-    tabs: { query: vi.fn(() => Promise.resolve([tab])) },
+    tabs: {
+      query: vi.fn(() => Promise.resolve([tab])),
+      create: vi.fn((_properties: { url?: string }) => Promise.resolve({ id: 8 })),
+    },
     i18n: {
       getMessage: vi.fn((key: string, substitutions: string[] = []) =>
         (MESSAGES[key]?.message ?? '').replace(

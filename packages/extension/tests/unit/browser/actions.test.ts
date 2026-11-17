@@ -1,7 +1,15 @@
 import { describe, expect, test, vi } from 'vitest';
 
 import { activate, forget, openOnce, setAuto } from '../../../src/browser/actions';
-import { LOADER_ID, LOADER_SCRIPT, PENDING_KEY, SETUP_SCRIPT, SITES_KEY } from '../../../src/browser/api';
+import {
+  BRIDGE_SCRIPT,
+  LOADER_ID,
+  LOADER_SCRIPT,
+  PENDING_KEY,
+  RELAY_TABS_KEY,
+  SETUP_SCRIPT,
+  SITES_KEY,
+} from '../../../src/browser/api';
 import { installChromeMock } from '../../mocks/chrome';
 
 const LOCAL = 'http://localhost:30000';
@@ -33,11 +41,12 @@ describe('activate', () => {
       runAt: 'document_idle',
       persistAcrossSessions: true,
     });
-    expect(chrome.scripting.executeScript).toHaveBeenCalledExactlyOnceWith({
-      target: { tabId: 7 },
-      files: ['/emma-setup.js'],
-      world: 'MAIN',
-    });
+    // The bridge first, in a world of its own, then EMMA in the page; the tab kept as one the catalogue may be asked for.
+    expect(chrome.scripting.executeScript.mock.calls).toEqual([
+      [{ target: { tabId: 7 }, files: ['/bridge.js'], world: 'ISOLATED' }],
+      [{ target: { tabId: 7 }, files: ['/emma-setup.js'], world: 'MAIN' }],
+    ]);
+    expect(session.get(RELAY_TABS_KEY)).toEqual({ '7': LOCAL });
     expect(session.has(PENDING_KEY)).toBe(false);
   });
 
@@ -48,7 +57,7 @@ describe('activate', () => {
     for (const listener of listeners.added) listener({ origins: ['http://localhost:30000/*'] });
     await new Promise(resolve => setTimeout(resolve));
 
-    expect(chrome.scripting.executeScript).toHaveBeenCalledOnce();
+    expect(chrome.scripting.executeScript).toHaveBeenCalledTimes(2);
     expect(chrome.scripting.registerContentScripts).toHaveBeenCalledOnce();
   });
 
@@ -58,7 +67,7 @@ describe('activate', () => {
     void activate({ id: 7, url: `${LOCAL}/setup` });
 
     await vi.waitFor(() => {
-      expect(chrome.scripting.executeScript).toHaveBeenCalledOnce();
+      expect(chrome.scripting.executeScript).toHaveBeenCalledTimes(2);
     });
     expect(storage.get(SITES_KEY)).toEqual([{ origin: LOCAL, auto: true }]);
   });
@@ -70,7 +79,7 @@ describe('activate', () => {
     await expect(activate({ id: 7, url: `${LOCAL}/setup` })).resolves.toBe('activated');
 
     expect(storage.get(SITES_KEY)).toEqual([{ origin: LOCAL, auto: true }]);
-    expect(chrome.scripting.executeScript).toHaveBeenCalledOnce();
+    expect(chrome.scripting.executeScript).toHaveBeenCalledTimes(2);
   });
 
   test('asks for the permission before anything else, while the click still counts', async () => {
@@ -121,7 +130,7 @@ describe('the scripts', () => {
 
     expect(registered.get(LOADER_ID)?.js).toEqual([LOADER_SCRIPT]);
     expect(chrome.scripting.executeScript).toHaveBeenCalledWith(expect.objectContaining({ files: [SETUP_SCRIPT] }));
-    for (const script of [LOADER_SCRIPT, SETUP_SCRIPT]) expect(script).toMatch(/^\//);
+    for (const script of [LOADER_SCRIPT, BRIDGE_SCRIPT, SETUP_SCRIPT]) expect(script).toMatch(/^\//);
   });
 });
 
@@ -131,7 +140,7 @@ describe('openOnce', () => {
 
     await expect(openOnce({ id: 7, url: `${LOCAL}/setup` })).resolves.toBe(true);
 
-    expect(chrome.scripting.executeScript).toHaveBeenCalledOnce();
+    expect(chrome.scripting.executeScript).toHaveBeenCalledTimes(2);
     expect(chrome.permissions.request).not.toHaveBeenCalled();
     expect(storage.size).toBe(0);
   });

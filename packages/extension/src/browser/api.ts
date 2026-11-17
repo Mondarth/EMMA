@@ -3,7 +3,7 @@
  * Firefox (version 128 and later, with Manifest V3) both provide, with promises.
  */
 import type { Site, Target } from '../lib/sites';
-import { autoPatterns, parseSites } from '../lib/sites';
+import { autoPatterns, originOf, parseSites } from '../lib/sites';
 
 /** The key the remembered servers are stored under. */
 export const SITES_KEY = 'sites';
@@ -19,6 +19,18 @@ export const SETUP_SCRIPT = '/emma-setup.js';
 
 /** EMMA's loader (`src/loader.ts`), named from the extension's root. */
 export const LOADER_SCRIPT = '/loader.js';
+
+/**
+ * The bridge (`src/bridge.ts`), named from the extension's root: brought into a tab with EMMA, in a world of its own,
+ * it takes the setup screen's requests to the catalogue to the background script.
+ */
+export const BRIDGE_SCRIPT = '/bridge.js';
+
+/**
+ * The key the tabs EMMA was brought into are kept under, in the browser's session storage, each with its server's
+ * origin: the background script asks the catalogue for a tab's page only while it is still on that server.
+ */
+export const RELAY_TABS_KEY = 'relayTabs';
 
 /** The message the loader sends when a page it runs on may be a setup screen. */
 export const SETUP_PAGE_MESSAGE = 'mondarth-emma/setup-page';
@@ -129,11 +141,32 @@ export async function syncLoader(sites: readonly Site[], target: Target): Promis
 }
 
 /**
- * Bring EMMA into a tab, running its script in the page itself, where Foundry's code runs.
+ * Bring EMMA into a tab: the bridge first, in a world of its own, then EMMA's script in the page itself, where
+ * Foundry's code runs. The tab is remembered, with its server, as one the catalogue may be asked for.
  * @param tabId - The tab
+ * @param url - The tab's address
  */
-export async function injectSetup(tabId: number): Promise<void> {
+export async function injectSetup(tabId: number, url: string | undefined): Promise<void> {
+  const server = originOf(url);
+  if (server !== undefined) {
+    const kept = await readRelayTabs();
+    await chrome.storage.session.set({ [RELAY_TABS_KEY]: { ...kept, [String(tabId)]: server } });
+  }
+  await chrome.scripting.executeScript({ target: { tabId }, files: [BRIDGE_SCRIPT], world: 'ISOLATED' });
   await chrome.scripting.executeScript({ target: { tabId }, files: [SETUP_SCRIPT], world: 'MAIN' });
+}
+
+/**
+ * The tabs EMMA was brought into, each with its server's origin.
+ * @returns The tabs, by id
+ */
+export async function readRelayTabs(): Promise<Readonly<Record<string, string>>> {
+  const stored = await chrome.storage.session.get(RELAY_TABS_KEY);
+  const value: unknown = stored[RELAY_TABS_KEY];
+  if (typeof value !== 'object' || value === null) return {};
+  return Object.fromEntries(
+    Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+  );
 }
 
 /**

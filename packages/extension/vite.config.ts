@@ -5,6 +5,8 @@ import path from 'node:path';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 
+import { catalogueUrlDefine } from '@mondarth/emma-core/default-catalogue-define';
+
 import packageJSON from './package.json' with { type: 'json' };
 import { manifestFor } from './scripts/manifest.ts';
 import type { Target } from './src/lib/sites.ts';
@@ -45,7 +47,11 @@ export default defineConfig(({ mode }) => {
     root: 'src',
     publicDir: '../public',
     cacheDir: '../.vite-cache',
-    define: { __TARGET__: JSON.stringify(target) },
+    define: {
+      __TARGET__: JSON.stringify(target),
+      // The catalogue's URL alone: the extension signs its user in to it, and asks it with their token.
+      __EMMA_CATALOGUE_URL__: mode === 'test' ? 'null' : catalogueUrlDefine(process.env),
+    },
     test: {
       root: '.',
       include: ['tests/unit/**/*.test.ts'],
@@ -76,6 +82,7 @@ export default defineConfig(({ mode }) => {
         input: {
           background: 'src/background.ts',
           loader: 'src/loader.ts',
+          bridge: 'src/bridge.ts',
           popup: 'src/popup/index.html',
           options: 'src/options/index.html',
         },

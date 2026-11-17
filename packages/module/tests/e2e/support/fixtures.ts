@@ -12,16 +12,26 @@ const PACKAGE_SITES =
   /^https:\/\/(api\.github\.com|github\.com|gitlab\.com|raw\.githubusercontent\.com|r2\.foundryvtt\.com)\//;
 
 /**
- * EMMA's package catalogue as the end-to-end build has it, with its key (see `.github/workflows/e2e.yml`): made up, so
- * that no test reaches the real one, and answered by {@link routeCatalogue}.
+ * EMMA's package catalogue as the end-to-end build has it, with the module's key (see `.github/workflows/e2e.yml`):
+ * made up, so that no test reaches the real one, and answered by {@link routeCatalogue}.
  */
 export const CATALOGUE = 'https://catalogue.e2e.test/';
 export const CATALOGUE_KEY = 'e2e-catalogue-key';
 
+/** The token of the user the browser extension is signed in as, in the tests' stand-in for it (see {@link standInBridge}). */
+export const CATALOGUE_TOKEN = 'e2e-user-token';
+
+/** What `/api/v2/me` answers for {@link CATALOGUE_TOKEN} when a test gives nothing else: a subscriber. */
+export const SUBSCRIBER = {
+  user: { handle: 'e2e-subscriber', nickname: null, role: 'user' },
+  subscription: { paidUntil: '2099-01-01T00:00:00.000Z', active: true },
+  entitled: true,
+};
+
 /** The headers the catalogue answers with, as the real one does, so that the browser reads what it gives. */
 const CATALOGUE_CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type, If-None-Match, X-API-Key, X-Catalogue-Client',
+  'Access-Control-Allow-Headers': 'Authorization, Content-Type, If-None-Match, X-API-Key, X-Catalogue-Client',
   'Access-Control-Expose-Headers': 'ETag',
 };
 
@@ -31,7 +41,69 @@ const CATALOGUE_NOTHING: Readonly<Record<string, unknown>> = {
   'api/v2/listing': { packages: [], asOf: null },
   'api/v2/recheck': { packages: [], pending: [] },
   'api/v2/manifest': { ok: false, problem: 'not-manifest' },
+  'api/v2/me': SUBSCRIBER,
 };
+
+/**
+ * Stand in for the browser extension's bridge and background script on the setup screen, which the tests bring EMMA
+ * into without the extension (see `setup-screen.spec.ts`): answer EMMA's posts as the extension does, asking the
+ * catalogue with a token, or answering as the catalogue does one it does not take when there is none. It records each
+ * request to open the sign-in in `window.emmaSignInOpened`. The protocol is `@mondarth/emma-core/catalogue-relay`'s.
+ * @param page - The page, before EMMA is brought in
+ * @param token - The signed-in user's token, or `null` for no one signed in
+ */
+export async function standInBridge(page: Page, token: string | null = CATALOGUE_TOKEN): Promise<void> {
+  await page.evaluate(signedIn => {
+    window.addEventListener('message', event => {
+      const data = event.data as {
+        source?: string;
+        id?: string;
+        openSignIn?: boolean;
+        request?: { url: string; method: string; headers: Record<string, string>; body?: string };
+      } | null;
+      if (event.source !== window || data?.source !== 'mondarth-emma/page' || data.id === undefined) return;
+      const reply = (answer: unknown) => {
+        window.postMessage({ source: 'mondarth-emma/bridge', id: data.id, answer }, location.origin);
+      };
+      if (data.openSignIn === true) {
+        Reflect.set(
+          window,
+          'emmaSignInOpened',
+          ((Reflect.get(window, 'emmaSignInOpened') as number | undefined) ?? 0) + 1,
+        );
+        return;
+      }
+      const { request } = data;
+      if (request === undefined) return;
+      if (signedIn === null) {
+        reply({ status: 401, headers: { 'content-type': 'application/json' }, body: '{}' });
+        return;
+      }
+      // Only the headers the extension lets through, as it does.
+      const passed = Object.fromEntries(
+        Object.entries(request.headers).filter(([name]) =>
+          ['content-type', 'if-none-match', 'x-catalogue-client'].includes(name),
+        ),
+      );
+      void fetch(request.url, {
+        method: request.method,
+        headers: { ...passed, authorization: `Bearer ${signedIn}` },
+        ...(request.body !== undefined && { body: request.body }),
+      })
+        .then(async response => {
+          const headers: Record<string, string> = {};
+          for (const name of ['content-type', 'etag']) {
+            const value = response.headers.get(name);
+            if (value !== null) headers[name] = value;
+          }
+          reply({ status: response.status, headers, body: await response.text() });
+        })
+        .catch(() => {
+          reply({ unreachable: true });
+        });
+    });
+  }, token);
+}
 
 /**
  * Answer the catalogue's requests, as the browser makes them, preflights too. A test's answers take the place of those

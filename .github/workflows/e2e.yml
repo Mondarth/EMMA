@@ -50,7 +50,7 @@ jobs:
         run: pnpm build
         env:
           EMMA_DEFAULT_CATALOGUE_URL: https://catalogue.e2e.test/
-          EMMA_DEFAULT_CATALOGUE_KEY: e2e-catalogue-key
+          EMMA_MODULE_CATALOGUE_KEY: e2e-catalogue-key
 
       - name: Cache Playwright browsers
         uses: actions/cache@v6

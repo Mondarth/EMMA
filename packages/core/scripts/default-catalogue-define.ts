@@ -1,22 +1,55 @@
 /**
- * Builds EMMA's package catalogue into a bundle, as `__EMMA_DEFAULT_CATALOGUE__` (see `src/default-catalogue.ts`): run by
- * the Vite configurations of the module and the EMMA extension, under Node.
+ * Builds EMMA's package catalogue into a bundle: run by the Vite configurations of the module and of the EMMA extension,
+ * under Node.
+ *
+ * - **The module** asks the catalogue with a key of its own, which the catalogue lets look up versions alone. It is
+ *   built in as `__EMMA_DEFAULT_CATALOGUE__`, the URL and key obscured ({@link defaultCatalogueDefine}; see
+ *   `src/default-catalogue.ts`).
+ * - **The EMMA extension** asks it as its signed-in user, with their token, and ships no key: its builds take the
+ *   catalogue's URL alone, as `__EMMA_CATALOGUE_URL__` ({@link catalogueUrlDefine}).
  */
 import { obscure } from '../src/obscure.ts';
 
+/** The variable the catalogue's URL is taken from: a repository variable, in a release. */
+export const CATALOGUE_URL_VARIABLE = 'EMMA_DEFAULT_CATALOGUE_URL';
+
+/** The variable the module's key is taken from: a repository secret, in a release. */
+export const MODULE_KEY_VARIABLE = 'EMMA_MODULE_CATALOGUE_KEY';
+
 /**
- * The value of `__EMMA_DEFAULT_CATALOGUE__` for a build.
+ * The catalogue's URL, if one is set.
  * @param env - The environment the build runs in
- * @returns JSON: the catalogue's URL and key, obscured, or `null` without them
+ * @returns The URL, or `undefined` without one
+ * @throws {Error} for a URL that is not https
+ */
+function catalogueUrl(env: Readonly<Record<string, string | undefined>>): string | undefined {
+  const url = env[CATALOGUE_URL_VARIABLE] || undefined;
+  if (url !== undefined && (!URL.canParse(url) || new URL(url).protocol !== 'https:'))
+    throw new Error(`${CATALOGUE_URL_VARIABLE} must be an https URL, such as https://catalogue.example.com/`);
+  return url;
+}
+
+/**
+ * The value of the module's `__EMMA_DEFAULT_CATALOGUE__`.
+ * @param env - The environment the build runs in
+ * @returns JSON: the catalogue's URL and the module's key, obscured, or `null` without them
  * @throws {Error} for only one of them, or a URL that is not https, rather than build a broken release
  */
 export function defaultCatalogueDefine(env: Readonly<Record<string, string | undefined>>): string {
-  const url = env['EMMA_DEFAULT_CATALOGUE_URL'] || undefined;
-  const key = env['EMMA_DEFAULT_CATALOGUE_KEY'] || undefined;
+  const url = catalogueUrl(env);
+  const key = env[MODULE_KEY_VARIABLE] || undefined;
   if (url === undefined && key === undefined) return 'null';
-  if (url === undefined) throw new Error('EMMA_DEFAULT_CATALOGUE_KEY is set without EMMA_DEFAULT_CATALOGUE_URL');
-  if (key === undefined) throw new Error('EMMA_DEFAULT_CATALOGUE_URL is set without EMMA_DEFAULT_CATALOGUE_KEY');
-  if (!URL.canParse(url) || new URL(url).protocol !== 'https:')
-    throw new Error('EMMA_DEFAULT_CATALOGUE_URL must be an https URL, such as https://catalogue.example.com/');
+  if (url === undefined) throw new Error(`${MODULE_KEY_VARIABLE} is set without ${CATALOGUE_URL_VARIABLE}`);
+  if (key === undefined) throw new Error(`${CATALOGUE_URL_VARIABLE} is set without ${MODULE_KEY_VARIABLE}`);
   return JSON.stringify({ url: obscure(url), key: obscure(key) });
+}
+
+/**
+ * The value of the EMMA extension's `__EMMA_CATALOGUE_URL__`: the catalogue's URL, which is no secret.
+ * @param env - The environment the build runs in
+ * @returns JSON: the URL, or `null` without one
+ * @throws {Error} for a URL that is not https
+ */
+export function catalogueUrlDefine(env: Readonly<Record<string, string | undefined>>): string {
+  return JSON.stringify(catalogueUrl(env) ?? null);
 }

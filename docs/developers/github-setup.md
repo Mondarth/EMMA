@@ -46,15 +46,16 @@ Under *Settings → Secrets and variables → Actions → Secrets*:
 | `FOUNDRY_LICENSE_KEY`   | E2E     | A Foundry VTT licence key for the test server                                     |
 | `FOUNDRY_ADMIN_KEY`     | E2E     | Any password; the tests use it to administer the test server                      |
 | `CODECOV_TOKEN`         | Dev CI  | Optional. Uploads coverage to [Codecov](https://about.codecov.io) (step 8)        |
-| `EMMA_DEFAULT_CATALOGUE_KEY` | Release | Required. The API key of the default package catalogue (see {doc}`default-catalogue`) |
+| `EMMA_MODULE_CATALOGUE_KEY` | Release | Required. The module's API key for the default package catalogue, listed in the catalogue as `module:<key>` (see {doc}`default-catalogue`) |
 | `AMO_JWT_ISSUER`        | Release | Optional. The issuer of an API key from addons.mozilla.org, to have Mozilla sign the Firefox extension |
 | `AMO_JWT_SECRET`        | Release | Optional. That API key's secret                                          |
 | `FOUNDRY_PACKAGE_RELEASE_TOKEN` | Release | The module's package release token, from its page on foundryvtt.com, to publish each release to Foundry VTT's package listing |
 
-And under *Variables*, `EMMA_DEFAULT_CATALOGUE_URL`, the default catalogue's URL. A release of the module or of the
-browser extension stops before it changes anything when either is not set, as a build without them would ship with no
-default catalogue. The `EMMA_DEFAULT_PROXY_URL` variable and `EMMA_DEFAULT_PROXY_KEY` secret of earlier releases are
-no longer read, and can be deleted.
+And under *Variables*, `EMMA_DEFAULT_CATALOGUE_URL`, the default catalogue's URL. A release of the module stops before
+it changes anything when either is not set, and one of the browser extension when the URL is not, as a build without
+them would ship with no default catalogue. The extension ships no key: it asks the catalogue as its signed-in user.
+The `EMMA_DEFAULT_CATALOGUE_KEY` secret, which both were built with before, and the `EMMA_DEFAULT_PROXY_URL` variable
+and `EMMA_DEFAULT_PROXY_KEY` secret of earlier releases, are no longer read, and can be deleted.
 
 Pull requests from forks cannot read secrets, so the end-to-end tests are skipped for them.
 

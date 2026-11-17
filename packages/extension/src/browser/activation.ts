@@ -24,7 +24,7 @@ export function finishActivation(): Promise<boolean> {
     await syncLoader(sites, __TARGET__);
     if (pending.tabId !== undefined && isSetupPage(pending.url)) {
       // The tab may have moved on, or been closed, while the user answered.
-      await injectSetup(pending.tabId).catch(() => undefined);
+      await injectSetup(pending.tabId, pending.url).catch(() => undefined);
     }
     return true;
   });

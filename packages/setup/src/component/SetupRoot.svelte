@@ -10,6 +10,7 @@
   import type { Layout } from '../foundry/preferences';
   import { readLayout, writeLayout } from '../foundry/preferences';
   import { EXTENSION_RELEASES } from '../foundry/setup-kit';
+  import { openSignIn } from '../foundry/catalogue-relay';
   import type { InstallFilters } from '../lib/install';
   import { installable, keptSystems, pendingPackages } from '../lib/install';
   import { UNINSTALL } from '../lib/plans';
@@ -166,6 +167,14 @@
         return format('Update.ModuleTooOld', { version: problem.version });
       case 'extension-too-old':
         return format('Update.ExtensionTooOld', { version: problem.version });
+      case 'signed-out':
+        return localize('Update.SignIn');
+      case 'lapsed':
+        return problem.paidUntil === null
+          ? localize('Update.NotSubscribed')
+          : format('Update.Lapsed', {
+              date: new Date(problem.paidUntil).toLocaleDateString(undefined, { dateStyle: 'medium' }),
+            });
       default:
         return localize('Update.NeedsModule');
     }
@@ -694,7 +703,22 @@
           </ul>
         </details>
       {/if}
-      {#if problem?.reason === 'extension-too-old'}
+      {#if problem?.reason === 'signed-out'}
+        <button
+          type="button"
+          class="emma-setup-get"
+          onclick={() => {
+            openSignIn();
+          }}>
+          <i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i>
+          {localize('Update.SignInButton')}
+        </button>
+      {:else if problem?.reason === 'lapsed'}
+        <a class="emma-setup-get" href={problem.renew} target="_blank" rel="noopener noreferrer">
+          <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+          {localize('Update.Renew')}
+        </a>
+      {:else if problem?.reason === 'extension-too-old'}
         <a class="emma-setup-get" href={EXTENSION_RELEASES} target="_blank" rel="noopener noreferrer">
           <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
           {localize('Update.UpdateExtension')}

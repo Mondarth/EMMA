@@ -4,7 +4,7 @@ import path from 'node:path';
 
 import { defineConfig } from 'vitest/config';
 
-import { defaultCatalogueDefine } from '@mondarth/emma-core/default-catalogue-define';
+import { catalogueUrlDefine } from '@mondarth/emma-core/default-catalogue-define';
 
 import extensionJSON from '../extension/package.json' with { type: 'json' };
 
@@ -32,7 +32,7 @@ export default defineConfig(({ command, mode }) => {
     define: {
       // EMMA's package catalogue, obscured, from the environment of a release build. Never in tests, so they never ask
       // it. See @mondarth/emma-core/default-catalogue.
-      __EMMA_DEFAULT_CATALOGUE__: mode === 'test' ? 'null' : defaultCatalogueDefine(process.env),
+      __EMMA_CATALOGUE_URL__: mode === 'test' ? 'null' : catalogueUrlDefine(process.env),
       // The browser extension's version, which a release stamps into its package.json before building this.
       __EMMA_EXTENSION_VERSION__: JSON.stringify(extensionJSON.version),
     },

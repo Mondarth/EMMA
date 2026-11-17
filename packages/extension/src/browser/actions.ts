@@ -54,7 +54,7 @@ export async function activate(tab: Tab): Promise<'activated' | 'refused' | 'uns
  */
 export async function openOnce(tab: Tab): Promise<boolean> {
   if (tab.id === undefined || !isSetupPage(tab.url)) return false;
-  await injectSetup(tab.id);
+  await injectSetup(tab.id, tab.url);
   return true;
 }
 
