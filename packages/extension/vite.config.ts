@@ -64,8 +64,16 @@ export default defineConfig(({ mode }) => {
         include: ['src/**/*.ts', 'src/**/*.svelte', 'scripts/**/*.ts'],
         // The pages' scripts only mount the components, and the loader only sends a message; the end-to-end check of
         // the built extension covers them. The release's packaging script only builds, zips and signs, as the module's
-        // does: a release runs it, and it can be run by hand (docs/developers/releases.md).
-        exclude: ['src/popup/main.ts', 'src/options/main.ts', 'src/loader.ts', 'src/types/**', 'scripts/release/**'],
+        // does: a release runs it, and it can be run by hand (docs/developers/releases.md). The development server
+        // (`scripts/dev/serve.ts`, `pnpm dev:extension`) likewise only builds, zips and serves.
+        exclude: [
+          'src/popup/main.ts',
+          'src/options/main.ts',
+          'src/loader.ts',
+          'src/types/**',
+          'scripts/release/**',
+          'scripts/dev/**',
+        ],
         reportsDirectory: 'coverage',
         reporter: ['text', 'html', 'lcov'],
         // Ratchet these upward as coverage improves; never lower them to make a change pass.

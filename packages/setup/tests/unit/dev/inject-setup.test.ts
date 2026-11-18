@@ -75,6 +75,12 @@ describe('the setup page', () => {
     );
     expect(addScripts('<p>no head</p>', SCRIPTS)).toBe('<p>no head</p>');
   });
+
+  test('gets a script given as code, in its place', () => {
+    expect(addScripts(PAGE, ['/dev/@vite/client', { code: 'start();' }])).toContain(
+      '<script type="module" src="/dev/@vite/client"></script><script type="module">start();</script></head>',
+    );
+  });
 });
 
 describe('the plugin', () => {

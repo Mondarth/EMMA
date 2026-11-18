@@ -8,6 +8,7 @@ import { catalogueUrlDefine } from '@mondarth/emma-core/default-catalogue-define
 
 import extensionJSON from '../extension/package.json' with { type: 'json' };
 
+import { RELAY_PATH, relayCatalogue } from './scripts/dev/catalogue-relay.ts';
 import { readDevServer } from './scripts/dev/dev-server.ts';
 import { injectSetup } from './scripts/dev/inject-setup.ts';
 
@@ -19,12 +20,20 @@ const BASE = '/emma-setup-dev/';
  * injects into Foundry VTT's setup screen as it is. Nothing else is loaded alongside it.
  *
  * `vite` (`pnpm dev:setup` from the root) serves a local Foundry through itself instead, with the EMMA extension's
- * source added to the setup page, which reloads on each change (see scripts/dev/inject-setup.ts).
+ * source added to the setup page, which reloads on each change (see scripts/dev/inject-setup.ts). With
+ * `EMMA_DEV_CATALOGUE_URL` set, it stands in for the browser extension too: a dev bridge in the page, and the dev
+ * server asking that catalogue with the token `pnpm dev:sign-in` kept (see scripts/dev/catalogue-relay.ts).
  */
 export default defineConfig(({ command, mode }) => {
   const serving = command === 'serve' && mode !== 'test';
   const dev = serving ? readDevServer(path.resolve(import.meta.dirname, '../..')) : undefined;
   const foundry = dev === undefined ? '' : `http://localhost:${dev.foundry}`;
+  const root = path.resolve(import.meta.dirname, '../..');
+  const devCatalogue = serving ? process.env['EMMA_DEV_CATALOGUE_URL'] || undefined : undefined;
+  // The dev bridge, ahead of EMMA, so that it answers EMMA's first post.
+  const bridge = {
+    code: `import { startDevBridge } from '${BASE}src/dev/dev-bridge.ts'; startDevBridge(window, '${BASE}${RELAY_PATH}');`,
+  };
 
   return {
     cacheDir: '.vite-cache',
@@ -86,7 +95,15 @@ export default defineConfig(({ command, mode }) => {
           }),
         },
       }),
-      ...(serving ? [injectSetup({ foundry, scripts: [`${BASE}@vite/client`, `${BASE}src/index.ts`] })] : []),
+      ...(serving
+        ? [
+            injectSetup({
+              foundry,
+              scripts: [`${BASE}@vite/client`, ...(devCatalogue === undefined ? [] : [bridge]), `${BASE}src/index.ts`],
+            }),
+          ]
+        : []),
+      ...(devCatalogue === undefined ? [] : [relayCatalogue({ root, catalogue: devCatalogue, base: BASE })]),
       ...(mode === 'test' ? [svelteTesting()] : []),
     ],
   };

@@ -13,6 +13,13 @@ import { obscure } from '../src/obscure.ts';
 /** The variable the catalogue's URL is taken from: a repository variable, in a release. */
 export const CATALOGUE_URL_VARIABLE = 'EMMA_DEFAULT_CATALOGUE_URL';
 
+/**
+ * The variable a development build takes a catalogue of the developer's own from, such as a local catalogue's
+ * `http://localhost:5173/`: `http` is allowed, and it takes the place of {@link CATALOGUE_URL_VARIABLE}. A release
+ * refuses to run while it is set (see `release-defaults.ts`).
+ */
+export const DEV_CATALOGUE_VARIABLE = 'EMMA_DEV_CATALOGUE_URL';
+
 /** The variable the module's key is taken from: a repository secret, in a release. */
 export const MODULE_KEY_VARIABLE = 'EMMA_MODULE_CATALOGUE_KEY';
 
@@ -45,11 +52,18 @@ export function defaultCatalogueDefine(env: Readonly<Record<string, string | und
 }
 
 /**
- * The value of the EMMA extension's `__EMMA_CATALOGUE_URL__`: the catalogue's URL, which is no secret.
+ * The value of the EMMA extension's `__EMMA_CATALOGUE_URL__`: the catalogue's URL, which is no secret; a development
+ * catalogue's, if one is set.
  * @param env - The environment the build runs in
  * @returns JSON: the URL, or `null` without one
- * @throws {Error} for a URL that is not https
+ * @throws {Error} for a URL that is not https, or a development one that is neither http nor https
  */
 export function catalogueUrlDefine(env: Readonly<Record<string, string | undefined>>): string {
+  const dev = env[DEV_CATALOGUE_VARIABLE] || undefined;
+  if (dev !== undefined) {
+    if (!URL.canParse(dev) || !['http:', 'https:'].includes(new URL(dev).protocol))
+      throw new Error(`${DEV_CATALOGUE_VARIABLE} must be an http or https URL, such as http://localhost:5173/`);
+    return JSON.stringify(dev);
+  }
   return JSON.stringify(catalogueUrl(env) ?? null);
 }

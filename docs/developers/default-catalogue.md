@@ -70,7 +70,7 @@ The build stops when only one of the two is set, or when the URL is not `https`.
 refuses to package a bundle that holds the key in plain text anywhere, and the browser extension's one that holds it
 at all. A release stops, before it changes anything, when what it needs is not set
 (`packages/core/scripts/release-defaults.ts`). Development,
-CI and test builds need neither, so have no catalogue unless they are set, and the unit tests always run without one.
+CI and test builds need neither, so have no catalogue unless they are set, and the unit tests always run without one. A development build may name a catalogue of the developer's own in `EMMA_DEV_CATALOGUE_URL`, `http` allowed, which a release refuses (see {doc}`setup`).
 The end-to-end tests build in a made-up catalogue, which they answer themselves (see `.github/workflows/e2e.yml`).
 
 ## Rotating the key

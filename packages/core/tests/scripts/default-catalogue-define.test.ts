@@ -55,4 +55,15 @@ describe('catalogueUrlDefine', () => {
       /EMMA_DEFAULT_CATALOGUE_URL/,
     );
   });
+
+  test("takes a development catalogue's URL in place of the release's, http or https", () => {
+    for (const url of ['http://localhost:5173/', 'http://foundrymoddev1:5173/', 'https://dev.example.test/']) {
+      expect(
+        JSON.parse(catalogueUrlDefine({ EMMA_DEV_CATALOGUE_URL: url, EMMA_DEFAULT_CATALOGUE_URL: CATALOGUE_URL })),
+      ).toBe(url);
+    }
+    for (const url of ['ftp://localhost/', 'localhost:5173']) {
+      expect(() => catalogueUrlDefine({ EMMA_DEV_CATALOGUE_URL: url })).toThrow(/EMMA_DEV_CATALOGUE_URL/);
+    }
+  });
 });
