@@ -1,3 +1,9 @@
+## [0.12.0](https://github.com/Mondarth/EMMA/compare/extension-v0.11.3...extension-v0.12.0) (2026-11-19)
+
+### Features
+
+* **extension:** sign in to EMMA's catalogue, and ask it as the user ([bd78082](https://github.com/Mondarth/EMMA/commit/bd780829356059c67e51d7c960b7517b5e5784c2))
+
 ## [0.11.3](https://github.com/Mondarth/EMMA/compare/extension-v0.11.2...extension-v0.11.3) (2026-11-16)
 
 ### Bug Fixes
