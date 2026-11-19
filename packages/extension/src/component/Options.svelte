@@ -1,16 +1,28 @@
 <!--
-  The extension's options page: the servers EMMA is active on, how it opens on each, and forgetting them.
+  The extension's options page: the servers EMMA is active on, how it opens on each, and forgetting them; and the
+  catalogue account EMMA asks the catalogue as.
 -->
 <script lang="ts">
   import { forget, setAuto } from '../browser/actions';
   import { t } from '../lib/i18n';
   import type { Site } from '../lib/sites';
+  import Account from './Account.svelte';
 
   interface Props {
     sites: readonly Site[];
+    /** The catalogue's URL, or `null` for a build without one. */
+    catalogue?: string | null;
+    /** Opens a page for the user: in a new tab, by default. */
+    openPage?: (url: string) => void;
   }
 
-  let { sites: initial }: Props = $props();
+  let {
+    sites: initial,
+    catalogue = null,
+    openPage = url => {
+      void chrome.tabs.create({ url });
+    },
+  }: Props = $props();
 
   // svelte-ignore state_referenced_locally
   let sites = $state<readonly Site[]>(initial);
@@ -45,6 +57,9 @@
         </li>
       {/each}
     </ul>
+  {/if}
+  {#if catalogue !== null}
+    <Account {catalogue} {openPage} />
   {/if}
 </main>
 

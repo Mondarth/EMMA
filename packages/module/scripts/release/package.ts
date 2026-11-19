@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { filesHolding } from '@mondarth/emma-core/files-holding';
-import { requireReleaseDefaults } from '@mondarth/emma-core/release-defaults';
+import { MODULE_RELEASE_DEFAULTS, requireReleaseDefaults } from '@mondarth/emma-core/release-defaults';
 
 /** The module's package, `packages/module`. */
 const ROOT = path.resolve(import.meta.dirname, '../..');
@@ -90,7 +90,7 @@ function stampDocs(version: string): void {
 function build(): void {
   fs.rmSync(DIST, { recursive: true, force: true });
   execFileSync('pnpm', ['build'], { cwd: ROOT, stdio: 'inherit' });
-  for (const [name, variable] of [["The default catalogue's key", 'EMMA_DEFAULT_CATALOGUE_KEY']] as const) {
+  for (const [name, variable] of [["The module's catalogue key", 'EMMA_MODULE_CATALOGUE_KEY']] as const) {
     const key = process.env[variable];
     const leaks = key ? filesHolding(DIST, key) : [];
     if (leaks.length > 0) {
@@ -127,7 +127,7 @@ if (!releaseVersion || !/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(releaseVersion)
 }
 
 // Before anything changes: a build without them succeeds, and the release would have no catalogue.
-requireReleaseDefaults(process.env);
+requireReleaseDefaults(process.env, MODULE_RELEASE_DEFAULTS);
 stampManifest(releaseVersion);
 stampDocs(releaseVersion);
 build();

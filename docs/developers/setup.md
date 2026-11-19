@@ -95,11 +95,65 @@ Finding updates needs the EMMA module installed in that Foundry, with its setup 
 after changing `src/setup-kit.ts` and read the installation again.
 
 A development build has no package catalogue, so the EMMA extension finds no updates: it knows only what is
-installed (see {doc}`default-catalogue`). To try it with one, start the server with `EMMA_DEFAULT_CATALOGUE_URL` and
-`EMMA_DEFAULT_CATALOGUE_KEY` set to a catalogue of your own; never commit them.
+installed (see {doc}`default-catalogue`). See [testing with a catalogue](#testing-with-a-catalogue) to give it one.
 
 Do not have the browser extension active for the development server's address as well: the EMMA extension starts once
 on a page, so the one that starts first would win.
+
+## Testing with a catalogue
+
+On the setup screen, EMMA asks its catalogue as the user the browser extension signed in, through the extension (see
+{doc}`default-catalogue`). Two development commands give it a catalogue of your own, such as the catalogue's
+development server (`pnpm dev` in the catalogue's repository, with `--host` for other machines to reach it), named in
+`EMMA_DEV_CATALOGUE_URL`. `http` is allowed there, as it is never a release's: a release refuses to run while it is set.
+Sign in to it as a subscriber or an admin, such as the catalogue's development users' Ada Lovelace, once named in its
+`ADMIN_USER_IDS`.
+
+### The setup screen's dev server
+
+`pnpm dev:setup` brings the EMMA extension's source in without the browser extension, so the dev server stands in for
+it: with `EMMA_DEV_CATALOGUE_URL` set, it adds a dev bridge to the setup page (`packages/setup/src/dev/dev-bridge.ts`),
+and asks the catalogue itself, with your token, letting through what the extension does
+(`packages/setup/scripts/dev/catalogue-relay.ts`). The token stays in the dev server, as it stays in the extension's
+background script.
+
+```bash
+export EMMA_DEV_CATALOGUE_URL=http://foundrymoddev1:5173/
+pnpm dev:sign-in     # prints a link and a code: open it, sign in, check the code, Approve
+pnpm dev:setup
+```
+
+`pnpm dev:sign-in` signs in as the extension does (the device flow), and keeps the token in
+`.foundryvtt/catalogue-token.json`, which git ignores: never commit it. The dev server reads it for each request, so
+signing in or out takes effect when EMMA next asks; refresh EMMA. `pnpm dev:sign-out` forgets it, to see the footer ask
+you to sign in. EMMA's **Sign in to EMMA's catalogue** button, which opens the extension's sign-in, says to run
+`pnpm dev:sign-in` instead.
+
+### The browser extension
+
+`pnpm dev:extension` builds the extension, with the setup screen's script, for `EMMA_DEV_CATALOGUE_URL`, zips each
+browser's build into `packages/extension/releases/dev/`, and serves them, with how to load them, at
+`http://<this machine>:31004/` (`EMMA_DEV_EXTENSION_PORT` to change it), for a browser on another machine:
+
+- **Chromium:** unzip `emma-extension-chromium-dev.zip` into a folder you keep, then **Load unpacked** it from
+  `chrome://extensions`, in Developer mode. After a rebuild, unzip over the same folder and reload EMMA's card.
+- **Firefox:** **Load Temporary Add-on…** from `about:debugging#/runtime/this-firefox`, choosing
+  `emma-extension-firefox-dev.zip`. Firefox forgets it when it restarts.
+
+The page's **Rebuild from the source** builds and zips again. The build goes to `packages/extension/dist/`, as a
+release's does, which a release builds afresh.
+
+### A quick check
+
+1. Open the extension's options (**Manage servers** in its popup), and **Sign in to EMMA's catalogue**: approve the
+   code on the catalogue's page. The options say whom it is signed in as, and their subscription.
+2. Activate EMMA on the Foundry server's setup screen, open EMMA, and see updates found; the catalogue's profile lists
+   *EMMA's browser extension* among its signed-in devices.
+3. **Sign out** in the options, and refresh EMMA: its footer asks you to sign in, and its button opens the options.
+4. In the catalogue's admin pages, end the user's subscription, sign in as them, and refresh EMMA: its footer says when
+   it ended, with **Renew your subscription**. (An admin is always entitled, so use a user who is not one.)
+
+For `pnpm dev:setup`, the same with `pnpm dev:sign-in` and `pnpm dev:sign-out` in place of the options.
 
 ## The module manifest
 

@@ -42,7 +42,7 @@ import {
   startCoreUpdate,
 } from '../foundry/setup-game';
 import { KitUnavailable, loadKit, locateKit } from '../foundry/setup-kit';
-import { revealCatalogue } from '@mondarth/emma-core/default-catalogue';
+import { builtCatalogue, relayFetch, requireAccount } from '../foundry/catalogue-relay';
 
 import { readListing } from '../foundry/listing';
 import { lookUpReleases } from '../foundry/releases';
@@ -121,6 +121,16 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
     return false;
   }
 
+  // The catalogue, asked as the user signed in to the browser extension, through it: the page holds no key or token,
+  // so the resolver's source is given an empty key, and the extension's `fetch`.
+  const catalogueUrl = builtCatalogue();
+  const catalogue = catalogueUrl === null ? null : { url: catalogueUrl, key: '' };
+  const relayed = relayFetch();
+  /** Make sure the user may use the catalogue before asking it, if this build has one. */
+  const signedIn = async () => {
+    if (catalogueUrl !== null) await requireAccount(catalogueUrl);
+  };
+
   // The guard follows the state's setting, and the state tells the guard when it changes.
   const placed: { guard?: Guard } = {};
   // A search from what the last one found is that one, and keeps what its planner learned.
@@ -143,12 +153,15 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
     findUpdates: async overview => {
       // The resolver comes from the installed EMMA module's setup kit, if it fits.
       const { installed, kit } = await kitIn(game);
-      const { universe, load, lookUp, readManifest, titleOf, catalogue } = await lookUpReleases(installed, {
+      await signedIn();
+      const found = await lookUpReleases(installed, {
         kit,
-        catalogue: revealCatalogue(__EMMA_DEFAULT_CATALOGUE__),
+        catalogue,
+        fetch: relayed,
         clientVersion: __EMMA_EXTENSION_VERSION__,
       });
-      const found = await searchOnce(kit, { overview, universe }, () =>
+      const { universe, load, lookUp, readManifest, titleOf } = found;
+      const updates = await searchOnce(kit, { overview, universe }, () =>
         findUpdates({
           resolver: kit.resolver,
           badges: kit.badges,
@@ -161,7 +174,7 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
         }),
       );
       // The catalogue's state is the one just found: when it last checked, and what it is fetching.
-      return { ...found, catalogue };
+      return { ...updates, catalogue: found.catalogue };
     },
     installModule: async () => {
       if (placed.guard !== undefined) await installEmma(game, placed.guard);
@@ -174,9 +187,11 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
     },
     listPackages: async type => {
       const { installed, kit } = await kitIn(game);
+      await signedIn();
       return readListing(type, {
         kit,
-        catalogue: revealCatalogue(__EMMA_DEFAULT_CATALOGUE__),
+        catalogue,
+        fetch: relayed,
         clientVersion: __EMMA_EXTENSION_VERSION__,
         core: installed.core.version,
         owned: () => ownedIn(game, type),

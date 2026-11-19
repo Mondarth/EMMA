@@ -76,7 +76,7 @@ describe('Popup', () => {
 
     await user.click(screen.getByRole('button', { name: 'Open EMMA just this once' }));
 
-    expect(chrome.scripting.executeScript).toHaveBeenCalledOnce();
+    expect(chrome.scripting.executeScript).toHaveBeenCalledTimes(2);
     expect(storage.get(SITES_KEY)).toEqual([]);
     expect(onDone).toHaveBeenCalledOnce();
   });

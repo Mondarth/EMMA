@@ -13,6 +13,8 @@
     "exactOptionalPropertyTypes": true,
     "noImplicitOverride": true,
     "resolveJsonModule": true,
+    // The tests import the dev server's scripts, which run under Node and name the files they import in full.
+    "allowImportingTsExtensions": true,
     "noEmit": true
   },
   "include": ["src/**/*", "tests/**/*"]
