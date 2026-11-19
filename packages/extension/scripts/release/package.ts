@@ -21,7 +21,7 @@ import path from 'node:path';
 import os from 'node:os';
 
 import { filesHolding } from '@mondarth/emma-core/files-holding';
-import { requireReleaseDefaults } from '@mondarth/emma-core/release-defaults';
+import { EXTENSION_RELEASE_DEFAULTS, requireReleaseDefaults } from '@mondarth/emma-core/release-defaults';
 
 import { differences, downloadAmoFile, signedAmoFile } from '../amo.ts';
 import type { AmoKey } from '../amo.ts';
@@ -47,18 +47,19 @@ function stampVersion(version: string): void {
 
 /**
  * Build the extension, and the setup screen's script it takes in, from a clean `dist/`, and lint the Firefox build.
- * Refuse a build that holds EMMA's catalogue key in plain text: it is only ever to be built in obscured.
+ * Refuse a build that holds the module's catalogue key: the extension asks the catalogue with its user's token, and
+ * ships no key, so a key in it can only have been built in by mistake.
  */
 function build(): void {
   fs.rmSync(DIST, { recursive: true, force: true });
   // `<package>...` builds the package after the workspace packages it depends on.
   execFileSync('pnpm', ['--filter', '@mondarth/emma-extension...', 'run', 'build'], { cwd: ROOT, stdio: 'inherit' });
   execFileSync('pnpm', ['run', 'lint:firefox'], { cwd: ROOT, stdio: 'inherit' });
-  for (const [name, variable] of [["The default catalogue's key", 'EMMA_DEFAULT_CATALOGUE_KEY']] as const) {
+  for (const [name, variable] of [["The module's catalogue key", 'EMMA_MODULE_CATALOGUE_KEY']] as const) {
     const key = process.env[variable];
     const leaks = key ? filesHolding(DIST, key) : [];
     if (leaks.length > 0) {
-      throw new Error(`${name} is in plain text in: ${leaks.map(file => path.relative(ROOT, file)).join(', ')}`);
+      throw new Error(`${name} is in: ${leaks.map(file => path.relative(ROOT, file)).join(', ')}`);
     }
   }
 }
@@ -179,7 +180,7 @@ if (!releaseVersion || !/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(releaseVersion)
 }
 
 // Before anything changes: a build without them succeeds, and the release would have no catalogue.
-requireReleaseDefaults(process.env);
+requireReleaseDefaults(process.env, EXTENSION_RELEASE_DEFAULTS);
 stampVersion(releaseVersion);
 build();
 for (const created of await createPackages(releaseVersion)) console.log(`Created ${path.relative(ROOT, created)}`);

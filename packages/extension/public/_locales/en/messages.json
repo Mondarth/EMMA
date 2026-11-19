@@ -1,33 +1,131 @@
 {
-  "name": { "message": "EMMA for Foundry VTT (alpha)" },
+  "name": {
+    "message": "EMMA for Foundry VTT (alpha)"
+  },
   "description": {
     "message": "Brings EMMA, the Enhanced Module Manager Application, to Foundry VTT's setup screen, on the servers you choose."
   },
-  "popupTitle": { "message": "EMMA for Foundry VTT" },
-  "alpha": { "message": "Alpha: for testing only." },
+  "popupTitle": {
+    "message": "EMMA for Foundry VTT"
+  },
+  "alpha": {
+    "message": "Alpha: for testing only."
+  },
   "notAServer": {
     "message": "EMMA runs on a Foundry VTT server's setup screen. Open one, then click this button again."
   },
-  "server": { "message": "Server: $1" },
-  "notSetup": { "message": "This is not the server's setup screen. EMMA opens on its setup screen (…/setup)." },
+  "server": {
+    "message": "Server: $1"
+  },
+  "notSetup": {
+    "message": "This is not the server's setup screen. EMMA opens on its setup screen (…/setup)."
+  },
   "consent": {
     "message": "EMMA can add its window to this server's setup screen. To do it each time, it needs your permission to read and change this server's pages. Nothing is sent anywhere else."
   },
-  "activate": { "message": "Activate on this server" },
-  "once": { "message": "Open EMMA just this once" },
-  "refused": { "message": "Permission was not given, so EMMA was not activated." },
-  "activated": { "message": "EMMA is active on this server." },
-  "auto": { "message": "Open EMMA by itself on this server's setup screen" },
-  "openNow": { "message": "Open EMMA now" },
-  "forget": { "message": "Forget this server" },
-  "manage": { "message": "Manage servers" },
-  "optionsTitle": { "message": "EMMA for Foundry VTT: servers" },
+  "activate": {
+    "message": "Activate on this server"
+  },
+  "once": {
+    "message": "Open EMMA just this once"
+  },
+  "refused": {
+    "message": "Permission was not given, so EMMA was not activated."
+  },
+  "activated": {
+    "message": "EMMA is active on this server."
+  },
+  "auto": {
+    "message": "Open EMMA by itself on this server's setup screen"
+  },
+  "openNow": {
+    "message": "Open EMMA now"
+  },
+  "forget": {
+    "message": "Forget this server"
+  },
+  "manage": {
+    "message": "Manage servers"
+  },
+  "optionsTitle": {
+    "message": "EMMA for Foundry VTT: servers"
+  },
   "optionsIntro": {
     "message": "The Foundry VTT servers EMMA is active on. Forgetting a server gives up the permission to run on it."
   },
   "noSites": {
     "message": "EMMA is not active on any server. Open a server's setup screen and click EMMA's button to activate it."
   },
-  "autoFor": { "message": "Open EMMA by itself on $1" },
-  "forgetSite": { "message": "Forget $1" }
+  "autoFor": {
+    "message": "Open EMMA by itself on $1"
+  },
+  "forgetSite": {
+    "message": "Forget $1"
+  },
+  "accountTitle": {
+    "message": "EMMA's catalogue"
+  },
+  "accountIntro": {
+    "message": "On the setup screen, EMMA finds updates and packages to install in EMMA's catalogue, as you: sign in with your catalogue account, which needs a subscription. This browser keeps your sign-in; Foundry's pages never see it."
+  },
+  "accountReading": {
+    "message": "Reading your sign-in…"
+  },
+  "accountAsking": {
+    "message": "Asking the catalogue to sign you in…"
+  },
+  "accountCode": {
+    "message": "Approve this browser on the catalogue's page, which has opened in a new tab, checking that it shows this code:"
+  },
+  "accountApprovePage": {
+    "message": "Open the catalogue's page again"
+  },
+  "accountCancel": {
+    "message": "Cancel"
+  },
+  "accountSignIn": {
+    "message": "Sign in to EMMA's catalogue"
+  },
+  "accountEnded_denied": {
+    "message": "You denied this browser, so it is not signed in."
+  },
+  "accountEnded_expired": {
+    "message": "The code expired before you approved this browser. Sign in again."
+  },
+  "accountEnded_failed": {
+    "message": "The catalogue could not sign you in. Try again later."
+  },
+  "accountUnreachable": {
+    "message": "EMMA's catalogue could not be reached."
+  },
+  "accountRetry": {
+    "message": "Try again"
+  },
+  "accountSignedInAs": {
+    "message": "Signed in as $1."
+  },
+  "accountEntitled": {
+    "message": "You may use everything EMMA's catalogue gives."
+  },
+  "accountSubscribedUntil": {
+    "message": "Subscribed until $1."
+  },
+  "accountNotSubscribed": {
+    "message": "You have no subscription, which EMMA's updates and installs need."
+  },
+  "accountLapsed": {
+    "message": "Your subscription ended on $1: renew it for EMMA's updates and installs."
+  },
+  "accountRenew": {
+    "message": "Your subscription"
+  },
+  "accountSignOut": {
+    "message": "Sign out"
+  },
+  "accountSignOutHint": {
+    "message": "Signing out makes this browser forget its sign-in. To end it on the catalogue as well, sign it out from"
+  },
+  "accountDevices": {
+    "message": "your signed-in devices"
+  }
 }

@@ -17,3 +17,4 @@ releases/
 node_modules/
 .foundryvtt/data/
 .foundryvtt/secrets.json
+.foundryvtt/catalogue-token.json

@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Page } from '@playwright/test';
 
 import { adminKey } from '../support/credentials';
-import { expect, test } from '../support/fixtures';
+import { CATALOGUE, expect, routeCatalogue, standInBridge, test } from '../support/fixtures';
 import { MODULE_TITLE, WORLD } from '../support/foundry';
 
 /**
@@ -51,11 +51,13 @@ async function openSetup(page: Page): Promise<void> {
 }
 
 /**
- * Open the setup screen with EMMA brought in, as the extension does.
+ * Open the setup screen with EMMA brought in, as the extension does, with a stand-in for its bridge.
  * @param page - The page
+ * @param token - The token of the user the extension is signed in as, or `null` for no one; a subscriber by default
  */
-async function openSetupWithEmma(page: Page): Promise<void> {
+async function openSetupWithEmma(page: Page, token?: string | null): Promise<void> {
   await openSetup(page);
+  await standInBridge(page, token);
   await page.addScriptTag({ path: SETUP_SCRIPT });
   await expect(page.getByRole('button', { name: 'EMMA', exact: true })).toBeVisible();
 }
@@ -135,5 +137,70 @@ test.describe('EMMA on the setup screen', () => {
     await expect(install).toHaveCSS('opacity', '1');
     await install.click();
     await expect(page.locator('#install-package')).toBeVisible();
+  });
+
+  test("finds updates in the catalogue as the extension's signed-in user, with their token and no key", async ({
+    page,
+  }) => {
+    const asked: { path: string; authorization: string | undefined; key: string | undefined }[] = [];
+    await routeCatalogue(page, (endpoint, _body, request) => {
+      asked.push({
+        path: endpoint,
+        authorization: request.headers()['authorization'],
+        key: request.headers()['x-api-key'],
+      });
+      return undefined;
+    });
+    await openSetupWithEmma(page);
+    await page.getByRole('button', { name: 'EMMA', exact: true }).click();
+
+    await expect(page.locator(EMMA_WINDOW).getByRole('status').first()).toContainText(
+      /No updates found|updates? found/,
+    );
+    expect(asked.map(request => request.path)).toEqual(expect.arrayContaining(['api/v2/me', 'api/v2/lookup']));
+    for (const request of asked) {
+      expect(request.authorization).toBe('Bearer e2e-user-token');
+      expect(request.key).toBeUndefined();
+    }
+  });
+
+  test('asks a user not signed in to sign in, from the extension, before finding updates', async ({ page }) => {
+    const asked: string[] = [];
+    await routeCatalogue(page, endpoint => {
+      asked.push(endpoint);
+      return undefined;
+    });
+    await openSetupWithEmma(page, null);
+    await page.getByRole('button', { name: 'EMMA', exact: true }).click();
+    const emma = page.locator(EMMA_WINDOW);
+
+    await expect(
+      emma.getByText("Finding updates needs you signed in to EMMA's catalogue", { exact: false }),
+    ).toBeVisible();
+    await emma.getByRole('button', { name: "Sign in to EMMA's catalogue" }).click();
+    await expect.poll(() => page.evaluate(() => Reflect.get(window, 'emmaSignInOpened') as number | undefined)).toBe(1);
+    // Nothing is asked of the catalogue for someone not signed in.
+    expect(asked).toEqual([]);
+  });
+
+  test('asks a user whose subscription ended to renew it, at the catalogue', async ({ page }) => {
+    await routeCatalogue(page, endpoint =>
+      endpoint === 'api/v2/me'
+        ? {
+            user: { handle: 'e2e-lapsed', nickname: null, role: 'user' },
+            subscription: { paidUntil: '2026-10-01T00:00:00.000Z', active: false },
+            entitled: false,
+          }
+        : undefined,
+    );
+    await openSetupWithEmma(page);
+    await page.getByRole('button', { name: 'EMMA', exact: true }).click();
+    const emma = page.locator(EMMA_WINDOW);
+
+    await expect(emma.getByText('Your EMMA subscription ended on', { exact: false })).toBeVisible();
+    await expect(emma.getByRole('link', { name: 'Renew your subscription' })).toHaveAttribute(
+      'href',
+      `${CATALOGUE}subscription`,
+    );
   });
 });

@@ -111,7 +111,7 @@ module:
 : Code that more than one package needs, and that uses no Foundry or browser globals: so far the world record's format
   (`src/world-record.ts`), which the module writes and the setup screen reads, with `parseWorldRecord` to read a record
   that anything may have written; EMMA's package catalogue, obscured in a build (`src/obscure.ts`,
-  `src/default-catalogue.ts`), with what builds it in and checks a release for its key in plain text, which run under Node (`scripts/`); and the setup kit's API
+  `src/default-catalogue.ts`), with what builds it in and checks a release for its key in plain text, which run under Node (`scripts/`); how the setup screen asks the catalogue through the browser extension as its signed-in user (`src/catalogue-relay.ts`: the messages, the endpoints and headers let through, and what `/api/v2/me` says of the account); and the setup kit's API
   (`src/setup-kit.ts`). The setup kit is the code the EMMA extension imports from the installed module, rather than
   carry its own copy: the resolver and the catalogue's sources, and how the module badges a version
   (`src/module/adapters/badges.ts`), so the extension's version lists are coloured as the module's are. It holds no
@@ -143,7 +143,10 @@ module:
   kit's `catalogueSet`, from the installed manifests `setup-game.ts` gives, and reads a manifest URL the user gives
   through the catalogue too; `src/foundry/listing.ts` reads the Install sections' listing from the catalogue, with
   which premium packages the user owns from `game.getPackages` (`readOwned`), kept a week in local storage
-  (`preferences.ts`); these two are the only code that fetches; `src/lib/updates.ts` resolves each recorded world's
+  (`preferences.ts`); these two are the only code that asks the catalogue, through the `fetch` of
+  `src/foundry/catalogue-relay.ts`, which posts each request to the extension's bridge and holds no key or token; it
+  also reads the account first (`requireAccount`), and the search for updates is `unavailable` with an
+  `AccountProblem` until the user signs in, or while their subscription has ended; `src/lib/updates.ts` resolves each recorded world's
   setup with the packages free to move up, and offers each package the lowest of the bests of the worlds that use it,
   or, if none does, its newest version the installed core can run; `src/app/update-state.svelte.ts` keeps what the
   search found, whether Update mode is on, and the versions chosen. `Splitter.svelte` resizes the panels, whose shares
@@ -164,8 +167,14 @@ module:
   background script (`src/background.ts`), which checks the server's origin against those remembered and injects
   `emma-setup.js` into the page itself (`world: "MAIN"`, Chrome 102 and Firefox 128). The background checks the
   origin, rather than trusting the loader's match patterns, because Firefox's patterns cannot name a port.
-  **Open EMMA just this once** injects through `activeTab`, with no permission kept. `src/browser/api.ts` is the only
-  code that uses the extension API.
+  **Open EMMA just this once** injects through `activeTab`, with no permission kept. With EMMA, the background
+  injects the bridge (`src/bridge.ts`), a classic script in the tab's isolated world, and remembers the tab and its
+  server in `chrome.storage.session` (`relayTabs`). The bridge takes the setup screen's requests to the catalogue to
+  the background, which asks the catalogue for a tab only while it is still on that server, with the signed-in user's
+  token (`src/browser/catalogue.ts`: `mayRelay`, `relay`); the options page signs the user in by the device flow
+  (`signIn`, `src/component/Account.svelte`) and keeps the token in `chrome.storage.local`. The catalogue answers CORS
+  for its two device endpoints, so the options page asks them from the extension's origin. `src/browser/api.ts` and
+  `src/browser/catalogue.ts` are the only code that uses the extension API.
 
 ## Activation changes
 

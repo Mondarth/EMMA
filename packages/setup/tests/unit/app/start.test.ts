@@ -9,9 +9,10 @@ import type { SetupState } from '../../../src/app/setup-state.svelte';
 import { startEmmaSetup, waitForSetup } from '../../../src/app/start';
 import { GUARDED_CLASS } from '../../../src/foundry/guard';
 import { GUARD_KEY, readOwnedKept, writeOwnedKept } from '../../../src/foundry/preferences';
-import { revealCatalogue } from '@mondarth/emma-core/default-catalogue';
+import { AccountRequired, builtCatalogue, requireAccount } from '../../../src/foundry/catalogue-relay';
 import { SETUP_KIT_API } from '@mondarth/emma-core/setup-kit';
 
+import type * as CatalogueRelay from '../../../src/foundry/catalogue-relay';
 import type * as SetupKitModule from '../../../src/foundry/setup-kit';
 import { installSetupMocks } from '../../mocks/foundry';
 import { KIT } from '../../mocks/kit';
@@ -22,8 +23,14 @@ vi.mock('../../../src/foundry/setup-kit', async importOriginal => ({
   loadKit: vi.fn(() => Promise.resolve(KIT)),
 }));
 
-// Tests are built without EMMA's catalogue; one may give it.
-vi.mock('@mondarth/emma-core/default-catalogue', () => ({ revealCatalogue: vi.fn(() => null) }));
+// Tests are built without EMMA's catalogue; one may give it, asked through the test's own `fetch` in place of the
+// extension, its user signed in (see catalogue-relay.test.ts for the relay itself).
+vi.mock('../../../src/foundry/catalogue-relay', async importOriginal => ({
+  ...(await importOriginal<typeof CatalogueRelay>()),
+  builtCatalogue: vi.fn(() => null),
+  relayFetch: vi.fn(() => (input: RequestInfo | URL, init?: RequestInit) => fetch(input, init)),
+  requireAccount: vi.fn(() => Promise.resolve()),
+}));
 
 // The window opens as ever; the tests may read the state it shows.
 vi.mock('../../../src/app/emma-setup-app', async importOriginal => {
@@ -138,11 +145,59 @@ describe('startEmmaSetup', () => {
     expect(await screen.findByText(/^Catalogue unreachable/)).toBeInTheDocument();
   });
 
+  test('asks the user to sign in to the catalogue, from the extension, before finding updates', async () => {
+    installSetupMocks({
+      modules: [{ id: 'mondarth-emma', flags: { setupKit: { api: SETUP_KIT_API, path: 'dist/emma-setup-kit.js' } } }],
+    });
+    vi.mocked(builtCatalogue).mockReturnValue('https://catalogue.example.test/');
+    vi.mocked(requireAccount).mockRejectedValue(new AccountRequired({ reason: 'signed-out' }));
+    const posted = vi.spyOn(window, 'postMessage');
+    const menu = showMenu();
+    await startEmmaSetup();
+
+    menu.querySelector('button')?.click();
+
+    expect(await screen.findByText(/^Finding updates needs you signed in/)).toBeInTheDocument();
+    expect(requireAccount).toHaveBeenCalledWith('https://catalogue.example.test/');
+    await userEvent.click(screen.getByRole('button', { name: /Sign in to EMMA's catalogue/ }));
+    expect(posted).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'mondarth-emma/page', openSignIn: true }),
+      window.location.origin,
+    );
+    vi.mocked(requireAccount).mockResolvedValue();
+    vi.mocked(builtCatalogue).mockReturnValue(null);
+  });
+
+  test.each([
+    ['2026-10-01T00:00:00.000Z', /^Your EMMA subscription ended on /],
+    [null, /^Finding updates needs an EMMA subscription/],
+  ])('asks the user to renew a subscription that ended (%s), linking to it', async (paidUntil, said) => {
+    installSetupMocks({
+      modules: [{ id: 'mondarth-emma', flags: { setupKit: { api: SETUP_KIT_API, path: 'dist/emma-setup-kit.js' } } }],
+    });
+    vi.mocked(builtCatalogue).mockReturnValue('https://catalogue.example.test/');
+    vi.mocked(requireAccount).mockRejectedValue(
+      new AccountRequired({ reason: 'lapsed', paidUntil, renew: 'https://catalogue.example.test/subscription' }),
+    );
+    const menu = showMenu();
+    await startEmmaSetup();
+
+    menu.querySelector('button')?.click();
+
+    expect(await screen.findByText(said)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Renew your subscription/ })).toHaveAttribute(
+      'href',
+      'https://catalogue.example.test/subscription',
+    );
+    vi.mocked(requireAccount).mockResolvedValue();
+    vi.mocked(builtCatalogue).mockReturnValue(null);
+  });
+
   test("reads Foundry's listing of what may be installed from the catalogue, and what the user owns from Foundry", async () => {
     const { game } = installSetupMocks({
       modules: [{ id: 'mondarth-emma', flags: { setupKit: { api: SETUP_KIT_API, path: 'dist/emma-setup-kit.js' } } }],
     });
-    vi.mocked(revealCatalogue).mockReturnValue({ url: 'https://catalogue.example.test/', key: 'k3y' });
+    vi.mocked(builtCatalogue).mockReturnValue('https://catalogue.example.test/');
     const listed = {
       package: { type: 'module', id: 'dice' },
       title: 'Dice',
@@ -174,14 +229,14 @@ describe('startEmmaSetup', () => {
     expect(getPackages).toHaveBeenCalledWith({ type: 'module' });
     // What the user owns is kept, for Foundry not to be asked again for a week.
     expect(readOwnedKept('module')).toEqual(new Set(['module:dice']));
-    vi.mocked(revealCatalogue).mockReturnValue(null);
+    vi.mocked(builtCatalogue).mockReturnValue(null);
   });
 
   test('takes what the user owns as kept, without asking Foundry', async () => {
     const { game } = installSetupMocks({
       modules: [{ id: 'mondarth-emma', flags: { setupKit: { api: SETUP_KIT_API, path: 'dist/emma-setup-kit.js' } } }],
     });
-    vi.mocked(revealCatalogue).mockReturnValue({ url: 'https://catalogue.example.test/', key: 'k3y' });
+    vi.mocked(builtCatalogue).mockReturnValue('https://catalogue.example.test/');
     const versions = [{ version: '1.0.0', minimum: null, maximum: null, verified: null, manifest: null, notes: null }];
     const listed = { package: { type: 'module', id: 'dice' }, title: 'Dice', summary: null, author: null, url: null };
     const packages = [{ ...listed, tags: [], systems: [], premium: true, exclusive: false, latest: null, versions }];
@@ -201,14 +256,14 @@ describe('startEmmaSetup', () => {
 
     expect(setup.listings.module).toEqual([expect.objectContaining({ id: 'dice', unowned: false })]);
     expect(getPackages).not.toHaveBeenCalled();
-    vi.mocked(revealCatalogue).mockReturnValue(null);
+    vi.mocked(builtCatalogue).mockReturnValue(null);
   });
 
   test('offers no listing to install from where Foundry cannot say what the user owns, and keeps nothing', async () => {
     const { game } = installSetupMocks({
       modules: [{ id: 'mondarth-emma', flags: { setupKit: { api: SETUP_KIT_API, path: 'dist/emma-setup-kit.js' } } }],
     });
-    vi.mocked(revealCatalogue).mockReturnValue({ url: 'https://catalogue.example.test/', key: 'k3y' });
+    vi.mocked(builtCatalogue).mockReturnValue('https://catalogue.example.test/');
     const listed = {
       package: { type: 'module', id: 'paid' },
       title: 'Paid',
@@ -236,7 +291,7 @@ describe('startEmmaSetup', () => {
 
     expect(setup.listings.module).toEqual([expect.objectContaining({ id: 'paid', unowned: true })]);
     expect(readOwnedKept('module')).toBeUndefined();
-    vi.mocked(revealCatalogue).mockReturnValue(null);
+    vi.mocked(builtCatalogue).mockReturnValue(null);
   });
 
   test("asks the server for the space a snapshot needs, as Foundry's own dialog does", async () => {

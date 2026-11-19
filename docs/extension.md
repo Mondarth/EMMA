@@ -77,6 +77,26 @@ Once a server is activated, the extension's button offers:
 
 **Manage servers** lists every server EMMA is active on, with the same choices.
 
+## Signing in to EMMA's catalogue
+
+On the setup screen, EMMA finds updates and the packages to install in EMMA's package catalogue, as you: the extension
+signs in to the catalogue with your catalogue account, which needs a subscription. The rest of EMMA on the setup
+screen (the installation tree, the world records, notes, and the guard on Foundry's buttons) works without signing in.
+
+1. Open the extension's options: **Manage servers** in its popup, or the extension's details in the browser.
+2. Under **EMMA's catalogue**, choose **Sign in to EMMA's catalogue**. The catalogue's page opens in a new tab, and the
+   options page shows a code.
+3. On the catalogue's page, sign in if you are not already, check that it shows the same code, and choose **Approve**.
+
+The options page then says whom it is signed in as, and until when you are subscribed. If EMMA's footer on the setup
+screen asks you to sign in, its **Sign in to EMMA's catalogue** button opens the options page. If your subscription
+has ended, the footer says when, with a link to renew it.
+
+The extension keeps its sign-in in your browser, where Foundry's pages cannot read it, and only the extension's own
+background script uses it. **Sign out** on the options page makes the browser forget it; to end it on the catalogue
+too, sign it out from your catalogue profile's **Signed-in devices**, where it shows as *EMMA's browser extension*.
+A sign-in lasts 30 days, renewed while it is used.
+
 ## On the setup screen
 
 With EMMA open, the setup screen changes in two ways.
@@ -387,9 +407,11 @@ screen, so one left off a larger screen opens on it.
 EMMA finds versions in EMMA's package catalogue alone, in one request: it holds every release of Foundry's listed
 packages and of those it is asked for, with the Foundry VTT versions each works with, and checks each package's own
 manifest about every hour, so it knows a version published by the manifest alone. A package it does not hold yet,
-such as one installed from a manifest only, it fetches by the manifest URL EMMA sends, to give it next time. When the
-catalogue cannot be reached, or in a development build without one, EMMA knows only what is installed, offers no
-updates, and its footer says **Catalogue unreachable**; **Refresh** tries again.
+such as one installed from a manifest only, it fetches by the manifest URL EMMA sends, to give it next time. Until you
+sign in (see [signing in](#signing-in-to-emmas-catalogue)), or while your subscription has ended, EMMA does not ask
+the catalogue, and its footer says what to do. When the catalogue cannot be reached, or in a development build
+without one, EMMA knows only what is installed, offers no updates, and its footer says **Catalogue unreachable**;
+**Refresh** tries again.
 
 The footer says how fresh the catalogue's versions are: as of when the installed packages' own manifests were last
 checked, the oldest of them. A version published since by a manifest alone is not known yet. **Check live** has the
@@ -595,12 +617,12 @@ record cannot be read is marked **Record unreadable**; opening it with EMMA acti
 
 The extension reads the setup screen of the servers you allow it on, and the world records in their worlds' folders,
 through the server's own pages. It keeps the list of servers you activated, the choice of whether EMMA opens by itself
-on each, and the sizes of EMMA's panels, in your browser.
+on each, the sizes of EMMA's panels, and your catalogue sign-in, in your browser.
 
 To find updates, EMMA sends EMMA's package catalogue the IDs and versions of the installed game systems and modules,
 the manifest URLs they were installed from, and the installed Foundry VTT generation; a manifest URL you give, to
-install from, goes to the catalogue too, which reads it. Each request to the catalogue carries a key that says it
-comes from EMMA, and the extension's version. EMMA asks nothing else, and sends nothing about your worlds, your server
+install from, goes to the catalogue too, which reads it. Each request to the catalogue carries your sign-in, which
+says it is you, and the extension's version; the catalogue keeps what its privacy page says it does. EMMA asks nothing else, and sends nothing about your worlds, your server
 or you.
 
 ## Limitations of the alpha

@@ -6,6 +6,8 @@
 import type { PackageKey, Release } from '@mondarth/fvtt-resolver';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
+import type { AccountProblem } from '../foundry/catalogue-relay';
+import { AccountRequired } from '../foundry/catalogue-relay';
 import type { KitProblem } from '../foundry/setup-kit';
 import { BusyState, afterPaint, paced } from './busy.svelte';
 import { KitUnavailable } from '../foundry/setup-kit';
@@ -23,7 +25,7 @@ import type { BlockedUpdate, ManifestRead, PackageUpdate, UpdateSearch, VersionO
 
 /**
  * Where the search for updates is: `unavailable` when it cannot be made, as without an EMMA module whose setup kit
- * fits (see {@link UpdateState.problem}).
+ * fits, or before the user signs in to the catalogue (see {@link UpdateState.problem}).
  */
 export type UpdateStatus = 'idle' | 'searching' | 'found' | 'failed' | 'unavailable';
 
@@ -198,7 +200,7 @@ export class UpdateState {
   /** What the last search found, once it has. */
   search = $state.raw<UpdateSearch | null>(null);
   /** Why the search cannot be made, while the status is `unavailable`. */
-  problem = $state.raw<KitProblem | null>(null);
+  problem = $state.raw<KitProblem | AccountProblem | null>(null);
   /** The version the user is looking at in a package's list, while it is open. */
   preview = $state.raw<{ readonly key: PackageKey; readonly version: string } | null>(null);
   /** The plan: the versions chosen, and what they need. */
@@ -540,7 +542,7 @@ export class UpdateState {
       }
     } catch (error) {
       if (search !== this.#searches) return;
-      if (error instanceof KitUnavailable) {
+      if (error instanceof KitUnavailable || error instanceof AccountRequired) {
         this.search = null;
         this.problem = error.problem;
         this.#picks.clear();

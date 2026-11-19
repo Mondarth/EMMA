@@ -12,8 +12,8 @@ import type { Plugin } from 'vite';
 export interface InjectSetupOptions {
   /** Foundry's address, such as `http://localhost:30000`. */
   readonly foundry: string;
-  /** The module scripts to add to the setup page, by URL. */
-  readonly scripts: readonly string[];
+  /** The module scripts to add to the setup page, in order: by URL, or as code. */
+  readonly scripts: readonly (string | { readonly code: string })[];
 }
 
 /**
@@ -28,11 +28,17 @@ export function isSetupPage(url: string): boolean {
 /**
  * Add module scripts to an HTML page, at the end of its head.
  * @param html - The page
- * @param scripts - The scripts' URLs
+ * @param scripts - The scripts: their URLs, or their code
  * @returns The page with the scripts, or as it was if it has no head
  */
-export function addScripts(html: string, scripts: readonly string[]): string {
-  const tags = scripts.map(src => `<script type="module" src="${src}"></script>`).join('');
+export function addScripts(html: string, scripts: InjectSetupOptions['scripts']): string {
+  const tags = scripts
+    .map(script =>
+      typeof script === 'string'
+        ? `<script type="module" src="${script}"></script>`
+        : `<script type="module">${script.code}</script>`,
+    )
+    .join('');
   return html.replace(/<\/head>/i, `${tags}</head>`);
 }
 
