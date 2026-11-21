@@ -120,6 +120,20 @@ function newestOf(
 }
 
 /**
+ * Whether two URLs are the same, as written in different ways, such as with a default port.
+ * @param a - One URL
+ * @param b - The other
+ * @returns `true` if they are; URLs that cannot be read are the same only as the same text
+ */
+function sameUrl(a: string, b: string): boolean {
+  try {
+    return new URL(a).href === new URL(b).href;
+  } catch {
+    return a === b;
+  }
+}
+
+/**
  * Look up every release of the installed systems and modules.
  * @param installed - The installed packages' manifests, and the Foundry build
  * @param options - How to fetch
@@ -179,13 +193,16 @@ export async function lookUpReleases(installed: InstalledManifests, options: Loo
   );
   // What each installed package's own manifest gives now, as the catalogue last read it, as Foundry's updater reads it:
   // a version published by the manifest alone is installable from that manifest. One the catalogue does not hold yet
-  // is pending there, so is not known here.
+  // is pending there, so is not known here. The installed copy's manifest URL gives that version only if it is the URL
+  // the catalogue read it from: one that names a version, as FA Nexus 0.5.3's `v0.5.3-beta/module.json` does while
+  // its newer releases give `releases/latest/download/module.json`, only ever gives that version.
   const current = installed.manifests.flatMap(({ type, id, manifest }) => {
     const key = packageKey({ type, id });
     const own = set?.packageOf(key)?.own.version ?? null;
     if (manifest === undefined || own === null) return [];
     const release = releases.find(given => packageKey(given.package) === key && sameVersion(given.version, own));
-    return release === undefined ? [] : [{ ...release, manifest }];
+    if (release === undefined || (release.manifest !== undefined && !sameUrl(release.manifest, manifest))) return [];
+    return [{ ...release, manifest }];
   });
   const unavailable = new Set((set?.unavailable() ?? []).map(({ package: ref }) => packageKey(ref)));
   const pending = set?.pending() ?? [];
