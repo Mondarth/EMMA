@@ -254,6 +254,46 @@ describe('lookUpReleases', () => {
     ]);
   });
 
+  test("never takes the version a package's own manifest gives as installable from another URL the installed copy names", async () => {
+    // FA Nexus 0.5.3 names its own release's manifest, which only ever gives 0.5.3, while the catalogue read 0.6.2 from
+    // the "latest" manifest its newer releases give.
+    const pinned = 'https://packages.example.test/nexus/v0.5.3-beta/module.json';
+    const latest = 'https://packages.example.test/nexus/latest/module.json';
+    const lookUp = (installedFrom: string) =>
+      lookUpReleases(
+        { core: CORE, manifests: [moduleManifest('nexus', '0.5.3', installedFrom)] },
+        {
+          kit: KIT,
+          catalogue: CATALOGUE,
+          fetch: catalogue({
+            [LOOKUP]: () =>
+              answer({
+                packages: [
+                  looked(
+                    'nexus',
+                    [
+                      // The catalogue gives a URL that names its version as that version's own.
+                      held('0.5.3', { manifest: pinned, versionManifest: pinned, origin: pinned }),
+                      held('0.6.2', { manifest: latest, origin: latest }),
+                    ],
+                    '0.6.2',
+                  ),
+                ],
+              }),
+          }),
+        },
+      );
+    const shown = async (installedFrom: string) =>
+      (await lookUp(installedFrom)).universe.releases.map(
+        ({ version, versionManifest }) => `${version} ${versionManifest ?? '-'}`,
+      );
+
+    // 0.6.2 is installable from the manifest it was read from, never from 0.5.3's.
+    await expect(shown(pinned)).resolves.toEqual([`0.5.3 ${pinned}`, `0.6.2 ${latest}`]);
+    // An installed manifest that is no URL is no other URL either.
+    await expect(shown('modules/nexus/module.json')).resolves.toEqual([`0.5.3 ${pinned}`, `0.6.2 ${latest}`]);
+  });
+
   test('installs from a "latest" manifest at the version it gives now', async () => {
     const url = 'https://packages.example.test/app/module.json';
     const fromLatest = (version: string) => held(version, { manifest: url, origin: url });
