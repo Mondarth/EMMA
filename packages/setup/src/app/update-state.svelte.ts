@@ -314,14 +314,15 @@ export class UpdateState {
 
   /**
    * What the plan offers to keep before it changes anything: a snapshot, checked when Foundry VTT changes, then a
-   * backup of each world that uses a package the plan changes (see `lib/safeguards.ts`). None while nothing is chosen.
+   * backup of each world that uses a package the plan changes as it is run, what was added against EMMA's advice
+   * included (see `lib/safeguards.ts`). None while nothing is chosen.
    */
   readonly safeguards: readonly Safeguard[] = $derived.by(() => {
     const overview = this.#overview;
     if (overview === null) return [];
     return safeguardsFor(
       overview,
-      this.plan,
+      this.runPlan,
       this.#safeguardEdits,
       {
         snapshot: format('Plan.SnapshotNote', { date: today() }),
