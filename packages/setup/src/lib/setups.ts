@@ -129,11 +129,14 @@ export function keepsLocked(resolver: KitResolver, overview: Overview): (release
 
 /** What the plans take into account of an installation, and of the releases found, leaving out what EMMA ignores. */
 export interface Considered {
-  /** The installation without the worlds EMMA ignores: their setups hold nothing back. */
+  /**
+   * The installation without the worlds EMMA ignores, whose setups hold nothing back, and without the modules it ignores
+   * among what each world runs or will need: a world is planned for without them.
+   */
   readonly overview: Overview;
   /**
-   * Releases as the plans take them: none of a package EMMA ignores, and any version of one asked for satisfied by the
-   * one installed.
+   * Releases as the plans take them: none of a package EMMA ignores, nothing requiring a module it ignores, and any
+   * version of a game system it ignores satisfied by the one installed.
    */
   readonly releases: (releases: readonly Release[]) => Release[];
   /** The releases the packages EMMA ignores stand as: at their installed versions, asking nothing. */
@@ -144,6 +147,9 @@ export interface Considered {
  * What the plans take into account, as the EMMA module's hypothetical mode takes a module it ignores, but for worlds and
  * game systems too. A package ignored is taken as present at its installed version, its other releases never looked up
  * or judged, so that it never changes, asks nothing of the setup, and satisfies whatever version of it another asks.
+ * A module ignored is not even required, of a world or of another package: the resolver's policy may refuse its
+ * installed version, such as one that looks like a pre-release (`3.19.6.noble-prerelease-25-93-v14`), and a world that
+ * runs it would then have no setup at all.
  * @param resolver - The resolver
  * @param overview - The installation, with what EMMA ignores
  * @returns What the plans take into account
@@ -157,8 +163,15 @@ export function considered(resolver: KitResolver, overview: Overview): Considere
   const ignored = new Set(installed.map(ref => packageKey(ref)));
   const satisfied = (relationship: Relationship): Relationship =>
     ignored.has(packageKey(relationship.package)) ? { ...relationship, compatibility: {} } : relationship;
+  const required = (relationship: Relationship): boolean => !ignored.has(packageKey(relationship.package));
+  const run = ({ id }: { readonly id: string }): boolean => !ignored.has(packageKey({ type: 'module', id }));
   return {
-    overview: { ...overview, worlds: overview.worlds.filter(({ world }) => !isIgnored(overview, `world:${world.id}`)) },
+    overview: {
+      ...overview,
+      worlds: overview.worlds
+        .filter(({ world }) => !isIgnored(overview, `world:${world.id}`))
+        .map(world => ({ ...world, modules: world.modules.filter(run), needs: world.needs.filter(run) })),
+    },
     releases: releases =>
       releases
         .filter(release => !ignored.has(packageKey(release.package)))
@@ -166,7 +179,7 @@ export function considered(resolver: KitResolver, overview: Overview): Considere
           ...release,
           relationships: {
             ...release.relationships,
-            requires: release.relationships.requires.map(satisfied),
+            requires: release.relationships.requires.filter(required),
             systems: release.relationships.systems.map(satisfied),
           },
         })),

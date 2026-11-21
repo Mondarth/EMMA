@@ -112,13 +112,13 @@ describe('WorldPanel, for a world no working setup was found for', () => {
   test('says why, and nothing for one a setup was found for', () => {
     const world = NEME.worlds[0] as (typeof NEME.worlds)[number];
     const { unmount } = render(WorldPanel, { world, unresolved: ['Neme cannot keep working. (1)'] });
-    expect(within(screen.getByRole('region', { name: 'No working setup' })).getByRole('listitem')).toHaveTextContent(
+    expect(within(screen.getByRole('region', { name: 'No update plan' })).getByRole('listitem')).toHaveTextContent(
       'Neme cannot keep working. (1)',
     );
     unmount();
 
     render(WorldPanel, { world });
-    expect(screen.queryByRole('region', { name: 'No working setup' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'No update plan' })).toBeNull();
   });
 });
 

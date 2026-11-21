@@ -175,7 +175,7 @@ describe('updates in the window', () => {
     await user.keyboard('{ArrowRight}');
     await user.click(within(row(/Library 1\.0\.0/)).getByText('Library'));
     expect(screen.getByRole('region', { name: 'Not offered: 3.0.0' })).toHaveTextContent(
-      'EMMA found no working setup for Alpha, so nothing it uses is updated.',
+      'EMMA cannot plan updates for Alpha, so nothing it uses is updated.',
     );
   });
 
@@ -653,7 +653,7 @@ describe('updates in the window', () => {
           judge: unjudged,
           planner: alone(),
         }),
-      'EMMA found no working setup for 1 recorded worlds',
+      'EMMA cannot plan updates for 1 recorded worlds',
     ],
   ] as const)('says so when the search %s, and offers no versions', async (_label, find, text) => {
     await setUp(find);
@@ -686,7 +686,7 @@ describe('updates in the window', () => {
     ).toEqual(expect.arrayContaining(why));
 
     await user.click(screen.getByRole('treeitem', { name: /^Alpha/ }));
-    const panel = screen.getByRole('region', { name: 'No working setup' });
+    const panel = screen.getByRole('region', { name: 'No update plan' });
     expect(
       within(panel)
         .getAllByRole('listitem')
