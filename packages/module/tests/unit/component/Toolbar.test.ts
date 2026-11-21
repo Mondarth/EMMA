@@ -319,7 +319,7 @@ describe('Toolbar', () => {
       const CHECK = 'MONDARTH-EMMA.Report.Reports.check';
       const UPDATE = 'MONDARTH-EMMA.Report.Reports.update';
 
-      test('are a group of toggles in the middle of the toolbar: plan, check and update', async () => {
+      test('are a group of toggles in the middle of the toolbar: check, update and plan, the order they are used in', async () => {
         const { state } = await loadedVersions({});
         render(Toolbar, {
           modules: createModules(),
@@ -335,15 +335,15 @@ describe('Toolbar', () => {
         expect(group.previousElementSibling).toHaveClass('emma-toolbar-hypothetical');
         expect(group.nextElementSibling).toHaveClass('emma-toolbar-end');
         const buttons = within(group).getAllByRole('button');
-        expect(buttons.map(button => button.getAttribute('aria-label'))).toEqual([PLAN, CHECK, UPDATE]);
+        expect(buttons.map(button => button.getAttribute('aria-label'))).toEqual([CHECK, UPDATE, PLAN]);
         expect(buttons.map(button => button.getAttribute('data-tooltip'))).toEqual([
-          'MONDARTH-EMMA.Report.Tooltips.plan',
           'MONDARTH-EMMA.Report.Tooltips.check',
           'MONDARTH-EMMA.Report.Tooltips.update',
+          'MONDARTH-EMMA.Report.Tooltips.plan',
         ]);
         expect(
           buttons.map(button => [...button.classList].find(name => name.startsWith('fa-') && name !== 'fa-solid')),
-        ).toEqual(['fa-list-ol', 'fa-clipboard-check', 'fa-circle-arrow-up']);
+        ).toEqual(['fa-clipboard-check', 'fa-circle-arrow-up', 'fa-list-ol']);
         expect(buttons.every(button => button.getAttribute('aria-pressed') === 'false')).toBe(true);
       });
 

@@ -312,7 +312,8 @@ describe('EmmaApp', () => {
       vi.spyOn(screen.getByRole('toolbar'), 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 10, 1024, 30));
       const render = vi.spyOn(SetupReportApp.prototype, 'render');
 
-      await userEvent.click(screen.getByRole('button', { name: PLAN }));
+      // The first report in the toolbar's order, which opens where no other has moved it along.
+      await userEvent.click(screen.getByRole('button', { name: CHECK }));
 
       await vi.waitFor(() => {
         expect(render).toHaveBeenCalled();
@@ -328,7 +329,8 @@ describe('EmmaApp', () => {
       screen.getByRole('toolbar').removeAttribute('role');
       const render = vi.spyOn(SetupReportApp.prototype, 'render');
 
-      await userEvent.click(screen.getByRole('button', { name: PLAN }));
+      // The first report in the toolbar's order, which opens where no other has moved it along.
+      await userEvent.click(screen.getByRole('button', { name: CHECK }));
 
       await vi.waitFor(() => {
         expect(render).toHaveBeenCalled();

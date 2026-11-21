@@ -248,26 +248,11 @@ which may not. Choose a version to see it on the button; every module's badge is
 
 ### Reporting on the setup
 
-In the middle of the toolbar, three buttons each open a report on the setup hypothetical mode shows: the Foundry
-version, the system and the modules staged active, at the versions chosen. They are enabled once the versions are
-looked up. Each report opens in a window of its own, so any of them can be open beside the others; a button shows
+In the middle of the toolbar, three buttons each open a report on the setup hypothetical mode shows (the Foundry
+version, the system and the modules staged active, at the versions chosen), in the order they are used in: check the
+setup, update it, then plan installing it. They are enabled once the versions are looked up. Each report opens in a window of its own, so any of them can be open beside the others; a button shows
 pressed while its report is open, and pressing it again closes the report:
 
-- **Plan** ![plan tool button](images/usage/EMMA_tool_plan.png) (a numbered list): the active modules in the order to
-  install them, numbered, in three columns: each module's ID, its name, and a manifest URL for the version chosen
-  alone, such as a GitHub release's own `module.json`, so that installing from it installs that version. A module's
-  own manifest URL usually gives whatever version is newest, so it is never shown; where no source gives a URL for the
-  version, the plan says _none for this version_. The plan is in two lists, each under its title and numbered from 1:
-  first the modules to install (a version other than the one installed, or a module not installed), then those kept at
-  the version installed. In each, a module comes before the modules that depend on it: the modules are ordered by how
-  deep the tree of active modules depending on each one goes, deepest first, so the libraries others build on come
-  first.
-  ```{figure} images/usage/EMMA_report_plan.png
-  :alt: The hypothetical mode's plan report
-  :width: 600px
-
-  Plan report showing the recommended ordered install list.
-  ```
 - **Check** ![check tool button](images/usage/EMMA_tool_check.png) (a clipboard with a tick): whether every package
   can be used in the setup, then every active module with its badge, Foundry's verdict and, in words, everything found
   about it: what keeps it from being used (a module it depends on at the wrong version, a system it does not run in),
@@ -295,6 +280,21 @@ pressed while its report is open, and pressing it again closes the report:
   :width: 600px
 
   The update report
+  ```
+- **Plan** ![plan tool button](images/usage/EMMA_tool_plan.png) (a numbered list): the active modules in the order to
+  install them, numbered, in three columns: each module's ID, its name, and a manifest URL for the version chosen
+  alone, such as a GitHub release's own `module.json`, so that installing from it installs that version. A module's
+  own manifest URL usually gives whatever version is newest, so it is never shown; where no source gives a URL for the
+  version, the plan says _none for this version_. The plan is in two lists, each under its title and numbered from 1:
+  first the modules to install (a version other than the one installed, or a module not installed), then those kept at
+  the version installed. In each, a module comes before the modules that depend on it: the modules are ordered by how
+  deep the tree of active modules depending on each one goes, deepest first, so the libraries others build on come
+  first.
+  ```{figure} images/usage/EMMA_report_plan.png
+  :alt: The hypothetical mode's plan report
+  :width: 600px
+
+  Plan report showing the recommended ordered install list.
   ```
 
 When the **Update** changes any version, a button (a wand) just left of its download button chooses the versions it
