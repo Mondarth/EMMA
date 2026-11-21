@@ -70,8 +70,8 @@
     "Need": "{title}: now required by {modules}, updated since the world last ran",
     "Unreadable": "EMMA cannot read this world's record. Open the world once, with EMMA active, to record its setup again.",
     "NeedBy": "now required by {modules}, updated since the world last ran",
-    "Unresolved": "No working setup",
-    "UnresolvedHint": "EMMA found no versions of what this world uses that work together on the installed build of Foundry VTT, as their manifests declare, so nothing it uses is offered an update. Why:"
+    "Unresolved": "No update plan",
+    "UnresolvedHint": "EMMA found no versions of what this world uses that work together on the installed build of Foundry VTT, as their manifests declare, so it plans no updates for it. The world, as installed, is not changed. Why:"
   },
   "ModuleInfo": {
     "InWorld": "In {world}",
@@ -99,6 +99,7 @@
     "Needs": "{world} needs {package}",
     "Installed": "the plan has {package}",
     "Fails": "{world} cannot keep working",
+    "Unplanned": "EMMA cannot plan updates for {world}",
     "Plan": "the plan",
     "Uninstalled": "{world} needs {package}, which the plan uninstalls"
   },
@@ -112,7 +113,7 @@
     "Checked": "As of {time}: a version published since by a package's own manifest alone may not be known yet.",
     "CheckLive": "Check live",
     "CheckLiveHint": "Have the catalogue read each installed package's own manifest now, then look again",
-    "Unresolved": "EMMA found no working setup for {count} recorded worlds, so nothing they use is offered an update.",
+    "Unresolved": "EMMA cannot plan updates for {count} recorded worlds by what their packages' manifests declare, so it offers nothing they use an update. The worlds themselves are not changed.",
     "Available": "Update available",
     "Hidden": "Updates in the rows under it",
     "Blocked": "Newer version EMMA cannot offer",
@@ -120,7 +121,7 @@
     "BlockedTitle": "Not offered: {version}",
     "BlockedWhy": "EMMA cannot make every world that uses it consistent with this update.",
     "HeldUnrecorded": "{world} has no EMMA record, so EMMA cannot tell whether the modules it runs would work with it.",
-    "HeldUnresolved": "EMMA found no working setup for {world}, so nothing it uses is updated.",
+    "HeldUnresolved": "EMMA cannot plan updates for {world}, so nothing it uses is updated.",
     "HeldInconsistent": "In {world}, the other packages it runs cannot all work with it.",
     "NeedsCore": "It needs Foundry VTT {core} or later, which is not installed.",
     "Explained": "{version} update",

@@ -14,6 +14,7 @@ function recordingGuard(events: string[]): Guard {
   return {
     refresh: vi.fn(),
     remove: vi.fn(),
+    quietly: run => run(),
     async allowing(run) {
       events.push('allow');
       try {

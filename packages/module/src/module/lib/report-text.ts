@@ -6,8 +6,11 @@ import type { PlanEntry, SetupCheck, SetupSolve, UnavailableModule } from '@modu
 
 import { format, formatList, localize } from './i18n';
 
-/** The reports, each in its own window, in the order the toolbar offers them. */
-export const REPORT_STYLES = ['plan', 'check', 'update'] as const;
+/**
+ * The reports, each in its own window, in the order the toolbar offers them: the order they are used in. Check the
+ * setup chosen, update it to the best versions, then plan installing it.
+ */
+export const REPORT_STYLES = ['check', 'update', 'plan'] as const;
 
 /** One of the reports. */
 export type ReportStyle = (typeof REPORT_STYLES)[number];

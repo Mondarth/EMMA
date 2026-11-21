@@ -235,11 +235,13 @@ package for all of them:
 
 - For each world with a record, EMMA works out the best setup of the installed Foundry VTT, the world's game system and
   the modules its record says are active, each moved up to the newest version that works with the others. A package is
-  offered the newest version that every world using it can take. If EMMA finds no working setup for a world, nothing
-  that world uses is offered an update, and the footer says so. **Why, world by world**, in the footer, opens to say
-  why for each such world, in the resolver's words: which packages' declared requirements cannot all be met together,
-  or which manifests EMMA could not read. The world's panel says the same, under **No working setup**. Packages EMMA
-  ignores are never the cause: they are taken as installed, and whatever needs them as met.
+  offered the newest version that every world using it can take. If EMMA cannot plan updates for a world, nothing
+  that world uses is offered an update, and the footer says so. The world itself is not changed: EMMA judges by what
+  the packages' manifests declare, and a world may run well enough although they say it should not. **Why, world by
+  world**, in the footer, opens to say why for each such world, in the resolver's words: which packages' declared
+  requirements cannot all be met together, or which manifests EMMA could not read. The world's panel says the same,
+  under **No update plan**. Packages EMMA ignores are never the cause: a module it ignores is not required, of the world
+  or of anything else, and a game system it ignores is taken as installed.
 - The game system of a world without a record is not offered an update, as EMMA cannot tell whether the modules the
   world runs would work with one.
 - A package no world with a record uses, such as a module that no world has active, is offered its newest version that
@@ -247,8 +249,7 @@ package for all of them:
 
 Foundry VTT itself is offered an update too, on the tree's root row: the newest stable build that every world with a
 record can take, with its game system and modules free to move up as well. A world without a record holds Foundry VTT
-to the builds its installed game system runs on, and a world for which EMMA finds no working setup holds it where it
-is. Its versions are coloured by how well the recorded worlds' packages fit each build, naming those that will not work
+to the builds its installed game system runs on, and a world EMMA cannot plan updates for holds it where it is. Its versions are coloured by how well the recorded worlds' packages fit each build, naming those that will not work
 with it and those not verified with it. Foundry's builds come from EMMA's package catalogue; without it, Foundry VTT
 is not offered an update.
 
@@ -338,6 +339,11 @@ back to the top so that the steps are in view:
    already has what each change needs. What you added against EMMA's advice is installed once the rest are over;
 3. each package to uninstall, last, one at a time, once the changes of the packages that needed it are done (see
    [Uninstalling](#uninstalling)).
+
+Each step shows its own progress in the plan. Foundry's own progress bars, at the top of its package tabs, are hidden
+while EMMA makes a snapshot, a backup, an install or an uninstall, and come back as each is done, so that a step's
+progress shows in one place. Installs and uninstalls you make with Foundry's own buttons, once you let it, still
+show Foundry's bars.
 
 A step that fails stops only the steps that need it, and those that need them in turn: they are **Not run**, each
 saying which step it needed. Every other step goes on. Every change needs the snapshot and backups, so if one of
@@ -569,8 +575,9 @@ to whole worlds and to game systems, outside any one world.
 
 - **An ignored game system or module** stays at its installed version. EMMA never looks up or judges its other
   releases, so it is never updated or offered as an update. What it asks of the setup holds nothing back, and whatever
-  version of it another package asks for is taken to be the one installed. Use it for a package whose releases EMMA
-  cannot read or judge correctly.
+  version of it another package asks for is taken to be the one installed. An ignored module is not even required, of a
+  world or of another package, so its version never matters, even one that looks like a pre-release. Use it for a
+  package whose releases EMMA cannot read or judge correctly.
 - **An ignored phantom module**: a world's record may name a module that is not a real one, such as a synthetic
   module another module adds, so that it never installs. Its row, under the world, offers **Ignore** too; ignored, it is
   no longer counted as a change since the world last ran.

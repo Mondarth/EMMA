@@ -77,9 +77,10 @@ describe('SetupReportApp', () => {
       style => (new SetupReportApp(style, report()).options as { position: { left: number; top: number } }).position,
     );
 
-    expect(check?.left).toBe((plan?.left ?? 0) + 32);
-    expect(check?.top).toBe((plan?.top ?? 0) + 32);
-    expect(update?.left).toBe((plan?.left ?? 0) + 64);
+    // In the toolbar's order: check, update, then plan.
+    expect(update?.left).toBe((check?.left ?? 0) + 32);
+    expect(update?.top).toBe((check?.top ?? 0) + 32);
+    expect(plan?.left).toBe((check?.left ?? 0) + 64);
   });
 
   test('shows the report once across re-renders, and leaves nothing behind when closed', async () => {
@@ -128,24 +129,25 @@ describe('reportPosition', () => {
   test('opens beside EMMA’s window when every report fits there, each a little further along', async () => {
     const { reportPosition } = await loadReport();
 
-    expect(reportPosition('plan', anchor(100, 800))).toEqual({ left: 908, top: 50, width: 560, height: 600 });
-    expect(reportPosition('update', anchor(100, 800))).toEqual({ left: 972, top: 114, width: 560, height: 600 });
+    // In the toolbar's order: check, update, then plan.
+    expect(reportPosition('check', anchor(100, 800))).toEqual({ left: 908, top: 50, width: 560, height: 600 });
+    expect(reportPosition('plan', anchor(100, 800))).toEqual({ left: 972, top: 114, width: 560, height: 600 });
   });
 
   test('opens just below EMMA’s toolbar when there is no room beside it, as tall as fits on the screen', async () => {
     const { reportPosition } = await loadReport();
     vi.stubGlobal('innerHeight', 600);
 
-    expect(reportPosition('check', anchor(400, 1200))).toEqual({ left: 440, top: 160, width: 560, height: 440 });
+    expect(reportPosition('update', anchor(400, 1200))).toEqual({ left: 440, top: 160, width: 560, height: 440 });
   });
 
   test('opens in the middle of the screen without EMMA’s window, never off its top or left', async () => {
     const { reportPosition } = await loadReport();
 
-    expect(reportPosition('plan')).toEqual({ left: 680, top: 240, width: 560, height: 600 });
+    expect(reportPosition('check')).toEqual({ left: 680, top: 240, width: 560, height: 600 });
     vi.stubGlobal('innerWidth', 400);
     vi.stubGlobal('innerHeight', 300);
-    expect(reportPosition('plan')).toEqual({ left: 0, top: 0, width: 560, height: 300 });
+    expect(reportPosition('check')).toEqual({ left: 0, top: 0, width: 560, height: 300 });
   });
 });
 

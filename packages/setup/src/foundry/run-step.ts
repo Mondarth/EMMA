@@ -49,13 +49,15 @@ export async function runStep(
     case 'snapshot': {
       const { createSnapshot } = game;
       if (createSnapshot === undefined) throw new Error(localize('Run.NoSnapshots'));
-      await createSnapshot.call(game, { note: step.note });
+      await guard.quietly(() => createSnapshot.call(game, { note: step.note }));
       return;
     }
     case 'backup': {
       const { createBackup } = game;
       if (createBackup === undefined) throw new Error(localize('Run.NoBackups'));
-      const backedUp = await createBackup.call(game, { type: 'world', ...step.world }, { note: step.note });
+      const backedUp = await guard.quietly(() =>
+        createBackup.call(game, { type: 'world', ...step.world }, { note: step.note }),
+      );
       if (!backedUp) throw new Error(format('Run.BackupFailed', { world: step.world.title }));
       return;
     }

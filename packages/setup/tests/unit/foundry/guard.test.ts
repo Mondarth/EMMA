@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import type { Guard } from '../../../src/foundry/guard';
-import { GUARDED_BUTTONS, GUARDED_CLASS, REFUSAL, installGuard } from '../../../src/foundry/guard';
+import { GUARDED_BUTTONS, GUARDED_CLASS, QUIET_CLASS, REFUSAL, installGuard } from '../../../src/foundry/guard';
 import { installSetupMocks } from '../../mocks/foundry';
 
 let guard: Guard | undefined;
@@ -119,6 +119,41 @@ describe('installGuard', () => {
     expect(document.body).not.toHaveClass(GUARDED_CLASS);
   });
 
+  test("hides Foundry's progress bars while EMMA installs, snapshots or backs up, nested or failing, and shows them after", async () => {
+    const { guard: placed } = setUp();
+    expect(document.head.querySelector('style')?.textContent).toContain(
+      `body.${QUIET_CLASS} #progress { display: none; }`,
+    );
+    expect(document.body).not.toHaveClass(QUIET_CLASS);
+
+    await placed.quietly(async () => {
+      expect(document.body).toHaveClass(QUIET_CLASS);
+      await placed.allowing(() => {
+        expect(document.body).toHaveClass(QUIET_CLASS);
+        return Promise.resolve();
+      });
+      // Still quiet once the inner one is done.
+      expect(document.body).toHaveClass(QUIET_CLASS);
+    });
+    expect(document.body).not.toHaveClass(QUIET_CLASS);
+
+    await expect(placed.quietly(() => Promise.reject(new Error('failed')))).rejects.toThrow('failed');
+    expect(document.body).not.toHaveClass(QUIET_CLASS);
+  });
+
+  test("hides only Foundry's progress bars, which it draws into #progress", () => {
+    setUp();
+    const progress = document.createElement('div');
+    progress.id = 'progress';
+    const elsewhere = document.createElement('div');
+    document.body.append(progress, elsewhere);
+    document.body.classList.add(QUIET_CLASS);
+    expect(getComputedStyle(progress).display).toBe('none');
+    expect(getComputedStyle(elsewhere).display).not.toBe('none');
+    progress.remove();
+    elsewhere.remove();
+  });
+
   test('removing it gives Foundry everything back', async () => {
     const { guard: placed, game, post } = setUp();
     const { element, foundryHandler } = button('updateAll');
@@ -131,6 +166,7 @@ describe('installGuard', () => {
     expect(foundryHandler).toHaveBeenCalledOnce();
     expect(game.post).toBe(post);
     expect(document.body).not.toHaveClass(GUARDED_CLASS);
+    expect(document.body).not.toHaveClass(QUIET_CLASS);
     expect(document.head.querySelector('style')).toBeNull();
   });
 });

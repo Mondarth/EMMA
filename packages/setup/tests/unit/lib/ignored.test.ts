@@ -139,4 +139,49 @@ describe('what EMMA ignores', () => {
     expect(loading.updates.get('module:lib')).toBeUndefined();
     expect(loading.updates.get('module:app')?.newest).toBe('3.0.0');
   });
+
+  // Regression: a module installed at a version that looks like a pre-release, such as Plutonium's
+  // `3.19.6.noble-prerelease-25-93-v14`, was refused by the search's policy even ignored, so a world that ran it, and
+  // worked, was said to have no working setup.
+  test('lets a world run a module it ignores whatever its version looks like, and what requires it too', async () => {
+    const overview = buildOverview(
+      installation({
+        worlds: [{ id: 'p', title: 'Prukath', system: 'dnd5e' }],
+        modules: [
+          installedModule('plutonium', 'Plutonium', '3.19.6.noble-prerelease-25-93-v14'),
+          installedModule('addon', 'Plutonium add-on', '1.0.0'),
+        ],
+        ignored: ['module:plutonium'],
+      }),
+      new Map([
+        [
+          'p',
+          recorded(
+            record('p', {
+              modules: [
+                { id: 'plutonium', title: 'Plutonium', version: '3.19.6.noble-prerelease-25-93-v14' },
+                { id: 'addon', title: 'Plutonium add-on', version: '1.0.0' },
+              ],
+            }),
+          ),
+        ],
+      ]),
+    );
+    const found = await findUpdates({
+      resolver: KIT.resolver,
+      badges: KIT.badges,
+      overview,
+      universe: {
+        core: [...CORES],
+        releases: [
+          release('system:dnd5e', '5.3.3'),
+          release('module:addon', '1.0.0', { requires: { plutonium: { minimum: '3.0.0' } } }),
+        ],
+      },
+      load: () => Promise.resolve([]),
+    });
+
+    expect(found.unresolved).toEqual([]);
+    expect(found.updates.has('module:plutonium')).toBe(false);
+  });
 });

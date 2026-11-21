@@ -33,6 +33,14 @@ function guardRecording(events: string[]): Guard {
   return {
     refresh: vi.fn(),
     remove: vi.fn(),
+    quietly: async run => {
+      events.push('quiet');
+      try {
+        return await run();
+      } finally {
+        events.push('loud');
+      }
+    },
     allowing: async run => {
       events.push('allowing');
       try {
@@ -104,18 +112,22 @@ describe('runStep', () => {
     vi.unstubAllGlobals();
   });
 
-  test("makes a snapshot with its note, as Foundry's Manage Backups does", async () => {
+  test("makes a snapshot with its note, as Foundry's Manage Backups does, with Foundry's progress bar hidden", async () => {
     const game = gameWith();
-    await runStep(game, guardRecording([]), { kind: 'snapshot', key: 'snapshot', note: 'Before' });
+    const events: string[] = [];
+    await runStep(game, guardRecording(events), { kind: 'snapshot', key: 'snapshot', note: 'Before' });
     expect(game.createSnapshot).toHaveBeenCalledWith({ note: 'Before' });
+    expect(events).toEqual(['quiet', 'loud']);
   });
 
   test('backs a world up with its note, failing if Foundry could not', async () => {
     const game = gameWith();
     const step = { kind: 'backup', key: 'world:a', world: { id: 'a', title: 'Alpha' }, note: 'Before' } as const;
 
-    await runStep(game, guardRecording([]), step);
+    const events: string[] = [];
+    await runStep(game, guardRecording(events), step);
     expect(game.createBackup).toHaveBeenCalledWith({ type: 'world', id: 'a', title: 'Alpha' }, { note: 'Before' });
+    expect(events).toEqual(['quiet', 'loud']);
 
     vi.mocked(game.createBackup)?.mockResolvedValueOnce(false);
     await expect(runStep(game, guardRecording([]), step)).rejects.toThrow('Foundry could not back up Alpha.');
