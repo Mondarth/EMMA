@@ -314,7 +314,11 @@ export async function findUpdates(given: UpdateInputs): Promise<UpdateSearch> {
         explanation:
           'failure' in resolution
             ? resolver
-                .explain(resolution.failure, toldOfWorld(messages, title))
+                .explain(resolution.failure, {
+                  ...toldOfWorld(messages, title),
+                  // The world runs as it is: what fails is EMMA's plan for it, by what the manifests declare.
+                  failed: format('Explain.Unplanned', { world: title }),
+                })
                 .map(({ text, number }) => (number === undefined ? text : `${text} (${String(number)})`))
             : [
                 format('Update.UnresolvedUnread', {

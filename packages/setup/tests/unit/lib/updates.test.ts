@@ -184,7 +184,7 @@ describe('findUpdates', () => {
         // In the resolver's words, told of the world rather than of the resolver's requirements.
         explanation: expect.arrayContaining([
           expect.stringContaining('app 2.0.0 depends on gone'),
-          'So, because no version of gone is available and a runs app, a cannot keep working. (1)',
+          'So, because no version of gone is available and a runs app, EMMA cannot plan updates for a. (1)',
         ]) as unknown,
       },
     ]);
