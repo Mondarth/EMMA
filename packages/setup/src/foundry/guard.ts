@@ -44,8 +44,20 @@ export const GUARDED_CLASS = 'mondarth-emma-guarded';
 /** The selector of the guarded buttons. */
 const BUTTONS = GUARDED_BUTTONS.map(action => `[data-action="${action}"]`).join(', ');
 
-/** Greys out the guarded buttons while the guard is on. */
-const STYLE = `body.${GUARDED_CLASS} :is(${BUTTONS}) { opacity: 0.4; cursor: not-allowed; }`;
+/**
+ * The class on `<body>` while EMMA itself installs, uninstalls, snapshots or backs up, which hides Foundry's own progress
+ * bars: EMMA's run shows its own progress for each step.
+ */
+export const QUIET_CLASS = 'mondarth-emma-quiet';
+
+/**
+ * Greys out the guarded buttons while the guard is on, and hides Foundry's progress bars while EMMA works. FRAGILE:
+ * Foundry 14 draws its bars for installs, snapshots and backups into `#progress` at the top of the setup screen's
+ * package tabs (`SetupPackages#getProgressBar`, checked on Foundry 14.368).
+ */
+const STYLE =
+  `body.${GUARDED_CLASS} :is(${BUTTONS}) { opacity: 0.4; cursor: not-allowed; }\n` +
+  `body.${QUIET_CLASS} #progress { display: none; }`;
 
 /** How the guard is controlled. */
 export interface GuardOptions {
@@ -66,6 +78,13 @@ export interface Guard {
    * @returns What it gives, once done
    */
   allowing<T>(run: () => Promise<T>): Promise<T>;
+  /**
+   * Hide Foundry's own progress bars while EMMA does something that has them, such as a snapshot or a backup, as EMMA
+   * shows its own progress. {@link allowing} hides them too.
+   * @param run - What EMMA does meanwhile
+   * @returns What it gives, once done
+   */
+  quietly<T>(run: () => Promise<T>): Promise<T>;
   /** Remove the guard, giving Foundry its buttons and requests back. */
   remove(): void;
 }
@@ -80,6 +99,18 @@ export function installGuard(game: SetupGame, options: GuardOptions): Guard {
   const { isOn, onRefused } = options;
   // How many of EMMA's own installs are going on.
   let allowed = 0;
+  // How many of EMMA's own operations with Foundry's progress bars are going on.
+  let quiet = 0;
+  const quietly = async <T>(run: () => Promise<T>): Promise<T> => {
+    quiet++;
+    document.body.classList.add(QUIET_CLASS);
+    try {
+      return await run();
+    } finally {
+      quiet--;
+      if (quiet === 0) document.body.classList.remove(QUIET_CLASS);
+    }
+  };
   // The type of package the package menu last opened for.
   let menuFor: string | undefined;
   const onContextMenu = (event: MouseEvent): void => {
@@ -138,18 +169,19 @@ export function installGuard(game: SetupGame, options: GuardOptions): Guard {
     async allowing(run) {
       allowed++;
       try {
-        return await run();
+        return await quietly(run);
       } finally {
         allowed--;
       }
     },
+    quietly,
     remove() {
       document.removeEventListener('contextmenu', onContextMenu, { capture: true });
       document.removeEventListener('click', onClick, { capture: true });
       game.post = post;
       if (uninstall !== undefined) game.uninstallPackage = uninstall;
       style.remove();
-      document.body.classList.remove(GUARDED_CLASS);
+      document.body.classList.remove(GUARDED_CLASS, QUIET_CLASS);
     },
   };
 }
