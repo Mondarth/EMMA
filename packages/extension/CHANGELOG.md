@@ -1,3 +1,9 @@
+## [0.13.1](https://github.com/Mondarth/EMMA/compare/extension-v0.13.0...extension-v0.13.1) (2026-11-21)
+
+### Bug Fixes
+
+* **setup:** offer an own manifest's version only from its URL ([02e6caf](https://github.com/Mondarth/EMMA/commit/02e6caf42384a744f40906b35d7408596f67f0af))
+
 ## [0.13.0](https://github.com/Mondarth/EMMA/compare/extension-v0.12.0...extension-v0.13.0) (2026-11-21)
 
 ### Features
