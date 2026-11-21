@@ -47,6 +47,11 @@ updates:
       - dependency-name: conventional-changelog-conventionalcommits
         update-types:
           - version-update:semver-major
+      # Version 26 needs Node 26.13 or later, and the workflows run Node 24 (.github/actions/setup). Lift this when they
+      # move to Node 26, checking the release against semantic-release 26's new core.
+      - dependency-name: semantic-release
+        update-types:
+          - version-update:semver-major
     groups:
       vitest:
         patterns:
