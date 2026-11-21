@@ -1,6 +1,8 @@
 blockExoticSubdeps: false
 allowBuilds:
-  "@league-of-foundry-developers/foundry-vtt-types@https://codeload.github.com/League-of-Foundry-Developers/foundry-vtt-types/tar.gz/e613e06e85f6fcded8a9621ad23337f20d0bff70": true
+  # fvtt-types follows its main branch, so it is approved by its repository, not by one commit's tarball, which stops
+  # matching whenever main moves. A bare package name cannot approve a git-hosted build (pnpm/pnpm#12294).
+  "@league-of-foundry-developers/foundry-vtt-types@git+https://github.com/League-of-Foundry-Developers/foundry-vtt-types.git": true
   "@parcel/watcher": true
   esbuild: true
   foundry-vtt-types: true
