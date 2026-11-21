@@ -1,3 +1,13 @@
+## [0.13.0](https://github.com/Mondarth/EMMA/compare/extension-v0.12.0...extension-v0.13.0) (2026-11-21)
+
+### Features
+
+* **setup:** hide Foundry's progress bars while EMMA works ([1be02bd](https://github.com/Mondarth/EMMA/commit/1be02bda78dc6508914ef22b451738ba003b5889)), closes [#progress](https://github.com/Mondarth/EMMA/issues/progress)
+
+### Bug Fixes
+
+* **setup:** never fail a world's plan on a module it ignores ([9d27f18](https://github.com/Mondarth/EMMA/commit/9d27f18c773048f6540877c5db5965bc662ed1ac))
+
 ## [0.12.0](https://github.com/Mondarth/EMMA/compare/extension-v0.11.3...extension-v0.12.0) (2026-11-19)
 
 ### Features
