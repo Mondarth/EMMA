@@ -340,6 +340,11 @@ back to the top so that the steps are in view:
 3. each package to uninstall, last, one at a time, once the changes of the packages that needed it are done (see
    [Uninstalling](#uninstalling)).
 
+Each step shows its own progress in the plan. Foundry's own progress bars, at the top of its package tabs, are hidden
+while EMMA makes a snapshot, a backup, an install or an uninstall, and come back as each is done, so that a step's
+progress shows in one place. Installs and uninstalls you make with Foundry's own buttons, once you let it, still
+show Foundry's bars.
+
 A step that fails stops only the steps that need it, and those that need them in turn: they are **Not run**, each
 saying which step it needed. Every other step goes on. Every change needs the snapshot and backups, so if one of
 those fails, nothing changes.
