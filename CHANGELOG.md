@@ -1,3 +1,9 @@
+## [0.15.0](https://github.com/Mondarth/EMMA/compare/v0.14.0...v0.15.0) (2026-11-21)
+
+### Features
+
+* **module:** offer the reports as check, update, then plan ([dedd0cb](https://github.com/Mondarth/EMMA/commit/dedd0cbcc23574a3cb1a726ce983f9569579ad27))
+
 ## [0.14.0](https://github.com/Mondarth/EMMA/compare/v0.13.1...v0.14.0) (2026-11-19)
 
 ### Features
