@@ -1,3 +1,14 @@
+## [0.14.0](https://github.com/Mondarth/EMMA/compare/extension-v0.13.1...extension-v0.14.0) (2026-11-24)
+
+### Features
+
+* **extension:** sign in at Mondarth's accounts ([d170d9f](https://github.com/Mondarth/EMMA/commit/d170d9f33431f8a900a1141d37e0dae1dd1003c3))
+
+### Bug Fixes
+
+* **setup:** back up worlds that use what was added against advice ([217251a](https://github.com/Mondarth/EMMA/commit/217251ab2f78261045a4859c12dc5afa7f6c2156))
+* **setup:** list what was added against advice before a run ([32f5b80](https://github.com/Mondarth/EMMA/commit/32f5b8018c5b891f49e7f919279d68dd0e660544))
+
 ## [0.13.1](https://github.com/Mondarth/EMMA/compare/extension-v0.13.0...extension-v0.13.1) (2026-11-21)
 
 ### Bug Fixes
