@@ -6,3 +6,6 @@ declare const __TARGET__: 'chromium' | 'firefox';
  * tests: the extension signs its user in to it (see `browser/catalogue.ts`).
  */
 declare const __EMMA_CATALOGUE_URL__: string | null;
+
+/** The URL of Mondarth's accounts, where the user signs in, or `null` for a build that signs in at the catalogue. */
+declare const __EMMA_ACCOUNTS_URL__: string | null;

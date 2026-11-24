@@ -47,14 +47,21 @@ subscriber's token, which no release holds.
 
 ## How the key is built in
 
-The release workflow sets two values in the environment of the module's release build, and the first alone in the
-browser extension's:
+The release workflow sets two values in the environment of the module's release build, and in the browser
+extension's the first, with the accounts':
 
 `EMMA_DEFAULT_CATALOGUE_URL`
 : A repository variable: the catalogue's `https` URL.
 
 `EMMA_MODULE_CATALOGUE_KEY`
 : A repository secret: the module's API key.
+
+`EMMA_ACCOUNTS_URL`
+: A repository variable: the `https` URL of Mondarth's accounts, such as `https://accounts.example.com/`, where the
+  browser extension signs its user in (the device flow), and links their profile and subscription. Since catalogue
+  0.12 the accounts are an application of their own: the extension refuses a sign-in page that is not theirs. Built
+  in as `__EMMA_ACCOUNTS_URL__` (`accountsUrlDefine`); without it, as in development, CI and tests, the extension signs
+  in at the catalogue.
 
 `packages/core/scripts/default-catalogue-define.ts` gives both to the module's Vite `define` as
 `__EMMA_DEFAULT_CATALOGUE__`,
@@ -70,7 +77,7 @@ The build stops when only one of the two is set, or when the URL is not `https`.
 refuses to package a bundle that holds the key in plain text anywhere, and the browser extension's one that holds it
 at all. A release stops, before it changes anything, when what it needs is not set
 (`packages/core/scripts/release-defaults.ts`). Development,
-CI and test builds need neither, so have no catalogue unless they are set, and the unit tests always run without one. A development build may name a catalogue of the developer's own in `EMMA_DEV_CATALOGUE_URL`, `http` allowed, which a release refuses (see {doc}`setup`).
+CI and test builds need neither, so have no catalogue unless they are set, and the unit tests always run without one. A development build may name a catalogue of the developer's own in `EMMA_DEV_CATALOGUE_URL`, and accounts of their own in `EMMA_DEV_ACCOUNTS_URL`, `http` allowed in each, which a release refuses (see {doc}`setup`).
 The end-to-end tests build in a made-up catalogue, which they answer themselves (see `.github/workflows/e2e.yml`).
 
 ## Rotating the key

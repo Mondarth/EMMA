@@ -6,4 +6,7 @@ import { mount } from 'svelte';
 import { readSites } from '../browser/api';
 import Options from '../component/Options.svelte';
 
-mount(Options, { target: document.body, props: { sites: await readSites(), catalogue: __EMMA_CATALOGUE_URL__ } });
+mount(Options, {
+  target: document.body,
+  props: { sites: await readSites(), catalogue: __EMMA_CATALOGUE_URL__, accounts: __EMMA_ACCOUNTS_URL__ },
+});
