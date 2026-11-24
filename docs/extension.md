@@ -321,8 +321,8 @@ Before the changes, under **Keep first**, the plan offers what Foundry's **Manag
 
 - a **snapshot of the installation**, unchecked unless the plan changes Foundry VTT, when EMMA checks it as a strong
   recommendation, which can be unchecked;
-- a **backup of each world** that uses a package the plan changes: its game system, a module its record says it runs,
-  or one it will need when next run. Each is unchecked, as a reminder.
+- a **backup of each world** that uses a package the plan changes, what you added against EMMA's advice included: its
+  game system, a module its record says it runs, or one it will need when next run. Each is unchecked, as a reminder.
 
 Each has a note, which Foundry keeps with it, written for it at first and free to change. The snapshot's row gives the
 space it needs and the space free, as Foundry's own dialog does, and says when there is too little; Foundry does not

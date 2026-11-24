@@ -1,6 +1,6 @@
 /**
  * Development only: `pnpm dev:extension` builds the browser extension with the development catalogue named in
- * `EMMA_DEV_CATALOGUE_URL`, zips each browser's build, and serves the zips from this machine, for a browser on another
+ * `EMMA_DEV_CATALOGUE_URL`, and the development accounts named in `EMMA_DEV_ACCOUNTS_URL`, zips each browser's build, and serves the zips from this machine, for a browser on another
  * to load: unpacked, in Chromium, or as a temporary add-on, in Firefox (see docs/developers/setup.md). The page it
  * serves rebuilds on request. It only builds, zips and serves, as the release's packaging script does, so it is left
  * out of the unit tests' coverage.
@@ -11,7 +11,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 
-import { DEV_CATALOGUE_VARIABLE } from '@mondarth/emma-core/default-catalogue-define';
+import { DEV_ACCOUNTS_VARIABLE, DEV_CATALOGUE_VARIABLE } from '@mondarth/emma-core/default-catalogue-define';
 
 const ROOT = path.resolve(import.meta.dirname, '../../../..');
 const EXTENSION = path.resolve(import.meta.dirname, '../..');
@@ -19,6 +19,7 @@ const OUT = path.join(EXTENSION, 'releases', 'dev');
 const PORT = Number(process.env['EMMA_DEV_EXTENSION_PORT'] ?? 31004);
 const TARGETS = ['chromium', 'firefox'] as const;
 const CATALOGUE = process.env[DEV_CATALOGUE_VARIABLE] || undefined;
+const ACCOUNTS = process.env[DEV_ACCOUNTS_VARIABLE] || undefined;
 
 let built: { at: Date; error?: string } | undefined;
 
@@ -60,7 +61,8 @@ function page(): string {
   return `<!doctype html><meta charset="utf-8"><title>EMMA extension, development</title>
 <style>body{font:14px/1.5 system-ui,sans-serif;max-width:46rem;margin:2rem auto;padding:0 1rem}code{font-size:.95em}</style>
 <h1>EMMA extension, development build</h1>
-<p>${state} Catalogue: <code>${CATALOGUE ?? 'none (set ' + DEV_CATALOGUE_VARIABLE + ')'}</code>.</p>
+<p>${state} Catalogue: <code>${CATALOGUE ?? 'none (set ' + DEV_CATALOGUE_VARIABLE + ')'}</code>. Signs in at:
+<code>${ACCOUNTS ?? 'the catalogue (set ' + DEV_ACCOUNTS_VARIABLE + ')'}</code>.</p>
 <ul>${links}</ul>
 <form method="post" action="/rebuild"><button>Rebuild from the source</button></form>
 <h2>Loading it</h2>
@@ -106,6 +108,7 @@ const server = http.createServer((request, response) => {
 });
 
 if (CATALOGUE === undefined) console.warn(`${DEV_CATALOGUE_VARIABLE} is not set: the build has no catalogue.`);
+if (ACCOUNTS === undefined) console.warn(`${DEV_ACCOUNTS_VARIABLE} is not set: the build signs in at the catalogue.`);
 build();
 server.listen(PORT, () => {
   console.info(`EMMA's development extension: http://${os.hostname()}:${String(PORT)}/`);

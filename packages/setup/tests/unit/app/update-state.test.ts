@@ -6,7 +6,7 @@ import { buildOverview } from '../../../src/lib/overview';
 import type { CatalogueState, ManifestRead, PackageUpdate, UpdateSearch } from '../../../src/lib/updates';
 import type { PlanEntry, Planner } from '../../../src/lib/plans';
 import { UNINSTALL } from '../../../src/lib/plans';
-import { alone, installation, installedModule, release } from '../../mocks/fixtures';
+import { alone, installation, installedModule, record, recorded, release } from '../../mocks/fixtures';
 
 const OVERVIEW = buildOverview(installation(), new Map());
 
@@ -817,6 +817,26 @@ describe('installing from a manifest URL', () => {
     expect(updates.force(refused.override)).toBe(true);
     updates.clear();
     expect(updates.forced).toEqual([]);
+  });
+
+  test('offers a backup of each world that uses what was added against advice, as for an advised install', async () => {
+    const { updates } = await searched({ ok: true, release: DICE, title: 'Dice' }, true);
+    const refused = await updates.installFrom(DICE_URL, 'module');
+    if (refused.ok || refused.override === undefined) throw new Error('No override');
+    expect(updates.force(refused.override)).toBe(true);
+
+    // A world whose record says it runs Dice: the plan's only change, made against advice.
+    await updates.searchFor(
+      buildOverview(
+        installation({ worlds: [{ id: 'arena', title: 'Arena', system: 'dnd5e' }] }),
+        new Map([['arena', recorded(record('arena', { modules: [{ id: 'dice', title: 'Dice', version: '1.0.0' }] }))]]),
+      ),
+    );
+
+    expect(updates.safeguards.map(({ kind, key }) => `${kind} ${key}`)).toEqual([
+      'snapshot snapshot',
+      'backup world:arena',
+    ]);
   });
 
   test('takes the place of the same package in the plan, and goes once it is installed', async () => {

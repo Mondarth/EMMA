@@ -94,8 +94,11 @@
     header?.scrollIntoView({ block: 'nearest' });
   }
   const running = $derived(run !== null && !run.over);
-  /** The steps a run would take now. */
-  const steps = $derived(runSteps(updates.safeguards, updates.plan, key => updates.titleOf(key)));
+  /**
+   * The steps a run would take now: those of the plan as it is run, with what the user added against EMMA's advice, as
+   * `SetupState.runPlan` takes them.
+   */
+  const steps = $derived(runSteps(updates.safeguards, updates.runPlan, key => updates.titleOf(key)));
 
   /**
    * A safeguard's name.

@@ -1,9 +1,10 @@
 /**
- * Development only: `pnpm dev:sign-in` signs the developer in to the development catalogue named in
- * `EMMA_DEV_CATALOGUE_URL`, as EMMA's browser extension signs its user in (OAuth 2's device authorization grant), and
+ * Development only: `pnpm dev:sign-in` signs the developer in for the development catalogue named in
+ * `EMMA_DEV_CATALOGUE_URL`, at the development accounts named in `EMMA_DEV_ACCOUNTS_URL` (or at the catalogue, without
+ * them), as EMMA's browser extension signs its user in (OAuth 2's device authorization grant), and
  * keeps the token for the setup screen's dev server (see `catalogue-token.ts`). `pnpm dev:sign-out` forgets it.
  */
-import { DEV_CATALOGUE_VARIABLE } from '@mondarth/emma-core/default-catalogue-define';
+import { DEV_ACCOUNTS_VARIABLE, DEV_CATALOGUE_VARIABLE } from '@mondarth/emma-core/default-catalogue-define';
 
 import { forgetDevToken, writeDevToken } from './catalogue-token.ts';
 
@@ -14,7 +15,10 @@ export type DevSignInEnd = 'approved' | 'denied' | 'expired' | 'failed';
 export interface DevSignInOptions {
   /** The repository's root, where the token is kept. */
   readonly root: string;
+  /** The catalogue the token is for. */
   readonly catalogue: string;
+  /** Where the developer signs in: the development accounts; the catalogue by default. */
+  readonly accounts?: string | undefined;
   readonly fetch?: typeof fetch;
   /** Says something to the developer. */
   readonly log?: (line: string) => void;
@@ -51,6 +55,7 @@ export async function devSignIn(options: DevSignInOptions): Promise<DevSignInEnd
   const {
     root,
     catalogue,
+    accounts = catalogue,
     fetch: send = globalThis.fetch.bind(globalThis),
     log = line => {
       console.info(line);
@@ -61,11 +66,11 @@ export async function devSignIn(options: DevSignInOptions): Promise<DevSignInEnd
   const client = { client_id: 'emma-extension' };
   let codes: Record<string, unknown>;
   try {
-    const asked = await post(send, new URL('/auth/device/code', catalogue).href, client);
+    const asked = await post(send, new URL('/auth/device/code', accounts).href, client);
     if (!asked.ok) throw new Error('refused');
     codes = asked.read;
   } catch {
-    log(`The catalogue at ${catalogue} gave no codes: is it running, at 0.10.1 or later?`);
+    log(`The accounts at ${accounts} gave no codes: are they running?`);
     return 'failed';
   }
   const { device_code: deviceCode, user_code: userCode, verification_uri_complete: page } = codes;
@@ -80,13 +85,13 @@ export async function devSignIn(options: DevSignInOptions): Promise<DevSignInEnd
     }
     let read: Record<string, unknown>;
     try {
-      ({ read } = await post(send, new URL('/auth/device/token', catalogue).href, {
+      ({ read } = await post(send, new URL('/auth/device/token', accounts).href, {
         ...client,
         grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
         device_code: deviceCode,
       }));
     } catch {
-      log('The catalogue could not be asked for the token.');
+      log('The accounts could not be asked for the token.');
       return 'failed';
     }
     const token = read['access_token'];
@@ -100,7 +105,7 @@ export async function devSignIn(options: DevSignInOptions): Promise<DevSignInEnd
       log('Denied.');
       return 'denied';
     } else if (read['error'] !== 'authorization_pending') {
-      log(`The catalogue refused: ${String(read['error'])}`);
+      log(`The accounts refused: ${String(read['error'])}`);
       return 'failed';
     }
   }
@@ -128,7 +133,8 @@ export async function main(
     console.error(`Set ${DEV_CATALOGUE_VARIABLE} to the development catalogue, such as http://localhost:5173/`);
     return 1;
   }
-  return (await devSignIn({ root, catalogue })) === 'approved' ? 0 : 1;
+  const accounts = env[DEV_ACCOUNTS_VARIABLE] || undefined;
+  return (await devSignIn({ root, catalogue, accounts })) === 'approved' ? 0 : 1;
 }
 
 // Run as a command alone, not when the tests import it.

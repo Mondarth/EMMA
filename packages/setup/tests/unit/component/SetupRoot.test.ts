@@ -514,6 +514,12 @@ describe('the alpha', () => {
 
     await user.click(within(plan).getByRole('button', { name: 'Run plan' }));
     const confirm = within(plan).getByRole('alertdialog');
+    // What the user added against EMMA's advice is listed, as the run installs it.
+    expect(
+      within(confirm)
+        .getAllByRole('listitem')
+        .map(item => item.textContent),
+    ).toEqual(['install Dice 1.0.0']);
     expect(within(confirm).getByRole('button', { name: 'Run' })).toBeDisabled();
     expect(confirm).toHaveTextContent('Running the plan changes your installation');
 
