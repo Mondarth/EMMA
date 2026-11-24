@@ -1,3 +1,9 @@
+## [0.16.0](https://github.com/Mondarth/EMMA/compare/v0.15.0...v0.16.0) (2026-11-24)
+
+### Features
+
+* **extension:** sign in at Mondarth's accounts ([d170d9f](https://github.com/Mondarth/EMMA/commit/d170d9f33431f8a900a1141d37e0dae1dd1003c3))
+
 ## [0.15.0](https://github.com/Mondarth/EMMA/compare/v0.14.0...v0.15.0) (2026-11-21)
 
 ### Features
