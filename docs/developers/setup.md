@@ -105,8 +105,10 @@ on a page, so the one that starts first would win.
 On the setup screen, EMMA asks its catalogue as the user the browser extension signed in, through the extension (see
 {doc}`default-catalogue`). Two development commands give it a catalogue of your own, such as the catalogue's
 development server (`pnpm dev` in the catalogue's repository, with `--host` for other machines to reach it), named in
-`EMMA_DEV_CATALOGUE_URL`. `http` is allowed there, as it is never a release's: a release refuses to run while it is set.
-Sign in to it as a subscriber or an admin, such as the catalogue's development users' Ada Lovelace, once named in its
+`EMMA_DEV_CATALOGUE_URL`, and the accounts' development server, where you sign in (`pnpm dev:accounts` there, on
+5174), named in `EMMA_DEV_ACCOUNTS_URL`. `http` is allowed in both, as they are never a release's: a release refuses to
+run while either is set. Without `EMMA_DEV_ACCOUNTS_URL`, signing in goes to the catalogue, as before catalogue 0.12.
+Sign in as a subscriber or an admin, such as the accounts' development users' Ada Lovelace, once named in their
 `ADMIN_USER_IDS`.
 
 ### The setup screen's dev server
@@ -119,6 +121,7 @@ background script.
 
 ```bash
 export EMMA_DEV_CATALOGUE_URL=http://foundrymoddev1:5173/
+export EMMA_DEV_ACCOUNTS_URL=http://foundrymoddev1:5174/
 pnpm dev:sign-in     # prints a link and a code: open it, sign in, check the code, Approve
 pnpm dev:setup
 ```
@@ -131,7 +134,8 @@ you to sign in. EMMA's **Sign in to EMMA's catalogue** button, which opens the e
 
 ### The browser extension
 
-`pnpm dev:extension` builds the extension, with the setup screen's script, for `EMMA_DEV_CATALOGUE_URL`, zips each
+`pnpm dev:extension` builds the extension, with the setup screen's script, for `EMMA_DEV_CATALOGUE_URL` and
+`EMMA_DEV_ACCOUNTS_URL`, zips each
 browser's build into `packages/extension/releases/dev/`, and serves them, with how to load them, at
 `http://<this machine>:31004/` (`EMMA_DEV_EXTENSION_PORT` to change it), for a browser on another machine:
 

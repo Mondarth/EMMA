@@ -72,13 +72,13 @@
     "message": "Reading your sign-in…"
   },
   "accountAsking": {
-    "message": "Asking the catalogue to sign you in…"
+    "message": "Asking for a code to sign you in…"
   },
   "accountCode": {
-    "message": "Approve this browser on the catalogue's page, which has opened in a new tab, checking that it shows this code:"
+    "message": "Approve this browser on the sign-in page, which has opened in a new tab, checking that it shows this code:"
   },
   "accountApprovePage": {
-    "message": "Open the catalogue's page again"
+    "message": "Open the sign-in page again"
   },
   "accountCancel": {
     "message": "Cancel"
@@ -93,7 +93,7 @@
     "message": "The code expired before you approved this browser. Sign in again."
   },
   "accountEnded_failed": {
-    "message": "The catalogue could not sign you in. Try again later."
+    "message": "Signing in did not work. Try again later."
   },
   "accountUnreachable": {
     "message": "EMMA's catalogue could not be reached."

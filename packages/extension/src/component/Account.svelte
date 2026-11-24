@@ -1,6 +1,6 @@
 <!--
-  The options page's catalogue account: signing the user in to EMMA's catalogue, by approving this browser on the
-  catalogue's page (the device flow), whom it is signed in as, their subscription, and signing out.
+  The options page's catalogue account: signing the user in at Mondarth's accounts, by approving this browser on the
+  accounts' page (the device flow), whom the catalogue takes it to be signed in as, their subscription, and signing out.
 -->
 <script lang="ts">
   import { onDestroy } from 'svelte';
@@ -10,15 +10,20 @@
   import { t } from '../lib/i18n';
 
   interface Props {
-    /** The catalogue's URL. */
+    /** The catalogue's URL, which says whom the token is for. */
     catalogue: string;
+    /** The accounts' URL, where the user signs in and finds their profile and subscription; the catalogue's without. */
+    accounts?: string | null;
     /** Opens a page for the user, in a new tab. */
     openPage: (url: string) => void;
     /** How the extension asks the catalogue, as a test gives its own. */
     fetch?: typeof globalThis.fetch;
   }
 
-  let { catalogue, openPage, fetch: send = globalThis.fetch.bind(globalThis) }: Props = $props();
+  let { catalogue, accounts = null, openPage, fetch: send = globalThis.fetch.bind(globalThis) }: Props = $props();
+
+  /** Where the user signs in, and finds their profile and subscription. */
+  const site = $derived(accounts ?? catalogue);
 
   let me = $state<Me | null>(null);
   let codes = $state<DeviceCodes | null>(null);
@@ -27,12 +32,12 @@
   let controller: AbortController | undefined;
 
   /**
-   * The catalogue's page by its path.
+   * The accounts' page by its path.
    * @param path - The path
    * @returns The page's address
    */
   function page(path: string): string {
-    return new URL(path, catalogue).href;
+    return new URL(path, site).href;
   }
 
   /**
@@ -66,7 +71,7 @@
     controller = new AbortController();
     signingIn = true;
     ended = null;
-    const end = await signIn(catalogue, {
+    const end = await signIn(site, {
       onCodes: given => {
         codes = given;
       },

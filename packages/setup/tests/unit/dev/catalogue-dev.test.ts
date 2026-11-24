@@ -42,6 +42,13 @@ function answering(...answers: (Response | Error)[]) {
   });
 }
 
+/**
+ * Where a request went.
+ * @param input - What it was asked with
+ * @returns Its URL
+ */
+const hrefOf = (input: RequestInfo | URL) => (input instanceof Request ? input.url : input.toString());
+
 describe("the developer's token", () => {
   test('is kept for its catalogue alone, in a file only its owner reads, and forgotten', () => {
     expect(readDevToken(root, CATALOGUE)).toBeUndefined();
@@ -238,7 +245,21 @@ describe('devSignIn', () => {
     for (const answer of [new Response('{}', { status: 400 }), new TypeError('Failed to fetch')]) {
       expect(await devSignIn({ root, catalogue: CATALOGUE, fetch: answering(answer), log })).toBe('failed');
     }
-    expect(log).toHaveBeenCalledWith(expect.stringContaining('is it running'));
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('are they running'));
+  });
+
+  test('signs in at the development accounts, keeping the token for the catalogue', async () => {
+    const { now, wait } = clock();
+    const accounts = 'http://localhost:5174/';
+    const send = answering(codes(), token({ access_token: 't0k3n' }));
+    expect(await devSignIn({ root, catalogue: CATALOGUE, accounts, fetch: send, log: vi.fn(), wait, now })).toBe(
+      'approved',
+    );
+    expect(send.mock.calls.map(([input]) => hrefOf(input))).toEqual([
+      `${accounts}auth/device/code`,
+      `${accounts}auth/device/token`,
+    ]);
+    expect(readDevToken(root, CATALOGUE)).toBe('t0k3n');
   });
 
   test('says things on the console, and waits in real time, by default', async () => {
@@ -274,5 +295,14 @@ describe('main', () => {
     vi.spyOn(console, 'info').mockImplementation(() => undefined);
     vi.stubGlobal('fetch', answering(new Response('{}', { status: 500 })));
     expect(await main(root, { EMMA_DEV_CATALOGUE_URL: CATALOGUE }, [])).toBe(1);
+  });
+
+  test('signs in at the development accounts, when they are named', async () => {
+    vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const send = answering(new Response('{}', { status: 500 }));
+    vi.stubGlobal('fetch', send);
+    const env = { EMMA_DEV_CATALOGUE_URL: CATALOGUE, EMMA_DEV_ACCOUNTS_URL: 'http://localhost:5174/' };
+    expect(await main(root, env, [])).toBe(1);
+    expect(hrefOf(send.mock.calls[0]?.[0] ?? '')).toBe('http://localhost:5174/auth/device/code');
   });
 });

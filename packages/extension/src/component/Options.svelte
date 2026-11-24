@@ -12,6 +12,8 @@
     sites: readonly Site[];
     /** The catalogue's URL, or `null` for a build without one. */
     catalogue?: string | null;
+    /** The accounts' URL, where the user signs in, or `null` for a build that signs in at the catalogue. */
+    accounts?: string | null;
     /** Opens a page for the user: in a new tab, by default. */
     openPage?: (url: string) => void;
   }
@@ -19,6 +21,7 @@
   let {
     sites: initial,
     catalogue = null,
+    accounts = null,
     openPage = url => {
       void chrome.tabs.create({ url });
     },
@@ -59,7 +62,7 @@
     </ul>
   {/if}
   {#if catalogue !== null}
-    <Account {catalogue} {openPage} />
+    <Account {catalogue} {accounts} {openPage} />
   {/if}
 </main>
 

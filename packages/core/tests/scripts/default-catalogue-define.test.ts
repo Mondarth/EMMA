@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'vitest';
 
-import { catalogueUrlDefine, defaultCatalogueDefine } from '../../scripts/default-catalogue-define.ts';
+import {
+  accountsUrlDefine,
+  catalogueUrlDefine,
+  defaultCatalogueDefine,
+} from '../../scripts/default-catalogue-define.ts';
 import type { Obscured } from '../../src/obscure.ts';
 import { reveal } from '../../src/obscure.ts';
 
@@ -65,5 +69,32 @@ describe('catalogueUrlDefine', () => {
     for (const url of ['ftp://localhost/', 'localhost:5173']) {
       expect(() => catalogueUrlDefine({ EMMA_DEV_CATALOGUE_URL: url })).toThrow(/EMMA_DEV_CATALOGUE_URL/);
     }
+  });
+});
+
+describe('accountsUrlDefine', () => {
+  test("gives the EMMA extension the accounts' URL, or none, when it signs in at the catalogue", () => {
+    expect(JSON.parse(accountsUrlDefine({ EMMA_ACCOUNTS_URL: 'https://accounts.example.com/' }))).toBe(
+      'https://accounts.example.com/',
+    );
+    expect(JSON.parse(accountsUrlDefine({}))).toBeNull();
+    expect(JSON.parse(accountsUrlDefine({ EMMA_ACCOUNTS_URL: '' }))).toBeNull();
+  });
+
+  test('refuses an accounts URL that is not https, or not a URL', () => {
+    expect(() => accountsUrlDefine({ EMMA_ACCOUNTS_URL: 'http://accounts.example.com/' })).toThrow(
+      'EMMA_ACCOUNTS_URL must be an https URL',
+    );
+    expect(() => accountsUrlDefine({ EMMA_ACCOUNTS_URL: 'accounts' })).toThrow(
+      'EMMA_ACCOUNTS_URL must be an https URL',
+    );
+  });
+
+  test("takes development accounts' URL in place of the release's, http or https", () => {
+    const env = { EMMA_ACCOUNTS_URL: 'https://accounts.example.com/', EMMA_DEV_ACCOUNTS_URL: 'http://localhost:5174/' };
+    expect(JSON.parse(accountsUrlDefine(env))).toBe('http://localhost:5174/');
+    expect(() => accountsUrlDefine({ EMMA_DEV_ACCOUNTS_URL: 'ftp://localhost/' })).toThrow(
+      'EMMA_DEV_ACCOUNTS_URL must be an http or https URL',
+    );
   });
 });

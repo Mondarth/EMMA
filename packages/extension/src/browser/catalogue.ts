@@ -108,13 +108,13 @@ export async function relay(
   return { status: response.status, headers, body: await response.text() };
 }
 
-/** The codes the catalogue gives the extension to sign its user in with. */
+/** The codes the accounts give the extension to sign its user in with. */
 export interface DeviceCodes {
   /** Kept to the extension: it polls for the token with it. */
   readonly deviceCode: string;
-  /** Shown to the user, to check against the catalogue's page. */
+  /** Shown to the user, to check against the accounts' page. */
   readonly userCode: string;
-  /** The catalogue's page, with the code, where the user approves this browser. */
+  /** The accounts' page, with the code, where the user approves this browser. */
   readonly verificationUri: string;
   /** How long the codes last, in seconds. */
   readonly expiresIn: number;
@@ -123,17 +123,17 @@ export interface DeviceCodes {
 }
 
 /**
- * Ask the catalogue for codes to sign the user in with.
- * @param catalogue - The catalogue's URL
+ * Ask Mondarth's accounts for codes to sign the user in with.
+ * @param accounts - The accounts' URL
  * @param send - How to fetch
- * @returns The codes, or `undefined` if the catalogue could not be asked, or gave none
+ * @returns The codes, or `undefined` if the accounts could not be asked, or gave none
  */
 export async function askCodes(
-  catalogue: string,
+  accounts: string,
   send: typeof fetch = globalThis.fetch.bind(globalThis),
 ): Promise<DeviceCodes | undefined> {
   try {
-    const response = await send(new URL('/auth/device/code', catalogue).href, {
+    const response = await send(new URL('/auth/device/code', accounts).href, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ client_id: CLIENT_ID }),
@@ -144,8 +144,8 @@ export async function askCodes(
     const { device_code: deviceCode, user_code: userCode, verification_uri_complete: page } = read;
     const { expires_in: expiresIn, interval } = read;
     if (typeof deviceCode !== 'string' || typeof userCode !== 'string' || typeof page !== 'string') return undefined;
-    // The page must be the catalogue's own: the user is sent there to approve this browser.
-    if (!URL.canParse(page) || new URL(page).origin !== new URL(catalogue).origin) return undefined;
+    // The page must be the accounts' own: the user is sent there to approve this browser.
+    if (!URL.canParse(page) || new URL(page).origin !== new URL(accounts).origin) return undefined;
     return {
       deviceCode,
       userCode,
@@ -164,20 +164,20 @@ export type Poll =
   | { readonly state: 'approved'; readonly token: string };
 
 /**
- * Poll the catalogue once for the token.
- * @param catalogue - The catalogue's URL
+ * Poll the accounts once for the token.
+ * @param accounts - The accounts' URL
  * @param deviceCode - The device code
  * @param send - How to fetch
  * @returns What it gave
  */
 export async function pollToken(
-  catalogue: string,
+  accounts: string,
   deviceCode: string,
   send: typeof fetch = globalThis.fetch.bind(globalThis),
 ): Promise<Poll> {
   let read: Record<string, unknown>;
   try {
-    const response = await send(new URL('/auth/device/token', catalogue).href, {
+    const response = await send(new URL('/auth/device/token', accounts).href, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ grant_type: DEVICE_GRANT, device_code: deviceCode, client_id: CLIENT_ID }),
@@ -211,7 +211,7 @@ export type SignInEnd = 'approved' | 'denied' | 'expired' | 'failed' | 'cancelle
 export interface SignInOptions {
   /** Shows the user the code, and where to approve this browser. */
   readonly onCodes: (codes: DeviceCodes) => void;
-  /** Opens the catalogue's page for the user. */
+  /** Opens the accounts' page for the user. */
   readonly openPage: (url: string) => void;
   /** Ends the sign-in early, as the user asks. */
   readonly signal?: AbortSignal;
@@ -223,13 +223,13 @@ export interface SignInOptions {
 }
 
 /**
- * Sign the user in: ask for codes, open the catalogue's page for them to approve this browser, and poll for the token
+ * Sign the user in: ask for codes, open the accounts' page for them to approve this browser, and poll for the token
  * until they do, or deny it, or the codes expire, keeping the token once given.
- * @param catalogue - The catalogue's URL
+ * @param accounts - The accounts' URL
  * @param options - What the sign-in is given
  * @returns How it ended
  */
-export async function signIn(catalogue: string, options: SignInOptions): Promise<SignInEnd> {
+export async function signIn(accounts: string, options: SignInOptions): Promise<SignInEnd> {
   const {
     onCodes,
     openPage,
@@ -238,7 +238,7 @@ export async function signIn(catalogue: string, options: SignInOptions): Promise
     wait = ms => new Promise(resolve => setTimeout(resolve, ms)),
     now = Date.now,
   } = options;
-  const codes = await askCodes(catalogue, send);
+  const codes = await askCodes(accounts, send);
   if (codes === undefined) return 'failed';
   onCodes(codes);
   openPage(codes.verificationUri);
@@ -248,7 +248,7 @@ export async function signIn(catalogue: string, options: SignInOptions): Promise
     await wait(interval * 1000);
     if (signal?.aborted === true) return 'cancelled';
     if (now() >= until) return 'expired';
-    const poll = await pollToken(catalogue, codes.deviceCode, send);
+    const poll = await pollToken(accounts, codes.deviceCode, send);
     switch (poll.state) {
       case 'approved':
         await keepToken(poll.token);
