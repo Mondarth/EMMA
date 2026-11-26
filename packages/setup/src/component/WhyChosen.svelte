@@ -22,6 +22,8 @@
   let { updates, key }: Props = $props();
 
   const uid = $props.id();
+  /** The version last chosen that the plan refused, as it needs premium content the user does not own. */
+  const refusal = $derived(updates.premiumRefusalOf(key));
   /** The version the plan takes, or the one installed where it holds the package's update back. */
   const chosen = $derived(updates.explainedAt(key));
   /** The newer versions not taken, once worked out. */
@@ -125,7 +127,23 @@
   </section>
 {/if}
 
+{#if refusal !== undefined}
+  <!-- The version last chosen of it that the plan refused, as it needs premium content the user does not own. -->
+  <div class="emma-why emma-why-refused" role="alert">
+    <p>{refusal.reason}</p>
+    <ul>
+      {#each refusal.explanation as line, index (index)}
+        <li>{line}</li>
+      {/each}
+    </ul>
+  </div>
+{/if}
+
 <style>
+  .emma-why-refused {
+    color: var(--color-level-error, #c00);
+  }
+
   .emma-why {
     margin-top: 1rem;
     min-height: 2.5rem;

@@ -471,6 +471,8 @@ the plan again, with what it brought in. A premium package you do not own has it
 added whose plan needs one, however many modules lie between, as Foundry would refuse to install it part-way through
 the run: the section names the premium packages to buy first, and how the plan comes to need each (**Alpha → Beta →
 Premium Maps**), and the drawer marks a required module that is premium and not owned before you tick the box.
+The same goes for a newer version of a game system or module installed, as an update that newly requires premium
+content: choosing it is refused, the plan stays as it was, and its panel says why, naming what to buy and the way to it.
 
 **Manifest URL**, at the top of the section, installs a package from a manifest you give, as Foundry's own Install
 dialog can. **+** (or Enter) has EMMA's package catalogue read it, and checks that it is a

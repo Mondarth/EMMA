@@ -1907,3 +1907,70 @@ describe('premium content the user does not own, needed by a module to install',
     await expect(updates.install('module:direct', 'Direct')).resolves.toEqual({ ok: true, version: '1.0.0' });
   });
 });
+
+describe('premium content the user does not own, needed by an update of an installed module', () => {
+  /**
+   * The state, searched, with App installed, whose 2.0.0 newly requires Premium Maps, through Beta, and whose 1.5.0
+   * requires nothing new; Premium Maps is premium content the user does not own.
+   * @returns The state
+   */
+  async function searched() {
+    const base = alone(APP, LIB);
+    const planner: Planner = {
+      ...base,
+      plan: async picks => {
+        const planned = (await base.plan(picks)) ?? [];
+        return picks.get('module:app') === '2.0.0'
+          ? [
+              ...planned,
+              { key: 'module:beta', version: '1.0.0', by: { package: 'module:app', version: '2.0.0' } },
+              {
+                key: 'module:premium',
+                version: '1.0.0',
+                by: { package: 'module:app', version: '2.0.0' },
+                through: [{ package: 'module:beta', version: '1.0.0' }],
+              },
+            ]
+          : planned;
+      },
+    };
+    const updates = new UpdateState(() => Promise.resolve({ ...finding(APP, LIB), planner }));
+    await updates.searchFor(OVERVIEW);
+    updates.knowListing([
+      { type: 'module', id: 'app', title: 'App' },
+      { type: 'module', id: 'beta', title: 'Beta' },
+      { type: 'module', id: 'premium', title: 'Premium Maps', unowned: true },
+    ]);
+    return updates;
+  }
+
+  test('refuses the version, saying why and the way to it, and leaves the plan as it was', async () => {
+    const updates = await searched();
+    await updates.choose('module:lib', '1.1.0');
+    const before = updates.plan;
+
+    await expect(updates.choose('module:app', '2.0.0')).resolves.toBe(false);
+
+    expect(updates.plan).toBe(before);
+    expect(updates.chosenOf('module:app')).toBe('1.0.0');
+    expect(updates.premiumRefusalOf('module:app')).toEqual({
+      version: '2.0.0',
+      reason:
+        '2.0.0 is not planned: it needs premium content you do not own, which Foundry cannot install: Premium Maps. Buy it first; EMMA reads what you own again once a week.',
+      explanation: ['App → Beta → Premium Maps'],
+    });
+    expect(updates.premiumRefusalOf('module:lib')).toBeUndefined();
+  });
+
+  test('takes another version, forgetting the refusal, as clearing the plan does', async () => {
+    const updates = await searched();
+    await updates.choose('module:app', '2.0.0');
+
+    await expect(updates.choose('module:app', '1.5.0')).resolves.toBe(true);
+    expect(updates.premiumRefusalOf('module:app')).toBeUndefined();
+
+    await updates.choose('module:app', '2.0.0');
+    updates.clear();
+    expect(updates.premiumRefusalOf('module:app')).toBeUndefined();
+  });
+});

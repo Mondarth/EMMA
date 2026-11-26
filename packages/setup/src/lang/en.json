@@ -435,7 +435,8 @@
     "NeedsBuild": "{versions}: needs Foundry VTT {minimum} or later.",
     "NoManifest": "{versions}: no manifest URL for that version alone, which installing it needs.",
     "Conflict": "{versions}: the plan cannot take it with the other versions chosen:",
-    "Possible": "{versions}: the plan could take it now."
+    "Possible": "{versions}: the plan could take it now.",
+    "NeedsUnowned": "{version} is not planned: it needs premium content you do not own, which Foundry cannot install: {modules}. Buy it first; EMMA reads what you own again once a week."
   },
   "Failure": {
     "Install": "Installing {title} {version} failed",

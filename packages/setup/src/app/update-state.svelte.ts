@@ -128,6 +128,15 @@ export type ManifestResult =
     };
 
 /** Installing a package anew: the version the plan took, or why it could take none. */
+/** A version of an installed package refused, as the plan would then need premium content the user does not own. */
+export interface PremiumRefusal {
+  readonly version: string;
+  /** Why, naming the premium packages. */
+  readonly reason: string;
+  /** The way the plan comes to need each, as `A → B → Premium`. */
+  readonly explanation: readonly string[];
+}
+
 export type InstallResult =
   | { readonly ok: true; readonly version: string }
   | { readonly ok: false; readonly reason: string; readonly explanation?: readonly string[] };
@@ -235,6 +244,11 @@ export class UpdateState {
   readonly #listingTitles = new SvelteMap<PackageKey, string>();
   /** The premium packages on Foundry's listing the user does not own, which Foundry cannot install for them. */
   readonly #unowned = new SvelteSet<PackageKey>();
+  /**
+   * The versions of installed packages last refused as the plan would then need premium content the user does not own,
+   * by package key, with why (see {@link premiumRefusalOf}).
+   */
+  readonly #premiumRefused = new SvelteMap<PackageKey, PremiumRefusal>();
   /** The releases read from manifests the user gave, by package key, which no search finds again. */
   readonly #manual = new SvelteMap<PackageKey, Release>();
   /** The packages added against EMMA's advice, by package key. */
@@ -985,6 +999,18 @@ export class UpdateState {
     try {
       const plan = await search.planner.plan(picks);
       if (plan === undefined || search !== this.search) return false;
+      // A version of an installed package that brings premium content the user does not own into the plan, as a module
+      // update newly requiring it, is refused: Foundry would refuse to install that, and the plan would fail part-way.
+      // One to install anew is refused by its install, which takes it back out (see #refuseUnowned).
+      if (installed !== undefined && version !== UNINSTALL) {
+        const before = this.#unownedKeys();
+        const unowned = this.#unownedInPlan(plan).filter(({ key: needed }) => !before.includes(needed));
+        if (unowned.length > 0) {
+          this.#premiumRefused.set(key, { version, ...this.#unownedWords(unowned, 'Why.NeedsUnowned', version) });
+          return false;
+        }
+      }
+      this.#premiumRefused.delete(key);
       this.#picks.clear();
       for (const [picked, to] of picks) this.#picks.set(picked, to);
       this.plan = plan;
@@ -1593,13 +1619,39 @@ export class UpdateState {
     const unowned = this.#unownedInPlan().filter(({ key: needed }) => !before.includes(needed));
     if (unowned.length === 0) return undefined;
     await this.takeOut(key, true);
+    return { ok: false, ...this.#unownedWords(unowned, 'Install.NeedsUnowned') };
+  }
+
+  /**
+   * Why premium content the user does not own keeps a choice out, in words: the message, naming the packages, and the
+   * way the plan comes to need each.
+   * @param unowned - The packages, each with its way
+   * @param message - The message's key
+   * @param version - The version refused, for a message that names it
+   * @returns The words
+   */
+  #unownedWords(
+    unowned: readonly { readonly key: PackageKey; readonly chain: readonly PackageKey[] }[],
+    message: string,
+    version = '',
+  ): { readonly reason: string; readonly explanation: readonly string[] } {
     return {
-      ok: false,
-      reason: format('Install.NeedsUnowned', {
-        modules: new Intl.ListFormat('en').format(unowned.map(({ key: needed }) => this.#nameOf(needed))),
+      reason: format(message, {
+        version,
+        modules: new Intl.ListFormat('en').format(unowned.map(({ key }) => this.#nameOf(key))),
       }),
       explanation: unowned.map(({ chain }) => chain.map(step => this.#nameOf(step)).join(' → ')),
     };
+  }
+
+  /**
+   * The version of an installed package last refused, as the plan would then need premium content the user does not
+   * own, and why; none once another version of it is chosen, or the plan is cleared.
+   * @param key - The package's key
+   * @returns The refusal, if any
+   */
+  premiumRefusalOf(key: PackageKey): PremiumRefusal | undefined {
+    return this.#premiumRefused.get(key);
   }
 
   /**
@@ -1613,10 +1665,13 @@ export class UpdateState {
   /**
    * The premium packages the plan installs anew that the user does not own, each with the way the plan comes to need
    * it: the choice that needs it, the other changes it is needed through, then itself.
+   * @param plan - The plan; the one in place by default
    * @returns The packages, in the plan's order
    */
-  #unownedInPlan(): { readonly key: PackageKey; readonly chain: readonly PackageKey[] }[] {
-    return this.plan
+  #unownedInPlan(
+    plan: readonly PlanEntry[] = this.plan,
+  ): { readonly key: PackageKey; readonly chain: readonly PackageKey[] }[] {
+    return plan
       .filter(
         ({ key, version }) => version !== UNINSTALL && this.#unowned.has(key) && this.#installedOf(key) === undefined,
       )
@@ -1636,6 +1691,7 @@ export class UpdateState {
     this.#forced.clear();
     this.#recommendedBy.clear();
     this.#safeguardEdits.clear();
+    this.#premiumRefused.clear();
     this.plan = [];
     this.changes++;
     // The pins alone are planned again, as they were before the other choices.
