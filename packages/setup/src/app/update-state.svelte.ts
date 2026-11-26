@@ -233,11 +233,6 @@ export class UpdateState {
   readonly #named = new SvelteMap<PackageKey, string>();
   /** The titles of every package on Foundry's listing, once read, by package key, to name any not installed by. */
   readonly #listingTitles = new SvelteMap<PackageKey, string>();
-  /**
-   * The installed game systems and modules the last best-versions plan left as they are, as no recorded world uses
-   * them, where it was limited to what worlds use (see {@link planBest}).
-   */
-  readonly #leftUnused = new SvelteSet<PackageKey>();
   /** The releases read from manifests the user gave, by package key, which no search finds again. */
   readonly #manual = new SvelteMap<PackageKey, Release>();
   /** The packages added against EMMA's advice, by package key. */
@@ -263,6 +258,11 @@ export class UpdateState {
   #searches = 0;
   /** The packages whose update the plan as it stands holds back (see {@link heldBack}). */
   readonly #heldBack = new SvelteSet<PackageKey>();
+  /**
+   * The installed game systems and modules the last best-versions plan left as they are, as no recorded world uses
+   * them, where it was limited to what worlds use (see {@link planBest}).
+   */
+  readonly #leftUnused = new SvelteSet<PackageKey>();
   /** The plan and search {@link checkHeldBack} last checked, and how many checks were begun. */
   #heldBackFor = '';
   #heldBackRuns = 0;
