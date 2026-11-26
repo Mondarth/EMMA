@@ -467,7 +467,10 @@ The checkbox at the left of each title, **Install <title>**, is ticked while the
 the package's releases, from the same sources as the updates, and the plan takes the newest version that fits with its
 other choices, and with what that version requires, which comes in with it. Its row says it is not installed. If no
 version fits, the section says why, in the resolver's words, and the box stays unticked. Unticking it takes it out of
-the plan again, with what it brought in. A premium package you do not own has its box disabled.
+the plan again, with what it brought in. A premium package you do not own has its box disabled. Nor is a package
+added whose plan needs one, however many modules lie between, as Foundry would refuse to install it part-way through
+the run: the section names the premium packages to buy first, and how the plan comes to need each (**Alpha → Beta →
+Premium Maps**), and the drawer marks a required module that is premium and not owned before you tick the box.
 
 **Manifest URL**, at the top of the section, installs a package from a manifest you give, as Foundry's own Install
 dialog can. **+** (or Enter) has EMMA's package catalogue read it, and checks that it is a
