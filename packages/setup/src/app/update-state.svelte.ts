@@ -233,6 +233,8 @@ export class UpdateState {
   readonly #named = new SvelteMap<PackageKey, string>();
   /** The titles of every package on Foundry's listing, once read, by package key, to name any not installed by. */
   readonly #listingTitles = new SvelteMap<PackageKey, string>();
+  /** The premium packages on Foundry's listing the user does not own, which Foundry cannot install for them. */
+  readonly #unowned = new SvelteSet<PackageKey>();
   /** The releases read from manifests the user gave, by package key, which no search finds again. */
   readonly #manual = new SvelteMap<PackageKey, Release>();
   /** The packages added against EMMA's advice, by package key. */
@@ -1018,7 +1020,23 @@ export class UpdateState {
     for (const version of installable) {
       const completion = await planner.complete(withChoice(this.#picks, key, version));
       if (completion.ok) {
+        const unownedBefore = this.#unownedInPlan().map(({ key: needed }) => needed);
         const chosen = await this.#choose(key, version);
+        // Premium content the user does not own, which it needs, perhaps through others, keeps it out: Foundry would
+        // refuse to install it, and the plan would fail part-way.
+        const unowned = chosen
+          ? this.#unownedInPlan().filter(({ key: needed }) => !unownedBefore.includes(needed))
+          : [];
+        if (unowned.length > 0) {
+          await this.takeOut(key, true);
+          return {
+            ok: false,
+            reason: format('Install.NeedsUnowned', {
+              modules: new Intl.ListFormat('en').format(unowned.map(({ key: needed }) => this.#nameOf(needed))),
+            }),
+            explanation: unowned.map(({ chain }) => chain.map(step => this.#nameOf(step)).join(' → ')),
+          };
+        }
         // What it recommends that the user wants comes in with it, or it does not come in at all.
         const missed = chosen ? await this.#bringRecommended(key, false) : [];
         if (!chosen || missed.length === 0) {
@@ -1545,8 +1563,45 @@ export class UpdateState {
    * as one a module recommends that comes into the plan with it.
    * @param packages - The packages on the listing
    */
-  knowListing(packages: readonly { readonly type: string; readonly id: string; readonly title: string }[]): void {
-    for (const { type, id, title } of packages) this.#listingTitles.set(`${type}:${id}`, title);
+  knowListing(
+    packages: readonly {
+      readonly type: string;
+      readonly id: string;
+      readonly title: string;
+      readonly unowned?: boolean;
+    }[],
+  ): void {
+    for (const { type, id, title, unowned } of packages) {
+      const key = `${type}:${id}`;
+      this.#listingTitles.set(key, title);
+      if (unowned === true) this.#unowned.add(key);
+      else this.#unowned.delete(key);
+    }
+  }
+
+  /**
+   * Whether a package is premium content on Foundry's listing that the user does not own.
+   * @param key - The package's key
+   * @returns `true` if it is
+   */
+  isUnowned(key: PackageKey): boolean {
+    return this.#unowned.has(key);
+  }
+
+  /**
+   * The premium packages the plan installs anew that the user does not own, each with the way the plan comes to need
+   * it: the choice that needs it, the other changes it is needed through, then itself.
+   * @returns The packages, in the plan's order
+   */
+  #unownedInPlan(): { readonly key: PackageKey; readonly chain: readonly PackageKey[] }[] {
+    return this.plan
+      .filter(
+        ({ key, version }) => version !== UNINSTALL && this.#unowned.has(key) && this.#installedOf(key) === undefined,
+      )
+      .map(({ key, by, through }) => ({
+        key,
+        chain: [...(by === undefined ? [] : [by.package]), ...(through ?? []).map(step => step.package), key],
+      }));
   }
 
   /** Take back every choice, and what was changed of the plan's snapshot and backups. */

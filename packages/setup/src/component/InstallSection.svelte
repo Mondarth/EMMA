@@ -177,7 +177,13 @@
           <li>
             {nameOf(required)}
             <span class="emma-install-hint">
-              {localize(updates.isInstalled(required) ? 'Module.same' : 'Relations.ComesWith')}
+              {localize(
+                updates.isInstalled(required)
+                  ? 'Module.same'
+                  : updates.isUnowned(required)
+                    ? 'Relations.Unowned'
+                    : 'Relations.ComesWith',
+              )}
             </span>
           </li>
         {/each}

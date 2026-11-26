@@ -1806,3 +1806,83 @@ describe('a pin in the way of a choice', () => {
     ]);
   });
 });
+
+describe('premium content the user does not own, needed by a module to install', () => {
+  /**
+   * The state, searched, with a planner that installs A with B, and B with Premium, as each requires the next, and
+   * Solo alone; and Foundry's listing, on which Premium is premium content the user does not own.
+   * @returns The state
+   */
+  async function searched() {
+    const base = alone(APP, LIB);
+    const known = new Set(['module:a', 'module:b', 'module:premium', 'module:solo', 'module:owned']);
+    const needs: Record<string, readonly PlanEntry[]> = {
+      'module:a': [
+        { key: 'module:b', version: '1.0.0', by: { package: 'module:a', version: '1.0.0' } },
+        {
+          key: 'module:premium',
+          version: '1.0.0',
+          by: { package: 'module:a', version: '1.0.0' },
+          through: [{ package: 'module:b', version: '1.0.0' }],
+        },
+      ],
+      'module:direct': [
+        { key: 'module:premium', version: '1.0.0', by: { package: 'module:direct', version: '1.0.0' } },
+      ],
+    };
+    const planner: Planner = {
+      ...base,
+      add: key => Promise.resolve(known.has(key) || key === 'module:direct'),
+      candidates: key => (known.has(key) || key === 'module:direct' ? ['1.0.0'] : base.candidates(key)),
+      plan: picks =>
+        Promise.resolve([...picks].flatMap(([key, version]): PlanEntry[] => [{ key, version }, ...(needs[key] ?? [])])),
+    };
+    const updates = new UpdateState(() => Promise.resolve({ ...finding(APP, LIB), planner }));
+    await updates.searchFor(OVERVIEW);
+    updates.knowListing([
+      { type: 'module', id: 'a', title: 'Alpha' },
+      { type: 'module', id: 'b', title: 'Beta' },
+      { type: 'module', id: 'premium', title: 'Premium Maps', unowned: true },
+      { type: 'module', id: 'owned', title: 'Owned', unowned: false },
+    ]);
+    return updates;
+  }
+
+  test('keeps out a module that needs it through another, naming it, and the way to it', async () => {
+    const updates = await searched();
+
+    await expect(updates.install('module:a', 'Alpha')).resolves.toEqual({
+      ok: false,
+      reason:
+        'It needs premium content you do not own, which Foundry cannot install: Premium Maps. Buy it first; EMMA reads what you own again once a week.',
+      explanation: ['Alpha → Beta → Premium Maps'],
+    });
+    // Taken back out, with what it brought in.
+    expect(updates.picks).toEqual([]);
+    expect(updates.plan).toEqual([]);
+  });
+
+  test('keeps out a module that needs it itself', async () => {
+    const updates = await searched();
+    await expect(updates.install('module:direct', 'Direct')).resolves.toMatchObject({
+      ok: false,
+      explanation: ['Direct → Premium Maps'],
+    });
+    expect(updates.picks).toEqual([]);
+  });
+
+  test('lets in a module that needs none, and knows which the user does not own', async () => {
+    const updates = await searched();
+    await expect(updates.install('module:solo', 'Solo')).resolves.toEqual({ ok: true, version: '1.0.0' });
+    expect(updates.isUnowned('module:premium')).toBe(true);
+    expect(updates.isUnowned('module:owned')).toBe(false);
+    expect(updates.isUnowned('module:a')).toBe(false);
+    // Bought since, as a listing read again says.
+    updates.knowListing([{ type: 'module', id: 'premium', title: 'Premium Maps', unowned: false }]);
+    expect(updates.isUnowned('module:premium')).toBe(false);
+    await expect(updates.install('module:a', 'Alpha')).resolves.toEqual({ ok: true, version: '1.0.0' });
+    // Read as not owned once it is in the plan, it keeps out only what newly needs it.
+    updates.knowListing([{ type: 'module', id: 'premium', title: 'Premium Maps', unowned: true }]);
+    await expect(updates.install('module:direct', 'Direct')).resolves.toEqual({ ok: true, version: '1.0.0' });
+  });
+});
