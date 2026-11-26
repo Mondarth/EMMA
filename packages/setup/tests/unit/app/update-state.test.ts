@@ -711,6 +711,27 @@ describe('installing from a manifest URL', () => {
     return { updates, planner };
   }
 
+  test('keeps out the version a manifest gives where it needs premium content the user does not own', async () => {
+    const { updates } = await searched({ ok: true, release: DICE, title: 'Dice' });
+    updates.knowListing([{ type: 'module', id: 'lib', title: 'Library', unowned: true }]);
+    // Library is installed: only one installed anew is kept out.
+    await expect(updates.installFrom(DICE_URL, 'module')).resolves.toEqual({
+      ok: true,
+      title: 'Dice',
+      version: '1.2.0',
+    });
+    await updates.forget('module:dice');
+    updates.knowListing([{ type: 'module', id: 'dice', title: 'Dice', unowned: true }]);
+
+    await expect(updates.installFrom(DICE_URL, 'module')).resolves.toEqual({
+      ok: false,
+      reason:
+        'It needs premium content you do not own, which Foundry cannot install: Dice. Buy it first; EMMA reads what you own again once a week.',
+      explanation: ['Dice'],
+    });
+    expect(updates.picks).toEqual([]);
+  });
+
   test('adds the version a manifest gives, looking up what it requires', async () => {
     const { updates, planner } = await searched({ ok: true, release: DICE, title: 'Dice' });
 

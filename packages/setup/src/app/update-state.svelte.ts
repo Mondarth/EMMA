@@ -1022,21 +1022,8 @@ export class UpdateState {
       if (completion.ok) {
         const unownedBefore = this.#unownedInPlan().map(({ key: needed }) => needed);
         const chosen = await this.#choose(key, version);
-        // Premium content the user does not own, which it needs, perhaps through others, keeps it out: Foundry would
-        // refuse to install it, and the plan would fail part-way.
-        const unowned = chosen
-          ? this.#unownedInPlan().filter(({ key: needed }) => !unownedBefore.includes(needed))
-          : [];
-        if (unowned.length > 0) {
-          await this.takeOut(key, true);
-          return {
-            ok: false,
-            reason: format('Install.NeedsUnowned', {
-              modules: new Intl.ListFormat('en').format(unowned.map(({ key: needed }) => this.#nameOf(needed))),
-            }),
-            explanation: unowned.map(({ chain }) => chain.map(step => this.#nameOf(step)).join(' → ')),
-          };
-        }
+        const refused = chosen ? await this.#refuseUnowned(key, unownedBefore) : undefined;
+        if (refused !== undefined) return refused;
         // What it recommends that the user wants comes in with it, or it does not come in at all.
         const missed = chosen ? await this.#bringRecommended(key, false) : [];
         if (!chosen || missed.length === 0) {
@@ -1286,7 +1273,10 @@ export class UpdateState {
     }
     const { version } = release;
     const completion = await planner.complete(withChoice(this.#picks, key, version));
-    if (completion.ok && (await this.choose(key, version))) return { ok: true, title, version };
+    const unownedBefore = this.#unownedInPlan().map(({ key: needed }) => needed);
+    if (completion.ok && (await this.choose(key, version))) {
+      return (await this.#refuseUnowned(key, unownedBefore)) ?? { ok: true, title, version };
+    }
     const explanation = completion.ok ? undefined : completion.explanation;
     return {
       ok: false,
@@ -1586,6 +1576,30 @@ export class UpdateState {
    */
   isUnowned(key: PackageKey): boolean {
     return this.#unowned.has(key);
+  }
+
+  /**
+   * Take a package just chosen to install back out of the plan, with what it brought in, if the plan now needs premium
+   * content the user does not own that it did not before, perhaps through other modules: Foundry would refuse to install
+   * it, and the plan would fail part-way.
+   * @param key - The package's key
+   * @param before - The premium packages not owned that the plan installed before it was chosen
+   * @returns Why it was taken out, or none if it was not
+   */
+  async #refuseUnowned(
+    key: PackageKey,
+    before: readonly PackageKey[],
+  ): Promise<{ readonly ok: false; readonly reason: string; readonly explanation: readonly string[] } | undefined> {
+    const unowned = this.#unownedInPlan().filter(({ key: needed }) => !before.includes(needed));
+    if (unowned.length === 0) return undefined;
+    await this.takeOut(key, true);
+    return {
+      ok: false,
+      reason: format('Install.NeedsUnowned', {
+        modules: new Intl.ListFormat('en').format(unowned.map(({ key: needed }) => this.#nameOf(needed))),
+      }),
+      explanation: unowned.map(({ chain }) => chain.map(step => this.#nameOf(step)).join(' → ')),
+    };
   }
 
   /**
