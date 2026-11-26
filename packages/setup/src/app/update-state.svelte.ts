@@ -1020,7 +1020,7 @@ export class UpdateState {
     for (const version of installable) {
       const completion = await planner.complete(withChoice(this.#picks, key, version));
       if (completion.ok) {
-        const unownedBefore = this.#unownedInPlan().map(({ key: needed }) => needed);
+        const unownedBefore = this.#unownedKeys();
         const chosen = await this.#choose(key, version);
         const refused = chosen ? await this.#refuseUnowned(key, unownedBefore) : undefined;
         if (refused !== undefined) return refused;
@@ -1273,7 +1273,7 @@ export class UpdateState {
     }
     const { version } = release;
     const completion = await planner.complete(withChoice(this.#picks, key, version));
-    const unownedBefore = this.#unownedInPlan().map(({ key: needed }) => needed);
+    const unownedBefore = this.#unownedKeys();
     if (completion.ok && (await this.choose(key, version))) {
       return (await this.#refuseUnowned(key, unownedBefore)) ?? { ok: true, title, version };
     }
@@ -1600,6 +1600,14 @@ export class UpdateState {
       }),
       explanation: unowned.map(({ chain }) => chain.map(step => this.#nameOf(step)).join(' → ')),
     };
+  }
+
+  /**
+   * The keys of the premium packages the plan installs anew that the user does not own.
+   * @returns The keys
+   */
+  #unownedKeys(): PackageKey[] {
+    return this.#unownedInPlan().map(({ key }) => key);
   }
 
   /**
