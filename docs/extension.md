@@ -175,6 +175,10 @@ module it runs, or Foundry VTT the plan changes, takes its own colour and a dash
 A game system or module the plan installs anew shows in the tree as soon as it is added, at the version the plan
 takes, on a pale amber background with an amber edge, marked **Pending**: a game system among the game systems, with
 a group of the modules for it, and a module in the groups of the game systems it is for, as Foundry's listing says.
+Its panel, not having the package installed to read, names it by its title on Foundry's listing, gives the version
+the plan installs (**To install**), and, under **On Foundry's listing**, what the listing says of it, as the Install
+section's drawer does: its description, authors, newest version, the Foundry VTT builds it declares, the game systems a
+module is for, its tags, whether it is premium or exclusive content, and its web page.
 
 A game system's panel gives the version installed, how many modules are for it, and the worlds that use it, each with
 the version it last ran with; under a world, also the version that world last ran with.

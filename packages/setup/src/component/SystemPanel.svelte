@@ -6,12 +6,14 @@
   import type { Snippet } from 'svelte';
 
   import type { ExplainedVersion } from '../app/update-state.svelte';
+  import type { ListedPackage } from '../foundry/setup-game';
   import type { SystemDetail } from '../lib/details';
   import type { BlockedUpdate as Blocked } from '../lib/updates';
 
   import type { TreeSelection } from '../lib/tree';
 
   import BlockedUpdate from './BlockedUpdate.svelte';
+  import ListedDetails from './ListedDetails.svelte';
   import TreeLink from './TreeLink.svelte';
   import VersionExplanation from './VersionExplanation.svelte';
   import { format, localize } from '../lib/i18n';
@@ -28,12 +30,16 @@
     actions?: Snippet | undefined;
     /** The latest version known of it, if known: none before the search, for one not installed, or one ignored. */
     latest?: string | undefined;
+    /** What Foundry's listing says of it, for one the plan installs anew; none for one installed. */
+    listed?: ListedPackage | undefined;
+    /** The version the plan installs, for one it installs anew. */
+    planned?: string | undefined;
   }
 
-  let { detail, blocked, explained, onOpen, actions, latest }: Props = $props();
+  let { detail, blocked, explained, onOpen, actions, latest, listed, planned }: Props = $props();
 </script>
 
-<h2>{detail.title}</h2>
+<h2>{detail.installed === undefined && listed !== undefined ? listed.title : detail.title}</h2>
 {@render actions?.()}
 {#if detail.world !== undefined}
   <p>{format('ModuleInfo.InWorld', { world: detail.world.world.title })}</p>
@@ -48,6 +54,10 @@
   <dd class={['emma-status', `emma-status-${detail.status}`]}>
     {detail.installed?.version ?? localize('ModuleInfo.NotInstalled')}
   </dd>
+  {#if planned !== undefined && detail.installed === undefined}
+    <dt>{localize('ModuleInfo.ToInstall')}</dt>
+    <dd>{planned}</dd>
+  {/if}
   {#if latest !== undefined && detail.installed !== undefined}
     <dt>{localize('ModuleInfo.Latest')}</dt>
     <dd>{latest}</dd>
@@ -55,6 +65,14 @@
   <dt>{localize('System.Modules')}</dt>
   <dd>{detail.modules}</dd>
 </dl>
+
+{#if listed !== undefined && detail.installed === undefined}
+  <!-- Not installed yet, so known only by what Foundry's listing says of it, as its Install dialog shows. -->
+  <section aria-labelledby="emma-setup-listed">
+    <h3 id="emma-setup-listed">{localize('ModuleInfo.Listing')}</h3>
+    <ListedDetails pkg={listed} />
+  </section>
+{/if}
 
 {#if explained !== undefined}
   <VersionExplanation {explained} />

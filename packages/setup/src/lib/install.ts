@@ -10,7 +10,7 @@
 import type { ListedPackage } from '../foundry/setup-game';
 import { format, localize } from './i18n';
 import type { Overview } from './overview';
-import type { PendingPackage } from './tree';
+import type { PendingPackage, TreeSelection } from './tree';
 import { UNINSTALL } from './plans';
 
 /** What a package to install must fit. */
@@ -237,4 +237,49 @@ export function tagText(tag: string): string {
     .split('-')
     .map(word => word.charAt(0).toLocaleUpperCase() + word.slice(1))
     .join(' ');
+}
+
+/**
+ * Whether a game system or module is installed.
+ * @param overview - The installation, if read
+ * @param type - Its type
+ * @param id - Its ID
+ * @returns `true` if it is; `false` before the installation is read
+ */
+export function isInstalledIn(overview: Overview | null, type: 'module' | 'system', id: string): boolean {
+  return type === 'system'
+    ? overview?.systems.some(system => system.id === id) === true
+    : overview?.modules.some(({ module: pkg }) => pkg.id === id) === true;
+}
+
+/**
+ * What Foundry's listing says of a package the plan installs anew, for its panel.
+ * @param overview - The installation, if read
+ * @param listing - Foundry's listing of its type, as read so far
+ * @param id - Its ID
+ * @param type - Its type
+ * @returns It, as listed; none for one installed, or before the listing is read
+ */
+export function listedAnew(
+  overview: Overview | null,
+  listing: readonly ListedPackage[] | string | null,
+  id: string,
+  type: 'module' | 'system',
+): ListedPackage | undefined {
+  if (isInstalledIn(overview, type, id) || typeof listing !== 'object' || listing === null) return undefined;
+  return listing.find(pkg => pkg.id === id);
+}
+
+/**
+ * Which of Foundry's listings to read for what the tree has selected: that of a game system or module not installed, as
+ * one the plan installs anew, whose panel shows what the listing says of it.
+ * @param overview - The installation, if read
+ * @param selection - What the tree has selected
+ * @returns The listing's type, or none
+ */
+export function listingWanted(overview: Overview | null, selection: TreeSelection): 'module' | 'system' | undefined {
+  if (overview === null) return undefined;
+  if (selection.kind === 'module') return isInstalledIn(overview, 'module', selection.module) ? undefined : 'module';
+  if (selection.kind === 'system') return isInstalledIn(overview, 'system', selection.system) ? undefined : 'system';
+  return undefined;
 }

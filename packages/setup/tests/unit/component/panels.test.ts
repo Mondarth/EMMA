@@ -96,6 +96,34 @@ describe('ModulePanel', () => {
       'Neme Will need it when next run: it is now required by EMMA, updated since the world last ran.',
     );
   });
+  test("shows a module the plan installs anew as Foundry's listing gives it, and the version it installs", () => {
+    render(ModulePanel, {
+      detail: moduleDetail(OVERVIEW, 'maps'),
+      planned: '2.1.0',
+      listed: {
+        type: 'module',
+        id: 'maps',
+        title: 'Monster Maps',
+        version: '2.2.0',
+        compatibility: { minimum: '13', verified: '14.368' },
+        systems: ['dnd5e'],
+        unowned: false,
+        description: 'Maps of monsters.',
+        authors: ['Cartographer'],
+        tags: ['maps'],
+        premium: true,
+      },
+    });
+
+    // By its title, not its ID.
+    expect(screen.getByRole('heading', { level: 2, name: 'Monster Maps' })).toBeInTheDocument();
+    expect(screen.getByText('To install', { selector: 'dt' }).nextElementSibling).toHaveTextContent('2.1.0');
+    const listed = screen.getByRole('region', { name: "On Foundry's listing" });
+    for (const text of ['Maps of monsters.', 'Cartographer', '2.2.0', 'minimum 13, verified 14.368', 'dnd5e', 'Maps']) {
+      expect(listed).toHaveTextContent(text);
+    }
+    expect(listed).toHaveTextContent('Premium, owned');
+  });
 });
 
 describe('WorldPanel', () => {
