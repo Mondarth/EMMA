@@ -173,7 +173,8 @@
     "HeldBack": "Update available, but not with the plan as it stands (its choices or locks): open its versions to see why",
     "HiddenHeldBack": "Updates in the rows under it, but none with the plan as it stands",
     "UnresolvedWhy": "Why, world by world",
-    "UnresolvedUnread": "EMMA could not read the manifests of {releases}, so cannot tell what they need."
+    "UnresolvedUnread": "EMMA could not read the manifests of {releases}, so cannot tell what they need.",
+    "Unused": "Update available, not planned: no recorded world uses it, and the best versions were planned for what worlds use"
   },
   "Plan": {
     "Safeguards": "Keep first",
@@ -433,7 +434,8 @@
     "NeedsBuild": "{versions}: needs Foundry VTT {minimum} or later.",
     "NoManifest": "{versions}: no manifest URL for that version alone, which installing it needs.",
     "Conflict": "{versions}: the plan cannot take it with the other versions chosen:",
-    "Possible": "{versions}: the plan could take it now."
+    "Possible": "{versions}: the plan could take it now.",
+    "Unused": "Its update is not planned: no recorded world uses it, and the best versions were planned only for what worlds use. Choose a version to plan it anyway."
   },
   "Failure": {
     "Install": "Installing {title} {version} failed",

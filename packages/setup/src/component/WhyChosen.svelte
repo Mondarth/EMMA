@@ -125,6 +125,11 @@
   </section>
 {/if}
 
+{#if updates.leftUnused(key)}
+  <!-- Its update is offered, but the best versions were planned for what worlds use alone, and no world uses it. -->
+  <p class="emma-why" role="note">{localize('Why.Unused')}</p>
+{/if}
+
 <style>
   .emma-why {
     margin-top: 1rem;

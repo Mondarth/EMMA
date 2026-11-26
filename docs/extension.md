@@ -317,6 +317,10 @@ are not ignored (see [Ignoring](#ignoring)): every other plan still takes them i
 chosen by hand. A world without a record may run modules EMMA cannot see, which the option then leaves as they are. The
 browser remembers the choice for that server.
 
+An update left out this way says so: in the tree, its arrow's tooltip says the update is available but not planned, as
+no recorded world uses it; and its panel says the same, and that choosing a version plans it anyway. It stops saying so
+once a version is chosen, the plan is cleared, or the best versions are planned for everything.
+
 Before the changes, under **Keep first**, the plan offers what Foundry's **Manage Backups** makes by hand:
 
 - a **snapshot of the installation**, unchecked unless the plan changes Foundry VTT, when EMMA checks it as a strong
