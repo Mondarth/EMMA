@@ -12,9 +12,7 @@
     "firefox": ["games-entertainment"]
   },
   "homepage": {
-    "url": {
-      "en-US": "https://mondarth.github.io/EMMA/extension.html"
-    }
+    "en-US": "https://mondarth.github.io/EMMA/extension.html"
   },
   "support_url": {
     "url": {
