@@ -7,7 +7,7 @@ import type { Overview } from '../../../src/lib/overview';
 import { buildOverview } from '../../../src/lib/overview';
 import type { RunStep } from '../../../src/lib/run';
 import type { PackageUpdate } from '../../../src/lib/updates';
-import { alone, installation, installedModule, noInstall, noUpdates, unjudged } from '../../mocks/fixtures';
+import { alone, installation, installedModule, noUpdates, unjudged } from '../../mocks/fixtures';
 
 const OVERVIEW = buildOverview(installation(), new Map());
 
@@ -22,7 +22,6 @@ describe('SetupState', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: noUpdates,
-      installModule: noInstall,
     };
     const setup = new SetupState({ ...options, listPackages, runStep: () => Promise.resolve() });
     expect(setup.canInstall).toBe(true);
@@ -68,7 +67,6 @@ describe('SetupState', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: noUpdates,
-      installModule: noInstall,
     };
     const setup = new SetupState({ ...options, listPackages, forgetOwned });
     await setup.loadListing('module');
@@ -98,7 +96,6 @@ describe('SetupState', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: noUpdates,
-      installModule: noInstall,
     });
     expect(setup.installFilters.module).toEqual({ hideBehind: true, showUnowned: false, offTags: [] });
 
@@ -112,7 +109,7 @@ describe('SetupState', () => {
 
   test('locks a package only where it can, while no plan runs, reading the installation again once it has', async () => {
     const load = vi.fn(() => Promise.resolve(OVERVIEW));
-    const options = { load, guardOn: true, onGuardChange: vi.fn(), findUpdates: noUpdates, installModule: noInstall };
+    const options = { load, guardOn: true, onGuardChange: vi.fn(), findUpdates: noUpdates };
     const without = new SetupState(options);
     expect(without.canLock).toBe(false);
     await expect(without.setLocked('module:lib', true)).resolves.toBe(false);
@@ -134,7 +131,7 @@ describe('SetupState', () => {
 
   test('locks Foundry VTT in EMMA only where it can, while no plan runs, reading the installation again', async () => {
     const load = vi.fn(() => Promise.resolve(OVERVIEW));
-    const options = { load, guardOn: true, onGuardChange: vi.fn(), findUpdates: noUpdates, installModule: noInstall };
+    const options = { load, guardOn: true, onGuardChange: vi.fn(), findUpdates: noUpdates };
     const without = new SetupState(options);
     expect(without.canLockCore).toBe(false);
     await expect(without.setCoreLocked(true)).resolves.toBe(false);
@@ -153,7 +150,7 @@ describe('SetupState', () => {
 
   test('ignores a world, a game system or a module only where it can, while no plan runs, reading again', async () => {
     const load = vi.fn(() => Promise.resolve(OVERVIEW));
-    const options = { load, guardOn: true, onGuardChange: vi.fn(), findUpdates: noUpdates, installModule: noInstall };
+    const options = { load, guardOn: true, onGuardChange: vi.fn(), findUpdates: noUpdates };
     const without = new SetupState(options);
     expect(without.canIgnore).toBe(false);
     await expect(without.setIgnored('module:lib', true)).resolves.toBe(false);
@@ -182,7 +179,6 @@ describe('SetupState', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: noUpdates,
-      installModule: noInstall,
     });
 
     const reading = setup.refresh();
@@ -203,7 +199,6 @@ describe('SetupState', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: noUpdates,
-      installModule: noInstall,
     });
 
     await setup.refresh();
@@ -221,7 +216,6 @@ describe('SetupState', () => {
       guardOn: false,
       onGuardChange,
       findUpdates: noUpdates,
-      installModule: noInstall,
     });
     expect(setup.guardOn).toBe(false);
 
@@ -229,50 +223,6 @@ describe('SetupState', () => {
 
     expect(setup.guardOn).toBe(true);
     expect(onGuardChange).toHaveBeenCalledExactlyOnceWith(true);
-  });
-
-  test('installs the EMMA module, once at a time, then reads the installation afresh', async () => {
-    let finish = (): void => undefined;
-    const installModule = vi.fn(
-      () =>
-        new Promise<void>(resolve => {
-          finish = resolve;
-        }),
-    );
-    const load = vi.fn(() => Promise.resolve(OVERVIEW));
-    const setup = new SetupState({
-      load,
-      guardOn: true,
-      onGuardChange: vi.fn(),
-      findUpdates: noUpdates,
-      installModule,
-    });
-
-    const installing = setup.installModule();
-    expect(setup.installing).toBe(true);
-    await setup.installModule();
-    finish();
-    await installing;
-
-    expect(installModule).toHaveBeenCalledOnce();
-    expect(setup.installing).toBe(false);
-    expect(load).toHaveBeenCalledOnce();
-  });
-
-  test('reads the installation afresh after a failed install too, which Foundry reports', async () => {
-    const load = vi.fn(() => Promise.resolve(OVERVIEW));
-    const setup = new SetupState({
-      load,
-      guardOn: true,
-      onGuardChange: vi.fn(),
-      findUpdates: noUpdates,
-      installModule: () => Promise.reject(new Error('offline')),
-    });
-
-    await setup.installModule();
-
-    expect(setup.installing).toBe(false);
-    expect(load).toHaveBeenCalledOnce();
   });
 
   test('asks for the space a snapshot needs once, until the installation is read again, keeping a failure', async () => {
@@ -285,7 +235,6 @@ describe('SetupState', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: noUpdates,
-      installModule: noInstall,
       snapshotSpace,
     });
 
@@ -308,7 +257,6 @@ describe('SetupState', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: noUpdates,
-      installModule: noInstall,
     });
 
     await setup.checkSnapshotSpace();
@@ -344,7 +292,6 @@ describe('SetupState', () => {
             judge: unjudged,
             planner: alone(APP, LIB, CORE),
           }),
-        installModule: noInstall,
         ...(runStep !== undefined && { runStep }),
       });
       await setup.refresh();
@@ -540,7 +487,6 @@ describe('SetupState', () => {
             judge: unjudged,
             planner: alone(APP, CORE),
           }),
-        installModule: noInstall,
         runStep: () => Promise.resolve(),
         ...(core !== undefined && { core }),
         keepPendingPlan: plan => {
@@ -683,7 +629,6 @@ describe('SetupState', () => {
             judge: unjudged,
             planner: alone(APP),
           }),
-        installModule: noInstall,
         pendingPlan: () => ({ core: '14.369', picks }),
         keepPendingPlan,
       });
@@ -755,7 +700,6 @@ describe('SetupState', () => {
             judge: unjudged,
             planner: alone(APP),
           }),
-        installModule: noInstall,
         runStep: step => (fail && step.kind === 'install' ? Promise.reject(new Error('Refused')) : Promise.resolve()),
         keepPendingPlan: plan => {
           kept.push(plan);
@@ -796,7 +740,6 @@ describe('SetupState', () => {
             judge: unjudged,
             planner: alone(APP),
           }),
-        installModule: noInstall,
         pendingPlan: () => saved,
         keepPendingPlan,
       });
@@ -875,7 +818,6 @@ describe('the notes on what is held', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: noUpdates,
-      installModule: noInstall,
       pins: { initial: { 'module:dice': '1.0.0' }, keep: vi.fn() },
       notes: {
         read: () => kept,
@@ -915,7 +857,6 @@ describe('a lock and a pin', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: noUpdates,
-      installModule: noInstall,
       pins,
       lockPackage: () => Promise.resolve(),
       lockCore: vi.fn(),

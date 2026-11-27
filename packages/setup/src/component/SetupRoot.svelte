@@ -9,14 +9,12 @@
   import type { SetupState } from '../app/setup-state.svelte';
   import type { Layout } from '../foundry/preferences';
   import { readLayout, writeLayout } from '../foundry/preferences';
-  import { EXTENSION_RELEASES } from '../foundry/setup-kit';
   import { openSignIn } from '../foundry/catalogue-relay';
   import type { InstallFilters } from '../lib/install';
   import { installable, isInstalledIn, keptSystems, listedAnew, listingWanted, pendingPackages } from '../lib/install';
   import { UNINSTALL } from '../lib/plans';
   import { stepText } from '../lib/run';
   import { groupDetail, moduleDetail, systemDetail } from '../lib/details';
-  import { EMMA_VERSION } from '../lib/alpha';
   import { format, localize } from '../lib/i18n';
   import { ignoredItems, linkOf, lockedItems } from '../lib/held';
   import { isIgnored } from '../lib/overview';
@@ -29,7 +27,6 @@
   import Splitter from './Splitter.svelte';
   import SystemPanel from './SystemPanel.svelte';
   import CoreStep from './CoreStep.svelte';
-  import AlphaNotice from './AlphaNotice.svelte';
   import BusyMark from './BusyMark.svelte';
   import OpeningMark from './OpeningMark.svelte';
   import FailedStep from './FailedStep.svelte';
@@ -111,7 +108,6 @@
 
   /** What the footer says of the search for updates. */
   const updateStatus = $derived.by(() => {
-    if (setup.installing) return localize('Update.Installing');
     switch (updates.status) {
       case 'failed':
         return localize('Update.Failed');
@@ -162,22 +158,11 @@
    * @returns Why, in words
    */
   function problemText(): string {
-    switch (problem?.reason) {
-      case 'module-too-old':
-        return format('Update.ModuleTooOld', { version: problem.version });
-      case 'extension-too-old':
-        return format('Update.ExtensionTooOld', { version: problem.version });
-      case 'signed-out':
-        return localize('Update.SignIn');
-      case 'lapsed':
-        return problem.paidUntil === null
-          ? localize('Update.NotSubscribed')
-          : format('Update.Lapsed', {
-              date: new Date(problem.paidUntil).toLocaleDateString(undefined, { dateStyle: 'medium' }),
-            });
-      default:
-        return localize('Update.NeedsModule');
-    }
+    if (problem?.reason !== 'lapsed') return localize('Update.SignIn');
+    const { paidUntil } = problem;
+    return paidUntil === null
+      ? localize('Update.NotSubscribed')
+      : format('Update.Lapsed', { date: new Date(paidUntil).toLocaleDateString(undefined, { dateStyle: 'medium' }) });
   }
   const selection = $derived(selected.selection);
   /** Whether EMMA ignores what the panel shows. */
@@ -683,10 +668,6 @@
             run={setup.shownRun}
             onOpen={openLink}
             pinNoteOf={(key: string) => setup.notes.of('pin', key)}
-            acknowledged={setup.alphaAcknowledged}
-            onAcknowledge={() => {
-              setup.acknowledgeAlpha();
-            }}
             onRun={setup.canRun
               ? () => {
                   void setup.runPlan();
@@ -697,14 +678,6 @@
     </div>
   {/if}
   <footer class="emma-setup-footer">
-    {#if setup.isAlpha}
-      <AlphaNotice
-        version={EMMA_VERSION}
-        acknowledged={setup.alphaAcknowledged}
-        onAcknowledge={() => {
-          setup.acknowledgeAlpha();
-        }} />
-    {/if}
     {#if setup.savedPlan !== null}
       <SavedPlanNotice
         count={setup.savedPlan.picks.length}
@@ -762,22 +735,6 @@
           <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
           {localize('Update.Renew')}
         </a>
-      {:else if problem?.reason === 'extension-too-old'}
-        <a class="emma-setup-get" href={EXTENSION_RELEASES} target="_blank" rel="noopener noreferrer">
-          <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
-          {localize('Update.UpdateExtension')}
-        </a>
-      {:else if problem !== null}
-        <button
-          type="button"
-          class="emma-setup-get"
-          disabled={setup.installing}
-          onclick={() => {
-            void setup.installModule();
-          }}>
-          <i class="fa-solid fa-download" aria-hidden="true"></i>
-          {localize(problem.reason === 'missing' ? 'Update.InstallModule' : 'Update.UpdateModule')}
-        </button>
       {/if}
     {/if}
     {#if catalogue?.reached === true}

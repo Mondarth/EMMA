@@ -1,0 +1,24 @@
+{
+  "id": "token-tracker",
+  "title": "Token Tracker",
+  "description": "Marks turns, conditions and concentration on tokens at a glance.",
+  "version": "4.1.2",
+  "compatibility": {
+    "minimum": "14",
+    "verified": "14"
+  },
+  "authors": [
+    {
+      "name": "Hearthside Tools"
+    }
+  ],
+  "relationships": {
+    "requires": [
+      {
+        "id": "lib-wrapper",
+        "type": "module",
+        "reason": "It patches token rendering."
+      }
+    ]
+  }
+}

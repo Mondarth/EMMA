@@ -18,17 +18,21 @@ describe('manifestFor', () => {
 
   test('runs the background as a service worker on Chromium, from Chrome 102', () => {
     expect(manifestFor('chromium', '0.1.0')).toMatchObject({
-      version_name: '0.1.0 alpha',
       minimum_chrome_version: '102',
       background: { service_worker: 'background.js', type: 'module' },
     });
   });
 
-  test('runs the background as a script on Firefox, from Firefox 128, collecting no data', () => {
+  test('runs the background as a script on Firefox, from Firefox 128, declaring the data it sends', () => {
     expect(manifestFor('firefox', '0.1.0')).toMatchObject({
       background: { scripts: ['background.js'], type: 'module' },
       browser_specific_settings: {
-        gecko: { id: GECKO_ID, strict_min_version: '128.0', data_collection_permissions: { required: ['none'] } },
+        gecko: {
+          id: GECKO_ID,
+          strict_min_version: '128.0',
+          // The sign-in to EMMA's catalogue, and what is installed on the server, which it sends to find updates.
+          data_collection_permissions: { required: ['authenticationInfo', 'websiteContent'] },
+        },
       },
     });
   });

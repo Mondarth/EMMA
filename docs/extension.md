@@ -1,13 +1,13 @@
-# The browser extension (alpha)
+# The browser extension
 
 EMMA runs inside a world, but some of its work belongs outside any world: seeing every world on a Foundry VTT server at
 once, and which modules each one runs, before launching any of them. That happens on Foundry's setup screen, which
 modules cannot change. So EMMA comes with a browser extension that adds EMMA to the setup screen, on the servers you
 choose.
 
-:::{warning}
-The extension is an **alpha**, for testing: use it at your own risk, on a test installation. It is not listed in the
-Chrome Web Store or on Firefox Add-ons; you install it by hand, as described below. See [EMMA's alpha](alpha.md).
+:::{note}
+The extension is not listed in the Chrome Web Store or on Firefox Add-ons yet: you install it by hand, as described
+below. See [Help and feedback](help.md) for where to ask questions and report problems.
 :::
 
 ## Requirements
@@ -19,7 +19,8 @@ Chrome Web Store or on Firefox Add-ons; you install it by hand, as described bel
 
 ## Installing
 
-Each alpha is published as a pre-release on GitHub, named **EMMA browser extension &lt;version&gt; (alpha)**. Find the
+Each version is published on GitHub, named **EMMA browser extension &lt;version&gt;**, marked as a pre-release so that
+the module's releases stay GitHub's latest (see the developers' notes on releases). Find the
 newest on the [EMMA releases page](https://github.com/Mondarth/EMMA/releases?q=extension&expanded=true).
 
 ### Chrome, Edge and other Chromium browsers
@@ -30,7 +31,7 @@ newest on the [EMMA releases page](https://github.com/Mondarth/EMMA/releases?q=e
 3. Open the extensions page: `chrome://extensions` in Chrome, `edge://extensions` in Edge.
 4. Turn on **Developer mode**.
 5. Choose **Load unpacked** and select the folder.
-6. Pin **EMMA for Foundry VTT (alpha)** to the toolbar, from the extensions (puzzle piece) menu, so its button is at
+6. Pin **EMMA for Foundry VTT** to the toolbar, from the extensions (puzzle piece) menu, so its button is at
    hand.
 
 Some browsers remind you at start-up that an extension in developer mode is installed. That is expected of an extension
@@ -41,16 +42,13 @@ the extensions page.
 
 ### Firefox
 
-1. Download `emma-extension-firefox-v<version>.xpi` from the release.
-2. Open the file in Firefox: drag it onto a Firefox window, or choose it from **File → Open File**.
-3. Choose **Add** when Firefox asks.
+From version 0.16.0, EMMA for Foundry VTT is listed on Firefox Add-ons (addons.mozilla.org), once Mozilla has reviewed
+it: install it from there, with **Add to Firefox**, and Firefox keeps it up to date.
 
-The file is signed by Mozilla, so Firefox keeps the extension installed, but it is not listed on Firefox Add-ons. To
-update, install the newer `.xpi` the same way.
-
-If a release has only `emma-extension-firefox-v<version>-unsigned.zip`, Firefox can load it only until it restarts:
-unzip it, open `about:debugging#/runtime/this-firefox`, choose **Load Temporary Add-on…** and select the
-`manifest.json` inside.
+A release's `emma-extension-firefox-v<version>.zip` is the build as submitted for review, unsigned, so Firefox can load
+it only until it restarts: unzip it, open `about:debugging#/runtime/this-firefox`, choose **Load Temporary Add-on…**
+and select the `manifest.json` inside. Versions before 0.16.0 were released signed, as `.xpi` files, for installing by
+hand.
 
 ## Activating EMMA on a server
 
@@ -88,7 +86,8 @@ screen (the installation tree, the world records, notes, and the guard on Foundr
    options page shows a code.
 3. On the catalogue's page, sign in if you are not already, check that it shows the same code, and choose **Approve**.
 
-The options page then says whom it is signed in as, and until when you are subscribed. If EMMA's footer on the setup
+The options page then says whom it is signed in as, by the nickname you set on your profile, if any, then the name
+the accounts gave you (**Signed in as Ulenar (amber-fox-oak-01).**), and until when you are subscribed. If EMMA's footer on the setup
 screen asks you to sign in, its **Sign in to EMMA's catalogue** button opens the options page. If your subscription
 has ended, the footer says when, with a link to renew it.
 
@@ -102,9 +101,7 @@ A sign-in lasts 30 days, renewed while it is used.
 With EMMA open, the setup screen changes in two ways.
 
 **EMMA's button** joins the menu at the top of the screen, beside Foundry's own. It opens EMMA's window, whose title
-gives EMMA's version, such as **EMMA - installation (0.1.1)**. While EMMA is an alpha, the window's footer warns of it,
-with a link to [EMMA's alpha](alpha.md), and asks once for each new version that you acknowledge it with **I
-understand**: until you do, the plan cannot be run.
+gives EMMA's version, such as **EMMA - installation (0.16.0)**: say which one you ran when you ask for help.
 
 **While the window opens**, each time it does, a large spinner and **Analyzing** sit in its middle, until EMMA has read
 the installation and looked for updates; reading it again while the window is open shows only the **Read again** button
@@ -130,6 +127,13 @@ while EMMA checks which versions work with what is chosen, which can take a seco
 
 EMMA's window shows the installation as a tree, and beside it what is selected in it. The tree has three branches, in
 the order Foundry's Setup screen gives them: the worlds, the game systems, and the modules:
+
+:::{figure} _static/screenshots/screenshot-1-installation-tree.png
+:alt: EMMA's window: the installation tree, with its worlds, game system and modules, and a module's panel giving its update
+:width: 100%
+
+The installation tree, and a module's panel: its update, what it requires, and the worlds it is active in.
+:::
 
 ```text
 Foundry VTT
@@ -229,12 +233,16 @@ chosen, which EMMA explains. Versions one after another for one reason share a l
 expected at its newest version, so in the plan, one taken at another stands out in amber, with a warning sign: its
 tooltip names the newest version, and selecting the package says why.
 
-Looking for updates needs the EMMA module installed, as the extension uses the module's own code to work them out.
-Without it, the footer says so and offers **Install the EMMA module**, which installs it from its published manifest,
-through Foundry, even while EMMA guards Foundry's own Install buttons; Foundry then asks whether to install the
-module's dependencies, such as libWrapper. An EMMA module too old for the extension is offered **Update the EMMA
-module** in the same way. An EMMA module newer than the extension knows of needs a newer extension: the footer links to
-its releases. Everything else EMMA shows works without the module.
+:::{figure} _static/screenshots/screenshot-2-version-choice.png
+:alt: A module's panel, at the version chosen, saying why the plan takes it rather than its newest
+:width: 100%
+
+A version chosen below the newest, and why: the newest needs a newer Foundry VTT.
+:::
+
+The extension works out updates with its own code, built in: it needs no code from the server, and the EMMA module
+need not be installed for it. The module still records, in each world it is active in, what that world runs (see
+[worlds without a record](#worlds-without-a-record)).
 
 EMMA offers a package only versions that are safe for every world that uses it, as Foundry installs one version of a
 package for all of them:
@@ -338,6 +346,13 @@ Each has a note, which Foundry keeps with it, written for it at first and free t
 space it needs and the space free, as Foundry's own dialog does, and says when there is too little; Foundry does not
 say what a world's backup needs, so its row gives the space free alone. What is checked is made before anything changes.
 
+:::{figure} _static/screenshots/screenshot-3-update-plan.png
+:alt: The update plan: a snapshot and world backups to keep first, then the changes
+:width: 100%
+
+The update plan: what to keep first, with the space it needs, then the changes.
+:::
+
 **Run plan** scrolls the plan to its top, where it lists the steps and asks to confirm them, then runs them, scrolling
 back to the top so that the steps are in view:
 
@@ -349,6 +364,13 @@ back to the top so that the steps are in view:
    already has what each change needs. What you added against EMMA's advice is installed once the rest are over;
 3. each package to uninstall, last, one at a time, once the changes of the packages that needed it are done (see
    [Uninstalling](#uninstalling)).
+
+:::{figure} _static/screenshots/screenshot-4-before-running.png
+:alt: The update plan asking to confirm its steps, listed in order, before it runs them
+:width: 100%
+
+Before it runs, the plan lists its steps, in order, and asks to confirm them.
+:::
 
 Each step shows its own progress in the plan. Foundry's own progress bars, at the top of its package tabs, are hidden
 while EMMA makes a snapshot, a backup, an install or an uninstall, and come back as each is done, so that a step's
@@ -460,6 +482,13 @@ own, whose newest version runs on the plan's Foundry VTT build, and, for a modul
 installed, or for any. A game system's group of modules offers those for it, and the universal group those for any
 system. A search finds a package by its title, ID or author. The list shows enough packages to fill the panel, and
 more as it is scrolled down.
+
+:::{figure} _static/screenshots/screenshot-5-install.png
+:alt: The Install section of the Modules group: the manifest URL field, filters, tags, and a module's details open
+:width: 100%
+
+The Install section, with a module's details from Foundry's listing.
+:::
 
 Two filters narrow it, each kept for the session, apart for game systems and for modules:
 
@@ -654,11 +683,9 @@ install from, goes to the catalogue too, which reads it. Each request to the cat
 says it is you, and the extension's version; the catalogue keeps what its privacy page says it does. EMMA asks nothing else, and sends nothing about your worlds, your server
 or you.
 
-## Limitations of the alpha
+## Limitations
 
-- It is tested on few installations: a plan may fail part-way, or do what you did not expect. Back up your worlds
-  before running one.
-- Each new version must be acknowledged as an alpha before EMMA runs a plan (see [EMMA's alpha](alpha.md)).
+- A plan may fail part-way, as Foundry may refuse an install EMMA could not foresee. Back up your worlds before running
+  one.
 - EMMA disables Foundry's package buttons only in a browser where the extension is installed and has opened EMMA. It
   cannot stop installs from other browsers.
-- Finding updates needs the EMMA module installed (see [Updates](#updates)).

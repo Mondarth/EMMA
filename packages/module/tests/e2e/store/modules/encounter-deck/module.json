@@ -1,0 +1,23 @@
+{
+  "id": "encounter-deck",
+  "title": "Encounter Deck",
+  "description": "Draw random encounters by terrain, level and time of day.",
+  "version": "0.9.4",
+  "compatibility": {
+    "minimum": "14",
+    "verified": "14"
+  },
+  "authors": [
+    {
+      "name": "Copperpot Guild"
+    }
+  ],
+  "relationships": {
+    "systems": [
+      {
+        "id": "dnd5e",
+        "type": "system"
+      }
+    ]
+  }
+}

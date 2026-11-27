@@ -19,7 +19,7 @@ export class EmmaSetupApp extends foundry.applications.api.ApplicationV2 {
   static override DEFAULT_OPTIONS = {
     id: APP_ID,
     classes: [APP_ID],
-    // The version says which EMMA is running, as an alpha changes often.
+    // The version says which EMMA is running, for anyone asking for help with it.
     window: {
       title: `${localize('App.Title')} (${__EMMA_EXTENSION_VERSION__})`,
       icon: 'fa-solid fa-cubes',

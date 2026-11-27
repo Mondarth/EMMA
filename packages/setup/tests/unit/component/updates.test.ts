@@ -8,22 +8,11 @@ import SetupRoot from '../../../src/component/SetupRoot.svelte';
 import { LAYOUT_KEY } from '../../../src/foundry/preferences';
 import { MODULES, SYSTEMS } from '../../../src/lib/tree';
 import type { CoreTarget, CoreUpdateState, ListedPackage } from '../../../src/foundry/setup-game';
-import type { KitProblem } from '../../../src/foundry/setup-kit';
-import { EXTENSION_RELEASES, KitUnavailable } from '../../../src/foundry/setup-kit';
 import { buildOverview } from '../../../src/lib/overview';
 import type { RunStep } from '../../../src/lib/run';
 import type { BlockedUpdate, PackageUpdate, UpdateSearch, VersionJudge } from '../../../src/lib/updates';
 import { createPlanner } from '../../../src/lib/plans';
-import {
-  alone,
-  installation,
-  installedModule,
-  noInstall,
-  record,
-  recorded,
-  release,
-  unjudged,
-} from '../../mocks/fixtures';
+import { alone, installation, installedModule, record, recorded, release, unjudged } from '../../mocks/fixtures';
 import { KIT } from '../../mocks/kit';
 
 const OVERVIEW = buildOverview(
@@ -80,7 +69,6 @@ async function setUp(find: () => Promise<UpdateSearch> = findingBlocked()) {
     guardOn: true,
     onGuardChange: vi.fn(),
     findUpdates: find,
-    installModule: noInstall,
   });
   await setup.refresh();
   render(SetupRoot, { setup });
@@ -700,83 +688,11 @@ describe('updates in the window', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: () => new Promise(() => undefined),
-      installModule: noInstall,
     });
     await setup.refresh();
     render(SetupRoot, { setup });
 
     expect(screen.getByRole('status')).toHaveTextContent('Looking for updates…');
-  });
-});
-
-describe('without an EMMA module whose setup kit fits', () => {
-  /**
-   * Render EMMA's window content, with the search for updates unable to be made.
-   * @param problem - Why
-   * @param installModule - The install of the EMMA module
-   * @returns The state and a user to act with
-   */
-  async function unavailable(problem: KitProblem, installModule: () => Promise<void> = noInstall) {
-    const setup = new SetupState({
-      load: () => Promise.resolve(OVERVIEW),
-      guardOn: true,
-      onGuardChange: vi.fn(),
-      findUpdates: () => Promise.reject(new KitUnavailable(problem)),
-      installModule,
-    });
-    await setup.refresh();
-    render(SetupRoot, { setup });
-    await vi.waitFor(() => {
-      expect(setup.updates.status).toBe('unavailable');
-    });
-    return { setup, user: userEvent.setup() };
-  }
-
-  test('offers to install the module, which it does, and then searches again', async () => {
-    let finish = (): void => undefined;
-    const installModule = vi.fn(
-      () =>
-        new Promise<void>(resolve => {
-          finish = resolve;
-        }),
-    );
-    const { user } = await unavailable({ reason: 'missing' }, installModule);
-    expect(screen.getByRole('status')).toHaveTextContent('Finding updates needs the EMMA module installed.');
-    expect(screen.queryByRole('button', { name: /^Version of/ })).toBeNull();
-    // The tree works without it.
-    expect(screen.getByRole('tree')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Install the EMMA module' }));
-
-    expect(installModule).toHaveBeenCalledOnce();
-    expect(screen.getByRole('status')).toHaveTextContent('Installing the EMMA module…');
-    expect(screen.getByRole('button', { name: 'Install the EMMA module' })).toBeDisabled();
-    finish();
-    await vi.waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Install the EMMA module' })).toBeEnabled();
-    });
-  });
-
-  test('offers to update a module too old', async () => {
-    const installModule = vi.fn(noInstall);
-    const { user } = await unavailable({ reason: 'module-too-old', version: '0.9.0' }, installModule);
-
-    expect(screen.getByRole('status')).toHaveTextContent('Finding updates needs a newer EMMA module than 0.9.0.');
-    await user.click(screen.getByRole('button', { name: 'Update the EMMA module' }));
-    expect(installModule).toHaveBeenCalledOnce();
-  });
-
-  test('points to the newest browser extension when the module is newer than it', async () => {
-    await unavailable({ reason: 'extension-too-old', version: '2.0.0' });
-
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'EMMA module 2.0.0 needs a newer browser extension to find updates.',
-    );
-    expect(screen.getByRole('link', { name: 'Get the newest browser extension' })).toHaveAttribute(
-      'href',
-      EXTENSION_RELEASES,
-    );
-    expect(screen.queryByRole('button', { name: /EMMA module/ })).not.toBeInTheDocument();
   });
 });
 
@@ -913,7 +829,6 @@ describe('installing anew', () => {
           judge,
           planner,
         }),
-      installModule: noInstall,
       runStep: () => Promise.resolve(),
       listPackages,
     });
@@ -991,7 +906,6 @@ describe('installing anew, by group', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates,
-      installModule: noInstall,
       runStep: () => Promise.resolve(),
       listPackages,
     });
@@ -1598,7 +1512,6 @@ describe('uninstalling', () => {
           // Spare has no update on offer, but the planner knows it is installed.
           planner: alone(...UPDATES, spare),
         }),
-      installModule: noInstall,
       runStep,
     });
     await setup.refresh();
@@ -1698,7 +1611,6 @@ describe("the plan's snapshot and backups", () => {
           judge,
           planner: alone(...UPDATES, core),
         }),
-      installModule: noInstall,
       ...(snapshotSpace !== undefined && { snapshotSpace }),
       ...(runStep !== undefined && { runStep }),
       ...more,
@@ -2111,7 +2023,6 @@ describe('the changes a change is needed through', () => {
           judge,
           planner,
         }),
-      installModule: noInstall,
     });
     await setup.refresh();
     render(SetupRoot, { setup });
@@ -2159,7 +2070,6 @@ describe('taking changes out of the plan', () => {
           judge,
           planner,
         }),
-      installModule: noInstall,
     });
     await setup.refresh();
     render(SetupRoot, { setup });
@@ -2226,7 +2136,6 @@ describe('locking a package', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: findingBlocked(),
-      installModule: noInstall,
       lockPackage,
     });
     await setup.refresh();
@@ -2273,7 +2182,6 @@ describe('notes on what is held', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: findingBlocked(),
-      installModule: noInstall,
       lockPackage: (_type, _id, lock) => {
         locked = lock;
         return Promise.resolve();
@@ -2332,7 +2240,6 @@ describe('locking Foundry VTT in EMMA', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: findingBlocked(),
-      installModule: noInstall,
       lockCore,
     });
     await setup.refresh();
@@ -2364,7 +2271,6 @@ describe('planning the best versions', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: findingBlocked(),
-      installModule: noInstall,
     });
     await setup.refresh();
     render(SetupRoot, { setup });
@@ -2418,7 +2324,6 @@ describe('planning the best versions', () => {
           judge,
           planner: alone(...UPDATES, dice),
         }),
-      installModule: noInstall,
     });
     await setup.refresh();
     render(SetupRoot, { setup });
@@ -2453,7 +2358,6 @@ describe('planning the best versions', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: findingBlocked(),
-      installModule: noInstall,
     });
     await setup.refresh();
     render(SetupRoot, { setup });
@@ -2497,7 +2401,6 @@ describe('planning the best versions', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: findingBlocked(),
-      installModule: noInstall,
       onBestInUseOnlyChange,
     });
     await setup.refresh();
@@ -2522,7 +2425,6 @@ describe('planning the best versions', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: findingBlocked(),
-      installModule: noInstall,
       bestInUseOnly: true,
     });
     expect(kept.bestInUseOnly).toBe(true);
@@ -2571,7 +2473,6 @@ describe('what a module recommends', () => {
           judge,
           planner,
         }),
-      installModule: noInstall,
     });
     await setup.refresh();
     render(SetupRoot, { setup });
@@ -2657,7 +2558,6 @@ describe('what a module recommends, installed or not to be had', () => {
           judge,
           planner,
         }),
-      installModule: noInstall,
     });
     await setup.refresh();
     render(SetupRoot, { setup });
@@ -2701,7 +2601,6 @@ describe('pins in the window', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: findingBlocked(),
-      installModule: noInstall,
       pins: { initial: {}, keep: vi.fn() },
       notes: { read: () => ({}), write: vi.fn() },
     });
@@ -2735,7 +2634,6 @@ describe('pins in the window', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: findingBlocked(),
-      installModule: noInstall,
       pins: { initial: {}, keep },
     });
     await setup.refresh();
@@ -2796,7 +2694,6 @@ describe('pins in the window', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: findingBlocked(),
-      installModule: noInstall,
       lockPackage: () => Promise.resolve(),
     });
     await setup.refresh();
@@ -2823,7 +2720,6 @@ describe('pins in the window', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: findingBlocked(),
-      installModule: noInstall,
       pins: { initial: { 'module:lib': '9.0.0' }, keep: vi.fn() },
     });
     await setup.refresh();

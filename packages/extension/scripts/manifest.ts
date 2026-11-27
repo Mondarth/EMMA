@@ -30,7 +30,6 @@ export function manifestFor(target: Target, version: string): Record<string, unk
     optional_host_permissions: ['http://*/*', 'https://*/*'],
     ...(target === 'chromium'
       ? {
-          version_name: `${version} alpha`,
           // Running a registered script in the page itself (`world: "MAIN"`) needs Chrome 102.
           minimum_chrome_version: '102',
           background: { service_worker: 'background.js', type: 'module' },
@@ -42,8 +41,10 @@ export function manifestFor(target: Target, version: string): Record<string, unk
               id: GECKO_ID,
               // Running a script in the page itself (`world: "MAIN"`) needs Firefox 128.
               strict_min_version: '128.0',
-              // The extension sends nothing anywhere.
-              data_collection_permissions: { required: ['none'] },
+              // What leaves the user's device, as Firefox shows it at install, and AMO's review holds it to: the sign-in to
+              // EMMA's catalogue, sent with each request to it, and what is installed on the user's Foundry VTT server,
+              // read from its setup screen, sent to the catalogue to find updates (see store/amo.md).
+              data_collection_permissions: { required: ['authenticationInfo', 'websiteContent'] },
             },
           },
         }),

@@ -168,11 +168,3 @@ export function alone(...updates: readonly PackageUpdate[]): Planner {
 export function unjudged(_key: PackageKey, version: string): VersionOption {
   return { version, badge: null };
 }
-
-/**
- * An install of the EMMA module that does nothing.
- * @returns Once done
- */
-export function noInstall(): Promise<void> {
-  return Promise.resolve();
-}

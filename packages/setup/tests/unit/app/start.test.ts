@@ -1,5 +1,4 @@
 import { screen } from '@testing-library/svelte';
-import { EMMA_VERSION } from '../../../src/lib/alpha';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
@@ -10,18 +9,12 @@ import { startEmmaSetup, waitForSetup } from '../../../src/app/start';
 import { GUARDED_CLASS } from '../../../src/foundry/guard';
 import { GUARD_KEY, readOwnedKept, writeOwnedKept } from '../../../src/foundry/preferences';
 import { AccountRequired, builtCatalogue, requireAccount } from '../../../src/foundry/catalogue-relay';
-import { SETUP_KIT_API } from '@mondarth/emma-core/setup-kit';
 
 import type * as CatalogueRelay from '../../../src/foundry/catalogue-relay';
-import type * as SetupKitModule from '../../../src/foundry/setup-kit';
 import { installSetupMocks } from '../../mocks/foundry';
-import { KIT } from '../../mocks/kit';
 
-// The browser imports the kit from the server, which the tests have none of.
-vi.mock('../../../src/foundry/setup-kit', async importOriginal => ({
-  ...(await importOriginal<typeof SetupKitModule>()),
-  loadKit: vi.fn(() => Promise.resolve(KIT)),
-}));
+// The extension's own kit badges versions with Foundry's client, which the tests have none of: a stand-in does.
+vi.mock('../../../src/foundry/kit', async () => ({ KIT: (await import('../../mocks/kit')).KIT }));
 
 // Tests are built without EMMA's catalogue; one may give it, asked through the test's own `fetch` in place of the
 // extension, its user signed in (see catalogue-relay.test.ts for the relay itself).
@@ -132,10 +125,8 @@ describe('startEmmaSetup', () => {
     await expect(startEmmaSetup()).resolves.toBe(true);
   });
 
-  test('finds updates with the kit of the installed EMMA module, saying so when it has no catalogue to ask', async () => {
-    installSetupMocks({
-      modules: [{ id: 'mondarth-emma', flags: { setupKit: { api: SETUP_KIT_API, path: 'dist/emma-setup-kit.js' } } }],
-    });
+  test('finds updates with its own kit, without the EMMA module installed, saying so when it has no catalogue to ask', async () => {
+    installSetupMocks();
     const menu = showMenu();
     await startEmmaSetup();
 
@@ -146,9 +137,7 @@ describe('startEmmaSetup', () => {
   });
 
   test('asks the user to sign in to the catalogue, from the extension, before finding updates', async () => {
-    installSetupMocks({
-      modules: [{ id: 'mondarth-emma', flags: { setupKit: { api: SETUP_KIT_API, path: 'dist/emma-setup-kit.js' } } }],
-    });
+    installSetupMocks();
     vi.mocked(builtCatalogue).mockReturnValue('https://catalogue.example.test/');
     vi.mocked(requireAccount).mockRejectedValue(new AccountRequired({ reason: 'signed-out' }));
     const posted = vi.spyOn(window, 'postMessage');
@@ -172,9 +161,7 @@ describe('startEmmaSetup', () => {
     ['2026-10-01T00:00:00.000Z', /^Your EMMA subscription ended on /],
     [null, /^Finding updates needs an EMMA subscription/],
   ])('asks the user to renew a subscription that ended (%s), linking to it', async (paidUntil, said) => {
-    installSetupMocks({
-      modules: [{ id: 'mondarth-emma', flags: { setupKit: { api: SETUP_KIT_API, path: 'dist/emma-setup-kit.js' } } }],
-    });
+    installSetupMocks();
     vi.mocked(builtCatalogue).mockReturnValue('https://catalogue.example.test/');
     vi.mocked(requireAccount).mockRejectedValue(
       new AccountRequired({ reason: 'lapsed', paidUntil, renew: 'https://catalogue.example.test/subscription' }),
@@ -194,9 +181,7 @@ describe('startEmmaSetup', () => {
   });
 
   test("reads Foundry's listing of what may be installed from the catalogue, and what the user owns from Foundry", async () => {
-    const { game } = installSetupMocks({
-      modules: [{ id: 'mondarth-emma', flags: { setupKit: { api: SETUP_KIT_API, path: 'dist/emma-setup-kit.js' } } }],
-    });
+    const { game } = installSetupMocks();
     vi.mocked(builtCatalogue).mockReturnValue('https://catalogue.example.test/');
     const listed = {
       package: { type: 'module', id: 'dice' },
@@ -233,9 +218,7 @@ describe('startEmmaSetup', () => {
   });
 
   test('takes what the user owns as kept, without asking Foundry', async () => {
-    const { game } = installSetupMocks({
-      modules: [{ id: 'mondarth-emma', flags: { setupKit: { api: SETUP_KIT_API, path: 'dist/emma-setup-kit.js' } } }],
-    });
+    const { game } = installSetupMocks();
     vi.mocked(builtCatalogue).mockReturnValue('https://catalogue.example.test/');
     const versions = [{ version: '1.0.0', minimum: null, maximum: null, verified: null, manifest: null, notes: null }];
     const listed = { package: { type: 'module', id: 'dice' }, title: 'Dice', summary: null, author: null, url: null };
@@ -260,9 +243,7 @@ describe('startEmmaSetup', () => {
   });
 
   test('offers no listing to install from where Foundry cannot say what the user owns, and keeps nothing', async () => {
-    const { game } = installSetupMocks({
-      modules: [{ id: 'mondarth-emma', flags: { setupKit: { api: SETUP_KIT_API, path: 'dist/emma-setup-kit.js' } } }],
-    });
+    const { game } = installSetupMocks();
     vi.mocked(builtCatalogue).mockReturnValue('https://catalogue.example.test/');
     const listed = {
       package: { type: 'module', id: 'paid' },
@@ -328,14 +309,6 @@ describe('startEmmaSetup', () => {
       },
     ];
 
-    // Not until the user acknowledges this version is an alpha, which is kept for it.
-    expect(setup.isAlpha).toBe(true);
-    expect(setup.alphaAcknowledged).toBe(false);
-    await setup.runPlan();
-    expect(setup.run).toBeNull();
-    setup.acknowledgeAlpha();
-    expect(localStorage.getItem('mondarth-emma.setup.alpha-acknowledged')).toBe(EMMA_VERSION);
-
     await setup.runPlan();
 
     expect(setup.run).toMatchObject({ over: true, states: { 'module:app': 'done' } });
@@ -386,22 +359,5 @@ describe('startEmmaSetup', () => {
       { notify: false },
     );
     expect([...game.modules].find(pkg => (pkg as { id: string }).id === 'midi-qol')).toMatchObject({ locked: true });
-  });
-
-  test('installs the EMMA module from its prompt, through the guard', async () => {
-    const { game, post, ui } = installSetupMocks();
-    const installPackage = vi.fn(() => game.post({ action: 'installPackage', id: 'mondarth-emma' }));
-    Object.assign(game, { installPackage });
-    const menu = showMenu();
-    await startEmmaSetup();
-    menu.querySelector('button')?.click();
-
-    await userEvent.setup().click(await screen.findByRole('button', { name: 'Install the EMMA module' }));
-
-    await vi.waitFor(() => {
-      expect(installPackage).toHaveBeenCalledOnce();
-    });
-    expect(post).toHaveBeenCalledOnce();
-    expect(ui.notifications.info).not.toHaveBeenCalled();
   });
 });

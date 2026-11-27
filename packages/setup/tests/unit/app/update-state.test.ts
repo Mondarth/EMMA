@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { UpdateState, versionIn } from '../../../src/app/update-state.svelte';
-import { KitUnavailable } from '../../../src/foundry/setup-kit';
+import { AccountRequired } from '../../../src/foundry/catalogue-relay';
 import { buildOverview } from '../../../src/lib/overview';
 import type { CatalogueState, ManifestRead, PackageUpdate, UpdateSearch } from '../../../src/lib/updates';
 import type { PlanEntry, Planner } from '../../../src/lib/plans';
@@ -618,9 +618,7 @@ describe('UpdateState', () => {
   test('says why a search cannot be made, dropping what was found and chosen, until one can again', async () => {
     let unavailable = false;
     const updates = new UpdateState(() =>
-      unavailable
-        ? Promise.reject(new KitUnavailable({ reason: 'module-too-old', version: '0.9.0' }))
-        : Promise.resolve(finding(APP)),
+      unavailable ? Promise.reject(new AccountRequired({ reason: 'signed-out' })) : Promise.resolve(finding(APP)),
     );
     await updates.searchFor(OVERVIEW);
     await updates.choose('module:app', '2.0.0');
@@ -629,7 +627,7 @@ describe('UpdateState', () => {
     await updates.searchFor(OVERVIEW);
 
     expect(updates.status).toBe('unavailable');
-    expect(updates.problem).toEqual({ reason: 'module-too-old', version: '0.9.0' });
+    expect(updates.problem).toEqual({ reason: 'signed-out' });
     expect(updates.search).toBeNull();
     expect(updates.choices).toEqual([]);
 
@@ -650,7 +648,7 @@ describe('UpdateState', () => {
 
     const earlier = updates.searchFor(OVERVIEW);
     await updates.searchFor(OVERVIEW);
-    refuse(new KitUnavailable({ reason: 'missing' }));
+    refuse(new AccountRequired({ reason: 'signed-out' }));
     await earlier;
 
     expect(updates.status).toBe('found');

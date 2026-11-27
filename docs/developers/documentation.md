@@ -19,6 +19,16 @@ This builds the image if necessary and writes the HTML to `docs/_build/html`. It
 docker compose run --rm --user "$(id -u):$(id -g)" docs make html
 ```
 
+The guide to the browser extension shows its store screenshots, which are not kept in the repository: each release of
+the extension takes them, and attaches them to its GitHub release (see {doc}`releases`). The documentation's own build
+fetches the newest; to see them in a local build, fetch them first, with the GitHub CLI signed in:
+
+```sh
+scripts/docs/fetch-screenshots.sh
+```
+
+Without them, the build warns of each picture it cannot find, and goes on.
+
 ## Live preview
 
 ```sh

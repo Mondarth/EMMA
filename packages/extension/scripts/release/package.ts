@@ -5,11 +5,12 @@
  * from, build it for each browser with EMMA's catalogue, which it refuses to release without, check the
  * Firefox build and that its key is not in either build in plain text, and package both builds into `releases/`:
  *
- * - the Chromium build, zipped, for loading unpacked;
- * - the Firefox build, signed by Mozilla as an unlisted add-on when `AMO_JWT_ISSUER` and `AMO_JWT_SECRET` hold an API
- *   key from addons.mozilla.org, or else zipped unsigned, which Firefox installs only until it restarts. A release run
- *   again for a version AMO holds already, or whose wait for the signature broke off, takes the add-on AMO signed
- *   then, once shown to be this build (see `scripts/amo.ts`).
+ * - the Chromium build, zipped, for the Chrome Web Store, or for loading unpacked;
+ * - the Firefox build, zipped, which, when `AMO_JWT_ISSUER` and `AMO_JWT_SECRET` hold an API key from
+ *   addons.mozilla.org, is submitted there as a listed version, for Mozilla's review, with the listing
+ *   `store/amo-metadata.json` gives and the source it is built from (see `scripts/amo.ts`). The release does not wait
+ *   for the review: Mozilla signs it once it approves it. A submission that fails is an error the release reports, but
+ *   the release goes on, so that it can be submitted by hand.
  *
  * Run by semantic-release (see `release.config.js`) as `node packages/extension/scripts/release/package.ts <version>`.
  */
@@ -18,13 +19,11 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import os from 'node:os';
-
 import { filesHolding } from '@mondarth/emma-core/files-holding';
 import { EXTENSION_RELEASE_DEFAULTS, requireReleaseDefaults } from '@mondarth/emma-core/release-defaults';
 
-import { differences, downloadAmoFile, signedAmoFile } from '../amo.ts';
-import type { AmoKey } from '../amo.ts';
+import { submitListed } from '../amo.ts';
+import type { AmoKey, AmoListing } from '../amo.ts';
 import { GECKO_ID } from '../manifest.ts';
 
 /** The extension's package, `packages/extension`. */
@@ -74,76 +73,44 @@ function zip(folder: string, archive: string): void {
 }
 
 /**
- * Have Mozilla sign the Firefox build as an unlisted add-on.
- * @param archive - Where to put the signed add-on
- * @param version - The release version
- * @param key - The API key
+ * The source the build is made from, archived for Mozilla's reviewers: the repository's files as they are now, the
+ * version stamped into `package.json` among them, which is not committed yet.
+ * @param archive - Where to put it
  */
-async function sign(archive: string, version: string, key: AmoKey): Promise<void> {
-  const artifacts = path.join(RELEASES, 'web-ext-artifacts');
-  try {
-    // web-ext takes the key from its environment, which keeps it out of the command line.
-    execFileSync(
-      'pnpm',
-      [
-        'exec',
-        'web-ext',
-        'sign',
-        '--channel',
-        'unlisted',
-        '--source-dir',
-        'dist/firefox',
-        '--artifacts-dir',
-        artifacts,
-      ],
-      {
-        cwd: ROOT,
-        stdio: 'inherit',
-        env: { ...process.env, WEB_EXT_API_KEY: key.issuer, WEB_EXT_API_SECRET: key.secret },
-      },
-    );
-  } catch (error) {
-    await signedBefore(archive, version, key, error);
-    return;
-  }
-  const signed = fs.readdirSync(artifacts).filter(file => file.endsWith('.xpi'));
-  if (signed.length !== 1 || signed[0] === undefined) {
-    throw new Error(`Expected one signed add-on in ${artifacts}, found: ${signed.join(', ') || 'none'}`);
-  }
-  fs.renameSync(path.join(artifacts, signed[0]), archive);
-  fs.rmSync(artifacts, { recursive: true, force: true });
+function archiveSource(archive: string): void {
+  const repository = path.resolve(ROOT, '../..');
+  // A commit of the working tree's changes, without touching it; none if nothing has changed.
+  const stashed = execFileSync('git', ['stash', 'create'], { cwd: repository, encoding: 'utf8' }).trim();
+  execFileSync('git', ['archive', '--format=zip', '-o', archive, stashed || 'HEAD'], {
+    cwd: repository,
+    stdio: 'inherit',
+  });
 }
 
 /**
- * Take the add-on AMO signed for this version before, when signing it now failed: as a release run again for it is
- * refused, AMO never taking a version twice, or a release whose wait for the signature broke off. It is taken only if
- * its files are this build's.
- * @param archive - Where to put the signed add-on
+ * Submit the Firefox build to addons.mozilla.org as a listed version, for Mozilla's review. A failure is reported as
+ * the release's error, and the release goes on.
+ * @param firefox - The Firefox build, zipped
  * @param version - The release version
  * @param key - The API key
- * @param failure - Why signing it now failed, thrown again if AMO does not hold the version
- * @throws {Error} The failure, if AMO does not hold the version; or why the add-on it holds cannot be taken
  */
-async function signedBefore(archive: string, version: string, key: AmoKey, failure: unknown): Promise<void> {
-  const options = { key, send: globalThis.fetch };
-  const file = await signedAmoFile(GECKO_ID, version, options);
-  if (file === undefined) throw failure;
-  console.warn(`AMO holds ${version} already: taking the add-on it signed, if it is this build`);
-  const unpacked = fs.mkdtempSync(path.join(os.tmpdir(), 'emma-amo-'));
+async function submit(firefox: string, version: string, key: AmoKey): Promise<void> {
+  const source = path.join(RELEASES, `emma-source-v${version}.zip`);
   try {
-    const xpi = path.join(unpacked, 'signed.xpi');
-    fs.writeFileSync(xpi, await downloadAmoFile(file, options));
-    const files = path.join(unpacked, 'files');
-    execFileSync('unzip', ['-q', xpi, '-d', files], { stdio: 'inherit' });
-    const differ = differences(path.join(DIST, 'firefox'), files);
-    if (differ.length > 0) {
-      throw new Error(
-        `AMO holds ${version} from another build, which cannot be taken; release another version.\n${differ.join('\n')}`,
-      );
-    }
-    fs.copyFileSync(xpi, archive);
+    archiveSource(source);
+    const listing = JSON.parse(fs.readFileSync(path.join(ROOT, 'store', 'amo-metadata.json'), 'utf8')) as AmoListing;
+    const files = { build: fs.readFileSync(firefox), source: fs.readFileSync(source) };
+    const result = await submitListed(GECKO_ID, version, files, listing, { key, send: globalThis.fetch });
+    console.log(
+      result === 'held'
+        ? `addons.mozilla.org holds ${version} already: nothing more is submitted`
+        : `Submitted ${version} to addons.mozilla.org, for Mozilla's review`,
+    );
+  } catch (error) {
+    // GitHub's annotation, so that the run shows it: the release goes on without it.
+    console.log(`::error title=addons.mozilla.org::${version} was not submitted: ${String(error)}`);
   } finally {
-    fs.rmSync(unpacked, { recursive: true, force: true });
+    fs.rmSync(source, { force: true });
   }
 }
 
@@ -159,18 +126,14 @@ async function createPackages(version: string): Promise<string[]> {
   const chromium = path.join(RELEASES, `emma-extension-chromium-v${version}.zip`);
   zip(path.join(DIST, 'chromium'), chromium);
 
+  const firefox = path.join(RELEASES, `emma-extension-firefox-v${version}.zip`);
+  zip(path.join(DIST, 'firefox'), firefox);
+
   const issuer = process.env.AMO_JWT_ISSUER;
   const secret = process.env.AMO_JWT_SECRET;
-  if (issuer && secret) {
-    const signed = path.join(RELEASES, `emma-extension-firefox-v${version}.xpi`);
-    await sign(signed, version, { issuer, secret });
-    return [chromium, signed];
-  }
-
-  console.warn('No AMO_JWT_ISSUER and AMO_JWT_SECRET: the Firefox build is released unsigned');
-  const unsigned = path.join(RELEASES, `emma-extension-firefox-v${version}-unsigned.zip`);
-  zip(path.join(DIST, 'firefox'), unsigned);
-  return [chromium, unsigned];
+  if (issuer && secret) await submit(firefox, version, { issuer, secret });
+  else console.warn('No AMO_JWT_ISSUER and AMO_JWT_SECRET: the Firefox build is not submitted to addons.mozilla.org');
+  return [chromium, firefox];
 }
 
 const releaseVersion = process.argv[2];

@@ -6,7 +6,8 @@
  * extension, or the workspace packages it is built from (the setup screen's code and the shared code), count towards
  * its releases (see docs/developers/releases.md).
  *
- * The extension is an alpha: each release is a GitHub pre-release, so that the latest release stays the module's.
+ * Each release is a GitHub pre-release, so that the latest release stays the module's: EMMA modules before 0.9 find
+ * their updates through `releases/latest/download/module.json`.
  */
 import path from 'node:path';
 
@@ -46,18 +47,23 @@ export default {
         '@semantic-release/github',
         {
           assets: [
-            { path: `${RELEASES}/emma-extension-chromium-v*.zip`, label: 'Chromium extension, to load unpacked' },
-            { path: `${RELEASES}/emma-extension-firefox-v*.xpi`, label: 'Firefox extension, signed by Mozilla' },
-            { path: `${RELEASES}/emma-extension-firefox-v*-unsigned.zip`, label: 'Firefox extension, unsigned' },
+            {
+              path: `${RELEASES}/emma-extension-chromium-v*.zip`,
+              label: 'Chromium extension, for the Chrome Web Store',
+            },
+            {
+              path: `${RELEASES}/emma-extension-firefox-v*.zip`,
+              label: 'Firefox extension, as submitted to addons.mozilla.org, unsigned',
+            },
           ],
-          releaseNameTemplate: 'EMMA browser extension <%= nextRelease.version %> (alpha)',
+          releaseNameTemplate: 'EMMA browser extension <%= nextRelease.version %>',
           releaseBodyTemplate:
-            'An alpha of the browser extension that brings EMMA to Foundry VTT’s setup screen, for testing only. See ' +
+            'The browser extension that brings EMMA to Foundry VTT’s setup screen. See ' +
             '[installing the browser extension](https://mondarth.github.io/EMMA/extension.html).\n\n' +
             '<%= nextRelease.notes %>',
           successComment:
             ':tada: This <%= issue.pull_request ? "pull request" : "issue" %> is included in the browser extension’s ' +
-            '[<%= nextRelease.version %> alpha](https://github.com/Mondarth/EMMA/releases/tag/<%= nextRelease.gitTag %>).',
+            '[<%= nextRelease.version %>](https://github.com/Mondarth/EMMA/releases/tag/<%= nextRelease.gitTag %>).',
           failTitle: 'The automated release of the browser extension is failing',
         },
       ]),

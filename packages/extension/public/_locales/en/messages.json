@@ -1,15 +1,12 @@
 {
   "name": {
-    "message": "EMMA for Foundry VTT (alpha)"
+    "message": "EMMA for Foundry VTT"
   },
   "description": {
     "message": "Brings EMMA, the Enhanced Module Manager Application, to Foundry VTT's setup screen, on the servers you choose."
   },
   "popupTitle": {
     "message": "EMMA for Foundry VTT"
-  },
-  "alpha": {
-    "message": "Alpha: for testing only."
   },
   "notAServer": {
     "message": "EMMA runs on a Foundry VTT server's setup screen. Open one, then click this button again."
@@ -103,6 +100,9 @@
   },
   "accountSignedInAs": {
     "message": "Signed in as $1."
+  },
+  "accountSignedInAsNickname": {
+    "message": "Signed in as $1 ($2)."
   },
   "accountEntitled": {
     "message": "You may use everything EMMA's catalogue gives."

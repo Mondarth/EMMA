@@ -120,8 +120,8 @@ jobs:
         run: pnpm run release:extension
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-          # An API key from addons.mozilla.org, to have Mozilla sign the Firefox build as an unlisted add-on. Without
-          # it, the Firefox build is released unsigned, which Firefox installs only until it restarts.
+          # An API key from addons.mozilla.org, to submit the Firefox build there as a listed version, for Mozilla's
+          # review (packages/extension/scripts/amo.ts). Without it, the Firefox build is released, but not submitted.
           AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
           AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
           # EMMA's package catalogue's URL, and Mondarth's accounts', where its user signs in, as required: the release
@@ -142,10 +142,44 @@ jobs:
       version: ${{ needs.release.outputs.module-version }}
     secrets: inherit
 
+  # A new version of the extension has its store screenshots taken, at its own tag, so that EMMA's window gives that
+  # version, and attached to its release, beside its builds, for the stores' listings. The documentation shows them.
+  screenshots:
+    name: Store screenshots
+    needs: release
+    if: ${{ needs.release.outputs.extension-version != '' }}
+    uses: ./.github/workflows/store-screenshots.yml
+    with:
+      ref: extension-v${{ needs.release.outputs.extension-version }}
+    secrets: inherit
+
+  screenshot-assets:
+    name: Attach the store screenshots
+    needs: [release, screenshots]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: store-screenshots
+          path: screenshots
+
+      - name: Attach them to the extension's release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: extension-v${{ needs.release.outputs.extension-version }}
+        run: |
+          cd screenshots
+          for file in *.png; do mv "$file" "screenshot-$file"; done
+          gh release upload "$TAG" screenshot-*.png --repo "$GITHUB_REPOSITORY" --clobber
+
+  # After the screenshots, where the extension was released, as the documentation shows the newest release's; a release
+  # of the module alone does not wait for them, nor does a failure to take them hold the documentation back.
   docs:
     name: Publish documentation
-    needs: release
-    if: ${{ needs.release.outputs.module-version != '' || needs.release.outputs.extension-version != '' }}
+    needs: [release, screenshot-assets]
+    if: ${{ !cancelled() && needs.release.result == 'success' && (needs.release.outputs.module-version != '' || needs.release.outputs.extension-version != '') }}
     permissions:
       contents: read
       pages: write

@@ -7,7 +7,7 @@ import SetupRoot from '../../../src/component/SetupRoot.svelte';
 import type { RecordState } from '../../../src/foundry/records';
 import { buildOverview } from '../../../src/lib/overview';
 import type { CatalogueState } from '../../../src/lib/updates';
-import { installation, installedModule, noInstall, noUpdates, record, recorded } from '../../mocks/fixtures';
+import { installation, installedModule, noUpdates, record, recorded } from '../../mocks/fixtures';
 
 const OVERVIEW = buildOverview(
   installation({
@@ -53,7 +53,6 @@ async function setUp({ guardOn = true } = {}) {
     guardOn,
     onGuardChange,
     findUpdates: noUpdates,
-    installModule: noInstall,
   });
   await setup.refresh();
   render(SetupRoot, { setup });
@@ -95,7 +94,6 @@ describe('SetupRoot', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: noUpdates,
-      installModule: noInstall,
     });
     render(SetupRoot, { setup });
     expect(screen.getByRole('status')).toHaveTextContent("Reading the worlds' records…");
@@ -125,7 +123,6 @@ describe('SetupRoot', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: noUpdates,
-      installModule: noInstall,
       listPackages,
       forgetOwned,
     });
@@ -349,7 +346,6 @@ describe('ignoring', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: noUpdates,
-      installModule: noInstall,
       ignore,
     });
     await setup.refresh();
@@ -411,7 +407,6 @@ describe('ignoring', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: noUpdates,
-      installModule: noInstall,
       ignore,
     });
     await setup.refresh();
@@ -451,7 +446,6 @@ describe('ignoring', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: noUpdates,
-      installModule: noInstall,
       ignore: (key: string, on: boolean) => {
         if (on) ignored.add(key);
         else ignored.delete(key);
@@ -492,89 +486,6 @@ describe('ignoring', () => {
   });
 });
 
-describe('the alpha', () => {
-  /**
-   * The window, for an alpha not acknowledged yet, with a plan to run.
-   * @returns The state, what acknowledging keeps, what runs each step, and a user to act with
-   */
-  async function alpha() {
-    const acknowledge = vi.fn();
-    const runStep = vi.fn(() => Promise.resolve());
-    const setup = new SetupState({
-      load: () => Promise.resolve(OVERVIEW),
-      guardOn: true,
-      onGuardChange: vi.fn(),
-      findUpdates: noUpdates,
-      installModule: noInstall,
-      runStep,
-      alpha: { acknowledged: false, acknowledge },
-    });
-    await setup.refresh();
-    render(SetupRoot, { setup });
-    await vi.waitFor(() => {
-      expect(setup.updates.status).not.toBe('searching');
-    });
-    setup.updates.force({
-      key: 'module:dice',
-      title: 'Dice',
-      version: '1.0.0',
-      manifest: 'https://example.org/dice.json',
-    });
-    return { setup, acknowledge, runStep, user: userEvent.setup() };
-  }
-  const notice = () => screen.getByRole('note', { name: 'Alpha build' });
-
-  test('warns in the footer, with a link to the page about it, until acknowledged there', async () => {
-    const { setup, acknowledge, user } = await alpha();
-
-    expect(notice()).toHaveTextContent(/^EMMA \S+ is an alpha build\. Use it at your own risk/);
-    expect(within(notice()).getByRole('link', { name: /About the alpha/ })).toHaveAttribute(
-      'href',
-      'https://mondarth.github.io/EMMA/alpha.html',
-    );
-
-    await user.click(within(notice()).getByRole('button', { name: 'I understand' }));
-
-    expect(acknowledge).toHaveBeenCalledOnce();
-    expect(setup.alphaAcknowledged).toBe(true);
-    // The warning stays; only the question goes.
-    expect(within(notice()).queryByRole('button', { name: 'I understand' })).toBeNull();
-  });
-
-  test('keeps the final Run disabled until acknowledged, which the confirmation asks too', async () => {
-    const { acknowledge, runStep, user } = await alpha();
-    const plan = await screen.findByRole('region', { name: 'Update plan' });
-
-    await user.click(within(plan).getByRole('button', { name: 'Run plan' }));
-    const confirm = within(plan).getByRole('alertdialog');
-    // What the user added against EMMA's advice is listed, as the run installs it.
-    expect(
-      within(confirm)
-        .getAllByRole('listitem')
-        .map(item => item.textContent),
-    ).toEqual(['install Dice 1.0.0']);
-    expect(within(confirm).getByRole('button', { name: 'Run' })).toBeDisabled();
-    expect(confirm).toHaveTextContent('Running the plan changes your installation');
-
-    await user.click(within(confirm).getByRole('button', { name: 'I understand' }));
-    expect(acknowledge).toHaveBeenCalledOnce();
-    expect(within(confirm).queryByText(/Running the plan changes your installation/)).toBeNull();
-    await user.click(within(confirm).getByRole('button', { name: 'Run' }));
-    await vi.waitFor(() => {
-      expect(runStep).toHaveBeenCalled();
-    });
-  });
-
-  test('is not warned of where EMMA is not an alpha', async () => {
-    const { setup } = await setUp();
-
-    expect(setup.isAlpha).toBe(false);
-    expect(setup.alphaAcknowledged).toBe(true);
-    expect(screen.queryByRole('note', { name: 'Alpha build' })).toBeNull();
-    setup.acknowledgeAlpha();
-  });
-});
-
 describe("the footer's word of the catalogue", () => {
   /**
    * Render EMMA's window content, its search finding nothing, with what the catalogue says of it.
@@ -588,7 +499,6 @@ describe("the footer's word of the catalogue", () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates,
-      installModule: noInstall,
     });
     await setup.refresh();
     render(SetupRoot, { setup });
@@ -655,7 +565,6 @@ describe('opening the window', () => {
             void noUpdates().then(resolve);
           };
         }),
-      installModule: noInstall,
     });
     render(SetupRoot, { setup });
     const opening = screen.getByTestId('emma-opening');
@@ -687,7 +596,6 @@ describe('opening the window', () => {
             void noUpdates().then(resolve);
           });
         }),
-      installModule: noInstall,
     });
     render(SetupRoot, { setup });
     await setup.open();
@@ -716,7 +624,6 @@ describe('opening the window', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: noUpdates,
-      installModule: noInstall,
     });
     render(SetupRoot, { setup });
     await setup.refresh();
@@ -760,7 +667,6 @@ describe('what is locked and ignored, under Plan Updates', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: noUpdates,
-      installModule: noInstall,
       lockPackage,
       lockCore,
       ignore,
