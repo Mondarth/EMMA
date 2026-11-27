@@ -18,7 +18,6 @@ describe('manifestFor', () => {
 
   test('runs the background as a service worker on Chromium, from Chrome 102', () => {
     expect(manifestFor('chromium', '0.1.0')).toMatchObject({
-      version_name: '0.1.0 alpha',
       minimum_chrome_version: '102',
       background: { service_worker: 'background.js', type: 'module' },
     });
