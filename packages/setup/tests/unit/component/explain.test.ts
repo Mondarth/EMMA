@@ -10,7 +10,7 @@ import { buildOverview } from '../../../src/lib/overview';
 import type { Planner } from '../../../src/lib/plans';
 import type { RunStep } from '../../../src/lib/run';
 import type { PackageUpdate } from '../../../src/lib/updates';
-import { alone, installation, installedModule, noInstall, unjudged } from '../../mocks/fixtures';
+import { alone, installation, installedModule, unjudged } from '../../mocks/fixtures';
 
 const OVERVIEW = buildOverview(installation({ modules: [installedModule('lib', 'Library', '1.0.0')] }), new Map());
 const LIB: PackageUpdate = { key: 'module:lib', installed: '1.0.0', newest: '2.0.0', versions: ['2.0.0', '1.0.0'] };
@@ -62,7 +62,6 @@ async function planned() {
         judge: unjudged,
         planner: planner(),
       }),
-    installModule: noInstall,
     runStep,
   });
   await setup.refresh();
@@ -157,7 +156,6 @@ describe("a game system's update", () => {
             whyNotTaken: () => Promise.resolve({ reason: 'no-build' as const, minimum: '15' }),
           },
         }),
-      installModule: noInstall,
       runStep: () => Promise.reject(new Error('The server refused it')),
     });
     await setup.refresh();
@@ -198,7 +196,6 @@ describe("Foundry VTT's line in the plan", () => {
           judge: unjudged,
           planner: alone(CORE),
         }),
-      installModule: noInstall,
     });
     await setup.refresh();
     await vi.waitFor(() => {

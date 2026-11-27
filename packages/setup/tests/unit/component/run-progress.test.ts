@@ -8,7 +8,7 @@ import { buildOverview } from '../../../src/lib/overview';
 import type { Planner } from '../../../src/lib/plans';
 import type { RunStep, StepProgress } from '../../../src/lib/run';
 import type { PackageUpdate } from '../../../src/lib/updates';
-import { alone, installation, installedModule, noInstall, unjudged } from '../../mocks/fixtures';
+import { alone, installation, installedModule, unjudged } from '../../mocks/fixtures';
 
 const OVERVIEW = buildOverview(
   installation({ modules: [installedModule('lib', 'Library', '1.0.0'), installedModule('old', 'Old', '1.0.0')] }),
@@ -88,7 +88,6 @@ async function running({
         judge: unjudged,
         planner: waiting(alone(LIB, OLD), oldNeedsLib),
       }),
-    installModule: noInstall,
     runStep,
   });
   await setup.refresh();

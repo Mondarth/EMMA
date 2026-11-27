@@ -7,7 +7,7 @@ import SetupRoot from '../../../src/component/SetupRoot.svelte';
 import type { RecordState } from '../../../src/foundry/records';
 import { buildOverview } from '../../../src/lib/overview';
 import type { CatalogueState } from '../../../src/lib/updates';
-import { installation, installedModule, noInstall, noUpdates, record, recorded } from '../../mocks/fixtures';
+import { installation, installedModule, noUpdates, record, recorded } from '../../mocks/fixtures';
 
 const OVERVIEW = buildOverview(
   installation({
@@ -53,7 +53,6 @@ async function setUp({ guardOn = true } = {}) {
     guardOn,
     onGuardChange,
     findUpdates: noUpdates,
-    installModule: noInstall,
   });
   await setup.refresh();
   render(SetupRoot, { setup });
@@ -95,7 +94,6 @@ describe('SetupRoot', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: noUpdates,
-      installModule: noInstall,
     });
     render(SetupRoot, { setup });
     expect(screen.getByRole('status')).toHaveTextContent("Reading the worlds' records…");
@@ -125,7 +123,6 @@ describe('SetupRoot', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: noUpdates,
-      installModule: noInstall,
       listPackages,
       forgetOwned,
     });
@@ -349,7 +346,6 @@ describe('ignoring', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: noUpdates,
-      installModule: noInstall,
       ignore,
     });
     await setup.refresh();
@@ -411,7 +407,6 @@ describe('ignoring', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: noUpdates,
-      installModule: noInstall,
       ignore,
     });
     await setup.refresh();
@@ -451,7 +446,6 @@ describe('ignoring', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: noUpdates,
-      installModule: noInstall,
       ignore: (key: string, on: boolean) => {
         if (on) ignored.add(key);
         else ignored.delete(key);
@@ -505,7 +499,6 @@ describe("the footer's word of the catalogue", () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates,
-      installModule: noInstall,
     });
     await setup.refresh();
     render(SetupRoot, { setup });
@@ -572,7 +565,6 @@ describe('opening the window', () => {
             void noUpdates().then(resolve);
           };
         }),
-      installModule: noInstall,
     });
     render(SetupRoot, { setup });
     const opening = screen.getByTestId('emma-opening');
@@ -604,7 +596,6 @@ describe('opening the window', () => {
             void noUpdates().then(resolve);
           });
         }),
-      installModule: noInstall,
     });
     render(SetupRoot, { setup });
     await setup.open();
@@ -633,7 +624,6 @@ describe('opening the window', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: noUpdates,
-      installModule: noInstall,
     });
     render(SetupRoot, { setup });
     await setup.refresh();
@@ -677,7 +667,6 @@ describe('what is locked and ignored, under Plan Updates', () => {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: noUpdates,
-      installModule: noInstall,
       lockPackage,
       lockCore,
       ignore,

@@ -1,7 +1,7 @@
 /**
- * A setup kit for the tests, made of the resolver the EMMA module builds its own from (see the module's
- * `src/setup-kit.ts`). Its badges stand in for Foundry's `getVersionBadge`, which needs Foundry's client: coloured by
- * the verdict as Foundry colours it, with the verdict and the setup's packages in the tooltip.
+ * A setup kit for the tests, made of the resolver the extension's own is built from (see `src/foundry/kit.ts`). Its
+ * badges stand in for Foundry's `getVersionBadge`, which needs Foundry's client: coloured by the verdict as Foundry
+ * colours it, with the verdict and the setup's packages in the tooltip.
  */
 import type { ReleaseCheck } from '@mondarth/fvtt-resolver';
 import type { KitBadge, SetupKit } from '@mondarth/emma-core/setup-kit';

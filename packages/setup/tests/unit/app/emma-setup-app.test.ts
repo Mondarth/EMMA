@@ -6,7 +6,7 @@ import { GEOMETRY_KEY } from '../../../src/foundry/preferences';
 import { EMMA_VERSION } from '../../../src/lib/version';
 import { SetupState } from '../../../src/app/setup-state.svelte';
 import { buildOverview } from '../../../src/lib/overview';
-import { installation, noInstall, noUpdates } from '../../mocks/fixtures';
+import { installation, noUpdates } from '../../mocks/fixtures';
 
 /**
  * What the window shows: an installation with nothing in it.
@@ -20,7 +20,6 @@ function setUp() {
       guardOn: true,
       onGuardChange: vi.fn(),
       findUpdates: noUpdates,
-      installModule: noInstall,
     }),
     load,
   };
