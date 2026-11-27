@@ -1,4 +1,6 @@
 import { createHmac } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 
 import { describe, expect, test, vi } from 'vitest';
 
@@ -208,5 +210,24 @@ describe('submitListed', () => {
     const send = answering(Response.json({ file: { url: 'https://addons.test/emma.xpi', status: 'unreviewed' } }));
     expect(await submitListed(GUID, '0.16.0', files, LISTING, { key: KEY, send })).toBe('held');
     expect(send).toHaveBeenCalledOnce();
+  });
+});
+
+// Regression: AMO refused 0.16.0's listing, as `homepage` gave `{ url: { 'en-US': … } }`, the shape AMO answers with,
+// where its add-on edit takes the translated value alone.
+describe("the listing in store/amo-metadata.json, as AMO's add-on edit takes it", () => {
+  const listing = JSON.parse(
+    fs.readFileSync(path.resolve(import.meta.dirname, '../../../store/amo-metadata.json'), 'utf8'),
+  ) as Record<string, unknown>;
+
+  test.each(['name', 'summary', 'description', 'homepage'])('gives %s as text by language', field => {
+    const translated = listing[field] as Record<string, unknown>;
+    expect(Object.keys(translated)).toEqual(['en-US']);
+    expect(typeof translated['en-US']).toBe('string');
+  });
+
+  test("gives Firefox's categories, and the version's licence", () => {
+    expect(listing['categories']).toEqual({ firefox: ['games-entertainment'] });
+    expect(listing['version']).toMatchObject({ license: 'MIT' });
   });
 });
