@@ -3,19 +3,13 @@
 The add-on, `emma@mondarth`, exists already, with unlisted versions only. Its first **listed** version makes it listed:
 submit it on the listed channel, with the listing below. Later versions need only the version's own fields.
 
-## Submitting the first listed version
+## Submitting
 
-With `web-ext` (as the release signs unlisted versions now), from the release's Firefox build:
-
-```sh
-web-ext sign --channel listed --source-dir packages/extension/dist/firefox \
-  --amo-metadata packages/extension/store/amo-metadata.json \
-  --upload-source-code emma-source.zip --approval-timeout 0
-```
-
-If `web-ext` does not set the add-on's own fields (name, summary, description, categories) for an add-on that exists
-already, set them first with the API: `PATCH /api/v5/addons/addon/emma@mondarth/` with the same fields as
-`amo-metadata.json` but `version`.
+Each release submits its Firefox build as a listed version, with this listing, for Mozilla's review, and does not wait
+for it (`scripts/release/package.ts`, `scripts/amo.ts`; see the developers' notes on releases). It sets the add-on's
+fields from `amo-metadata.json` each time: those AMO's API does not take, such as the support site, are set on AMO's
+developer hub. By hand, as after a submission that failed, upload the release's `emma-extension-firefox-v<version>.zip`
+on the developer hub, choosing to list it, with the source from the release's tag.
 
 ## Listing (the add-on's)
 

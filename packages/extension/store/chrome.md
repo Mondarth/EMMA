@@ -16,13 +16,13 @@ lists are given as they are named there; check them against the dashboard, which
 - **Category:** Tools. (Developer Tools also fits; Games does not, as EMMA is no game.)
 - **Language:** English.
 - **Icon:** 128 × 128, `public/icons/emma-128.png`.
-- **Screenshots** (1280 × 800, or 640 × 400; one at least, five at most), still to be taken, on a server with a few
-  worlds:
+- **Screenshots** (1280 × 800): the five each release attaches to its GitHub release, `screenshot-<n>-<scene>.png`
+  (see the developers' notes on releases), taken in this order:
   1. The installation tree beside a module's panel, an update available.
-  2. A version list open, its badges, and why the plan takes the version it does.
-  3. The update plan, with its backups and snapshot, before running.
-  4. A plan running: its steps' progress.
-  5. The Install section: Foundry's listing, filtered, a module's drawer open.
+  2. A version chosen below the newest, and why the plan takes it.
+  3. The update plan, with its backups and snapshot, and its changes.
+  4. The plan's steps, listed in order, before it runs them.
+  5. The Install section: Foundry's listing, a module's drawer open.
 - **Small promo tile** (440 × 280): optional, unless the item is to be featured.
 - **Official URL:** none (it needs a site verified in Search Console; mondarth.com could be, later).
 - **Homepage URL:** https://mondarth.github.io/EMMA/extension.html
