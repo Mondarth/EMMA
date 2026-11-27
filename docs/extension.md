@@ -229,12 +229,9 @@ chosen, which EMMA explains. Versions one after another for one reason share a l
 expected at its newest version, so in the plan, one taken at another stands out in amber, with a warning sign: its
 tooltip names the newest version, and selecting the package says why.
 
-Looking for updates needs the EMMA module installed, as the extension uses the module's own code to work them out.
-Without it, the footer says so and offers **Install the EMMA module**, which installs it from its published manifest,
-through Foundry, even while EMMA guards Foundry's own Install buttons; Foundry then asks whether to install the
-module's dependencies, such as libWrapper. An EMMA module too old for the extension is offered **Update the EMMA
-module** in the same way. An EMMA module newer than the extension knows of needs a newer extension: the footer links to
-its releases. Everything else EMMA shows works without the module.
+The extension works out updates with its own code, built in: it needs no code from the server, and the EMMA module
+need not be installed for it. The module still records, in each world it is active in, what that world runs (see
+[worlds without a record](#worlds-without-a-record)).
 
 EMMA offers a package only versions that are safe for every world that uses it, as Foundry installs one version of a
 package for all of them:
@@ -660,4 +657,3 @@ or you.
   one.
 - EMMA disables Foundry's package buttons only in a browser where the extension is installed and has opened EMMA. It
   cannot stop installs from other browsers.
-- Finding updates needs the EMMA module installed (see [Updates](#updates)).

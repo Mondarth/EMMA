@@ -112,16 +112,15 @@ module:
   (`src/world-record.ts`), which the module writes and the setup screen reads, with `parseWorldRecord` to read a record
   that anything may have written; EMMA's package catalogue, obscured in a build (`src/obscure.ts`,
   `src/default-catalogue.ts`), with what builds it in and checks a release for its key in plain text, which run under Node (`scripts/`); how the setup screen asks the catalogue through the browser extension as its signed-in user (`src/catalogue-relay.ts`: the messages, the endpoints and headers let through, and what `/api/v2/me` says of the account); and the setup kit's API
-  (`src/setup-kit.ts`). The setup kit is the code the EMMA extension imports from the installed module, rather than
-  carry its own copy: the resolver and the catalogue's sources, and how the module badges a version
-  (`src/module/adapters/badges.ts`), so the extension's version lists are coloured as the module's are. It holds no
-  catalogue: each bundle builds in its own. The module builds it as `dist/emma-setup-kit.js`
-  (`src/setup-kit.ts`, `vite.kit.config.ts`) and names it, with its API version `<major>.<minor>`, in its manifest's
-  `flags.setupKit`; the EMMA extension checks that version against the one it was built with (`kitFit`) before it
-  imports the kit, and again after. Raise the minor when the kit gives more, and the major when it gives less or
-  changes what it gives, as a resolver release that changes a function the EMMA extension calls would; keep
-  `module.json`'s flag in step, which a unit test checks. Kit 2.0 gives only the catalogue's sources (`catalogueSet`,
-  `catalogueSource`) and the installed manifests' (`localSource`). Packages import core from its source, through its
+  (`src/setup-kit.ts`). The setup kit is what the EMMA extension works out updates with: the resolver, the catalogue's
+  sources (`catalogueSet`, `catalogueSource`) and the installed manifests' (`localSource`), and how a version is badged,
+  with EMMA's verdict in Foundry's colours. It holds no catalogue: each bundle builds in its own. Since the EMMA
+  extension 0.16.0 the extension builds the kit into itself (`packages/setup/src/foundry/kit.ts`, its badges in
+  `foundry/release-badge.ts`), as the browsers' extension stores accept no code an extension does not carry. Before,
+  it imported the kit from the installed module, which still builds it for those extensions, as
+  `dist/emma-setup-kit.js` (`src/setup-kit.ts`, `vite.kit.config.ts`), named with its API version `<major>.<minor>`
+  in its manifest's `flags.setupKit`; keep `module.json`'s flag in step, which a unit test checks. Once those
+  extensions are gone, the module's kit can go too. Packages import core from its source, through its
   `exports`.
 
 `packages/setup` (`@mondarth/emma-setup`)
@@ -136,10 +135,8 @@ module:
   installed and summarises the installation; `src/lib/tree.ts` gives the tree's rows and keyboard moves, working out the
   rows under a row only while it shows, as a module's requirements nest; `src/lib/details.ts` gives what the panel
   beside the tree shows for a system, a module or a group. As a module shows in many places, a row's key is its path
-  from the root, and the window keeps the selected row's key. Updates: `src/foundry/setup-kit.ts` finds the setup kit
-  in the installed EMMA module and imports it, and `src/foundry/install-emma.ts` installs or updates the module when
-  the kit is missing or does not fit, letting the install through the guard with `allowing`;
-  `src/foundry/releases.ts` looks up the releases of the installed packages in one catalogue lookup, through the
+  from the root, and the window keeps the selected row's key. Updates: `src/foundry/kit.ts` is the extension's own setup kit, so
+  they need nothing of the server, nor the EMMA module installed; `src/foundry/releases.ts` looks up the releases of the installed packages in one catalogue lookup, through the
   kit's `catalogueSet`, from the installed manifests `setup-game.ts` gives, and reads a manifest URL the user gives
   through the catalogue too; `src/foundry/listing.ts` reads the Install sections' listing from the catalogue, with
   which premium packages the user owns from `game.getPackages` (`readOwned`), kept a week in local storage
