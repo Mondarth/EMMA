@@ -65,7 +65,8 @@ in its manifest (`scripts/manifest.ts`), and AMO's review holds it to it:
 >
 > To try it, it needs a Foundry VTT server (version 14 or later) and its administrator password. Either:
 >
-> - we can give you a server, and an account with a subscription, on request; or
+> - on request, we set up a server for the review, and an account with a subscription, for as long as the review
+>   needs them; or
 > - run the whole thing yourself: get the source from https://github.com/Mondarth/EMMA, follow the developer setup
 >   (https://mondarth.github.io/EMMA/developers/setup.html), which runs a Foundry VTT server in Docker, with a trial
 >   Foundry VTT licence from Foundry Gaming, and load the extension you built (below) to use EMMA on its setup
