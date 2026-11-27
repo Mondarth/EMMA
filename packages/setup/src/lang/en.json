@@ -4,7 +4,8 @@
     "Title": "EMMA - installation",
     "Loading": "Reading the worlds' records…",
     "LoadFailed": "EMMA could not read the installation.",
-    "Refresh": "Read again"
+    "Refresh": "Read again",
+    "RefreshHint": "Read the installation again: its worlds and their records, and the game systems and modules installed, as after a change made outside EMMA; then look for updates again"
   },
   "Alpha": {
     "Label": "Alpha build",
@@ -489,6 +490,7 @@
     "Tree": "Note: {note}"
   },
   "Premium": {
-    "Recheck": "Check what I own again"
+    "Recheck": "Check what I own again",
+    "RecheckHint": "Ask Foundry now which premium packages you own, as after buying one: EMMA otherwise asks once a week"
   }
 }

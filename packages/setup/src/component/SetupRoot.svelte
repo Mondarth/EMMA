@@ -798,10 +798,27 @@
         <BusyMark activity={updates.busy.activityOf('check-live')} />
       </button>
     {/if}
+    {#if updates.recheckOwned !== undefined}
+      {@const recheckOwned = updates.recheckOwned}
+      <button
+        type="button"
+        class="emma-setup-owned emma-busy-host"
+        aria-busy={updates.busy.activityOf('owned') !== undefined}
+        data-tooltip={localize('Premium.RecheckHint')}
+        disabled={updates.locked || updates.busy.activityOf('owned') !== undefined}
+        onclick={() => {
+          void updates.busy.run('owned', 'checking', recheckOwned);
+        }}>
+        <i class="fa-solid fa-key" aria-hidden="true"></i>
+        {localize('Premium.Recheck')}
+        <BusyMark activity={updates.busy.activityOf('owned')} />
+      </button>
+    {/if}
     <button
       type="button"
       class="emma-setup-refresh emma-busy-host"
       aria-busy={updates.busy.activityOf('refresh') !== undefined}
+      data-tooltip={localize('App.RefreshHint')}
       disabled={setup.loading || updates.busy.activityOf('refresh') !== undefined}
       onclick={() => {
         void updates.busy.run('refresh', 'refreshing', () => setup.refresh());
@@ -935,12 +952,16 @@
     width: auto;
   }
 
+  /* The footer's actions at its right, together. */
   .emma-setup-check,
+  .emma-setup-owned,
   .emma-setup-refresh {
     margin-left: auto;
   }
 
-  .emma-setup-check + .emma-setup-refresh {
+  .emma-setup-check + .emma-setup-owned,
+  .emma-setup-check + .emma-setup-refresh,
+  .emma-setup-owned + .emma-setup-refresh {
     margin-left: 0;
   }
 
