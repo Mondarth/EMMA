@@ -62,8 +62,10 @@ jobs:
           EMMA_DEFAULT_CATALOGUE_URL: https://catalogue.e2e.test/
           EMMA_MODULE_CATALOGUE_KEY: e2e-catalogue-key
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@v6
+      # Restored only, never saved: run by hand, this takes the screenshots at whatever ref it is given, which must not
+      # write the caches the default branch's workflows read. The E2E workflow fills the same caches.
+      - name: Restore the Playwright browsers
+        uses: actions/cache/restore@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-chromium-${{ hashFiles('pnpm-lock.yaml') }}
@@ -71,8 +73,8 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Cache the Foundry VTT server download
-        uses: actions/cache@v6
+      - name: Restore the Foundry VTT server download
+        uses: actions/cache/restore@v6
         with:
           path: packages/module/tests/e2e/.data/container_cache
           key: foundry-server-${{ env.FOUNDRY_VERSION }}
