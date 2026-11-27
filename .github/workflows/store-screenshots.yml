@@ -12,6 +12,15 @@ on:
         description: The ref to take them at, such as the release's tag
         type: string
         required: true
+  # A change to how they are taken shows what they come to, in its pull request's run.
+  pull_request:
+    branches:
+      - dev
+    paths:
+      - .github/workflows/store-screenshots.yml
+      - packages/module/tests/e2e/store/**
+      - packages/module/tests/e2e/compose.store.yaml
+      - packages/module/scripts/e2e/install-packages.ts
   workflow_dispatch:
     inputs:
       ref:
@@ -29,6 +38,8 @@ env:
 jobs:
   screenshots:
     name: Store screenshots
+    # Pull requests from forks have no access to the Foundry licence secrets.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -41,7 +52,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.ref }}
+          # The pull request's own, for a pull request.
+          ref: ${{ inputs.ref || '' }}
       - uses: ./.github/actions/setup
 
       - name: Build the module
