@@ -25,12 +25,10 @@ export interface SetupStateOptions {
   /** Keep the guard's setting, and show it on the screen. */
   readonly onGuardChange: (on: boolean) => void;
   /**
-   * Search for the updates of the installation, each time it is read; failing with a `KitUnavailable` when the EMMA
-   * module's setup kit cannot be used.
+   * Search for the updates of the installation, each time it is read; failing with an `AccountRequired` while the user
+   * must sign in to the catalogue, or renew.
    */
   readonly findUpdates: (overview: Overview) => Promise<UpdateSearch>;
-  /** Install the EMMA module, or update it, which the search for updates needs. */
-  readonly installModule: () => Promise<void>;
   /** Ask how much space a snapshot needs, and how much is free; none where it cannot be asked. */
   readonly snapshotSpace?: () => Promise<SnapshotSpace>;
   /** Carry out a step of the update plan, failing with why; none where the plan cannot be run. */
@@ -130,8 +128,6 @@ export class SetupState {
   #readings = 0;
   /** Whether the last reading failed. */
   failed = $state(false);
-  /** Whether the EMMA module is being installed or updated. */
-  installing = $state(false);
   /** Whether EMMA guards Foundry's own Install, Update and Update All buttons. */
   guardOn = $state(true);
   /** Whether the best versions are limited to the game systems and modules worlds use. */
@@ -359,24 +355,6 @@ export class SetupState {
     ignore(key, ignored);
     await this.refresh();
     return true;
-  }
-
-  /**
-   * Install the EMMA module, or update it, then read the installation afresh. A failure, which Foundry tells the user
-   * of, leaves the installation as it was.
-   * @returns Once installed and read again, or failed
-   */
-  async installModule(): Promise<void> {
-    if (this.installing) return;
-    this.installing = true;
-    try {
-      await this.#options.installModule();
-    } catch {
-      // Foundry says why itself.
-    } finally {
-      this.installing = false;
-    }
-    await this.refresh();
   }
 
   /**

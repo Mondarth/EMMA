@@ -4,7 +4,6 @@
  */
 import type { Guard } from '../foundry/guard';
 import { installGuard } from '../foundry/guard';
-import { installEmma } from '../foundry/install-emma';
 import { keepMenuButton } from '../foundry/menu-button';
 import {
   readBestInUseOnly,
@@ -39,7 +38,7 @@ import {
   setupGame,
   startCoreUpdate,
 } from '../foundry/setup-game';
-import { KitUnavailable, loadKit, locateKit } from '../foundry/setup-kit';
+import { KIT } from '../foundry/kit';
 import { builtCatalogue, relayFetch, requireAccount } from '../foundry/catalogue-relay';
 
 import { readListing } from '../foundry/listing';
@@ -51,19 +50,6 @@ import type { UpdateSearch } from '../lib/updates';
 import { findUpdates } from '../lib/updates';
 import { openEmmaSetup } from './emma-setup-app';
 import { SetupState } from './setup-state.svelte';
-
-/**
- * The setup kit of the installed EMMA module, if it fits, with the installed packages' manifests it was found in.
- * @param game - The setup screen's `game`
- * @returns The kit and the manifests
- * @throws {KitUnavailable} If there is no kit to use
- */
-async function kitIn(game: SetupGame) {
-  const installed = readManifests(game);
-  const found = locateKit(installed, path => foundry.utils.getRoute(path));
-  if (!found.ok) throw new KitUnavailable(found.problem);
-  return { installed, kit: await loadKit(found) };
-}
 
 /**
  * The premium packages of a type the user owns: as kept, or else as Foundry gives them now, kept for next time.
@@ -149,8 +135,9 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
     bestInUseOnly: readBestInUseOnly(),
     onBestInUseOnlyChange: writeBestInUseOnly,
     findUpdates: async overview => {
-      // The resolver comes from the installed EMMA module's setup kit, if it fits.
-      const { installed, kit } = await kitIn(game);
+      // The resolver is the extension's own (see foundry/kit.ts).
+      const kit = KIT;
+      const installed = readManifests(game);
       await signedIn();
       const found = await lookUpReleases(installed, {
         kit,
@@ -174,9 +161,6 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
       // The catalogue's state is the one just found: when it last checked, and what it is fetching.
       return { ...updates, catalogue: found.catalogue };
     },
-    installModule: async () => {
-      if (placed.guard !== undefined) await installEmma(game, placed.guard);
-    },
     snapshotSpace: () => checkSnapshotSpace(game),
     core: {
       state: () => readCoreUpdate(game),
@@ -184,10 +168,10 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
       update: () => startCoreUpdate(game, readCoreUpdate(game).channel),
     },
     listPackages: async type => {
-      const { installed, kit } = await kitIn(game);
+      const installed = readManifests(game);
       await signedIn();
       return readListing(type, {
-        kit,
+        kit: KIT,
         catalogue,
         fetch: relayed,
         clientVersion: __EMMA_EXTENSION_VERSION__,
