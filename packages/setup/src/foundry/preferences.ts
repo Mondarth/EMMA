@@ -92,36 +92,6 @@ export function writeCoreLocked(locked: boolean): void {
   }
 }
 
-/** The key the EMMA version whose alpha state the user last acknowledged is kept under. */
-export const ALPHA_ACKNOWLEDGED_KEY = 'mondarth-emma.setup.alpha-acknowledged';
-
-/**
- * Whether the user has acknowledged that a version of EMMA is in alpha testing: each new version asks again. Not if
- * the storage cannot be read.
- * @param version - The version
- * @returns `true` if they acknowledged that version
- */
-export function readAlphaAcknowledged(version: string): boolean {
-  try {
-    return localStorage.getItem(ALPHA_ACKNOWLEDGED_KEY) === version;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Keep that the user acknowledged that a version of EMMA is in alpha testing. Kept for this visit only if the storage
- * cannot be written.
- * @param version - The version
- */
-export function writeAlphaAcknowledged(version: string): void {
-  try {
-    localStorage.setItem(ALPHA_ACKNOWLEDGED_KEY, version);
-  } catch {
-    // As for the guard's setting.
-  }
-}
-
 /** The key whether the best versions are limited to what worlds use is kept under. */
 export const BEST_IN_USE_KEY = 'mondarth-emma.setup.best-in-use';
 

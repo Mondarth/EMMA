@@ -16,7 +16,6 @@
   import { UNINSTALL } from '../lib/plans';
   import { stepText } from '../lib/run';
   import { groupDetail, moduleDetail, systemDetail } from '../lib/details';
-  import { EMMA_VERSION } from '../lib/alpha';
   import { format, localize } from '../lib/i18n';
   import { ignoredItems, linkOf, lockedItems } from '../lib/held';
   import { isIgnored } from '../lib/overview';
@@ -29,7 +28,6 @@
   import Splitter from './Splitter.svelte';
   import SystemPanel from './SystemPanel.svelte';
   import CoreStep from './CoreStep.svelte';
-  import AlphaNotice from './AlphaNotice.svelte';
   import BusyMark from './BusyMark.svelte';
   import OpeningMark from './OpeningMark.svelte';
   import FailedStep from './FailedStep.svelte';
@@ -683,10 +681,6 @@
             run={setup.shownRun}
             onOpen={openLink}
             pinNoteOf={(key: string) => setup.notes.of('pin', key)}
-            acknowledged={setup.alphaAcknowledged}
-            onAcknowledge={() => {
-              setup.acknowledgeAlpha();
-            }}
             onRun={setup.canRun
               ? () => {
                   void setup.runPlan();
@@ -697,14 +691,6 @@
     </div>
   {/if}
   <footer class="emma-setup-footer">
-    {#if setup.isAlpha}
-      <AlphaNotice
-        version={EMMA_VERSION}
-        acknowledged={setup.alphaAcknowledged}
-        onAcknowledge={() => {
-          setup.acknowledgeAlpha();
-        }} />
-    {/if}
     {#if setup.savedPlan !== null}
       <SavedPlanNotice
         count={setup.savedPlan.picks.length}
