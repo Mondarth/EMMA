@@ -1,13 +1,13 @@
-# The browser extension (alpha)
+# The browser extension
 
 EMMA runs inside a world, but some of its work belongs outside any world: seeing every world on a Foundry VTT server at
 once, and which modules each one runs, before launching any of them. That happens on Foundry's setup screen, which
 modules cannot change. So EMMA comes with a browser extension that adds EMMA to the setup screen, on the servers you
 choose.
 
-:::{warning}
-The extension is an **alpha**, for testing: use it at your own risk, on a test installation. It is not listed in the
-Chrome Web Store or on Firefox Add-ons; you install it by hand, as described below. See [EMMA's alpha](alpha.md).
+:::{note}
+The extension is not listed in the Chrome Web Store or on Firefox Add-ons yet: you install it by hand, as described
+below. See [Help and feedback](help.md) for where to ask questions and report problems.
 :::
 
 ## Requirements
@@ -19,7 +19,8 @@ Chrome Web Store or on Firefox Add-ons; you install it by hand, as described bel
 
 ## Installing
 
-Each alpha is published as a pre-release on GitHub, named **EMMA browser extension &lt;version&gt; (alpha)**. Find the
+Each version is published on GitHub, named **EMMA browser extension &lt;version&gt;**, marked as a pre-release so that
+the module's releases stay GitHub's latest (see the developers' notes on releases). Find the
 newest on the [EMMA releases page](https://github.com/Mondarth/EMMA/releases?q=extension&expanded=true).
 
 ### Chrome, Edge and other Chromium browsers
@@ -30,7 +31,7 @@ newest on the [EMMA releases page](https://github.com/Mondarth/EMMA/releases?q=e
 3. Open the extensions page: `chrome://extensions` in Chrome, `edge://extensions` in Edge.
 4. Turn on **Developer mode**.
 5. Choose **Load unpacked** and select the folder.
-6. Pin **EMMA for Foundry VTT (alpha)** to the toolbar, from the extensions (puzzle piece) menu, so its button is at
+6. Pin **EMMA for Foundry VTT** to the toolbar, from the extensions (puzzle piece) menu, so its button is at
    hand.
 
 Some browsers remind you at start-up that an extension in developer mode is installed. That is expected of an extension
@@ -103,9 +104,7 @@ A sign-in lasts 30 days, renewed while it is used.
 With EMMA open, the setup screen changes in two ways.
 
 **EMMA's button** joins the menu at the top of the screen, beside Foundry's own. It opens EMMA's window, whose title
-gives EMMA's version, such as **EMMA - installation (0.1.1)**. While EMMA is an alpha, the window's footer warns of it,
-with a link to [EMMA's alpha](alpha.md), and asks once for each new version that you acknowledge it with **I
-understand**: until you do, the plan cannot be run.
+gives EMMA's version, such as **EMMA - installation (0.16.0)**: say which one you ran when you ask for help.
 
 **While the window opens**, each time it does, a large spinner and **Analyzing** sit in its middle, until EMMA has read
 the installation and looked for updates; reading it again while the window is open shows only the **Read again** button
@@ -655,11 +654,10 @@ install from, goes to the catalogue too, which reads it. Each request to the cat
 says it is you, and the extension's version; the catalogue keeps what its privacy page says it does. EMMA asks nothing else, and sends nothing about your worlds, your server
 or you.
 
-## Limitations of the alpha
+## Limitations
 
-- It is tested on few installations: a plan may fail part-way, or do what you did not expect. Back up your worlds
-  before running one.
-- Each new version must be acknowledged as an alpha before EMMA runs a plan (see [EMMA's alpha](alpha.md)).
+- A plan may fail part-way, as Foundry may refuse an install EMMA could not foresee. Back up your worlds before running
+  one.
 - EMMA disables Foundry's package buttons only in a browser where the extension is installed and has opened EMMA. It
   cannot stop installs from other browsers.
 - Finding updates needs the EMMA module installed (see [Updates](#updates)).

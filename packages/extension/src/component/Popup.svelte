@@ -45,7 +45,6 @@
 
 <main class="emma-popup">
   <h1>{t('popupTitle')}</h1>
-  <p class="emma-alpha">{t('alpha')}</p>
 
   {#if server === undefined}
     <p>{t('notAServer')}</p>
@@ -131,7 +130,6 @@
     font-size: 1.1rem;
   }
 
-  .emma-alpha,
   .emma-note {
     color: #8a5a00;
   }

@@ -30,7 +30,6 @@ export function manifestFor(target: Target, version: string): Record<string, unk
     optional_host_permissions: ['http://*/*', 'https://*/*'],
     ...(target === 'chromium'
       ? {
-          version_name: `${version} alpha`,
           // Running a registered script in the page itself (`world: "MAIN"`) needs Chrome 102.
           minimum_chrome_version: '102',
           background: { service_worker: 'background.js', type: 'module' },

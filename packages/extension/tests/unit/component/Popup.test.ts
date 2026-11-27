@@ -37,7 +37,6 @@ describe('Popup', () => {
 
     expect(screen.getByText(`Server: ${LOCAL}`)).toBeInTheDocument();
     expect(screen.getByText(/needs your permission to read and change this server's pages/)).toBeInTheDocument();
-    expect(screen.getByText('Alpha: for testing only.')).toBeInTheDocument();
   });
 
   test('activates EMMA on the server and closes, EMMA now open', async () => {

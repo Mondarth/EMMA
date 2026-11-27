@@ -3,7 +3,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { APP_ID, closeEmmaSetup, openEmmaSetup } from '../../../src/app/emma-setup-app';
 import { GEOMETRY_KEY } from '../../../src/foundry/preferences';
-import { EMMA_VERSION } from '../../../src/lib/alpha';
+import { EMMA_VERSION } from '../../../src/lib/version';
 import { SetupState } from '../../../src/app/setup-state.svelte';
 import { buildOverview } from '../../../src/lib/overview';
 import { installation, noInstall, noUpdates } from '../../mocks/fixtures';
