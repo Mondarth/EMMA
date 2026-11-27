@@ -1,0 +1,8 @@
+# For the browser extension's store screenshots (see store/screenshots.spec.ts), over compose.yaml: the EMMA module as
+# it is installed, its manifest and build alone, copied to STORE_MODULE, rather than this repository's package, whose
+# pnpm links lead outside the mount. Foundry VTT, measuring the space a snapshot needs, walks the data folder, and
+# reports each link it cannot follow, which a store's screenshot would show.
+services:
+  foundry:
+    volumes:
+      - ${STORE_MODULE:?Copy the built module first}:/data/Data/modules/mondarth-emma:ro

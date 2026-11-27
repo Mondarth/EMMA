@@ -132,15 +132,11 @@ export async function routeCatalogue(
 }
 
 export const test = base.extend<{
-  /** Console errors a spec knows of and accepts, beyond {@link ALLOWED_CONSOLE_ERRORS}, each explained where it is given. */
-  allowedConsoleErrors: RegExp[];
   catalogueStubbed: undefined;
   failOnBrowserErrors: undefined;
   noCanvas: undefined;
   packageSitesStubbed: undefined;
 }>({
-  allowedConsoleErrors: [[], { option: true }],
-
   // Answer the made-up catalogue the build asks with nothing held, so that a test that gives no answers of its own
   // finds only what is installed.
   catalogueStubbed: [
@@ -177,14 +173,13 @@ export const test = base.extend<{
   ],
 
   failOnBrowserErrors: [
-    async ({ page, allowedConsoleErrors }, use) => {
+    async ({ page }, use) => {
       const problems: string[] = [];
-      const allowed = [...ALLOWED_CONSOLE_ERRORS, ...allowedConsoleErrors];
 
       page.on('console', message => {
         if (message.type() !== 'error') return;
         const text = message.text();
-        if (!allowed.some(pattern => pattern.test(text))) problems.push(`console.error: ${text}`);
+        if (!ALLOWED_CONSOLE_ERRORS.some(allowed => allowed.test(text))) problems.push(`console.error: ${text}`);
       });
       page.on('pageerror', error => {
         problems.push(`uncaught: ${error.message}`);

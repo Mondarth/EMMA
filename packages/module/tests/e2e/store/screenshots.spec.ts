@@ -17,6 +17,17 @@ import { listing, lookup } from './catalogue';
 const OUT = path.resolve(import.meta.dirname, '../store-screenshots');
 
 /**
+ * Have EMMA's window take the whole page, as a store's screenshot shows only EMMA.
+ * @param page - The page
+ */
+async function fillPage(page: Page): Promise<void> {
+  await page.evaluate(id => {
+    const app = foundry.applications.instances.get(id);
+    app?.setPosition({ left: 0, top: 0, width: window.innerWidth, height: window.innerHeight });
+  }, EMMA_WINDOW.slice(1));
+}
+
+/**
  * Open EMMA's window over the whole page, with the catalogue answering as `catalogue.ts` says.
  * @param page - The page
  * @returns EMMA's window
@@ -26,6 +37,10 @@ async function openEmma(page: Page): Promise<Locator> {
     if (endpoint === 'api/v2/lookup') return lookup();
     if (endpoint === 'api/v2/listing') return listing();
     return undefined;
+  });
+  // The update plan takes most of the window's height, below the tree, so that its changes show with its backups.
+  await page.addInitScript(() => {
+    localStorage.setItem('mondarth-emma.setup.layout', JSON.stringify({ tree: 0.4, plan: 0.62 }));
   });
   await openSetupWithEmma(page);
   // The setup screen may still be settling as its menu is clicked: asked again once, it is not.
@@ -39,11 +54,7 @@ async function openEmma(page: Page): Promise<Locator> {
       await button.click({ force: true });
       await expect(emma).toBeVisible({ timeout: 60_000 });
     });
-  // The window takes the whole page, as a store's screenshot shows only EMMA.
-  await page.evaluate(id => {
-    const app = foundry.applications.instances.get(id);
-    app?.setPosition({ left: 0, top: 0, width: window.innerWidth, height: window.innerHeight });
-  }, EMMA_WINDOW.slice(1));
+  await fillPage(page);
   await expect(emma.getByRole('status').first()).toContainText(/updates? (available|found)/i, { timeout: 60_000 });
   return emma;
 }
@@ -75,6 +86,8 @@ async function expand(page: Page, emma: Locator, title: RegExp): Promise<void> {
  * @param name - The file's name, without `.png`
  */
 async function shoot(page: Page, name: string): Promise<void> {
+  // The window grows and shrinks as panels open; it takes the whole page again for the picture.
+  await fillPage(page);
   await page.mouse.move(0, 0);
   await page.waitForTimeout(500);
   await page.screenshot({ path: path.join(OUT, `${name}.png`) });
@@ -82,14 +95,6 @@ async function shoot(page: Page, name: string): Promise<void> {
 
 test.describe('the store screenshots', () => {
   test.describe.configure({ mode: 'serial' });
-  // A plan has Foundry VTT measure the space a snapshot needs, walking the data folder, where the EMMA module under test
-  // is this repository's package, mounted, with pnpm's links to packages outside the mount, which it cannot follow. An
-  // installed module has no such links.
-  test.use({
-    allowedConsoleErrors: [
-      /ENOENT: no such file or directory, stat '\/data\/Data\/modules\/mondarth-emma\/node_modules\//,
-    ],
-  });
 
   test('1: the installation tree, and a module with an update', async ({ page }) => {
     const emma = await openEmma(page);
@@ -114,9 +119,7 @@ test.describe('the store screenshots', () => {
       .click();
     await expect(emma.getByText(/2\.5\.0/).first()).toBeVisible({ timeout: 30_000 });
     await emma.getByRole('button', { name: /^Version of Ambient Weather/ }).click();
-    const options = page.getByRole('listbox');
-    await expect(options).toBeVisible();
-    await options.getByRole('option').first().hover();
+    await expect(page.getByRole('listbox')).toBeVisible();
     await shoot(page, '2-version-list');
   });
 
@@ -148,7 +151,12 @@ test.describe('the store screenshots', () => {
     const install = emma.getByRole('region', { name: 'Install a module' });
     await expect(install).toBeVisible();
     await install.getByText('Lantern Light', { exact: true }).click();
-    await expect(install.getByText('Flickering torches', { exact: false })).toBeVisible();
+    const details = install.getByText('Flickering torches', { exact: false });
+    await expect(details).toBeVisible();
+    // The drawer opens at the foot of the list: the panel scrolls to show it all.
+    await details.evaluate(element => {
+      element.closest('details')?.scrollIntoView({ block: 'end' });
+    });
     await shoot(page, '5-install');
   });
 });

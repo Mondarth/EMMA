@@ -167,8 +167,15 @@ jobs:
           echo '{}' > "$RUNNER_TEMP/foundry-secrets.json"
           echo "FOUNDRY_SECRETS_FILE=$RUNNER_TEMP/foundry-secrets.json" >> "$GITHUB_ENV"
 
-      - name: Start Foundry VTT
-        run: pnpm run e2e:server --wait-timeout 300
+      # The EMMA module as it is installed, its manifest and build alone (see packages/module/tests/e2e/compose.store.yaml).
+      - name: Start Foundry VTT, with the module as installed
+        working-directory: packages/module
+        run: |
+          export STORE_MODULE="$RUNNER_TEMP/mondarth-emma"
+          mkdir -p "$STORE_MODULE" tests/e2e/.data/Data/modules/mondarth-emma
+          cp -r module.json dist "$STORE_MODULE/"
+          HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose -f tests/e2e/compose.yaml -f tests/e2e/compose.store.yaml \
+            up --detach --wait --force-recreate --wait-timeout 300
 
       - name: Take the screenshots
         run: pnpm run test:e2e --project=store
@@ -179,7 +186,9 @@ jobs:
 
       - name: Stop Foundry VTT
         if: ${{ always() }}
-        run: docker compose -f packages/module/tests/e2e/compose.yaml down
+        env:
+          STORE_MODULE: ${{ runner.temp }}/mondarth-emma
+        run: docker compose -f packages/module/tests/e2e/compose.yaml -f packages/module/tests/e2e/compose.store.yaml down
 
       - name: Upload the screenshots
         if: ${{ !cancelled() }}
