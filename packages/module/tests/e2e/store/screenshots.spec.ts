@@ -32,7 +32,13 @@ async function openEmma(page: Page): Promise<Locator> {
   const button = page.getByRole('button', { name: 'EMMA', exact: true });
   await button.click({ timeout: 20_000 }).catch(() => button.click({ force: true }));
   const emma = page.locator(EMMA_WINDOW);
-  await expect(emma).toBeVisible();
+  // The first window on a fresh server takes a while: it reads the installation and the worlds' records.
+  await expect(emma)
+    .toBeVisible({ timeout: 60_000 })
+    .catch(async () => {
+      await button.click({ force: true });
+      await expect(emma).toBeVisible({ timeout: 60_000 });
+    });
   // The window takes the whole page, as a store's screenshot shows only EMMA.
   await page.evaluate(id => {
     const app = foundry.applications.instances.get(id);
@@ -76,6 +82,14 @@ async function shoot(page: Page, name: string): Promise<void> {
 
 test.describe('the store screenshots', () => {
   test.describe.configure({ mode: 'serial' });
+  // A plan has Foundry VTT measure the space a snapshot needs, walking the data folder, where the EMMA module under test
+  // is this repository's package, mounted, with pnpm's links to packages outside the mount, which it cannot follow. An
+  // installed module has no such links.
+  test.use({
+    allowedConsoleErrors: [
+      /ENOENT: no such file or directory, stat '\/data\/Data\/modules\/mondarth-emma\/node_modules\//,
+    ],
+  });
 
   test('1: the installation tree, and a module with an update', async ({ page }) => {
     const emma = await openEmma(page);
