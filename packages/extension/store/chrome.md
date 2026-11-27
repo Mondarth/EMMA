@@ -82,6 +82,20 @@ What the extension collects, that is, sends off the user's device, as the dashbo
 
 **Privacy policy URL:** https://accounts.mondarth.com/privacy
 
+## Test instructions
+
+The dashboard's test instructions, for its reviewers:
+
+> EMMA runs only on the setup screen (`/setup`) of a self-hosted Foundry VTT server, version 14 or later, once
+> activated there from the toolbar button; it needs the server's administrator password, and finding updates needs a
+> signed-in account with an EMMA subscription (from the options page). Either:
+>
+> - we can give you a server, and an account with a subscription, on request; or
+> - run the whole thing yourself: get the source from https://github.com/Mondarth/EMMA, follow the developer setup
+>   (https://mondarth.github.io/EMMA/developers/setup.html), which runs a Foundry VTT server in Docker, with a trial
+>   Foundry VTT licence from Foundry Gaming, and load the extension, built as `packages/extension/store/amo.md`'s
+>   source code instructions describe, to use EMMA on its setup screen.
+
 ## Distribution
 
 - **Visibility:** Public (or Unlisted, to share by link before going public).

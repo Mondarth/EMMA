@@ -63,8 +63,13 @@ in its manifest (`scripts/manifest.ts`), and AMO's review holds it to it:
 > user signs in with a device code, from the options page. The catalogue needs a subscription; without one, EMMA shows
 > the installation but finds no updates.
 >
-> To try it, it needs a Foundry VTT server (version 14 or later) and its administrator password; we can give you one,
-> and an account with a subscription, on request.
+> To try it, it needs a Foundry VTT server (version 14 or later) and its administrator password. Either:
+>
+> - we can give you a server, and an account with a subscription, on request; or
+> - run the whole thing yourself: get the source from https://github.com/Mondarth/EMMA, follow the developer setup
+>   (https://mondarth.github.io/EMMA/developers/setup.html), which runs a Foundry VTT server in Docker, with a trial
+>   Foundry VTT licence from Foundry Gaming, and load the extension you built (below) to use EMMA on its setup
+>   screen.
 >
 > The build is bundled and minified by Vite from TypeScript and Svelte; the source is attached, and public at
 > https://github.com/Mondarth/EMMA. Building it is described below.
