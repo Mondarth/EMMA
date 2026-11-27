@@ -56,6 +56,8 @@ export interface SetupStateOptions {
   readonly lockPackage?: (type: 'module' | 'system', id: string, lock: boolean) => Promise<void>;
   /** Read Foundry's listing of the packages of a type that may be installed; none where it cannot be read. */
   readonly listPackages?: (type: 'module' | 'system') => Promise<readonly ListedPackage[]>;
+  /** Forget which premium packages the user owns, so that Foundry is asked again; none where it cannot be. */
+  readonly forgetOwned?: () => void;
   /**
    * Where EMMA is in alpha testing: whether the user has acknowledged it for this version, and how to keep that they
    * have. None where EMMA is not an alpha.
@@ -221,6 +223,9 @@ export class SetupState {
     this.alphaAcknowledged = options.alpha?.acknowledged ?? true;
     this.bestInUseOnly = options.bestInUseOnly ?? false;
     this.updates = new UpdateState(options.findUpdates, options.pins);
+    if (options.forgetOwned !== undefined && options.listPackages !== undefined) {
+      this.updates.recheckOwned = () => this.recheckOwned();
+    }
     this.notes = new NoteState(options.notes);
     // A note on a pin goes with it.
     this.updates.onUnpinned = key => {
@@ -417,6 +422,20 @@ export class SetupState {
     }
     this.listings = { ...this.listings, [type]: listing };
     if (typeof listing === 'object') this.updates.knowListing(listing);
+  }
+
+  /**
+   * Ask Foundry again which premium packages the user owns, as after buying one, rather than wait for EMMA's weekly
+   * check: what is kept is forgotten, and the listings read so far are read again, with what Foundry says now. What was
+   * refused for want of premium content can then be chosen again.
+   * @returns Once read again
+   */
+  async recheckOwned(): Promise<void> {
+    this.#options.forgetOwned?.();
+    this.updates.forgetPremiumRefusals();
+    const read = (['module', 'system'] as const).filter(type => Array.isArray(this.listings[type]));
+    this.listings = { ...this.listings, ...Object.fromEntries(read.map(type => [type, null])) };
+    await Promise.all(read.map(type => this.loadListing(type)));
   }
 
   /**
