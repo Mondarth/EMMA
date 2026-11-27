@@ -7,11 +7,6 @@ on:
     branches:
       - main
   workflow_dispatch:
-    inputs:
-      screenshots:
-        description: Take the browser extension's store screenshots instead of running the tests
-        type: boolean
-        default: false
 
 concurrency:
   group: e2e-${{ github.ref }}
@@ -28,7 +23,7 @@ jobs:
   e2e:
     name: Playwright (${{ matrix.browser }})
     # Pull requests from forks have no access to the Foundry licence secrets.
-    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.screenshots) || github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
@@ -114,95 +109,6 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report-${{ matrix.browser }}
-          path: |
-            packages/module/tests/e2e/playwright-report/
-            packages/module/tests/e2e/test-results/
-          if-no-files-found: ignore
-
-  # The browser extension's store screenshots, at 1280 x 800, in Chromium: EMMA on a real Foundry VTT setup screen, with
-  # made-up modules and worlds, and the catalogue's answers made up to match (packages/module/tests/e2e/store/). The
-  # PNGs are uploaded as the run's `store-screenshots` artifact.
-  screenshots:
-    name: Store screenshots
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.screenshots }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
-      FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
-      FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}
-      FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
-      # The test world, as a user's would be titled, beside the made-up worlds.
-      E2E_WORLD_TITLE: Curse of the Ashen Crown
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup
-
-      - name: Build the module
-        run: pnpm build
-        env:
-          EMMA_DEFAULT_CATALOGUE_URL: https://catalogue.e2e.test/
-          EMMA_MODULE_CATALOGUE_KEY: e2e-catalogue-key
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Cache the Foundry VTT server download
-        uses: actions/cache@v6
-        with:
-          path: packages/module/tests/e2e/.data/container_cache
-          key: foundry-server-${{ env.FOUNDRY_VERSION }}
-
-      - name: Install the pinned system and module, and the made-up modules and worlds
-        run: pnpm run e2e:packages --store
-
-      - name: Provide an empty secrets file
-        run: |
-          echo '{}' > "$RUNNER_TEMP/foundry-secrets.json"
-          echo "FOUNDRY_SECRETS_FILE=$RUNNER_TEMP/foundry-secrets.json" >> "$GITHUB_ENV"
-
-      # The EMMA module as it is installed, its manifest and build alone (see packages/module/tests/e2e/compose.store.yaml).
-      - name: Start Foundry VTT, with the module as installed
-        working-directory: packages/module
-        run: |
-          export STORE_MODULE="$RUNNER_TEMP/mondarth-emma"
-          mkdir -p "$STORE_MODULE" tests/e2e/.data/Data/modules/mondarth-emma
-          cp -r module.json dist "$STORE_MODULE/"
-          HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose -f tests/e2e/compose.yaml -f tests/e2e/compose.store.yaml \
-            up --detach --wait --force-recreate --wait-timeout 300
-
-      - name: Take the screenshots
-        run: pnpm run test:e2e --project=store
-
-      - name: Foundry VTT logs
-        if: ${{ failure() }}
-        run: docker compose -f packages/module/tests/e2e/compose.yaml logs --no-color --tail 200
-
-      - name: Stop Foundry VTT
-        if: ${{ always() }}
-        env:
-          STORE_MODULE: ${{ runner.temp }}/mondarth-emma
-        run: docker compose -f packages/module/tests/e2e/compose.yaml -f packages/module/tests/e2e/compose.store.yaml down
-
-      - name: Upload the screenshots
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: store-screenshots
-          path: packages/module/tests/e2e/store-screenshots/
-          if-no-files-found: warn
-
-      - name: Upload the Playwright report
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-report-store
           path: |
             packages/module/tests/e2e/playwright-report/
             packages/module/tests/e2e/test-results/

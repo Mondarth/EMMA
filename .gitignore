@@ -19,3 +19,6 @@ node_modules/
 .foundryvtt/data/
 .foundryvtt/secrets.json
 .foundryvtt/catalogue-token.json
+
+# The extension's store screenshots, fetched for the guide (scripts/docs/fetch-screenshots.sh).
+docs/_static/screenshots/
