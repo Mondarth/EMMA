@@ -1,3 +1,15 @@
+## [0.15.0](https://github.com/Mondarth/EMMA/compare/extension-v0.14.0...extension-v0.15.0) (2026-11-27)
+
+### Features
+
+* **setup:** check what the user owns from the footer ([1ad0f21](https://github.com/Mondarth/EMMA/commit/1ad0f2157c98cda72c52796040dbb00cc4603339))
+* **setup:** keep out a manifest's package needing unowned premium ([058f4d1](https://github.com/Mondarth/EMMA/commit/058f4d15556c0b9d2e311a9a7406f6b9bfcb3f11))
+* **setup:** keep out modules that need unowned premium content ([4ab35f4](https://github.com/Mondarth/EMMA/commit/4ab35f43d8804b3aedab0997d99dc2b75da6e70c))
+* **setup:** let the user have EMMA check what they own again ([ba68a26](https://github.com/Mondarth/EMMA/commit/ba68a26c8c41cfb9fa7b5c9c549444ec2eac9ad3))
+* **setup:** refuse updates that need unowned premium content ([16ee740](https://github.com/Mondarth/EMMA/commit/16ee740b7480e9256a79bb566c4190915bca5cef))
+* **setup:** say why an unused module's update is not planned ([fd2a49b](https://github.com/Mondarth/EMMA/commit/fd2a49bcdc0511733ce9e825fb9f3e5448ab3038))
+* **setup:** show a planned install's listing in its panel ([b8adfcc](https://github.com/Mondarth/EMMA/commit/b8adfcc6c21a7d49e5c75df0a7a324acc6b4ca07))
+
 ## [0.14.0](https://github.com/Mondarth/EMMA/compare/extension-v0.13.1...extension-v0.14.0) (2026-11-24)
 
 ### Features
