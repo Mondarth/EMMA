@@ -287,6 +287,11 @@ export class UpdateState {
   #searches = 0;
   /** The packages whose update the plan as it stands holds back (see {@link heldBack}). */
   readonly #heldBack = new SvelteSet<PackageKey>();
+  /**
+   * The installed game systems and modules the last best-versions plan left as they are, as no recorded world uses
+   * them, where it was limited to what worlds use (see {@link planBest}).
+   */
+  readonly #leftUnused = new SvelteSet<PackageKey>();
   /** The plan and search {@link checkHeldBack} last checked, and how many checks were begun. */
   #heldBackFor = '';
   #heldBackRuns = 0;
@@ -708,6 +713,23 @@ export class UpdateState {
    */
   heldBack(key: PackageKey): boolean {
     return this.#heldBack.has(key);
+  }
+
+  /**
+   * Whether a package's update is not planned only because the best versions were planned for what worlds use alone,
+   * and no recorded world uses it: it has an update, the plan leaves it as it is installed, and the plan could take a
+   * newer version, were it chosen.
+   * @param key - The package's key
+   * @returns `true` if so
+   */
+  leftUnused(key: PackageKey): boolean {
+    const update = this.updateOf(key);
+    return (
+      update !== undefined &&
+      this.#leftUnused.has(key) &&
+      this.chosenOf(key) === update.installed &&
+      !this.heldBack(key)
+    );
   }
 
   /**
@@ -1417,6 +1439,15 @@ export class UpdateState {
       this.#recommendedBy.clear();
       this.#safeguardEdits.clear();
       for (const [picked, to] of picks) this.#picks.set(picked, to);
+      this.#leftUnused.clear();
+      if (used !== undefined) {
+        for (const key of [
+          ...overview.systems.map(({ id }) => `system:${id}`),
+          ...overview.modules.map(({ module: { id } }) => `module:${id}`),
+        ]) {
+          if (!used.has(key)) this.#leftUnused.add(key);
+        }
+      }
       this.plan = plan;
       this.changes++;
       return true;
@@ -1712,6 +1743,7 @@ export class UpdateState {
     this.#forced.clear();
     this.#recommendedBy.clear();
     this.#safeguardEdits.clear();
+    this.#leftUnused.clear();
     this.#premiumRefused.clear();
     this.plan = [];
     this.changes++;

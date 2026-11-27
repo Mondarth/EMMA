@@ -2391,6 +2391,62 @@ describe('planning the best versions', () => {
     expect(within(section).queryByRole('status')).toBeNull();
   });
 
+  test("says, in the tree and its panel, that an unused module's update is left out of a plan for what worlds use", async () => {
+    // Dice is installed, with an update, but no world runs it.
+    const dice: PackageUpdate = {
+      key: 'module:dice',
+      installed: '1.0.0',
+      newest: '1.1.0',
+      versions: ['1.1.0', '1.0.0'],
+    };
+    const overview = buildOverview(
+      installation({
+        worlds: [{ id: 'a', title: 'Alpha', system: 'dnd5e' }],
+        modules: [installedModule('lib', 'Library', '1.0.0'), installedModule('dice', 'Dice', '1.0.0')],
+      }),
+      new Map([['a', recorded(record('a', { modules: [{ id: 'lib', title: 'Library', version: '1.0.0' }] }))]]),
+    );
+    const setup = new SetupState({
+      load: () => Promise.resolve(overview),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: () =>
+        Promise.resolve({
+          updates: new Map([...UPDATES, dice].map(update => [update.key, update])),
+          blocked: new Map(),
+          unresolved: [],
+          judge,
+          planner: alone(...UPDATES, dice),
+        }),
+      installModule: noInstall,
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    await vi.waitFor(() => {
+      expect(setup.updates.status).toBe('found');
+    });
+    const user = userEvent.setup();
+    const section = screen.getByRole('region', { name: 'Plan Updates' });
+    await user.click(within(section).getByRole('checkbox', { name: 'Only what worlds use' }));
+    await user.click(within(section).getByRole('button', { name: 'Plan the best versions' }));
+    await vi.waitFor(() => {
+      expect(setup.updates.leftUnused('module:dice')).toBe(true);
+    });
+
+    expect(setup.updates.leftUnused('module:lib')).toBe(false);
+    const universal = row(/Universal/);
+    await user.click(within(universal).getByText('Universal'));
+    await user.keyboard('{ArrowRight}');
+    const library = row(/Dice/);
+    expect(library).toHaveTextContent(
+      'Update available, not planned: no recorded world uses it, and the best versions were planned for what worlds use',
+    );
+    await user.click(within(library).getByText('Dice'));
+    expect(screen.getByRole('note')).toHaveTextContent(
+      'Its update is not planned: no recorded world uses it, and the best versions were planned only for what worlds use.',
+    );
+  });
+
   test('says when there is nothing to change, or no plan to be had, until the plan changes', async () => {
     const setup = new SetupState({
       load: () => Promise.resolve(OVERVIEW),

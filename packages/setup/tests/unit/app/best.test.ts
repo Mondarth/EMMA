@@ -96,6 +96,31 @@ describe('planning the best versions', () => {
     expect(updates.optionOf('module:lib', '2.0.0')).toBeDefined();
   });
 
+  test("says an unused module's update is left out as no world uses it, until chosen, cleared or planned in full", async () => {
+    const updates = await searched();
+    expect(updates.leftUnused('module:lib')).toBe(false);
+
+    await updates.planBest({ inUseOnly: true });
+    // Library has an update, which no world's use asks for; Midi, which a world runs, is planned.
+    expect(updates.leftUnused('module:lib')).toBe(true);
+    expect(updates.leftUnused('module:midi')).toBe(false);
+    expect(updates.leftUnused('system:dnd5e')).toBe(false);
+    expect(updates.leftUnused('module:none')).toBe(false);
+
+    // Chosen by hand, it is planned after all.
+    await updates.choose('module:lib', '2.0.0');
+    expect(updates.leftUnused('module:lib')).toBe(false);
+    await updates.choose('module:lib', '1.0.0');
+    expect(updates.leftUnused('module:lib')).toBe(true);
+
+    // Planned in full, nothing is left out; nor once the plan is cleared.
+    await updates.planBest();
+    expect(updates.leftUnused('module:lib')).toBe(false);
+    await updates.planBest({ inUseOnly: true });
+    updates.clear();
+    expect(updates.leftUnused('module:lib')).toBe(false);
+  });
+
   test('keeps Foundry VTT locked in EMMA at its build, updating what runs on it', async () => {
     const updates = await searched(true);
 

@@ -128,6 +128,11 @@
   </section>
 {/if}
 
+{#if updates.leftUnused(key)}
+  <!-- Its update is offered, but the best versions were planned for what worlds use alone, and no world uses it. -->
+  <p class="emma-why" role="note">{localize('Why.Unused')}</p>
+{/if}
+
 {#if refusal !== undefined}
   <!-- The version last chosen of it that the plan refused, as it needs premium content the user does not own. -->
   <div class="emma-why emma-why-refused" role="alert">

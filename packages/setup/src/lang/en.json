@@ -175,7 +175,8 @@
     "HeldBack": "Update available, but not with the plan as it stands (its choices or locks): open its versions to see why",
     "HiddenHeldBack": "Updates in the rows under it, but none with the plan as it stands",
     "UnresolvedWhy": "Why, world by world",
-    "UnresolvedUnread": "EMMA could not read the manifests of {releases}, so cannot tell what they need."
+    "UnresolvedUnread": "EMMA could not read the manifests of {releases}, so cannot tell what they need.",
+    "Unused": "Update available, not planned: no recorded world uses it, and the best versions were planned for what worlds use"
   },
   "Plan": {
     "Safeguards": "Keep first",
@@ -438,6 +439,7 @@
     "NoManifest": "{versions}: no manifest URL for that version alone, which installing it needs.",
     "Conflict": "{versions}: the plan cannot take it with the other versions chosen:",
     "Possible": "{versions}: the plan could take it now.",
+    "Unused": "Its update is not planned: no recorded world uses it, and the best versions were planned only for what worlds use. Choose a version to plan it anyway.",
     "NeedsUnowned": "{version} is not planned: it needs premium content you do not own, which Foundry cannot install: {modules}. Buy it first, then choose Check what I own again, so that EMMA asks Foundry now rather than at its weekly check."
   },
   "Failure": {
