@@ -72,7 +72,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-jsdoc": "^65.4.3",
     "eslint-plugin-prettier": "^5.5.7",
-    "eslint-plugin-svelte": "^3.23.0",
+    "eslint-plugin-svelte": "^3.24.1",
     "fvtt-types": "github:League-of-Foundry-Developers/foundry-vtt-types#main",
     "globals": "^17.14.0",
     "happy-dom": "^21.0.4",
