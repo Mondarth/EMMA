@@ -125,6 +125,8 @@ export type ManifestResult =
       readonly reason: string;
       readonly explanation?: readonly string[];
       readonly override?: ForcedInstall;
+      /** Refused for premium content the user does not own, which asking Foundry again may change. */
+      readonly unowned?: true;
     };
 
 /** Installing a package anew: the version the plan took, or why it could take none. */
@@ -139,7 +141,13 @@ export interface PremiumRefusal {
 
 export type InstallResult =
   | { readonly ok: true; readonly version: string }
-  | { readonly ok: false; readonly reason: string; readonly explanation?: readonly string[] };
+  | {
+      readonly ok: false;
+      readonly reason: string;
+      readonly explanation?: readonly string[];
+      /** Refused for premium content the user does not own, which asking Foundry again may change. */
+      readonly unowned?: true;
+    };
 
 /** Uninstalling a package, as its panel offers it: what it would break, and whether the plan uninstalls it. */
 export interface UninstallOffer {
@@ -249,6 +257,11 @@ export class UpdateState {
    * by package key, with why (see {@link premiumRefusalOf}).
    */
   readonly #premiumRefused = new SvelteMap<PackageKey, PremiumRefusal>();
+  /**
+   * Ask Foundry again which premium packages the user owns, as after buying one (see `SetupState.recheckOwned`); none
+   * where it cannot be asked.
+   */
+  recheckOwned: (() => Promise<void>) | undefined = undefined;
   /** The releases read from manifests the user gave, by package key, which no search finds again. */
   readonly #manual = new SvelteMap<PackageKey, Release>();
   /** The packages added against EMMA's advice, by package key. */
@@ -1615,11 +1628,14 @@ export class UpdateState {
   async #refuseUnowned(
     key: PackageKey,
     before: readonly PackageKey[],
-  ): Promise<{ readonly ok: false; readonly reason: string; readonly explanation: readonly string[] } | undefined> {
+  ): Promise<
+    | { readonly ok: false; readonly reason: string; readonly explanation: readonly string[]; readonly unowned: true }
+    | undefined
+  > {
     const unowned = this.#unownedInPlan().filter(({ key: needed }) => !before.includes(needed));
     if (unowned.length === 0) return undefined;
     await this.takeOut(key, true);
-    return { ok: false, ...this.#unownedWords(unowned, 'Install.NeedsUnowned') };
+    return { ok: false, ...this.#unownedWords(unowned, 'Install.NeedsUnowned'), unowned: true };
   }
 
   /**
@@ -1652,6 +1668,11 @@ export class UpdateState {
    */
   premiumRefusalOf(key: PackageKey): PremiumRefusal | undefined {
     return this.#premiumRefused.get(key);
+  }
+
+  /** Forget every refusal for want of premium content, as once Foundry is asked again what the user owns. */
+  forgetPremiumRefusals(): void {
+    this.#premiumRefused.clear();
   }
 
   /**

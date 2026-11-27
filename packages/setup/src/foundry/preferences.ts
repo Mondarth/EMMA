@@ -392,3 +392,15 @@ export function writeOwnedKept(type: 'module' | 'system', keys: ReadonlySet<stri
     // As for the guard's setting: Foundry is asked again next visit.
   }
 }
+
+/**
+ * Forget the premium packages the user owns, of both types, so that Foundry is asked again the next time the listing
+ * is read: as after buying one, sooner than {@link OWNED_FOR_MS}.
+ */
+export function forgetOwnedKept(): void {
+  try {
+    for (const type of ['module', 'system']) localStorage.removeItem(`${OWNED_KEY}.${type}`);
+  } catch {
+    // Nothing kept can be read either, so Foundry is asked again all the same.
+  }
+}

@@ -16,6 +16,7 @@
   import { compatibilityText, matching, tagsAmong, tagText, toggleTag, UNTAGGED, withTags } from '../lib/install';
 
   import BusyMark from './BusyMark.svelte';
+  import OwnedRecheck from './OwnedRecheck.svelte';
 
   interface Props {
     type: 'module' | 'system';
@@ -283,6 +284,14 @@
           {/each}
         </ul>
       {/if}
+      {#if refused.unowned === true && updates.recheckOwned !== undefined}
+        <OwnedRecheck
+          {updates}
+          recheck={updates.recheckOwned}
+          onDone={() => {
+            fromUrl = null;
+          }} />
+      {/if}
       {#if refused.override !== undefined}
         <button
           type="button"
@@ -466,6 +475,14 @@
                     <li>{line}</li>
                   {/each}
                 </ul>
+              {/if}
+              {#if state.unowned === true && updates.recheckOwned !== undefined}
+                <OwnedRecheck
+                  {updates}
+                  recheck={updates.recheckOwned}
+                  onDone={() => {
+                    added.delete(key);
+                  }} />
               {/if}
             </div>
           {/if}

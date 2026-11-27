@@ -12,6 +12,7 @@
   import { versionIn } from '../app/update-state.svelte';
   import { format, localize } from '../lib/i18n';
   import BusyMark from './BusyMark.svelte';
+  import OwnedRecheck from './OwnedRecheck.svelte';
 
   interface Props {
     updates: UpdateState;
@@ -136,6 +137,9 @@
         <li>{line}</li>
       {/each}
     </ul>
+    {#if updates.recheckOwned !== undefined}
+      <OwnedRecheck {updates} recheck={updates.recheckOwned} />
+    {/if}
   </div>
 {/if}
 

@@ -726,8 +726,9 @@ describe('installing from a manifest URL', () => {
     await expect(updates.installFrom(DICE_URL, 'module')).resolves.toEqual({
       ok: false,
       reason:
-        'It needs premium content you do not own, which Foundry cannot install: Dice. Buy it first; EMMA reads what you own again once a week.',
+        'It needs premium content you do not own, which Foundry cannot install: Dice. Buy it first, then choose Check what I own again, so that EMMA asks Foundry now rather than at its weekly check.',
       explanation: ['Dice'],
+      unowned: true,
     });
     expect(updates.picks).toEqual([]);
   });
@@ -1875,8 +1876,9 @@ describe('premium content the user does not own, needed by a module to install',
     await expect(updates.install('module:a', 'Alpha')).resolves.toEqual({
       ok: false,
       reason:
-        'It needs premium content you do not own, which Foundry cannot install: Premium Maps. Buy it first; EMMA reads what you own again once a week.',
+        'It needs premium content you do not own, which Foundry cannot install: Premium Maps. Buy it first, then choose Check what I own again, so that EMMA asks Foundry now rather than at its weekly check.',
       explanation: ['Alpha → Beta → Premium Maps'],
+      unowned: true,
     });
     // Taken back out, with what it brought in.
     expect(updates.picks).toEqual([]);
@@ -1956,7 +1958,7 @@ describe('premium content the user does not own, needed by an update of an insta
     expect(updates.premiumRefusalOf('module:app')).toEqual({
       version: '2.0.0',
       reason:
-        '2.0.0 is not planned: it needs premium content you do not own, which Foundry cannot install: Premium Maps. Buy it first; EMMA reads what you own again once a week.',
+        '2.0.0 is not planned: it needs premium content you do not own, which Foundry cannot install: Premium Maps. Buy it first, then choose Check what I own again, so that EMMA asks Foundry now rather than at its weekly check.',
       explanation: ['App → Beta → Premium Maps'],
     });
     expect(updates.premiumRefusalOf('module:lib')).toBeUndefined();
@@ -1971,6 +1973,12 @@ describe('premium content the user does not own, needed by an update of an insta
 
     await updates.choose('module:app', '2.0.0');
     updates.clear();
+    expect(updates.premiumRefusalOf('module:app')).toBeUndefined();
+
+    // Nor once Foundry is asked again what the user owns.
+    await updates.choose('module:app', '2.0.0');
+    expect(updates.premiumRefusalOf('module:app')).toBeDefined();
+    updates.forgetPremiumRefusals();
     expect(updates.premiumRefusalOf('module:app')).toBeUndefined();
   });
 });

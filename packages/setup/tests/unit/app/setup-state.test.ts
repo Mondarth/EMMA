@@ -43,6 +43,55 @@ describe('SetupState', () => {
     expect(unlisted.listings.module).toBeNull();
   });
 
+  test('asks Foundry again what the user owns, reading again the listings read, and forgetting refusals', async () => {
+    const owned = { premium: false };
+    const listPackages = vi.fn((type: 'module' | 'system') =>
+      Promise.resolve(
+        type === 'module'
+          ? [
+              {
+                type,
+                id: 'premium',
+                title: 'Premium Maps',
+                version: '1.0.0',
+                compatibility: {},
+                systems: [],
+                unowned: !owned.premium,
+              },
+            ]
+          : [],
+      ),
+    );
+    const forgetOwned = vi.fn();
+    const options = {
+      load: () => Promise.resolve(OVERVIEW),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: noUpdates,
+      installModule: noInstall,
+    };
+    const setup = new SetupState({ ...options, listPackages, forgetOwned });
+    await setup.loadListing('module');
+    expect(setup.updates.isUnowned('module:premium')).toBe(true);
+    const forget = vi.spyOn(setup.updates, 'forgetPremiumRefusals');
+
+    // Bought since.
+    owned.premium = true;
+    await setup.updates.recheckOwned?.();
+
+    expect(forgetOwned).toHaveBeenCalledOnce();
+    expect(forget).toHaveBeenCalledOnce();
+    // The module listing, read before, is read again; the system listing, never read, is not.
+    expect(listPackages).toHaveBeenCalledTimes(2);
+    expect(listPackages).toHaveBeenLastCalledWith('module');
+    expect(setup.listings.system).toBeNull();
+    expect(setup.updates.isUnowned('module:premium')).toBe(false);
+
+    // Without a way to forget, or a listing, there is nothing to ask.
+    expect(new SetupState({ ...options, listPackages }).updates.recheckOwned).toBeUndefined();
+    expect(new SetupState({ ...options, forgetOwned }).updates.recheckOwned).toBeUndefined();
+  });
+
   test('narrows each listing as the user says, hiding old packages and premium ones not owned at first', () => {
     const setup = new SetupState({
       load: () => Promise.resolve(OVERVIEW),

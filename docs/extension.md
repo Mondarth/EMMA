@@ -473,6 +473,9 @@ the run: the section names the premium packages to buy first, and how the plan c
 Premium Maps**), and the drawer marks a required module that is premium and not owned before you tick the box.
 The same goes for a newer version of a game system or module installed, as an update that newly requires premium
 content: choosing it is refused, the plan stays as it was, and its panel says why, naming what to buy and the way to it.
+Once you have bought it, **Check what I own again**, beside the refusal, has EMMA ask Foundry now, rather than at its
+weekly check, and reads the listings again with what Foundry says; you can then add the package, or choose the
+version, again.
 
 **Manifest URL**, at the top of the section, installs a package from a manifest you give, as Foundry's own Install
 dialog can. **+** (or Enter) has EMMA's package catalogue read it, and checks that it is a
