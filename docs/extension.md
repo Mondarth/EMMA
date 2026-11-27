@@ -175,6 +175,10 @@ module it runs, or Foundry VTT the plan changes, takes its own colour and a dash
 A game system or module the plan installs anew shows in the tree as soon as it is added, at the version the plan
 takes, on a pale amber background with an amber edge, marked **Pending**: a game system among the game systems, with
 a group of the modules for it, and a module in the groups of the game systems it is for, as Foundry's listing says.
+Its panel, not having the package installed to read, names it by its title on Foundry's listing, gives the version
+the plan installs (**To install**), and, under **On Foundry's listing**, what the listing says of it, as the Install
+section's drawer does: its description, authors, newest version, the Foundry VTT builds it declares, the game systems a
+module is for, its tags, whether it is premium or exclusive content, and its web page.
 
 A game system's panel gives the version installed, how many modules are for it, and the worlds that use it, each with
 the version it last ran with; under a world, also the version that world last ran with.
@@ -190,7 +194,9 @@ module when next run, and which updated modules require it. The world's panel li
 be.
 
 Every row with rows under it opens and closes, from its triangle or from the keyboard: the arrow keys move up and down,
-and open and close a row, and Home and End go to the first and last row. **Read again** reads the installation afresh.
+and open and close a row, and Home and End go to the first and last row. **Read again**, in the footer, reads the
+installation afresh: its worlds and their records, and the game systems and modules installed, as after a change made
+outside EMMA, then looks for updates again.
 
 Typing in the tree finds: each key selects the first row, from the top, whose title has what is typed so far,
 anywhere in it and ignoring case, so "eon" finds Dungeons and Dragons Fifth Edition. The rows it is under open to show
@@ -317,6 +323,10 @@ are not ignored (see [Ignoring](#ignoring)): every other plan still takes them i
 chosen by hand. A world without a record may run modules EMMA cannot see, which the option then leaves as they are. The
 browser remembers the choice for that server.
 
+An update left out this way says so: in the tree, its arrow's tooltip says the update is available but not planned, as
+no recorded world uses it; and its panel says the same, and that choosing a version plans it anyway. It stops saying so
+once a version is chosen, the plan is cleared, or the best versions are planned for everything.
+
 Before the changes, under **Keep first**, the plan offers what Foundry's **Manage Backups** makes by hand:
 
 - a **snapshot of the installation**, unchecked unless the plan changes Foundry VTT, when EMMA checks it as a strong
@@ -426,6 +436,10 @@ and the catalogue checks a package at most once every five minutes, however ofte
 catalogue does not hold yet, it fetches, and the footer says how many it is fetching; EMMA looks again once, by
 itself, when the catalogue says they may be found.
 
+Which premium packages you own, EMMA asks Foundry once a week, and keeps in your browser between. **Check what I own
+again**, in the footer beside **Read again**, has it ask Foundry now, as after buying one, and reads the Install
+listings again with what Foundry says; it is also offered beside every refusal for premium content you do not own.
+
 ### How versions are compared
 
 EMMA compares versions as Foundry VTT does, so that what it plans Foundry accepts. That includes one anomaly: a version
@@ -467,7 +481,15 @@ The checkbox at the left of each title, **Install <title>**, is ticked while the
 the package's releases, from the same sources as the updates, and the plan takes the newest version that fits with its
 other choices, and with what that version requires, which comes in with it. Its row says it is not installed. If no
 version fits, the section says why, in the resolver's words, and the box stays unticked. Unticking it takes it out of
-the plan again, with what it brought in. A premium package you do not own has its box disabled.
+the plan again, with what it brought in. A premium package you do not own has its box disabled. Nor is a package
+added whose plan needs one, however many modules lie between, as Foundry would refuse to install it part-way through
+the run: the section names the premium packages to buy first, and how the plan comes to need each (**Alpha → Beta →
+Premium Maps**), and the drawer marks a required module that is premium and not owned before you tick the box.
+The same goes for a newer version of a game system or module installed, as an update that newly requires premium
+content: choosing it is refused, the plan stays as it was, and its panel says why, naming what to buy and the way to it.
+Once you have bought it, **Check what I own again**, beside the refusal, has EMMA ask Foundry now, rather than at its
+weekly check, and reads the listings again with what Foundry says; you can then add the package, or choose the
+version, again.
 
 **Manifest URL**, at the top of the section, installs a package from a manifest you give, as Foundry's own Install
 dialog can. **+** (or Enter) has EMMA's package catalogue read it, and checks that it is a

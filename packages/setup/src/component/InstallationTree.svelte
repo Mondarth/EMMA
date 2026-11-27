@@ -269,7 +269,7 @@
           {#if update !== undefined && key !== undefined && updates?.heldBack(key) === true}
             {@render arrow('Update.HeldBack', false, true)}
           {:else if update !== undefined}
-            {@render arrow('Update.Available', false)}
+            {@render arrow(updates?.leftUnused(key ?? '') === true ? 'Update.Unused' : 'Update.Available', false)}
           {:else if hidden}
             {@render arrow('Update.Hidden', true)}
           {:else if hiddenHeld}

@@ -109,9 +109,42 @@ describe('SetupRoot', () => {
     const { setup, user } = await setUp();
     const refresh = vi.spyOn(setup, 'refresh');
 
-    await user.click(screen.getByRole('button', { name: 'Read again' }));
+    const button = screen.getByRole('button', { name: 'Read again' });
+    expect(button).toHaveAttribute('data-tooltip', expect.stringMatching(/^Read the installation again: /));
+
+    await user.click(button);
 
     expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  test('asks Foundry again what the user owns, from beside Read again, where it can', async () => {
+    const forgetOwned = vi.fn();
+    const listPackages = vi.fn(() => Promise.resolve([]));
+    const setup = new SetupState({
+      load: () => Promise.resolve(OVERVIEW),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: noUpdates,
+      installModule: noInstall,
+      listPackages,
+      forgetOwned,
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    const user = userEvent.setup();
+
+    const button = screen.getByRole('button', { name: 'Check what I own again' });
+    expect(button).toHaveAttribute('data-tooltip', expect.stringMatching(/^Ask Foundry now which premium packages/));
+    // Beside Read again, before it.
+    expect(button.nextElementSibling).toBe(screen.getByRole('button', { name: 'Read again' }));
+
+    await user.click(button);
+    expect(forgetOwned).toHaveBeenCalledOnce();
+  });
+
+  test('offers no check of what the user owns where Foundry cannot be asked', async () => {
+    await setUp();
+    expect(screen.queryByRole('button', { name: 'Check what I own again' })).toBeNull();
   });
 
   test('shows the root at first: the Foundry version and a summary', async () => {

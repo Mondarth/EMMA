@@ -1266,7 +1266,10 @@ describe('installing anew, by group', () => {
     const fromManifest = {
       ...release('module:new', '1.0.0'),
       relationships: {
-        requires: [{ package: { type: 'module' as const, id: 'lib' }, compatibility: {} }],
+        requires: [
+          { package: { type: 'module' as const, id: 'lib' }, compatibility: {} },
+          { package: { type: 'module' as const, id: 'premium' }, compatibility: {} },
+        ],
         systems: [],
         conflicts: [],
         recommends: [
@@ -1298,6 +1301,7 @@ describe('installing anew, by group', () => {
         Promise.resolve([
           { ...listed('new'), title: 'New', manifest: url },
           { ...listed('maps'), title: 'Maps' },
+          { ...listed('premium'), title: 'Premium Maps', premium: true as const, unowned: true },
         ]),
       () =>
         Promise.resolve({
@@ -1318,6 +1322,8 @@ describe('installing anew, by group', () => {
     await vi.waitFor(() => {
       expect(drawer).toHaveTextContent('Requires Library Installed');
     });
+    // Premium content the user does not own is said to be kept out, before they try.
+    expect(drawer).toHaveTextContent('Premium Maps Premium, not owned: it cannot come into the plan');
     // By name, Maps as the listing names it, Dice by its ID.
     expect(drawer).toHaveTextContent('Recommends dice Not installed Maps Not installed');
     const dice = within(drawer).getByRole('checkbox', { name: 'Install dice with New' });
@@ -1418,7 +1424,16 @@ describe('installing anew, by group', () => {
       type =>
         Promise.resolve(
           type === 'system'
-            ? [{ ...listed('pf2e'), type, title: 'Pathfinder' }]
+            ? [
+                {
+                  ...listed('pf2e'),
+                  type,
+                  title: 'Pathfinder',
+                  description: 'The Pathfinder Second Edition rules.',
+                  authors: ['Paizo'],
+                  url: 'https://example.org/pf2e',
+                },
+              ]
             : [listed('anywhere'), listed('pf-tools', ['pf2e'])],
         ),
       () =>
@@ -1459,6 +1474,25 @@ describe('installing anew, by group', () => {
     const offered = screen.getByRole('region', { name: 'Install a Pathfinder module' });
     expect(offered).toHaveTextContent('pf-tools');
     expect(offered).not.toHaveTextContent('anywhere');
+
+    // Its panel, not installed yet, says what Foundry's listing says of it, and the version the plan installs.
+    await user.click(within(system as HTMLElement).getByText('Pathfinder'));
+    expect(screen.getByRole('heading', { level: 2, name: 'Pathfinder' })).toBeInTheDocument();
+    expect(screen.getByText('To install').nextElementSibling).toHaveTextContent('7.0.0');
+    const fromListing = screen.getByRole('region', { name: "On Foundry's listing" });
+    expect(fromListing).toHaveTextContent('The Pathfinder Second Edition rules.');
+    expect(fromListing).toHaveTextContent('Paizo');
+    expect(within(fromListing).getByRole('link', { name: 'https://example.org/pf2e' })).toHaveAttribute(
+      'href',
+      'https://example.org/pf2e',
+    );
+    // An installed package's panel has none.
+    const dnd = document.querySelector(`[data-key="${SYSTEMS}/system:dnd5e"]`);
+    if (!(dnd instanceof HTMLElement)) throw new Error('No row for D&D 5e');
+    await user.click(within(dnd).getByText('D&D 5e'));
+    expect(screen.getByRole('heading', { level: 2, name: 'D&D 5e' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: "On Foundry's listing" })).not.toBeInTheDocument();
+    expect(screen.queryByText('To install')).not.toBeInTheDocument();
   });
 
   test('shows more of the list as its end comes into view, and starts again on a search', async () => {
@@ -2355,6 +2389,62 @@ describe('planning the best versions', () => {
     ).toEqual(['D&D 5e', 'Library']);
     expect(within(section).getByRole('button', { name: 'Replace the plan with the best versions' })).toBeEnabled();
     expect(within(section).queryByRole('status')).toBeNull();
+  });
+
+  test("says, in the tree and its panel, that an unused module's update is left out of a plan for what worlds use", async () => {
+    // Dice is installed, with an update, but no world runs it.
+    const dice: PackageUpdate = {
+      key: 'module:dice',
+      installed: '1.0.0',
+      newest: '1.1.0',
+      versions: ['1.1.0', '1.0.0'],
+    };
+    const overview = buildOverview(
+      installation({
+        worlds: [{ id: 'a', title: 'Alpha', system: 'dnd5e' }],
+        modules: [installedModule('lib', 'Library', '1.0.0'), installedModule('dice', 'Dice', '1.0.0')],
+      }),
+      new Map([['a', recorded(record('a', { modules: [{ id: 'lib', title: 'Library', version: '1.0.0' }] }))]]),
+    );
+    const setup = new SetupState({
+      load: () => Promise.resolve(overview),
+      guardOn: true,
+      onGuardChange: vi.fn(),
+      findUpdates: () =>
+        Promise.resolve({
+          updates: new Map([...UPDATES, dice].map(update => [update.key, update])),
+          blocked: new Map(),
+          unresolved: [],
+          judge,
+          planner: alone(...UPDATES, dice),
+        }),
+      installModule: noInstall,
+    });
+    await setup.refresh();
+    render(SetupRoot, { setup });
+    await vi.waitFor(() => {
+      expect(setup.updates.status).toBe('found');
+    });
+    const user = userEvent.setup();
+    const section = screen.getByRole('region', { name: 'Plan Updates' });
+    await user.click(within(section).getByRole('checkbox', { name: 'Only what worlds use' }));
+    await user.click(within(section).getByRole('button', { name: 'Plan the best versions' }));
+    await vi.waitFor(() => {
+      expect(setup.updates.leftUnused('module:dice')).toBe(true);
+    });
+
+    expect(setup.updates.leftUnused('module:lib')).toBe(false);
+    const universal = row(/Universal/);
+    await user.click(within(universal).getByText('Universal'));
+    await user.keyboard('{ArrowRight}');
+    const library = row(/Dice/);
+    expect(library).toHaveTextContent(
+      'Update available, not planned: no recorded world uses it, and the best versions were planned for what worlds use',
+    );
+    await user.click(within(library).getByText('Dice'));
+    expect(screen.getByRole('note')).toHaveTextContent(
+      'Its update is not planned: no recorded world uses it, and the best versions were planned only for what worlds use.',
+    );
   });
 
   test('says when there is nothing to change, or no plan to be had, until the plan changes', async () => {

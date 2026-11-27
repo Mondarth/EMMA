@@ -12,6 +12,7 @@
   import { versionIn } from '../app/update-state.svelte';
   import { format, localize } from '../lib/i18n';
   import BusyMark from './BusyMark.svelte';
+  import OwnedRecheck from './OwnedRecheck.svelte';
 
   interface Props {
     updates: UpdateState;
@@ -22,6 +23,8 @@
   let { updates, key }: Props = $props();
 
   const uid = $props.id();
+  /** The version last chosen that the plan refused, as it needs premium content the user does not own. */
+  const refusal = $derived(updates.premiumRefusalOf(key));
   /** The version the plan takes, or the one installed where it holds the package's update back. */
   const chosen = $derived(updates.explainedAt(key));
   /** The newer versions not taken, once worked out. */
@@ -125,7 +128,31 @@
   </section>
 {/if}
 
+{#if updates.leftUnused(key)}
+  <!-- Its update is offered, but the best versions were planned for what worlds use alone, and no world uses it. -->
+  <p class="emma-why" role="note">{localize('Why.Unused')}</p>
+{/if}
+
+{#if refusal !== undefined}
+  <!-- The version last chosen of it that the plan refused, as it needs premium content the user does not own. -->
+  <div class="emma-why emma-why-refused" role="alert">
+    <p>{refusal.reason}</p>
+    <ul>
+      {#each refusal.explanation as line, index (index)}
+        <li>{line}</li>
+      {/each}
+    </ul>
+    {#if updates.recheckOwned !== undefined}
+      <OwnedRecheck {updates} recheck={updates.recheckOwned} />
+    {/if}
+  </div>
+{/if}
+
 <style>
+  .emma-why-refused {
+    color: var(--color-level-error, #c00);
+  }
+
   .emma-why {
     margin-top: 1rem;
     min-height: 2.5rem;

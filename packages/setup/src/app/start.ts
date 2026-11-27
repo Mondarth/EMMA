@@ -15,6 +15,7 @@ import {
   readPins,
   readIgnored,
   readGuardOn,
+  forgetOwnedKept,
   readOwnedKept,
   readPendingPlan,
   writeAlphaAcknowledged,
@@ -197,6 +198,7 @@ export async function startEmmaSetup(options: WaitOptions = {}): Promise<boolean
         owned: () => ownedIn(game, type),
       });
     },
+    forgetOwned: forgetOwnedKept,
     ...(IN_ALPHA && {
       alpha: {
         acknowledged: readAlphaAcknowledged(__EMMA_EXTENSION_VERSION__),
