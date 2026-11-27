@@ -108,23 +108,23 @@ test.describe('the store screenshots', () => {
     await shoot(page, '1-installation-tree');
   });
 
-  test('2: a version list, and why the plan takes the version it does', async ({ page }) => {
+  test('2: a version chosen, and why the plan takes it rather than the newest', async ({ page }) => {
     // A plan of one change needs little room; the panel, saying why, needs the rest.
     const emma = await openEmma(page, 0.25);
     await expand(page, emma, /^Modules/);
     await expand(page, emma, /Universal/);
     await row(emma, /Ambient Weather/).click();
-    // 2.4.0 chosen, the panel says why not 2.5.0, its newest, which needs a newer Foundry VTT; the list, open again,
-    // shows what else may be chosen.
     await emma.getByRole('button', { name: /^Version of Ambient Weather/ }).click();
     await page
       .getByRole('listbox')
       .getByRole('option', { name: /^2\.4\.0/ })
       .click();
-    await expect(emma.getByText(/2\.5\.0/).first()).toBeVisible({ timeout: 30_000 });
-    await emma.getByRole('button', { name: /^Version of Ambient Weather/ }).click();
-    await expect(page.getByRole('listbox')).toBeVisible();
-    await shoot(page, '2-version-list');
+    await expect(page.getByRole('listbox')).toHaveCount(0);
+    // 2.4.0 chosen, the panel says why not 2.5.0, its newest, which needs a newer Foundry VTT.
+    const why = emma.locator('.emma-why').first();
+    await expect(why).toContainText('2.5.0', { timeout: 30_000 });
+    await why.scrollIntoViewIfNeeded();
+    await shoot(page, '2-version-choice');
   });
 
   test('3: the update plan, with its backups and snapshot', async ({ page }) => {
