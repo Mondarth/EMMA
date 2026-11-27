@@ -2,6 +2,9 @@ import { defineConfig, devices } from '@playwright/test';
 
 const SETUP = /.*\.setup\.ts/;
 
+/** The browser extension's store screenshots (`store/screenshots.spec.ts`): run only as the `store` project. */
+const STORE = /store\/.*\.spec\.ts/;
+
 /**
  * Foundry VTT logs a console error, which fails the test, in a window smaller than 1024x768; the desktop device
  * presets are 1280x720.
@@ -41,7 +44,7 @@ export default defineConfig({
     { name: 'setup', testMatch: SETUP, use: { ...devices['Desktop Chrome'], viewport: VIEWPORT } },
     {
       name: 'chromium',
-      testIgnore: SETUP,
+      testIgnore: [SETUP, STORE],
       dependencies: ['setup'],
       use: { ...devices['Desktop Chrome'], viewport: VIEWPORT },
     },
@@ -49,13 +52,20 @@ export default defineConfig({
     // opens a window, which needs a display: `pnpm test:e2e:xvfb` provides a virtual 1920x1080 one, in CI and locally.
     {
       name: 'firefox',
-      testIgnore: SETUP,
+      testIgnore: [SETUP, STORE],
       dependencies: ['setup'],
       use: { ...devices['Desktop Firefox'], viewport: VIEWPORT, headless: false },
     },
+    // The store's screenshots, at the stores' 1280 × 800, in Chromium (see `store/screenshots.spec.ts`).
+    {
+      name: 'store',
+      testMatch: STORE,
+      dependencies: ['setup'],
+      use: { ...devices['Desktop Chrome'], viewport: VIEWPORT },
+    },
     {
       name: 'webkit',
-      testIgnore: SETUP,
+      testIgnore: [SETUP, STORE],
       dependencies: ['setup'],
       use: { ...devices['Desktop Safari'], viewport: VIEWPORT },
     },

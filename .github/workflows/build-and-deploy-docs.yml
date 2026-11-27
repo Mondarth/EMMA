@@ -26,6 +26,13 @@ jobs:
         with:
           ref: main
 
+      # The browser extension's store screenshots, which the guide shows: the newest extension release's (see
+      # store-screenshots.yml). Without them, as before the first release that has them, the guide is built without.
+      - name: Fetch the extension's screenshots
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/docs/fetch-screenshots.sh
+
       - name: Build Documentation
         run: docker compose run --rm --user "$(id -u):$(id -g)" docs make html
 

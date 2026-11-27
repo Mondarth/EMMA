@@ -4,7 +4,10 @@
  * Install the pinned game system (and any modules) that EMMA - Enhanced Module Manager Application is tested with into the end-to-end test data
  * directory, along with the empty fixture modules in `tests/e2e/fixtures/modules` that the tests activate.
  *
- * Usage: `node scripts/e2e/install-packages.ts`
+ * Usage: `node scripts/e2e/install-packages.ts`, or with `--store` for the browser extension's store screenshots: the
+ * made-up modules of `tests/e2e/store/modules` in place of the test fixtures, and the made-up worlds of
+ * `tests/e2e/store/worlds.json`, each with the record the EMMA module would have written (see
+ * `tests/e2e/store/screenshots.spec.ts`).
  */
 
 import { execFileSync } from 'node:child_process';
@@ -15,6 +18,7 @@ import path from 'node:path';
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const DATA = path.join(ROOT, 'tests/e2e/.data/Data');
 const FIXTURES = path.join(ROOT, 'tests/e2e/fixtures/modules');
+const STORE = path.join(ROOT, 'tests/e2e/store');
 
 interface PinnedPackage {
   /** Directory under the Foundry user data folder: `systems` or `modules`. */
@@ -92,17 +96,63 @@ async function install(pinned: PinnedPackage): Promise<void> {
 }
 
 /**
- * Copy the fixture modules into the test data, replacing any older copies so they always match the repository.
+ * Copy fixture modules into the test data, replacing any older copies so they always match the repository.
+ * @param folder - The folder of modules to copy
  */
-function installFixtures(): void {
-  for (const entry of fs.readdirSync(FIXTURES, { withFileTypes: true })) {
+function installFixtures(folder: string = FIXTURES): void {
+  for (const entry of fs.readdirSync(folder, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     const target = path.join(DATA, 'modules', entry.name);
     fs.rmSync(target, { recursive: true, force: true });
-    fs.cpSync(path.join(FIXTURES, entry.name), target, { recursive: true });
-    console.log(`${entry.name}: installed from the fixtures`);
+    fs.cpSync(path.join(folder, entry.name), target, { recursive: true });
+    console.log(`${entry.name}: installed from ${path.relative(ROOT, folder)}`);
+  }
+}
+
+/** A world of the store's screenshots: what `tests/e2e/store/worlds.json` gives. */
+interface StoreWorld {
+  readonly id: string;
+  readonly title: string;
+  /** The modules its record says it runs. */
+  readonly modules: readonly { readonly id: string; readonly title: string; readonly version: string }[];
+}
+
+/**
+ * Set the test data up for the store's screenshots: the made-up modules, without the test fixtures, whose names give
+ * the game away, and the made-up worlds, never launched, each with the record the EMMA module writes in a world.
+ */
+function installStore(): void {
+  for (const entry of fs.readdirSync(FIXTURES))
+    fs.rmSync(path.join(DATA, 'modules', entry), { recursive: true, force: true });
+  installFixtures(path.join(STORE, 'modules'));
+  const { worlds } = JSON.parse(fs.readFileSync(path.join(STORE, 'worlds.json'), 'utf8')) as { worlds: StoreWorld[] };
+  const system = { id: 'dnd5e', title: 'Dungeons & Dragons Fifth Edition', version: '5.3.3' };
+  for (const world of worlds) {
+    const folder = path.join(DATA, 'worlds', world.id);
+    fs.mkdirSync(folder, { recursive: true });
+    const manifest = {
+      id: world.id,
+      title: world.title,
+      system: system.id,
+      coreVersion: '14.368',
+      systemVersion: system.version,
+      compatibility: { minimum: '14', verified: '14.368' },
+    };
+    fs.writeFileSync(path.join(folder, 'world.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+    const record = {
+      schema: 1,
+      emma: '0.16.0',
+      world: { id: world.id, title: world.title },
+      core: '14.368',
+      system,
+      modules: [...world.modules].sort((a, b) => a.id.localeCompare(b.id)),
+      updated: '2026-11-20T19:30:00.000Z',
+    };
+    fs.writeFileSync(path.join(folder, 'mondarth-emma.json'), `${JSON.stringify(record, null, 2)}\n`);
+    console.log(`${world.id}: made, with its record`);
   }
 }
 
 for (const pinned of PACKAGES) await install(pinned);
-installFixtures();
+if (process.argv.includes('--store')) installStore();
+else installFixtures();

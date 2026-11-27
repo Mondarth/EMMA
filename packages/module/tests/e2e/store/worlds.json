@@ -1,0 +1,72 @@
+{
+  "worlds": [
+    {
+      "id": "tomb-of-whispers",
+      "title": "The Tomb of Whispers",
+      "modules": [
+        {
+          "id": "ambient-weather",
+          "title": "Ambient Weather",
+          "version": "2.3.0"
+        },
+        {
+          "id": "lib-wrapper",
+          "title": "libWrapper",
+          "version": "1.13.5.1"
+        },
+        {
+          "id": "party-ledger",
+          "title": "Party Ledger",
+          "version": "3.0.1"
+        },
+        {
+          "id": "token-tracker",
+          "title": "Token Tracker",
+          "version": "4.1.2"
+        }
+      ]
+    },
+    {
+      "id": "saltmarsh-sundays",
+      "title": "Saltmarsh Sundays",
+      "modules": [
+        {
+          "id": "ambient-weather",
+          "title": "Ambient Weather",
+          "version": "2.3.0"
+        },
+        {
+          "id": "dungeon-doors",
+          "title": "Dungeon Doors",
+          "version": "1.8.0"
+        },
+        {
+          "id": "encounter-deck",
+          "title": "Encounter Deck",
+          "version": "0.9.4"
+        },
+        {
+          "id": "party-ledger",
+          "title": "Party Ledger",
+          "version": "3.0.1"
+        }
+      ]
+    },
+    {
+      "id": "one-shot-night",
+      "title": "One-Shot Night",
+      "modules": [
+        {
+          "id": "dungeon-doors",
+          "title": "Dungeon Doors",
+          "version": "1.8.0"
+        },
+        {
+          "id": "encounter-deck",
+          "title": "Encounter Deck",
+          "version": "0.9.3"
+        }
+      ]
+    }
+  ]
+}

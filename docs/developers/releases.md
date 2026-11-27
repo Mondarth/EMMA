@@ -72,6 +72,19 @@ Copies of the module installed before 0.9.0 find updates at
 release became the latest, they would find no manifest there. So the extension's releases are always published as
 pre-releases, which GitHub never makes the latest. The module's releases stay the latest.
 
+### The extension's store screenshots
+
+Each new version of the extension has its store screenshots taken, after the release, by
+`.github/workflows/store-screenshots.yml`: EMMA on a real Foundry VTT setup screen, at the stores' 1280 × 800, built at
+the release's tag, so that EMMA's window gives that version. The installation and the catalogue's answers are made up,
+so that no real module is pictured (`packages/module/tests/e2e/store/`). They are attached to the extension's GitHub
+release, as `screenshot-<n>-<scene>.png`, beside its builds, for the stores' listings (see
+`packages/extension/store/`), and the documentation, built after them, shows the newest. A release of the module
+alone does not take them.
+
+They can be taken by hand too, at any ref, from the **Store screenshots** workflow's **Run workflow**: they are then
+the run's `store-screenshots` artifact, and attached to nothing.
+
 ### Signing the extension again
 
 Mozilla signs the Firefox build as an unlisted add-on on addons.mozilla.org (AMO), which **never takes the same version

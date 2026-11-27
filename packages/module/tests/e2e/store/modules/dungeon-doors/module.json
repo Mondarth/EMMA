@@ -1,0 +1,15 @@
+{
+  "id": "dungeon-doors",
+  "title": "Dungeon Doors",
+  "description": "Animated doors, locks and secret passages for your maps.",
+  "version": "1.8.0",
+  "compatibility": {
+    "minimum": "14",
+    "verified": "14"
+  },
+  "authors": [
+    {
+      "name": "Stonekeep Studio"
+    }
+  ]
+}

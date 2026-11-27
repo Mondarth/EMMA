@@ -13,8 +13,12 @@ releases/
 **/tests/e2e/.data/
 **/tests/e2e/test-results/
 **/tests/e2e/playwright-report/
+**/tests/e2e/store-screenshots/
 **/tests/browser/test-results/
 node_modules/
 .foundryvtt/data/
 .foundryvtt/secrets.json
 .foundryvtt/catalogue-token.json
+
+# The extension's store screenshots, fetched for the guide (scripts/docs/fetch-screenshots.sh).
+docs/_static/screenshots/
