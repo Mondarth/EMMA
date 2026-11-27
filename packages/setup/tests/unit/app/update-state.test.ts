@@ -711,6 +711,28 @@ describe('installing from a manifest URL', () => {
     return { updates, planner };
   }
 
+  test('keeps out the version a manifest gives where it needs premium content the user does not own', async () => {
+    const { updates } = await searched({ ok: true, release: DICE, title: 'Dice' });
+    updates.knowListing([{ type: 'module', id: 'lib', title: 'Library', unowned: true }]);
+    // Library is installed: only one installed anew is kept out.
+    await expect(updates.installFrom(DICE_URL, 'module')).resolves.toEqual({
+      ok: true,
+      title: 'Dice',
+      version: '1.2.0',
+    });
+    await updates.forget('module:dice');
+    updates.knowListing([{ type: 'module', id: 'dice', title: 'Dice', unowned: true }]);
+
+    await expect(updates.installFrom(DICE_URL, 'module')).resolves.toEqual({
+      ok: false,
+      reason:
+        'It needs premium content you do not own, which Foundry cannot install: Dice. Buy it first, then choose Check what I own again, so that EMMA asks Foundry now rather than at its weekly check.',
+      explanation: ['Dice'],
+      unowned: true,
+    });
+    expect(updates.picks).toEqual([]);
+  });
+
   test('adds the version a manifest gives, looking up what it requires', async () => {
     const { updates, planner } = await searched({ ok: true, release: DICE, title: 'Dice' });
 
@@ -1804,5 +1826,159 @@ describe('a pin in the way of a choice', () => {
     expect(options.find(({ version }) => version === '2.0.0')?.conflict?.remove).toEqual([
       { title: 'module:lib (pinned)', version: '1.1.0' },
     ]);
+  });
+});
+
+describe('premium content the user does not own, needed by a module to install', () => {
+  /**
+   * The state, searched, with a planner that installs A with B, and B with Premium, as each requires the next, and
+   * Solo alone; and Foundry's listing, on which Premium is premium content the user does not own.
+   * @returns The state
+   */
+  async function searched() {
+    const base = alone(APP, LIB);
+    const known = new Set(['module:a', 'module:b', 'module:premium', 'module:solo', 'module:owned']);
+    const needs: Record<string, readonly PlanEntry[]> = {
+      'module:a': [
+        { key: 'module:b', version: '1.0.0', by: { package: 'module:a', version: '1.0.0' } },
+        {
+          key: 'module:premium',
+          version: '1.0.0',
+          by: { package: 'module:a', version: '1.0.0' },
+          through: [{ package: 'module:b', version: '1.0.0' }],
+        },
+      ],
+      'module:direct': [
+        { key: 'module:premium', version: '1.0.0', by: { package: 'module:direct', version: '1.0.0' } },
+      ],
+    };
+    const planner: Planner = {
+      ...base,
+      add: key => Promise.resolve(known.has(key) || key === 'module:direct'),
+      candidates: key => (known.has(key) || key === 'module:direct' ? ['1.0.0'] : base.candidates(key)),
+      plan: picks =>
+        Promise.resolve([...picks].flatMap(([key, version]): PlanEntry[] => [{ key, version }, ...(needs[key] ?? [])])),
+    };
+    const updates = new UpdateState(() => Promise.resolve({ ...finding(APP, LIB), planner }));
+    await updates.searchFor(OVERVIEW);
+    updates.knowListing([
+      { type: 'module', id: 'a', title: 'Alpha' },
+      { type: 'module', id: 'b', title: 'Beta' },
+      { type: 'module', id: 'premium', title: 'Premium Maps', unowned: true },
+      { type: 'module', id: 'owned', title: 'Owned', unowned: false },
+    ]);
+    return updates;
+  }
+
+  test('keeps out a module that needs it through another, naming it, and the way to it', async () => {
+    const updates = await searched();
+
+    await expect(updates.install('module:a', 'Alpha')).resolves.toEqual({
+      ok: false,
+      reason:
+        'It needs premium content you do not own, which Foundry cannot install: Premium Maps. Buy it first, then choose Check what I own again, so that EMMA asks Foundry now rather than at its weekly check.',
+      explanation: ['Alpha → Beta → Premium Maps'],
+      unowned: true,
+    });
+    // Taken back out, with what it brought in.
+    expect(updates.picks).toEqual([]);
+    expect(updates.plan).toEqual([]);
+  });
+
+  test('keeps out a module that needs it itself', async () => {
+    const updates = await searched();
+    await expect(updates.install('module:direct', 'Direct')).resolves.toMatchObject({
+      ok: false,
+      explanation: ['Direct → Premium Maps'],
+    });
+    expect(updates.picks).toEqual([]);
+  });
+
+  test('lets in a module that needs none, and knows which the user does not own', async () => {
+    const updates = await searched();
+    await expect(updates.install('module:solo', 'Solo')).resolves.toEqual({ ok: true, version: '1.0.0' });
+    expect(updates.isUnowned('module:premium')).toBe(true);
+    expect(updates.isUnowned('module:owned')).toBe(false);
+    expect(updates.isUnowned('module:a')).toBe(false);
+    // Bought since, as a listing read again says.
+    updates.knowListing([{ type: 'module', id: 'premium', title: 'Premium Maps', unowned: false }]);
+    expect(updates.isUnowned('module:premium')).toBe(false);
+    await expect(updates.install('module:a', 'Alpha')).resolves.toEqual({ ok: true, version: '1.0.0' });
+    // Read as not owned once it is in the plan, it keeps out only what newly needs it.
+    updates.knowListing([{ type: 'module', id: 'premium', title: 'Premium Maps', unowned: true }]);
+    await expect(updates.install('module:direct', 'Direct')).resolves.toEqual({ ok: true, version: '1.0.0' });
+  });
+});
+
+describe('premium content the user does not own, needed by an update of an installed module', () => {
+  /**
+   * The state, searched, with App installed, whose 2.0.0 newly requires Premium Maps, through Beta, and whose 1.5.0
+   * requires nothing new; Premium Maps is premium content the user does not own.
+   * @returns The state
+   */
+  async function searched() {
+    const base = alone(APP, LIB);
+    const planner: Planner = {
+      ...base,
+      plan: async picks => {
+        const planned = (await base.plan(picks)) ?? [];
+        return picks.get('module:app') === '2.0.0'
+          ? [
+              ...planned,
+              { key: 'module:beta', version: '1.0.0', by: { package: 'module:app', version: '2.0.0' } },
+              {
+                key: 'module:premium',
+                version: '1.0.0',
+                by: { package: 'module:app', version: '2.0.0' },
+                through: [{ package: 'module:beta', version: '1.0.0' }],
+              },
+            ]
+          : planned;
+      },
+    };
+    const updates = new UpdateState(() => Promise.resolve({ ...finding(APP, LIB), planner }));
+    await updates.searchFor(OVERVIEW);
+    updates.knowListing([
+      { type: 'module', id: 'app', title: 'App' },
+      { type: 'module', id: 'beta', title: 'Beta' },
+      { type: 'module', id: 'premium', title: 'Premium Maps', unowned: true },
+    ]);
+    return updates;
+  }
+
+  test('refuses the version, saying why and the way to it, and leaves the plan as it was', async () => {
+    const updates = await searched();
+    await updates.choose('module:lib', '1.1.0');
+    const before = updates.plan;
+
+    await expect(updates.choose('module:app', '2.0.0')).resolves.toBe(false);
+
+    expect(updates.plan).toBe(before);
+    expect(updates.chosenOf('module:app')).toBe('1.0.0');
+    expect(updates.premiumRefusalOf('module:app')).toEqual({
+      version: '2.0.0',
+      reason:
+        '2.0.0 is not planned: it needs premium content you do not own, which Foundry cannot install: Premium Maps. Buy it first, then choose Check what I own again, so that EMMA asks Foundry now rather than at its weekly check.',
+      explanation: ['App → Beta → Premium Maps'],
+    });
+    expect(updates.premiumRefusalOf('module:lib')).toBeUndefined();
+  });
+
+  test('takes another version, forgetting the refusal, as clearing the plan does', async () => {
+    const updates = await searched();
+    await updates.choose('module:app', '2.0.0');
+
+    await expect(updates.choose('module:app', '1.5.0')).resolves.toBe(true);
+    expect(updates.premiumRefusalOf('module:app')).toBeUndefined();
+
+    await updates.choose('module:app', '2.0.0');
+    updates.clear();
+    expect(updates.premiumRefusalOf('module:app')).toBeUndefined();
+
+    // Nor once Foundry is asked again what the user owns.
+    await updates.choose('module:app', '2.0.0');
+    expect(updates.premiumRefusalOf('module:app')).toBeDefined();
+    updates.forgetPremiumRefusals();
+    expect(updates.premiumRefusalOf('module:app')).toBeUndefined();
   });
 });

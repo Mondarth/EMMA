@@ -1266,7 +1266,10 @@ describe('installing anew, by group', () => {
     const fromManifest = {
       ...release('module:new', '1.0.0'),
       relationships: {
-        requires: [{ package: { type: 'module' as const, id: 'lib' }, compatibility: {} }],
+        requires: [
+          { package: { type: 'module' as const, id: 'lib' }, compatibility: {} },
+          { package: { type: 'module' as const, id: 'premium' }, compatibility: {} },
+        ],
         systems: [],
         conflicts: [],
         recommends: [
@@ -1298,6 +1301,7 @@ describe('installing anew, by group', () => {
         Promise.resolve([
           { ...listed('new'), title: 'New', manifest: url },
           { ...listed('maps'), title: 'Maps' },
+          { ...listed('premium'), title: 'Premium Maps', premium: true as const, unowned: true },
         ]),
       () =>
         Promise.resolve({
@@ -1318,6 +1322,8 @@ describe('installing anew, by group', () => {
     await vi.waitFor(() => {
       expect(drawer).toHaveTextContent('Requires Library Installed');
     });
+    // Premium content the user does not own is said to be kept out, before they try.
+    expect(drawer).toHaveTextContent('Premium Maps Premium, not owned: it cannot come into the plan');
     // By name, Maps as the listing names it, Dice by its ID.
     expect(drawer).toHaveTextContent('Recommends dice Not installed Maps Not installed');
     const dice = within(drawer).getByRole('checkbox', { name: 'Install dice with New' });
