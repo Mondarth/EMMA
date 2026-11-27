@@ -194,7 +194,9 @@ module when next run, and which updated modules require it. The world's panel li
 be.
 
 Every row with rows under it opens and closes, from its triangle or from the keyboard: the arrow keys move up and down,
-and open and close a row, and Home and End go to the first and last row. **Read again** reads the installation afresh.
+and open and close a row, and Home and End go to the first and last row. **Read again**, in the footer, reads the
+installation afresh: its worlds and their records, and the game systems and modules installed, as after a change made
+outside EMMA, then looks for updates again.
 
 Typing in the tree finds: each key selects the first row, from the top, whose title has what is typed so far,
 anywhere in it and ignoring case, so "eon" finds Dungeons and Dragons Fifth Edition. The rows it is under open to show
@@ -433,6 +435,10 @@ catalogue read each installed package's own manifest now, then looks again: a ch
 and the catalogue checks a package at most once every five minutes, however often it is asked. A package the
 catalogue does not hold yet, it fetches, and the footer says how many it is fetching; EMMA looks again once, by
 itself, when the catalogue says they may be found.
+
+Which premium packages you own, EMMA asks Foundry once a week, and keeps in your browser between. **Check what I own
+again**, in the footer beside **Read again**, has it ask Foundry now, as after buying one, and reads the Install
+listings again with what Foundry says; it is also offered beside every refusal for premium content you do not own.
 
 ### How versions are compared
 
