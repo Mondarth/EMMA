@@ -22,6 +22,8 @@ const OUT = path.resolve(import.meta.dirname, '../store-screenshots');
  */
 async function fillPage(page: Page): Promise<void> {
   await page.evaluate(id => {
+    // An open version list can scroll the setup screen beneath the window.
+    window.scrollTo(0, 0);
     const app = foundry.applications.instances.get(id);
     app?.setPosition({ left: 0, top: 0, width: window.innerWidth, height: window.innerHeight });
   }, EMMA_WINDOW.slice(1));
@@ -30,18 +32,19 @@ async function fillPage(page: Page): Promise<void> {
 /**
  * Open EMMA's window over the whole page, with the catalogue answering as `catalogue.ts` says.
  * @param page - The page
+ * @param plan - The share of the window's height the update plan takes
  * @returns EMMA's window
  */
-async function openEmma(page: Page): Promise<Locator> {
+async function openEmma(page: Page, plan = 0.62): Promise<Locator> {
   await routeCatalogue(page, endpoint => {
     if (endpoint === 'api/v2/lookup') return lookup();
     if (endpoint === 'api/v2/listing') return listing();
     return undefined;
   });
   // The update plan takes most of the window's height, below the tree, so that its changes show with its backups.
-  await page.addInitScript(() => {
-    localStorage.setItem('mondarth-emma.setup.layout', JSON.stringify({ tree: 0.4, plan: 0.62 }));
-  });
+  await page.addInitScript(share => {
+    localStorage.setItem('mondarth-emma.setup.layout', JSON.stringify({ tree: 0.4, plan: share }));
+  }, plan);
   await openSetupWithEmma(page);
   // The setup screen may still be settling as its menu is clicked: asked again once, it is not.
   const button = page.getByRole('button', { name: 'EMMA', exact: true });
@@ -106,7 +109,8 @@ test.describe('the store screenshots', () => {
   });
 
   test('2: a version list, and why the plan takes the version it does', async ({ page }) => {
-    const emma = await openEmma(page);
+    // A plan of one change needs little room; the panel, saying why, needs the rest.
+    const emma = await openEmma(page, 0.25);
     await expand(page, emma, /^Modules/);
     await expand(page, emma, /Universal/);
     await row(emma, /Ambient Weather/).click();
