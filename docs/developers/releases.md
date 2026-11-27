@@ -70,7 +70,7 @@ The version follows from the commits that count, as in {doc}`workflow`: `fix` â†
 Copies of the module installed before 0.9.0 find updates at
 `https://github.com/Mondarth/EMMA/releases/latest/download/module.json`, GitHub's **latest** release. If an extension
 release became the latest, they would find no manifest there. So the extension's releases are always published as
-pre-releases, which GitHub never makes the latest: they are alphas, too. The module's releases stay the latest.
+pre-releases, which GitHub never makes the latest. The module's releases stay the latest.
 
 ### Signing the extension again
 
