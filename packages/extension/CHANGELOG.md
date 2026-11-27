@@ -1,3 +1,17 @@
+## [0.16.0](https://github.com/Mondarth/EMMA/compare/extension-v0.15.0...extension-v0.16.0) (2026-11-27)
+
+### Features
+
+* **extension:** leave alpha testing ([18d4639](https://github.com/Mondarth/EMMA/commit/18d4639e1b0b35222ba8c38884161444543851ac))
+* **extension:** name the user by their nickname where they set one ([7ed8251](https://github.com/Mondarth/EMMA/commit/7ed82513a4452a986a567815398e1ced47cea630))
+* **extension:** submit each release to addons.mozilla.org, listed ([5f536e0](https://github.com/Mondarth/EMMA/commit/5f536e04848abc5ad715bc03d8b82bc8a7a4530d))
+* **setup:** build the setup kit into the extension ([78e4148](https://github.com/Mondarth/EMMA/commit/78e4148997edccab96923b191d52d292b81c5728))
+* **setup:** leave alpha testing ([f70dad0](https://github.com/Mondarth/EMMA/commit/f70dad082341c2895984c5c533793cc94148e96e))
+
+### Bug Fixes
+
+* **extension:** declare the data the Firefox build sends ([dcad194](https://github.com/Mondarth/EMMA/commit/dcad1945ecc05758bf08e1f232511cc570860986))
+
 ## [0.15.0](https://github.com/Mondarth/EMMA/compare/extension-v0.14.0...extension-v0.15.0) (2026-11-27)
 
 ### Features
