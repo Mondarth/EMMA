@@ -14,7 +14,7 @@ reviewed like code, and so that the release can submit it.
 
 - **Version:** 0.16.0 or later only. Earlier versions import code from the server (the setup kit), which both stores
   refuse, and call themselves alpha.
-- **Screenshots** are still to be taken: see the lists in `chrome.md` and `amo.md`.
+- **Screenshots** are each release's, attached to its GitHub release.
 - **Support e-mail:** both stores ask for one. None is given here; add the address you want public.
 - **Keep the data declarations true.** If what the extension sends changes, change `chrome.md`'s privacy answers,
   the Firefox manifest's `data_collection_permissions` (`scripts/manifest.ts`) and `amo.md` with it.

@@ -85,22 +85,29 @@ alone does not take them.
 They can be taken by hand too, at any ref, from the **Store screenshots** workflow's **Run workflow**: they are then
 the run's `store-screenshots` artifact, and attached to nothing.
 
-### Signing the extension again
+### Submitting the extension to addons.mozilla.org
 
-Mozilla signs the Firefox build as an unlisted add-on on addons.mozilla.org (AMO), which **never takes the same version
-twice**. A release that submits a version and then fails, such as when the connection drops while `web-ext sign`
-waits for Mozilla's approval, leaves that version on AMO without a tag; run again, it computes the same version and AMO
-refuses it ("Version … already exists").
+Each release of the extension submits its Firefox build to addons.mozilla.org (AMO) as a **listed** version, for
+Mozilla's review (`scripts/release/package.ts`, `scripts/amo.ts`), with the API key in the `AMO_JWT_ISSUER` and
+`AMO_JWT_SECRET` secrets:
 
-So when signing fails and AMO already holds the version, `scripts/release/package.ts` takes the add-on AMO signed then
-instead (`scripts/amo.ts`): it waits for Mozilla's signature if it is still to come, downloads the signed add-on with
-the API key, checks it against AMO's hash, and takes it only if its files are byte for byte this build's, Mozilla's
-`META-INF/` signature aside. The extension builds the same each time, its catalogue obscured the same way, so a release
-run again for the same commit passes, and one for any other build fails, saying which files differ.
+1. it sets the add-on's listing from `packages/extension/store/amo-metadata.json` (name, summary, description,
+   categories and the rest), which a listed version needs, so the listing is kept, and reviewed, as code;
+2. uploads the build on the listed channel, and waits for AMO's automatic validation, a few minutes at most;
+3. creates the version, with its licence and the notes to Mozilla's reviewers;
+4. attaches the source it is built from, the repository at the release, as Mozilla's reviewers need for a bundled
+   build.
 
-A version AMO holds from another build cannot be released. Skip it: tag `extension-v<version>` on the commit the last
-extension release is tagged on, and run the release again, which then releases the next version. Extension 0.11.1 was
-skipped so, as it was submitted by a release whose wait broke off, before the extension built the same each time.
+The release does **not** wait for the review, which may take days: Mozilla signs the version once it approves it, and
+Firefox users get it, and its updates, from AMO. The GitHub release carries the Firefox build unsigned, as submitted.
+
+AMO never takes the same version twice: a release run again for a version AMO holds already submits nothing more. A
+submission that fails, such as a build AMO finds invalid, is the release run's error, but the release goes on, so the
+version is released everywhere else; submit it by hand from AMO's developer hub, with the build attached to the
+release.
+
+The Chrome Web Store is not submitted to yet: its first version is made by hand from the release's Chromium build, and
+later versions will be submitted by the release once the item exists.
 
 ### Tags
 

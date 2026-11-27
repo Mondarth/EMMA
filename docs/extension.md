@@ -42,16 +42,13 @@ the extensions page.
 
 ### Firefox
 
-1. Download `emma-extension-firefox-v<version>.xpi` from the release.
-2. Open the file in Firefox: drag it onto a Firefox window, or choose it from **File → Open File**.
-3. Choose **Add** when Firefox asks.
+From version 0.16.0, EMMA for Foundry VTT is listed on Firefox Add-ons (addons.mozilla.org), once Mozilla has reviewed
+it: install it from there, with **Add to Firefox**, and Firefox keeps it up to date.
 
-The file is signed by Mozilla, so Firefox keeps the extension installed, but it is not listed on Firefox Add-ons. To
-update, install the newer `.xpi` the same way.
-
-If a release has only `emma-extension-firefox-v<version>-unsigned.zip`, Firefox can load it only until it restarts:
-unzip it, open `about:debugging#/runtime/this-firefox`, choose **Load Temporary Add-on…** and select the
-`manifest.json` inside.
+A release's `emma-extension-firefox-v<version>.zip` is the build as submitted for review, unsigned, so Firefox can load
+it only until it restarts: unzip it, open `about:debugging#/runtime/this-firefox`, choose **Load Temporary Add-on…**
+and select the `manifest.json` inside. Versions before 0.16.0 were released signed, as `.xpi` files, for installing by
+hand.
 
 ## Activating EMMA on a server
 
