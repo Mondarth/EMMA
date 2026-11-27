@@ -120,8 +120,8 @@ jobs:
         run: pnpm run release:extension
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-          # An API key from addons.mozilla.org, to have Mozilla sign the Firefox build as an unlisted add-on. Without
-          # it, the Firefox build is released unsigned, which Firefox installs only until it restarts.
+          # An API key from addons.mozilla.org, to submit the Firefox build there as a listed version, for Mozilla's
+          # review (packages/extension/scripts/amo.ts). Without it, the Firefox build is released, but not submitted.
           AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
           AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
           # EMMA's package catalogue's URL, and Mondarth's accounts', where its user signs in, as required: the release

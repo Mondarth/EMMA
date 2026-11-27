@@ -1,18 +1,15 @@
 /**
- * The add-on as addons.mozilla.org (AMO) holds it, for a release that has to be signed again. AMO never takes the
- * same version twice: once a release has submitted a version, a release run again for it is refused ("Version …
- * already exists"), and one whose wait for the signature broke off has the signed add-on there, never downloaded.
- * Either way the signed add-on can be had from AMO's API, and used once it is shown to be this build: the extension
- * builds the same each time, its catalogue obscured the same way (see `obscure.ts` in the core), so its files are
- * byte for byte the build's, but for the signature Mozilla adds in `META-INF/`.
+ * The browser extension on addons.mozilla.org (AMO): each release submits its Firefox build as a **listed** version,
+ * for Mozilla's review, with the listing `store/amo-metadata.json` gives and the source the build is made from. The
+ * release does not wait for the review, which may take days: Mozilla signs the version once it approves it, and Firefox
+ * users get it from AMO. AMO never takes the same version twice, so a release run again for a version AMO holds already
+ * submits nothing more.
  *
- * AMO's API: https://mozilla.github.io/addons-server/topics/api/ (v5). An unlisted version needs the add-on's
- * developer's key, sent as a JSON Web Token.
+ * AMO's API: https://mozilla.github.io/addons-server/topics/api/ (v5), with the add-on's developer's key, sent as a
+ * JSON Web Token.
  */
 
-import { createHash, createHmac, randomUUID } from 'node:crypto';
-import fs from 'node:fs';
-import path from 'node:path';
+import { createHmac, randomUUID } from 'node:crypto';
 
 /** AMO's API. */
 export const AMO_API = 'https://addons.mozilla.org/api/v5';
@@ -27,10 +24,8 @@ export interface AmoKey {
 export interface AmoFile {
   /** Where to download it. */
   readonly url: string;
-  /** `public` once signed; `unreviewed` while it waits; `disabled` if refused. */
+  /** `public` once signed; `unreviewed` while it waits for review; `disabled` if refused. */
   readonly status: string;
-  /** Its hash, such as `sha256:<hex>`. */
-  readonly hash?: string;
 }
 
 /**
@@ -60,7 +55,7 @@ export interface AmoOptions {
   readonly key: AmoKey;
   /** How to fetch: `globalThis.fetch`, or a stand-in. */
   readonly send: typeof globalThis.fetch;
-  /** Waits, in milliseconds. */
+  /** Waits, in milliseconds: between asking whether an upload is validated. */
   readonly sleep?: (ms: number) => Promise<void>;
 }
 
@@ -84,77 +79,141 @@ export async function amoFile(guid: string, version: string, options: AmoOptions
   return file;
 }
 
-/** How long to wait for a version's signature: Mozilla signs an unlisted add-on in minutes. */
-const WAIT_ATTEMPTS = 40;
-const WAIT_MS = 30_000;
+/** The add-on's listing, as `store/amo-metadata.json` gives it. */
+export interface AmoListing {
+  /** The add-on's own fields, as AMO's add-on edit takes them: name, summary, description, categories, and so on. */
+  readonly [field: string]: unknown;
+  /** The version's own: its licence, and the notes to Mozilla's reviewers. */
+  readonly version: { readonly license: string; readonly approval_notes?: string };
+}
 
-/**
- * The file AMO holds for a version of the add-on, once Mozilla has signed it.
- * @param guid - The add-on's id
- * @param version - The version
- * @param options - The key, how to fetch, and how to wait
- * @returns Its file, signed; or `undefined` if AMO does not hold the version
- * @throws {Error} If Mozilla refused it, or has not signed it within twenty minutes
- */
-export async function signedAmoFile(guid: string, version: string, options: AmoOptions): Promise<AmoFile | undefined> {
-  const sleep = options.sleep ?? (ms => new Promise<void>(resolve => setTimeout(resolve, ms)));
-  for (let attempt = 1; ; attempt++) {
-    const file = await amoFile(guid, version, options);
-    if (file === undefined || file.status === 'public') return file;
-    if (file.status === 'disabled') throw new Error(`Mozilla refused to sign ${guid} ${version}`);
-    if (attempt >= WAIT_ATTEMPTS) throw new Error(`Mozilla has not signed ${guid} ${version}: it is ${file.status}`);
-    await sleep(WAIT_MS);
-  }
+/** The fields of the listing AMO's add-on edit takes; the others, such as `support_url`, are set on AMO's site. */
+const EDITABLE = [
+  'categories',
+  'contributions_url',
+  'description',
+  'homepage',
+  'is_experimental',
+  'name',
+  'requires_payment',
+  'summary',
+  'support_email',
+  'tags',
+] as const;
+
+/** A request to AMO's API: its method, and a body of form data or JSON, or none. */
+interface AmoRequest {
+  readonly method: string;
+  readonly body?: FormData;
+  readonly json?: unknown;
 }
 
 /**
- * Download a version's signed file, checking it against the hash AMO gives.
- * @param file - The file
+ * Ask AMO's API, with the key.
+ * @param path - The path, under {@link AMO_API}
+ * @param init - The request
  * @param options - The key, and how to fetch
- * @returns Its bytes
- * @throws {Error} If it cannot be downloaded, or is not what AMO's hash says
+ * @returns What AMO answered, as JSON
+ * @throws {Error} If AMO did not answer with success
  */
-export async function downloadAmoFile(file: AmoFile, options: AmoOptions): Promise<Buffer> {
+async function amo(path: string, init: AmoRequest, options: AmoOptions) {
   const { key, send } = options;
-  // An unlisted add-on's file is the developer's alone to download.
-  const response = await send(file.url, { headers: { Authorization: `JWT ${amoToken(key)}` } });
-  if (!response.ok) throw new Error(`Downloading ${file.url} failed: ${response.status}`);
-  const bytes = Buffer.from(await response.arrayBuffer());
-  const [algorithm, expected] = file.hash?.split(':') ?? [];
-  if (algorithm === 'sha256' && createHash('sha256').update(bytes).digest('hex') !== expected) {
-    throw new Error(`${file.url} is not the file AMO's hash says`);
+  const json = init.json !== undefined;
+  const response = await send(`${AMO_API}${path}`, {
+    method: init.method,
+    headers: { Authorization: `JWT ${amoToken(key)}`, ...(json && { 'Content-Type': 'application/json' }) },
+    body: json ? JSON.stringify(init.json) : (init.body ?? null),
+  });
+  if (!response.ok)
+    throw new Error(`AMO answered ${response.status} to ${init.method} ${path}: ${await response.text()}`);
+  return (await response.json()) as unknown;
+}
+
+/**
+ * Set the add-on's listing on AMO, which a listed version needs: its name, summary, categories and the rest.
+ * @param guid - The add-on's id
+ * @param listing - The listing
+ * @param options - The key, and how to fetch
+ */
+export async function editListing(guid: string, listing: AmoListing, options: AmoOptions): Promise<void> {
+  const fields = Object.fromEntries(EDITABLE.flatMap(field => (field in listing ? [[field, listing[field]]] : [])));
+  await amo(`/addons/addon/${encodeURIComponent(guid)}/`, { method: 'PATCH', json: fields }, options);
+}
+
+/** How long to wait for AMO to validate an upload: it takes seconds, or a few minutes when busy. */
+const VALIDATION_ATTEMPTS = 60;
+const VALIDATION_MS = 10_000;
+
+/**
+ * Upload the add-on's build to AMO on the listed channel, and wait for AMO to validate it.
+ * @param build - The build, zipped
+ * @param options - The key, how to fetch, and how to wait
+ * @returns The upload's id, to create the version with
+ * @throws {Error} If AMO finds the build invalid, or has not validated it within ten minutes
+ */
+export async function uploadListed(build: Buffer, options: AmoOptions): Promise<string> {
+  const sleep = options.sleep ?? (ms => new Promise<void>(resolve => setTimeout(resolve, ms)));
+  const form = new FormData();
+  form.append('upload', new Blob([new Uint8Array(build)]), 'emma-extension-firefox.zip');
+  form.append('channel', 'listed');
+  let upload = (await amo('/addons/upload/', { method: 'POST', body: form }, options)) as AmoUpload;
+  for (let attempt = 1; !upload.processed; attempt++) {
+    if (attempt >= VALIDATION_ATTEMPTS) throw new Error(`AMO has not validated the upload ${upload.uuid}`);
+    await sleep(VALIDATION_MS);
+    upload = (await amo(`/addons/upload/${upload.uuid}/`, { method: 'GET' }, options)) as AmoUpload;
   }
-  return bytes;
+  if (!upload.valid) {
+    const messages = (upload.validation?.messages ?? [])
+      .filter(({ type }) => type === 'error')
+      .map(({ message }) => message);
+    throw new Error(`AMO found the build invalid: ${messages.join('; ') || 'no reason given'}`);
+  }
+  return upload.uuid;
+}
+
+/** An upload, as AMO's API gives it. */
+interface AmoUpload {
+  readonly uuid: string;
+  readonly processed: boolean;
+  readonly valid: boolean;
+  readonly validation?: { readonly messages?: readonly { readonly type: string; readonly message: string }[] } | null;
 }
 
 /**
- * Every file under a folder, by its path relative to it, `/`-separated.
- * @param folder - The folder
- * @returns The paths
+ * Submit a release of the add-on to AMO as a listed version, for Mozilla's review, unless AMO holds the version
+ * already: set the listing, upload the build, create the version with its licence and notes to the reviewers, and
+ * attach the source it is built from. Nothing waits for the review.
+ * @param guid - The add-on's id
+ * @param version - The release's version
+ * @param files - The build, zipped, and the source, archived
+ * @param files.build - The build
+ * @param files.source - The source
+ * @param listing - The listing
+ * @param options - The key, how to fetch, and how to wait
+ * @returns `submitted`, or `held` if AMO holds the version already
  */
-function filesUnder(folder: string): string[] {
-  return fs
-    .readdirSync(folder, { recursive: true, withFileTypes: true })
-    .filter(entry => entry.isFile())
-    .map(entry => path.relative(folder, path.join(entry.parentPath, entry.name)).split(path.sep).join('/'));
-}
-
-/**
- * How a signed add-on, unpacked, differs from a build: the files one has and the other has not, and those both have
- * that differ. Mozilla's signature, in `META-INF/`, is not the build's, and is left out.
- * @param build - The build's folder
- * @param signed - The signed add-on's folder, unpacked
- * @returns What differs, each as `+ path` (only signed), `- path` (only the build) or `~ path`; none if it is the build
- */
-export function differences(build: string, signed: string): string[] {
-  const built = new Set(filesUnder(build));
-  const got = new Set(filesUnder(signed).filter(file => !file.startsWith('META-INF/')));
-  return [
-    ...[...got].filter(file => !built.has(file)).map(file => `+ ${file}`),
-    ...[...built].filter(file => !got.has(file)).map(file => `- ${file}`),
-    ...[...built]
-      .filter(file => got.has(file))
-      .filter(file => !fs.readFileSync(path.join(build, file)).equals(fs.readFileSync(path.join(signed, file))))
-      .map(file => `~ ${file}`),
-  ].sort();
+export async function submitListed(
+  guid: string,
+  version: string,
+  files: { readonly build: Buffer; readonly source: Buffer },
+  listing: AmoListing,
+  options: AmoOptions,
+): Promise<'submitted' | 'held'> {
+  if ((await amoFile(guid, version, options)) !== undefined) return 'held';
+  await editListing(guid, listing, options);
+  const upload = await uploadListed(files.build, options);
+  const addon = `/addons/addon/${encodeURIComponent(guid)}/versions/`;
+  const created = (await amo(
+    addon,
+    {
+      method: 'POST',
+      json: { upload, license: listing.version.license, approval_notes: listing.version.approval_notes ?? '' },
+    },
+    options,
+  )) as { id: number };
+  // The source goes as a file of its own: AMO takes it as form data alone.
+  const form = new FormData();
+  form.append('source', new Blob([new Uint8Array(files.source)]), `emma-source-v${version}.zip`);
+  await amo(`${addon}${String(created.id)}/`, { method: 'PATCH', body: form }, options);
+  return 'submitted';
 }

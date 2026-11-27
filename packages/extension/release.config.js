@@ -47,9 +47,14 @@ export default {
         '@semantic-release/github',
         {
           assets: [
-            { path: `${RELEASES}/emma-extension-chromium-v*.zip`, label: 'Chromium extension, to load unpacked' },
-            { path: `${RELEASES}/emma-extension-firefox-v*.xpi`, label: 'Firefox extension, signed by Mozilla' },
-            { path: `${RELEASES}/emma-extension-firefox-v*-unsigned.zip`, label: 'Firefox extension, unsigned' },
+            {
+              path: `${RELEASES}/emma-extension-chromium-v*.zip`,
+              label: 'Chromium extension, for the Chrome Web Store',
+            },
+            {
+              path: `${RELEASES}/emma-extension-firefox-v*.zip`,
+              label: 'Firefox extension, as submitted to addons.mozilla.org, unsigned',
+            },
           ],
           releaseNameTemplate: 'EMMA browser extension <%= nextRelease.version %>',
           releaseBodyTemplate:
