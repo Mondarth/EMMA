@@ -7,7 +7,8 @@ export const MODULE_TITLE = 'EMMA - Enhanced Module Manager Application';
 /** The world created by `setup/bootstrap.setup.ts`. */
 export const WORLD = {
   id: 'mondarth-emma-e2e',
-  title: 'EMMA - Enhanced Module Manager Application E2E',
+  // The store's screenshots give it a title as a user's world would have (see store/screenshots.spec.ts).
+  title: process.env['E2E_WORLD_TITLE'] ?? 'EMMA - Enhanced Module Manager Application E2E',
   system: 'dnd5e',
 } as const;
 

@@ -1,0 +1,15 @@
+{
+  "id": "ambient-weather",
+  "title": "Ambient Weather",
+  "description": "Rain, snow and fog over your scenes, with sounds to match.",
+  "version": "2.3.0",
+  "compatibility": {
+    "minimum": "14",
+    "verified": "14"
+  },
+  "authors": [
+    {
+      "name": "Northwind Works"
+    }
+  ]
+}
