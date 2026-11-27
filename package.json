@@ -51,7 +51,7 @@
     "@eslint/eslintrc": "^3.3.6",
     "@eslint/js": "^10.0.1",
     "@mondarth/emma-release": "workspace:*",
-    "@playwright/test": "1.65.0",
+    "@playwright/test": "1.65.1",
     "@semantic-release/changelog": "^7.0.0",
     "@semantic-release/exec": "^7.1.0",
     "@semantic-release/git": "^11.0.1",
