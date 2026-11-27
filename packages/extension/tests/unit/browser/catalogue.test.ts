@@ -377,9 +377,24 @@ describe('readMe', () => {
     expect(await readMe(CATALOGUE, answering(Response.json(ME)))).toEqual({
       state: 'signed-in',
       handle: 'crimson-bell-trail-58',
+      nickname: null,
       entitled: true,
       paidUntil: '2027-01-01T00:00:00.000Z',
     });
+  });
+
+  test('gives the nickname the user set, or none where the catalogue gives none', async () => {
+    installChromeMock({ storage: { [TOKEN_KEY]: 't0k3n' } });
+    const named = { ...ME, user: { ...ME.user, nickname: 'Ulenar' } };
+    expect(await readMe(CATALOGUE, answering(Response.json(named)))).toMatchObject({ nickname: 'Ulenar' });
+    // From a catalogue before nicknames were told, or an empty one.
+    const older = { handle: ME.user.handle, role: ME.user.role };
+    expect(await readMe(CATALOGUE, answering(Response.json({ ...ME, user: older })))).toMatchObject({
+      nickname: null,
+    });
+    expect(
+      await readMe(CATALOGUE, answering(Response.json({ ...ME, user: { ...ME.user, nickname: '' } }))),
+    ).toMatchObject({ nickname: null });
   });
 
   test('is signed out without a token, or with one the catalogue no longer takes', async () => {
