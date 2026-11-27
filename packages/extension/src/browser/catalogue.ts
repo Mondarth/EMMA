@@ -271,6 +271,8 @@ export type Me =
   | {
       readonly state: 'signed-in';
       readonly handle: string;
+      /** The name they chose to be shown by, if they set one. */
+      readonly nickname: string | null;
       readonly entitled: boolean;
       readonly paidUntil: string | null;
     };
@@ -291,13 +293,15 @@ export async function readMe(catalogue: string, send: typeof fetch = globalThis.
   if (answer.status !== 200) return { state: 'unreachable' };
   try {
     const me = JSON.parse(answer.body) as {
-      user: { handle: string };
+      user: { handle: string; nickname?: string | null };
       entitled: boolean;
       subscription: { paidUntil: string | null };
     };
     return {
       state: 'signed-in',
       handle: me.user.handle,
+      // A catalogue from before nicknames were told gives none.
+      nickname: typeof me.user.nickname === 'string' && me.user.nickname !== '' ? me.user.nickname : null,
       entitled: me.entitled,
       paidUntil: me.subscription.paidUntil,
     };

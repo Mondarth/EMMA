@@ -52,12 +52,14 @@
   /** What is said of the user signed in: whom, and their subscription, which needs renewing if it ended. */
   const signedIn = $derived.by(() => {
     if (me?.state !== 'signed-in') return null;
-    const { handle, entitled, paidUntil } = me;
+    const { handle, nickname, entitled, paidUntil } = me;
     let subscription: string;
     if (entitled)
       subscription = paidUntil === null ? t('accountEntitled') : t('accountSubscribedUntil', day(paidUntil));
     else subscription = paidUntil === null ? t('accountNotSubscribed') : t('accountLapsed', day(paidUntil));
-    return { who: t('accountSignedInAs', handle), subscription, renew: !entitled };
+    // By the nickname they chose, if they set one, then the name the accounts gave them, which they are known by too.
+    const who = nickname === null ? t('accountSignedInAs', handle) : t('accountSignedInAsNickname', nickname, handle);
+    return { who, subscription, renew: !entitled };
   });
 
   /** Read whom the extension is signed in as. */

@@ -13,11 +13,12 @@ const CATALOGUE = 'https://catalogue.example.test/';
  * The catalogue's answer to `/api/v2/me`.
  * @param entitled - Whether the user may use everything
  * @param paidUntil - When their subscription ends or ended
+ * @param nickname - The nickname they set, if any
  * @returns The answer
  */
-const me = (entitled: boolean, paidUntil: string | null) =>
+const me = (entitled: boolean, paidUntil: string | null, nickname: string | null = null) =>
   Response.json({
-    user: { handle: 'crimson-bell-trail-58', nickname: null, role: 'user' },
+    user: { handle: 'crimson-bell-trail-58', nickname, role: 'user' },
     subscription: { paidUntil, active: entitled },
     entitled,
   });
@@ -54,6 +55,12 @@ function setUp(token: string | undefined, answers: Record<string, (Response | Er
 }
 
 describe('Account', () => {
+  test('names the user by the nickname they set, then the name the accounts gave them', async () => {
+    setUp('t0k3n', { '/api/v2/me': [me(true, null, 'Ulenar')] });
+
+    expect(await screen.findByText('Signed in as Ulenar (crimson-bell-trail-58).')).toBeInTheDocument();
+  });
+
   test('says whom the extension is signed in as, until when they are subscribed, and signs out', async () => {
     const { user, storage } = setUp('t0k3n', { '/api/v2/me': [me(true, '2027-01-01T00:00:00.000Z')] });
 

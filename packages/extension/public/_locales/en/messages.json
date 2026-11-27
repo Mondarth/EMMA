@@ -104,6 +104,9 @@
   "accountSignedInAs": {
     "message": "Signed in as $1."
   },
+  "accountSignedInAsNickname": {
+    "message": "Signed in as $1 ($2)."
+  },
   "accountEntitled": {
     "message": "You may use everything EMMA's catalogue gives."
   },

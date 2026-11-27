@@ -88,7 +88,8 @@ screen (the installation tree, the world records, notes, and the guard on Foundr
    options page shows a code.
 3. On the catalogue's page, sign in if you are not already, check that it shows the same code, and choose **Approve**.
 
-The options page then says whom it is signed in as, and until when you are subscribed. If EMMA's footer on the setup
+The options page then says whom it is signed in as, by the nickname you set on your profile, if any, then the name
+the accounts gave you (**Signed in as Ulenar (amber-fox-oak-01).**), and until when you are subscribed. If EMMA's footer on the setup
 screen asks you to sign in, its **Sign in to EMMA's catalogue** button opens the options page. If your subscription
 has ended, the footer says when, with a link to renew it.
 
