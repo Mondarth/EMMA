@@ -6,7 +6,10 @@ import {
   fitsCore,
   installable,
   isBehind,
+  isInstalledIn,
   keptSystems,
+  listedAnew,
+  listingWanted,
   matching,
   pendingPackages,
   tagsAmong,
@@ -213,5 +216,45 @@ describe('in words', () => {
     expect(compatibilityText({ maximum: '14' })).toBe('maximum 14');
     expect(compatibilityText({})).toBe('Declares no builds');
     expect(['audio-sound', 'maps'].map(tagText)).toEqual(['Audio Sound', 'Maps']);
+  });
+});
+
+describe('a package the plan installs anew, as its panel knows it', () => {
+  const overview = buildOverview(installation({ modules: [installedModule('lib', 'Library', '1.0.0')] }), new Map());
+  const maps: ListedPackage = {
+    type: 'module',
+    id: 'maps',
+    title: 'Monster Maps',
+    version: '2.0.0',
+    compatibility: {},
+    systems: [],
+    unowned: false,
+  };
+
+  test('is installed or not, as the installation says, and not before it is read', () => {
+    expect(isInstalledIn(overview, 'module', 'lib')).toBe(true);
+    expect(isInstalledIn(overview, 'module', 'maps')).toBe(false);
+    expect(isInstalledIn(overview, 'system', 'dnd5e')).toBe(true);
+    expect(isInstalledIn(overview, 'system', 'pf2e')).toBe(false);
+    expect(isInstalledIn(null, 'module', 'lib')).toBe(false);
+    expect(isInstalledIn(null, 'system', 'dnd5e')).toBe(false);
+  });
+
+  test("is as Foundry's listing gives it, once read, but for one installed", () => {
+    expect(listedAnew(overview, [maps], 'maps', 'module')).toBe(maps);
+    expect(listedAnew(overview, [maps], 'other', 'module')).toBeUndefined();
+    expect(listedAnew(overview, [{ ...maps, id: 'lib' }], 'lib', 'module')).toBeUndefined();
+    for (const unread of [null, 'loading', 'failed']) {
+      expect(listedAnew(overview, unread, 'maps', 'module')).toBeUndefined();
+    }
+  });
+
+  test('has the listing of its type read for it, once the installation is read', () => {
+    expect(listingWanted(overview, { kind: 'module', module: 'maps' })).toBe('module');
+    expect(listingWanted(overview, { kind: 'module', module: 'lib' })).toBeUndefined();
+    expect(listingWanted(overview, { kind: 'system', system: 'pf2e' })).toBe('system');
+    expect(listingWanted(overview, { kind: 'system', system: 'dnd5e' })).toBeUndefined();
+    expect(listingWanted(overview, { kind: 'root' })).toBeUndefined();
+    expect(listingWanted(null, { kind: 'module', module: 'maps' })).toBeUndefined();
   });
 });

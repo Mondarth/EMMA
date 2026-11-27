@@ -85,7 +85,9 @@
     "Requires": "Requires",
     "RequiredBy": "Required by",
     "ActiveInNone": "Not active in any recorded world.",
-    "NeededNext": "Will need it when next run: it is now required by {modules}, updated since the world last ran."
+    "NeededNext": "Will need it when next run: it is now required by {modules}, updated since the world last ran.",
+    "ToInstall": "To install",
+    "Listing": "On Foundry's listing"
   },
   "Refused": "EMMA manages packages on this screen. To let Foundry install and update them, open EMMA from the menu and say so there.",
   "System": {

@@ -13,9 +13,10 @@
   import type { ListedPackage } from '../foundry/setup-game';
   import { format, localize, takesAn } from '../lib/i18n';
   import type { InstallFilters } from '../lib/install';
-  import { compatibilityText, matching, tagsAmong, tagText, toggleTag, UNTAGGED, withTags } from '../lib/install';
+  import { matching, tagsAmong, tagText, toggleTag, UNTAGGED, withTags } from '../lib/install';
 
   import BusyMark from './BusyMark.svelte';
+  import ListedDetails from './ListedDetails.svelte';
   import OwnedRecheck from './OwnedRecheck.svelte';
 
   interface Props {
@@ -424,40 +425,7 @@
               {/if}
               <i class="emma-install-caret fa-solid fa-caret-right" aria-hidden="true"></i>
             </summary>
-            <dl>
-              {#if pkg.description !== undefined}
-                <dt>{localize('Install.Description')}</dt>
-                <dd>{pkg.description}</dd>
-              {/if}
-              {#if pkg.authors !== undefined}
-                <dt>{localize('Install.Authors')}</dt>
-                <dd>{pkg.authors.join(', ')}</dd>
-              {/if}
-              <dt>{localize('Install.Version')}</dt>
-              <dd>{pkg.version}</dd>
-              <dt>{localize('Install.Compatibility')}</dt>
-              <dd>{compatibilityText(pkg.compatibility)}</dd>
-              {#if pkg.type === 'module'}
-                <dt>{localize('Install.ForSystems')}</dt>
-                <dd>{pkg.systems.length === 0 ? localize('Install.AnySystem') : pkg.systems.join(', ')}</dd>
-              {/if}
-              {#if pkg.tags !== undefined}
-                <dt>{localize('Install.Tags')}</dt>
-                <dd>{pkg.tags.map(tagText).join(', ')}</dd>
-              {/if}
-              {#if pkg.premium || pkg.exclusive}
-                <dt>{localize('Install.Content')}</dt>
-                <dd>
-                  {localize(
-                    pkg.premium ? (pkg.unowned ? 'Install.PremiumUnowned' : 'Install.Premium') : 'Install.Exclusive',
-                  )}
-                </dd>
-              {/if}
-              {#if pkg.url !== undefined}
-                <dt>{localize('Install.WebPage')}</dt>
-                <dd><a href={pkg.url} target="_blank" rel="noopener noreferrer">{pkg.url}</a></dd>
-              {/if}
-            </dl>
+            <div class="emma-install-listed"><ListedDetails {pkg} /></div>
             {@render relationsOf(pkg)}
           </details>
           {#if pkg.unowned && planned === undefined}
@@ -659,20 +627,8 @@
     color: var(--color-level-error, #c00);
   }
 
-  .emma-install-details dl {
-    display: grid;
-    grid-template-columns: max-content 1fr;
-    gap: 0.25rem 0.75rem;
+  .emma-install-listed {
     margin: 0.25rem 0 0.5rem 1rem;
-  }
-
-  .emma-install-details dt {
-    font-weight: bold;
-  }
-
-  .emma-install-details dd {
-    margin: 0;
-    overflow-wrap: anywhere;
   }
 
   .emma-install-end {

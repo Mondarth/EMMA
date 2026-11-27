@@ -12,7 +12,7 @@
   import { EXTENSION_RELEASES } from '../foundry/setup-kit';
   import { openSignIn } from '../foundry/catalogue-relay';
   import type { InstallFilters } from '../lib/install';
-  import { installable, keptSystems, pendingPackages } from '../lib/install';
+  import { installable, isInstalledIn, keptSystems, listedAnew, listingWanted, pendingPackages } from '../lib/install';
   import { UNINSTALL } from '../lib/plans';
   import { stepText } from '../lib/run';
   import { groupDetail, moduleDetail, systemDetail } from '../lib/details';
@@ -328,6 +328,46 @@
   const world = $derived(
     selection.kind === 'world' ? overview?.worlds.find(({ world: { id } }) => id === selection.world) : undefined,
   );
+
+  /**
+   * What Foundry's listing says of a package the plan installs anew, for its panel; none for one installed, or before
+   * the listing is read.
+   * @param type - Its type
+   * @param id - Its ID
+   * @returns It, as listed
+   */
+  function listedOf(type: 'module' | 'system', id: string) {
+    return listedAnew(overview, setup.listings[type], id, type);
+  }
+
+  /**
+   * The version the plan installs of a package it installs anew, for its panel; none for one installed.
+   * @param type - Its type
+   * @param id - Its ID
+   * @returns The version, if planned
+   */
+  function plannedOf(type: 'module' | 'system', id: string) {
+    return isInstalledIn(overview, type, id) ? undefined : updates.chosenOf(`${type}:${id}`);
+  }
+
+  /** The package the tree has selected, if it has one: its type and ID. */
+  const selectedPackage = $derived(
+    selection.kind === 'module'
+      ? { type: 'module' as const, id: selection.module }
+      : selection.kind === 'system'
+        ? { type: 'system' as const, id: selection.system }
+        : undefined,
+  );
+  /** What Foundry's listing says of the selected package, if the plan installs it anew. */
+  const selectedListed = $derived(selectedPackage && listedOf(selectedPackage.type, selectedPackage.id));
+  /** The version the plan installs of the selected package, if it installs it anew. */
+  const selectedPlanned = $derived(selectedPackage && plannedOf(selectedPackage.type, selectedPackage.id));
+
+  // A package the plan installs anew, selected, is known by Foundry's listing, read for it if not read yet.
+  $effect(() => {
+    const wanted = listingWanted(overview, selection);
+    if (wanted !== undefined && setup.canInstall) void setup.loadListing(wanted);
+  });
 </script>
 
 {#snippet lock(key: string)}
@@ -559,7 +599,9 @@
               onOpen={openLink}
               blocked={updates.blockedOf(`module:${selection.module}`)}
               explained={updates.explainedOf(`module:${selection.module}`)}
-              latest={latestOf(`module:${selection.module}`)} />
+              latest={latestOf(`module:${selection.module}`)}
+              listed={selectedListed}
+              planned={selectedPlanned} />
             <WhyChosen {updates} key={`module:${selection.module}`} />
             <RecommendsSection key={`module:${selection.module}`} {updates} onOpen={openLink} />
           {:else if selection.kind === 'system'}
@@ -570,7 +612,9 @@
               onOpen={openLink}
               blocked={updates.blockedOf(`system:${selection.system}`)}
               explained={updates.explainedOf(`system:${selection.system}`)}
-              latest={latestOf(`system:${selection.system}`)} />
+              latest={latestOf(`system:${selection.system}`)}
+              listed={selectedListed}
+              planned={selectedPlanned} />
             <WhyChosen {updates} key={`system:${selection.system}`} />
           {:else if selection.kind === 'worlds' || selection.kind === 'systems' || selection.kind === 'modules' || selection.kind === 'group'}
             <GroupPanel detail={groupDetail(overview, selection)} onOpen={openLink} />

@@ -1424,7 +1424,16 @@ describe('installing anew, by group', () => {
       type =>
         Promise.resolve(
           type === 'system'
-            ? [{ ...listed('pf2e'), type, title: 'Pathfinder' }]
+            ? [
+                {
+                  ...listed('pf2e'),
+                  type,
+                  title: 'Pathfinder',
+                  description: 'The Pathfinder Second Edition rules.',
+                  authors: ['Paizo'],
+                  url: 'https://example.org/pf2e',
+                },
+              ]
             : [listed('anywhere'), listed('pf-tools', ['pf2e'])],
         ),
       () =>
@@ -1465,6 +1474,25 @@ describe('installing anew, by group', () => {
     const offered = screen.getByRole('region', { name: 'Install a Pathfinder module' });
     expect(offered).toHaveTextContent('pf-tools');
     expect(offered).not.toHaveTextContent('anywhere');
+
+    // Its panel, not installed yet, says what Foundry's listing says of it, and the version the plan installs.
+    await user.click(within(system as HTMLElement).getByText('Pathfinder'));
+    expect(screen.getByRole('heading', { level: 2, name: 'Pathfinder' })).toBeInTheDocument();
+    expect(screen.getByText('To install').nextElementSibling).toHaveTextContent('7.0.0');
+    const fromListing = screen.getByRole('region', { name: "On Foundry's listing" });
+    expect(fromListing).toHaveTextContent('The Pathfinder Second Edition rules.');
+    expect(fromListing).toHaveTextContent('Paizo');
+    expect(within(fromListing).getByRole('link', { name: 'https://example.org/pf2e' })).toHaveAttribute(
+      'href',
+      'https://example.org/pf2e',
+    );
+    // An installed package's panel has none.
+    const dnd = document.querySelector(`[data-key="${SYSTEMS}/system:dnd5e"]`);
+    if (!(dnd instanceof HTMLElement)) throw new Error('No row for D&D 5e');
+    await user.click(within(dnd).getByText('D&D 5e'));
+    expect(screen.getByRole('heading', { level: 2, name: 'D&D 5e' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: "On Foundry's listing" })).not.toBeInTheDocument();
+    expect(screen.queryByText('To install')).not.toBeInTheDocument();
   });
 
   test('shows more of the list as its end comes into view, and starts again on a search', async () => {
