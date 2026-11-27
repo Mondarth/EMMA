@@ -1,3 +1,9 @@
+## [0.16.1](https://github.com/Mondarth/EMMA/compare/extension-v0.16.0...extension-v0.16.1) (2026-11-27)
+
+### Bug Fixes
+
+* **extension:** give AMO the homepage as its add-on edit takes it ([bb621a4](https://github.com/Mondarth/EMMA/commit/bb621a49ea1b822a1303b756958ce2665b1c1ec6))
+
 ## [0.16.0](https://github.com/Mondarth/EMMA/compare/extension-v0.15.0...extension-v0.16.0) (2026-11-27)
 
 ### Features
