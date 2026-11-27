@@ -249,7 +249,8 @@
     "TagsHint": "A module shows if any of its tags is on. Shift-click a tag that is off to show it alone, or one that is on to turn every tag off.",
     "NoneRuns": "EMMA found releases of it, but none that it can tell runs on the plan's Foundry VTT build.",
     "NoManifest": "The versions of it that run on the plan's Foundry VTT build give no manifest URL of their own to install from.",
-    "Choose": "Install {title}"
+    "Choose": "Install {title}",
+    "NeedsUnowned": "It needs premium content you do not own, which Foundry cannot install: {modules}. Buy it first, then choose Check what I own again, so that EMMA asks Foundry now rather than at its weekly check."
   },
   "Uninstall": {
     "Heading": "Uninstall",
@@ -414,7 +415,8 @@
     "Unreadable": "What it requires and recommends could not be read from its manifest.",
     "Requires": "Requires",
     "ComesWith": "Comes into the plan with it",
-    "None": "It requires and recommends no other module."
+    "None": "It requires and recommends no other module.",
+    "Unowned": "Premium, not owned: it cannot come into the plan"
   },
   "Busy": {
     "Planning": "Planning",
@@ -435,7 +437,8 @@
     "NoManifest": "{versions}: no manifest URL for that version alone, which installing it needs.",
     "Conflict": "{versions}: the plan cannot take it with the other versions chosen:",
     "Possible": "{versions}: the plan could take it now.",
-    "Unused": "Its update is not planned: no recorded world uses it, and the best versions were planned only for what worlds use. Choose a version to plan it anyway."
+    "Unused": "Its update is not planned: no recorded world uses it, and the best versions were planned only for what worlds use. Choose a version to plan it anyway.",
+    "NeedsUnowned": "{version} is not planned: it needs premium content you do not own, which Foundry cannot install: {modules}. Buy it first, then choose Check what I own again, so that EMMA asks Foundry now rather than at its weekly check."
   },
   "Failure": {
     "Install": "Installing {title} {version} failed",
@@ -482,5 +485,8 @@
     "Lock": "Note on locking {title}",
     "Pin": "Note on pinning {title}",
     "Tree": "Note: {note}"
+  },
+  "Premium": {
+    "Recheck": "Check what I own again"
   }
 }

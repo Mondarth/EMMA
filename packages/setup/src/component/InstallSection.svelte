@@ -16,6 +16,7 @@
   import { compatibilityText, matching, tagsAmong, tagText, toggleTag, UNTAGGED, withTags } from '../lib/install';
 
   import BusyMark from './BusyMark.svelte';
+  import OwnedRecheck from './OwnedRecheck.svelte';
 
   interface Props {
     type: 'module' | 'system';
@@ -177,7 +178,13 @@
           <li>
             {nameOf(required)}
             <span class="emma-install-hint">
-              {localize(updates.isInstalled(required) ? 'Module.same' : 'Relations.ComesWith')}
+              {localize(
+                updates.isInstalled(required)
+                  ? 'Module.same'
+                  : updates.isUnowned(required)
+                    ? 'Relations.Unowned'
+                    : 'Relations.ComesWith',
+              )}
             </span>
           </li>
         {/each}
@@ -276,6 +283,14 @@
             <li>{line}</li>
           {/each}
         </ul>
+      {/if}
+      {#if refused.unowned === true && updates.recheckOwned !== undefined}
+        <OwnedRecheck
+          {updates}
+          recheck={updates.recheckOwned}
+          onDone={() => {
+            fromUrl = null;
+          }} />
       {/if}
       {#if refused.override !== undefined}
         <button
@@ -460,6 +475,14 @@
                     <li>{line}</li>
                   {/each}
                 </ul>
+              {/if}
+              {#if state.unowned === true && updates.recheckOwned !== undefined}
+                <OwnedRecheck
+                  {updates}
+                  recheck={updates.recheckOwned}
+                  onDone={() => {
+                    added.delete(key);
+                  }} />
               {/if}
             </div>
           {/if}

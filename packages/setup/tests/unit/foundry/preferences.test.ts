@@ -18,6 +18,7 @@ import {
   writeNotes,
   OWNED_FOR_MS,
   OWNED_KEY,
+  forgetOwnedKept,
   readOwnedKept,
   writeOwnedKept,
   readCoreLocked,
@@ -321,6 +322,19 @@ describe('the premium packages the user owns', () => {
       writeOwnedKept('module', new Set(['module:dice']));
     }).not.toThrow();
     expect(readOwnedKept('module')).toBeUndefined();
+    expect(() => {
+      forgetOwnedKept();
+    }).not.toThrow();
+  });
+
+  test('are forgotten for both types, as after buying one, so that Foundry is asked again', () => {
+    writeOwnedKept('module', new Set(['module:dice']), NOW);
+    writeOwnedKept('system', new Set(['system:pf2e']), NOW);
+
+    forgetOwnedKept();
+
+    expect(readOwnedKept('module', NOW)).toBeUndefined();
+    expect(readOwnedKept('system', NOW)).toBeUndefined();
   });
 });
 
