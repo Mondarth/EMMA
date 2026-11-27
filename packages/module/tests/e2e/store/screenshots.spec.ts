@@ -28,7 +28,9 @@ async function openEmma(page: Page): Promise<Locator> {
     return undefined;
   });
   await openSetupWithEmma(page);
-  await page.getByRole('button', { name: 'EMMA', exact: true }).click();
+  // The setup screen may still be settling as its menu is clicked: asked again once, it is not.
+  const button = page.getByRole('button', { name: 'EMMA', exact: true });
+  await button.click({ timeout: 20_000 }).catch(() => button.click({ force: true }));
   const emma = page.locator(EMMA_WINDOW);
   await expect(emma).toBeVisible();
   // The window takes the whole page, as a store's screenshot shows only EMMA.
@@ -89,10 +91,18 @@ test.describe('the store screenshots', () => {
     await expand(page, emma, /^Modules/);
     await expand(page, emma, /Universal/);
     await row(emma, /Ambient Weather/).click();
+    // 2.4.0 chosen, the panel says why not 2.5.0, its newest, which needs a newer Foundry VTT; the list, open again,
+    // shows what else may be chosen.
+    await emma.getByRole('button', { name: /^Version of Ambient Weather/ }).click();
+    await page
+      .getByRole('listbox')
+      .getByRole('option', { name: /^2\.4\.0/ })
+      .click();
+    await expect(emma.getByText(/2\.5\.0/).first()).toBeVisible({ timeout: 30_000 });
     await emma.getByRole('button', { name: /^Version of Ambient Weather/ }).click();
     const options = page.getByRole('listbox');
     await expect(options).toBeVisible();
-    await options.getByRole('option', { name: /^2\.5\.0/ }).hover();
+    await options.getByRole('option').first().hover();
     await shoot(page, '2-version-list');
   });
 

@@ -28,7 +28,12 @@ const RELEASES: Readonly<Record<string, { readonly title: string; readonly relea
   'module:ambient-weather': {
     title: 'Ambient Weather',
     // Its newest is for a Foundry VTT the plan does not have: EMMA explains why it takes 2.4.0.
-    releases: [{ version: '2.3.0' }, { version: '2.4.0' }, { version: '2.5.0', minimum: '15', verified: '15' }],
+    releases: [
+      { version: '2.3.0' },
+      { version: '2.3.1' },
+      { version: '2.4.0' },
+      { version: '2.5.0', minimum: '15', verified: '15' },
+    ],
   },
   'module:token-tracker': {
     title: 'Token Tracker',
